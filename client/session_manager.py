@@ -96,6 +96,19 @@ class SessionManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
+        # CRITICAL FIX: Ensure session exists before adding message
+        cursor.execute('SELECT id FROM sessions WHERE id = ?', (session_id,))
+        session_exists = cursor.fetchone()
+
+        if not session_exists:
+            # Session doesn't exist - create it with a name based on first message
+            default_name = content[:50] if role == 'user' else 'New Chat'
+            cursor.execute('''
+                           INSERT INTO sessions (id, name, created_at, updated_at)
+                           VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                           ''', (session_id, default_name))
+            conn.commit()
+
         # Insert new message with model name
         cursor.execute('''
             INSERT INTO messages (session_id, role, content, model) 
