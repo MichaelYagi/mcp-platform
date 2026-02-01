@@ -1040,8 +1040,16 @@
             color: #7c3aed;
         }
 
+        #modelSelectLabel {
+            display: block;
+        }
+
         /* Mobile */
         @media (max-width: 768px) {
+            #modelSelectLabel {
+                display: none;
+            }
+
             #header {
                 padding: 0.75rem 1rem;
                 flex-direction: column;
@@ -1087,6 +1095,10 @@
                 height: 100%;
                 z-index: 1000;
                 border-right: none;
+            }
+
+            #status {
+                margin-bottom: 3.5rem;
             }
 
             .sessions-header {
@@ -1143,7 +1155,7 @@
     <div id="header">
         <h1>🤖 MCP Browser Client</h1>
         <div id="topBar">
-            <label for="modelSelect" style="color: white;">Model:</label>
+            <label for="modelSelect" id="modelSelectLabel" style="color: white;">Model:</label>
             <select id="modelSelect">
                 <option value="llama3.1:8b">Llama 3.1 8B</option>
             </select>
