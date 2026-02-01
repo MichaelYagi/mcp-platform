@@ -1,597 +1,532 @@
-# MCP Multi-Server Architecture with A2A Protocol
+# MCP Multi-Server Architecture
 
-A Model Context Protocol (MCP) implementation with distributed multi-server architecture, Agent-to-Agent (A2A) protocol support, ML-powered Plex recommendations, and intelligent web search fallback via LangSearch.
+A Model Context Protocol (MCP) implementation with distributed multi-server architecture, Agent-to-Agent (A2A) protocol support, and ML-powered recommendations.
 
-## Installation
+---
 
-### Prerequisites
+## Prerequisites
 
 * Python 3.10+
-* 16GB+ RAM
-* Ollama installed with at least one model:
-  * **Quick start**: `llama3.1:8b` (faster, lower resource usage)
-  * **Better results**: `qwen2.5:14b` or larger models
+* 16GB+ RAM recommended
+* One of:
+  * Ollama installed OR
+  * GGUF file
 
-### Setup
+---
 
-**1. Install Ollama and dependencies**
+## 1. Quick Start
 
+Get the client running in 3 steps:
+
+### Install Dependencies
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
+# Clone repository
+git clone <repo-url>
+cd mcp_a2a
+
+# Create virtual environment
 python -m venv .venv
-```
 
-Linux:
-```bash
+# Activate (Linux/macOS)
 source .venv/bin/activate
+
+# Activate (Windows PowerShell)
+.venv\Scripts\activate
+
+# Install requirements
 pip install -r requirements.txt
 ```
 
-Windows PowerShell:
-```powershell
-.venv\Scripts\activate
-.venv\Scripts\pip.exe install -r .\requirements.txt
-```
+### Choose LLM Backend
 
-**2. Configure environment (optional)**
-
-Create `.env` file in project root:
+**Option A: Ollama (recommended for beginners)**
 ```bash
-# === Plex Media Server ===
-PLEX_URL=http://192.168.0.199:32400    # Plex server URL
-PLEX_TOKEN=***************************  # Plex authentication token
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
 
-# === Weather API ===
-WEATHER_TOKEN=***************************  # OpenWeatherMap API key
-
-# === A2A Protocol ===
-A2A_ENDPOINTS=http://localhost:8010    # Comma-separated A2A endpoints
-A2A_EXPOSED_TOOLS=                     # Tool categories to expose (empty = all)
-
-# === LangSearch Web Search ===
-LANGSEARCH_TOKEN=***************************  # LangSearch API key (https://langsearch.com)
-
-# === Agent Configuration ===
-MAX_MESSAGE_HISTORY=30                 # Max conversation history (default: 20)
-
-# === RAG Performance ===
-CONCURRENT_LIMIT=2                     # Parallel ingestion jobs (default: 1)
-EMBEDDING_BATCH_SIZE=50                # Embeddings per batch (default: 20)
-DB_FLUSH_BATCH_SIZE=50                 # ChromaDB inserts per batch (default: 30)
-```
-
-**Performance tuning:**
-- `EMBEDDING_BATCH_SIZE=50` + `DB_FLUSH_BATCH_SIZE=50` = ~6x faster ingestion with `nomic-embed-text`
-- For RTX 3060 12GB, can increase to 100 for even faster processing
-- `CONCURRENT_LIMIT=2` enables parallel media ingestion
-
-All settings are optional - system works with defaults.
-
-**3. Download models**
-
-```bash
+# Start Ollama server
 ollama serve
+
+# Download a model
 ollama pull llama3.1:8b
-ollama pull qwen2.5:14b
-ollama pull bge-large
 ```
 
-**4. Start the system**
-
-**Standalone mode (local tools only):**
+**Option B: GGUF (local model files)**
 ```bash
-python client.py
+# Download a GGUF model (example)
+wget https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
+
+# Register the model
+# (After starting client, use :gguf add command)
 ```
 
-**Distributed mode (with A2A):**
-
-Terminal 1 - Start A2A server:
-```bash
-python a2a_server.py
-```
-
-Terminal 2 - Start client:
+### Start the Client
 ```bash
 python client.py
 ```
 
 Access web UI at: `http://localhost:9000`
 
-## A2A Server Configuration
+**That's it!** The client auto-discovers all MCP servers and tools.
 
-### Controlling Exposed Tools
+---
 
-Use `A2A_EXPOSED_TOOLS` in `.env` to control which tool categories are exposed publicly:
+## 2. Using MCP Servers with Other Clients
 
-**Example 1: Public server (read-only tools)**
+Use these MCP servers with Claude Desktop, Cline, or any MCP-compatible client.
+
+### Example Configuration
+
+Add to your MCP client config (e.g., `claude_desktop_config.json`):
+```json
+{
+    "mcpServers": {
+        "code_review": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/code_review/server.py"]
+        },
+        "location": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/location/server.py"]
+        },
+        "plex": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/plex/server.py"]
+        },
+        "rag": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/rag/server.py"]
+        },
+        "system_tools": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/system_tools/server.py"]
+        },
+        "text_tools": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/text_tools/server.py"]
+        },
+        "todo": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/todo/server.py"]
+        },
+        "knowledge_base": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/knowledge_base/server.py"]
+        }
+    }
+}
+```
+
+**Windows paths:**
+```json
+"command": "C:\\path\\to\\mcp_a2a\\.venv\\Scripts\\python.exe"
+```
+
+**Available servers:**
+- `code_review` - Code analysis (5 tools)
+- `location` - Weather, time, location (3 tools)
+- `plex` - Media library + ML recommendations (17 tools)
+- `rag` - Vector search (4 tools)
+- `system_tools` - System info (4 tools)
+- `text_tools` - Text processing (7 tools)
+- `todo` - Task management (6 tools)
+- `knowledge_base` - Notes management (10 tools)
+
+---
+
+## 3. Client Configuration
+
+### Environment Variables
+
+Create `.env` in project root:
 ```bash
-A2A_EXPOSED_TOOLS=plex,location,text_tools
-```
-Result: Only Plex search, weather, and text processing (20 tools)
+# === LLM Backend ===
+LLM_BACKEND=ollama              # "ollama" or "gguf"
+MAX_MESSAGE_HISTORY=30          # Chat history limit (default: 20)
 
-**Example 2: Expose everything**
+# === GGUF Configuration (if using GGUF backend) ===
+GGUF_GPU_LAYERS=-1              # -1 = all GPU, 0 = CPU only, N = N layers on GPU
+GGUF_CONTEXT_SIZE=4096          # Context window size
+GGUF_BATCH_SIZE=512             # Batch size for processing
+
+# === API Keys (optional services) ===
+PLEX_URL=http://localhost:32400  # Plex server URL
+PLEX_TOKEN=your_token_here       # Get from Plex account settings
+WEATHER_TOKEN=your_token_here    # OpenWeatherMap API key
+LANGSEARCH_TOKEN=your_token_here # LangSearch API key (https://langsearch.com)
+
+# === A2A Protocol (optional distributed mode) ===
+A2A_ENDPOINTS=http://localhost:8010  # Comma-separated endpoints
+A2A_EXPOSED_TOOLS=                   # Tool categories to expose (empty = all)
+
+# === Performance Tuning (optional) ===
+CONCURRENT_LIMIT=3              # Parallel ingestion jobs (default: 1)
+EMBEDDING_BATCH_SIZE=50         # Embeddings per batch (default: 20)
+DB_FLUSH_BATCH_SIZE=50          # DB inserts per batch (default: 30)
+
+# === Tool Control (optional) ===
+DISABLED_TOOLS=knowledge_base:*,todo:*  # Disable specific tools/categories
+```
+
+### Configuration Details
+
+**LLM Backend:**
+- `ollama`: Uses Ollama server (requires `ollama serve` running)
+- `gguf`: Uses local GGUF model files (GPU recommended)
+
+**GGUF GPU Layers:**
+- `-1`: Use all GPU (fastest, requires model fits in VRAM)
+- `0`: CPU only (slow but works with any model size)
+- `20`: Use 20 layers on GPU (balance for large models on limited VRAM)
+
+**Performance Tuning:**
+- `EMBEDDING_BATCH_SIZE=50` + `DB_FLUSH_BATCH_SIZE=50` = ~6x faster RAG ingestion
+- For 12GB VRAM, can increase to 100 for even faster processing
+- `CONCURRENT_LIMIT=2` enables parallel media ingestion
+
+**Disabled Tools:**
+- Format: `category:tool_name` or `category:*`
+- Example: `DISABLED_TOOLS=todo:delete_all_todo_items,system:*`
+- Hidden from `:tools` list, return error if called
+
+### Available Commands
+
+These work in both CLI and web UI:
+```
+:commands              - List all available commands
+:stop                  - Stop current operation
+:stats                 - Show performance metrics
+:tools                 - List available tools (hides disabled)
+:tools --all           - Show all tools including disabled
+:tool <name>           - Get tool description
+:model                 - List all available models
+:model <name>          - Switch to a model (auto-detects backend)
+:models                - List models (legacy)
+:sync                  - Sync to model in last_model.txt
+:gguf add <path>       - Register a GGUF model
+:gguf remove <alias>   - Remove a GGUF model
+:gguf list             - List registered GGUF models
+:a2a on                - Enable agent-to-agent mode
+:a2a off               - Disable agent-to-agent mode
+:a2a status            - Check A2A system status
+:env                   - Show environment configuration
+```
+
+### API Setup
+
+**Weather (OpenWeatherMap):**
+1. Sign up at https://openweathermap.org/api
+2. Get API key from account settings
+3. Add to `.env`: `WEATHER_TOKEN=your_key`
+
+**LangSearch (web search):**
+1. Sign up at https://langsearch.com
+2. Get API key from dashboard
+3. Add to `.env`: `LANGSEARCH_TOKEN=your_key`
+
+**Plex Media Server:**
+1. Open Plex web interface
+2. Settings → Network → Show Advanced
+3. Copy server URL (e.g., `http://192.168.1.100:32400`)
+4. Get token: Settings → Account → Show XML → Copy `authToken`
+5. Add to `.env`:
 ```bash
-A2A_EXPOSED_TOOLS=
-# Or don't set it at all
+   PLEX_URL=http://your_server_ip:32400
+   PLEX_TOKEN=your_token
 ```
-Result: All 8 servers exposed (49 tools)
 
-**Example 3: Keep private data safe**
+---
+
+## 4. Adding Tools (Developer Guide)
+
+### Step 1: Create Tool Server
 ```bash
-A2A_EXPOSED_TOOLS=plex,location,text_tools,system_tools,code_review
-```
-Result: Exclude `todo`, `knowledge_base`, `rag` (personal data)
+# Create server directory
+mkdir servers/my_tool
 
-### Available Tool Categories
-
-```
-knowledge_base   - 10 tools (notes, KB management)
-todo             - 6 tools (task management)
-system_tools     - 4 tools (system info, processes)
-code_review      - 5 tools (code analysis)
-location         - 3 tools (location, time, weather)
-text_tools       - 7 tools (text processing)
-rag              - 4 tools (vector search)
-plex             - 10 tools (media search) + ML recommendations
+# Create server file
+touch servers/my_tool/server.py
 ```
 
-### Checking Available Tools
+### Step 2: Implement Tool
+```python
+# servers/my_tool/server.py
+import asyncio
+from mcp.server import Server
+from mcp.types import TextContent
+from mcp import tool
 
-**Method 1: Startup output**
+mcp = Server("my_tool-server")
+
+@mcp.tool()
+def my_function(arg1: str, arg2: int) -> str:
+    """
+    Short description of what this tool does.
+    
+    Detailed explanation of behavior, use cases, etc.
+    
+    Args:
+        arg1: Description of arg1
+        arg2: Description of arg2
+    
+    Returns:
+        Description of return value
+    """
+    result = f"Processed {arg1} with {arg2}"
+    return result
+
+async def main():
+    from mcp.server.stdio import stdio_server
+    async with stdio_server() as (read_stream, write_stream):
+        await mcp.run(
+            read_stream,
+            write_stream,
+            mcp.create_initialization_options()
+        )
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Step 3: Create Skill Documentation (Optional)
+```bash
+# Create skills directory
+mkdir -p servers/my_tool/skills
+
+# Create skill file
+touch servers/my_tool/skills/my_feature.md
+```
+```markdown
+# My Feature Skill
+
+This skill enables X functionality.
+
+## When to Use
+- Use case 1
+- Use case 2
+
+## Examples
+User: "Do something"
+Assistant: [calls my_function with appropriate args]
+```
+
+### Step 4: Update Intent Patterns (Optional)
+
+If your tool needs specific routing, update `client/langgraph.py`:
+```python
+INTENT_PATTERNS = {
+    # ... existing patterns ...
+    "my_tool": {
+        "pattern": r'\bmy keyword\b|\bmy phrase\b',
+        "tools": ["my_function"],
+        "priority": 3
+    }
+}
+```
+
+### Step 5: Test & Deploy
+```bash
+# Restart client (auto-discovers new server)
+python client.py
+
+# Test in CLI or web UI
+> test my new tool
+```
+
+---
+
+## 5. Distributed Mode (A2A Protocol)
+
+Run tools on remote servers and expose them via HTTP.
+
+### Setup A2A Server
+
+**Terminal 1 - Start A2A server:**
 ```bash
 python a2a_server.py
 ```
-Shows available and exposed tool categories.
 
-**Method 2: HTTP endpoint**
+Server starts on `http://localhost:8010`
+
+**Terminal 2 - Start client:**
+```bash
+python client.py
+```
+
+Client auto-connects to A2A endpoints in `.env`
+
+### Control Exposed Tools
+
+Use `A2A_EXPOSED_TOOLS` to control which categories are publicly accessible:
+```bash
+# Expose specific categories (comma-separated)
+A2A_EXPOSED_TOOLS=plex,location,text_tools
+
+# Expose everything (default)
+A2A_EXPOSED_TOOLS=
+
+# Available categories:
+# plex, location, text_tools, system_tools, code_review,
+# rag, todo, knowledge_base
+```
+
+**Security:**
+- Empty = all 8 servers exposed (56 tools)
+- Specified = only listed categories exposed
+- Exclude `todo`, `knowledge_base`, `rag` to protect personal data
+
+### Multi-Endpoint Support
+
+Connect to multiple A2A servers:
+```bash
+# In .env
+A2A_ENDPOINTS=http://localhost:8010,http://gpu-server:8020
+```
+
+Client aggregates tools from all successful connections.
+
+### Check Available Tools
+
+**Via HTTP:**
 ```bash
 curl http://localhost:8010/tool-categories
 ```
 
-Returns JSON with available, exposed, and not-exposed categories.
-
-## Multi-Endpoint A2A Support
-
-Connect to multiple A2A servers simultaneously:
-
-**In `.env`:**
-```bash
-# Multiple endpoints (comma-separated)
-A2A_ENDPOINTS=http://localhost:8010/.well-known/agent-card.json,http://gpu-server:8020/.well-known/agent-card.json
+**Via Client:**
+```
+> :a2a status
 ```
 
-**Client behavior:**
-- Attempts to register tools from ALL endpoints
-- Continues if some endpoints fail
-- Tracks which endpoints are active
-- Aggregates tools from all successful connections
+---
 
-**Example output:**
-```
-🌐 Attempting to register 2 A2A endpoint(s)
-   [1/2] ✅ Registered successfully (+10 tools)
-   [2/2] ✅ Registered successfully (+5 tools)
-🔌 A2A Summary: 2/2 successful, 15 new tools
-```
+## 6. Architecture
 
-## Architecture
+### Multi-Server Design
 
-### Multi-Server Design (stdio)
-
-8 specialized MCP servers communicate via stdio (zero network overhead):
-
+8 specialized MCP servers communicate via stdio:
 ```
 servers/
-├── knowledge_base/    10 tools - Personal knowledge management
-├── todo/              6 tools  - Task management
-├── system_tools/      4 tools  - System info & processes
 ├── code_review/       5 tools  - Code analysis
-├── location/          3 tools  - Location/time/weather
-├── text_tools/        7 tools  - Text processing
+├── knowledge_base/   10 tools  - Notes management
+├── location/          3 tools  - Weather, time, location
+├── plex/             17 tools  - Media + ML recommendations
 ├── rag/               4 tools  - Vector search
-└── plex/             17 tools  - Media library + ML recommendations
+├── system_tools/      4 tools  - System info
+├── text_tools/        7 tools  - Text processing
+└── todo/              6 tools  - Task management
 
-Total: 56 local tools across 8 servers
+Total: 56 local tools
 ```
 
-### A2A Protocol (HTTP)
-
-Single A2A server exposes selected tools via HTTP for remote access:
-
+### Directory Structure
 ```
-┌─────────────────────────────────────┐
-│   a2a_server.py (Port 8010)         │
-│         ↓ stdio                     │
-│   ┌─────────────────────┐           │
-│   │  Selected MCP       │           │
-│   │  Servers            │           │
-│   └─────────────────────┘           │
-│                                     │
-│   Exposes via HTTP                  │
-└─────────────────────────────────────┘
-```
-
-## Features
-
-* **Multi-Server Architecture**: 8 specialized stdio servers (56 tools)
-* **A2A Protocol**: HTTP-based remote tool execution
-* **A2A_EXPOSED_TOOLS**: Control which tool categories are publicly accessible
-* **ML-Powered Plex Recommendations**: Random Forest model trained on your viewing history
-* **LangSearch Integration**: Automatic web search fallback
-* **RAG System**: Vector-based semantic search
-* **Plex Integration**: Media library search and analysis
-* **Real-Time Monitoring**: WebSocket logs and system metrics
-
-## ML-Powered Plex Recommendations
-
-The system includes a **Random Forest Classifier** that learns your viewing preferences and provides personalized content recommendations.
-
-### How It Works
-
-**Training Phase (automatic on startup):**
-1. **Data Collection**: Imports viewing history from Plex (default: 3000 items)
-2. **Feature Engineering**: Extracts genre, rating, runtime, release year, finish/abandon status
-3. **Model Training**: Random Forest (100 trees) learns patterns from what you finish vs. abandon
-4. **Validation**: Trains on 80% of data, validates on 20% for accuracy
-
-**Prediction Phase (on-demand):**
-1. Fetches unwatched content from Plex library (movies & TV only, filters music)
-2. Extracts same features for each unwatched item
-3. Predicts probability you'll finish each item (0-100%)
-4. Returns top recommendations ranked by ML score
-
-### Algorithm Details
-
-**Model:** Random Forest Classifier
-- **Trees:** 100 decision trees voting on predictions
-- **Features:** genre (encoded), year, rating, runtime, is_recent, is_short, is_highly_rated
-- **Target:** Binary classification (finished=1, abandoned=0)
-- **Training:** Learns YOUR unique patterns, not generic ratings
-
-**Example patterns discovered:**
-- "User finishes 92% of SciFi movies under 140 minutes"
-- "User abandons 98% of movies over 150 minutes"
-- "User prefers ratings in 7.5-8.5 range"
-
-**Performance:**
-- Typical accuracy: 85-100% (depends on data consistency)
-- Minimum data: 20 viewing events required
-- Optimal data: 50+ events for reliable predictions
-
-### Usage
-
-**Auto-setup:**
-```
-# Automatic on first startup with Plex configured
-✅ Imported 211 viewing events (total: 4858)
-🤖 Training ML model...
-✅ Model trained! Accuracy: 100.0%, Samples: 4858
+mcp_a2a/
+├── servers/           # MCP servers (stdio)
+│   ├── plex/
+│   │   ├── server.py
+│   │   ├── ml_recommender.py
+│   │   └── skills/
+│   └── ...
+├── a2a_server.py     # A2A HTTP server
+├── client.py         # AI agent client
+├── index.html        # Web UI
+├── client/
+│   ├── langgraph.py  # Agent execution
+│   ├── websocket.py  # WebSocket server
+│   └── ...
+└── tools/            # Tool implementations
 ```
 
-**Get recommendations:**
+---
+
+## 7. Example Prompts & Troubleshooting
+
+### Example Prompts
+
+**Weather:**
+```
+> What's the weather in Vancouver?
+```
+
+**Plex ML Recommendations:**
 ```
 > What should I watch tonight?
 > Recommend unwatched SciFi movies
-> Show me my best unwatched content
-```
-
-**Manual operations:**
-```
 > Show recommender stats
-> Import Plex history
-> Train recommender
 ```
 
-**Model persists** between sessions and auto-updates with new viewing history on each startup.
-
-## LangSearch Web Search
-
-### Intelligent Fallback Chain
-
+**Code Analysis:**
 ```
-User Query
-    ↓
-1. Check for appropriate tools → Found? → Use tools
-    ↓ Not found
-2. Try LangSearch web search → Success? → Augment context
-    ↓ Failed/unavailable
-3. Fall back to base LLM knowledge
+> Analyze the code in /path/to/project
+> Review this Python file for bugs
 ```
 
-### Examples
-
-**Tool-based (no search):**
+**Task Management:**
 ```
-> What's the weather in Tokyo?
+> Add "deploy feature" to my todos
+> List my todos
 ```
-Uses `get_weather_tool` directly.
 
-**General knowledge (LangSearch):**
+**Web Search (via LangSearch):**
 ```
 > Who won the 2024 NBA championship?
+> Latest AI developments
 ```
-No tool matches → LangSearch performs web search → LLM answers with search results.
 
-**LangSearch unavailable:**
-```
-> What is quantum computing?
-```
-No tool matches → LangSearch unavailable → Falls back to LLM training knowledge.
+### Troubleshooting
 
-### Configuration
-
-Get API key from https://langsearch.com
-
+**Ollama models not appearing:**
 ```bash
-# In .env
-LANGSEARCH_TOKEN=your_api_key_here
+# Make sure Ollama is running
+ollama serve
+
+# Check models are downloaded
+ollama list
+
+# Restart client
+python client.py
 ```
 
-## Usage
+**GGUF model won't load:**
+- Check model size vs VRAM (use models <7GB for 12GB VRAM)
+- Reduce GPU layers: `export GGUF_GPU_LAYERS=20`
+- Increase timeout: `export GGUF_LOAD_TIMEOUT=300`
+- Use CPU only: `export GGUF_GPU_LAYERS=0`
 
-### CLI/Web UI Commands
-
-These commands work in both the CLI and Web UI interfaces:
-```
-:commands              List all available commands
-:stop                  Stop current operation (Note: ingestion completes current batch before stopping)
-:stats                 Show performance metrics
-:tools                 List all available tools
-:tool <tool>           Get the tool description
-:model                 View the current active model
-:model <model>         Use the model passed
-:models                List available models
-:a2a on                Enable agent-to-agent mode
-:a2a off               Disable agent-to-agent mode
-:a2a status            Check A2A system status
-:env                   Show environment configuration
-```
-
-**Note:** The `:stop` command will gracefully halt most operations, but media ingestion will complete the current batch before stopping to prevent database corruption.
-
-### Example Workflows
-
-**ML Recommendations:**
-```
-> What should I watch tonight?
-> Recommend movies: Dune, Knives Out, The Northman
-> Show my recommender stats
-```
-
-**Weather via A2A:**
-```
-> what's the weather in Vancouver?
-```
-
-**Todo management:**
-```
-> add "deploy feature" to my todos
-> list my todos
-```
-
-**Plex media search:**
-```
-> search my plex library for sci-fi movies
-> find scenes with explosions
-```
-
-**General knowledge (LangSearch):**
-```
-> Who won the 2024 NBA championship?
-> What are the latest AI developments?
-```
-
-## Network Access
-
-**Find your IP:**
+**Web UI won't load:**
 ```bash
-hostname -I | awk '{print $1}'  # Linux/WSL
-ipconfig                         # Windows
+# Check ports are available: 8765, 8766, 9000
+netstat -an | grep LISTEN
+
+# Try localhost directly
+http://localhost:9000
 ```
-
-**Access from other devices:**
-```
-http://[your-ip]:9000
-```
-
-**Configure firewall:**
-
-Windows (PowerShell):
-```powershell
-New-NetFirewallRule -DisplayName "MCP Chat" -Direction Inbound -LocalPort 8765 -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "MCP Logs" -Direction Inbound -LocalPort 8766 -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "MCP HTTP" -Direction Inbound -LocalPort 9000 -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "A2A Server" -Direction Inbound -LocalPort 8010 -Protocol TCP -Action Allow
-```
-
-Linux:
-```bash
-sudo ufw allow 8765,8766,9000,8010/tcp
-```
-
-## Adding New Tools
-
-**1. Create server directory:**
-```bash
-mkdir servers/email_tools
-cp servers/todo/server.py servers/email_tools/server.py
-```
-
-**2. Add tools to server:**
-```python
-# servers/email_tools/server.py
-@mcp.tool()
-def send_email(to: str, subject: str, body: str) -> str:
-    """Send an email."""
-    return f"Email sent to {to}"
-```
-
-**3. Restart systems:**
-```bash
-# A2A server
-python a2a_server.py  # Auto-discovers new server
-
-# Client
-python client.py  # Auto-discovers new server
-```
-
-**4. Control exposure (optional):**
-```bash
-# In .env
-A2A_EXPOSED_TOOLS=plex,location,email_tools  # Include new category
-```
-
-**5. Tool Control  (optional):**
-
-### Overview
-
-The `DISABLED_TOOLS` environment variable lets you disable specific tools or entire categories without modifying code. Disabled tools are hidden from the `:tools` list and return an error if called.
-
-### Patterns
-
-1. **Specific tool**: `DISABLED_TOOLS=delete_all_todo_items,terminate_process`
-2. **Category-specific**: `DISABLED_TOOLS=todo:delete_all_todo_items,system:terminate_process`
-3. **All in category**: `DISABLED_TOOLS=system:*,rag:*`
-
-### Use Cases
-
-**Disable destructive operations:**
-```bash
-DISABLED_TOOLS=delete_all_todo_items,terminate_process,delete_all_entries
-```
-
-**Disable slow operations:**
-```bash
-DISABLED_TOOLS=rag:plex_ingest_batch,rag:*
-```
-
-**Disable experimental tools:**
-```bash
-DISABLED_TOOLS=code:debug_fix,system:*
-```
-
-### Behavior
-
-- Hidden from `:tools` list
-- Returns error if called
-- Use `:tools --all` to see disabled tools (marked)
-
-New tools are automatically:
-- Discovered by client (local access via stdio)
-- Exposed by A2A server (if in A2A_EXPOSED_TOOLS or all exposed)
-- Available to remote clients (via A2A protocol)
-
-## Troubleshooting
-
-**Stopping long-running operations:**
-- ✅ **Safe**: Use `:stop` command - completes current batch, prevents corruption
-- ⚠️ **Unsafe**: `Ctrl+C` force-exit during ingestion may corrupt the database
-- Monitor progress with `:stats` or `:metrics`
-- For stuck operations, try `:stop` first and wait for current batch to complete
-
-**`:stop` command not immediately responding during ingestion:**
-- This is expected behavior - ingestion must complete current batch
-- Database integrity is protected by finishing atomic operations
-- Operation will stop after current batch finishes
 
 **A2A server not connecting:**
 ```bash
 # Verify server is running
 curl http://localhost:8010/.well-known/agent-card.json
 
-# Check .env
-A2A_ENDPOINTS=http://localhost:8010/.well-known/agent-card.json
-
-# Check logs for registration messages
-```
-
-**Tools not appearing:**
-```bash
-# List available tool categories
-curl http://localhost:8010/tool-categories
-
-# Check A2A_EXPOSED_TOOLS in .env
-# Empty or not set = all tools exposed
+# Check A2A_ENDPOINTS in .env
 ```
 
 **LangSearch not working:**
-- Check `LANGSEARCH_TOKEN` in `.env`
-- Verify API key at https://langsearch.com
-- Check logs for LangSearch activity
+- Verify `LANGSEARCH_TOKEN` in `.env`
+- Check API key at https://langsearch.com
 - System falls back to LLM if unavailable
 
-**Web UI won't load:**
-- Check ports available: 8765, 8766, 9000, 8010
-- Verify firewall rules
-- Try `http://localhost:9000` directly
+**Tools not appearing:**
+```bash
+# Check tool is enabled
+:tools --all
 
-## Directory Structure
+# Check DISABLED_TOOLS in .env
 
-```
-mcp_a2a/
-├── servers/               # 8 specialized MCP servers (stdio)
-│   ├── knowledge_base/
-│   ├── todo/
-│   ├── system_tools/
-│   ├── code_review/
-│   ├── location/
-│   ├── text_tools/
-│   ├── rag/
-│   └── plex/
-│       ├── server.py      # Plex MCP server
-│       ├── ml_recommender.py  # ML recommendation engine
-│       └── skills/
-│           └── ml_recommendations.md  # ML skill documentation
-├── a2a_server.py         # A2A HTTP server (exposes selected tools)
-├── client.py             # AI Agent
-├── index.html            # Web UI
-├── dashboard.html        # Performance metrics
-├── client/
-│   ├── a2a_client.py     # A2A client
-│   ├── langsearch_client.py  # LangSearch web search
-│   ├── langgraph.py      # Single-agent execution
-│   └── websocket.py      # WebSocket server
-└── tools/                # Tool implementations
+# Restart client
+python client.py
 ```
 
-## API Details
-
-### A2A Protocol
-
-**Agent Card** (`/.well-known/agent-card.json`):
-```json
-{
-  "name": "Local A2A Agent",
-  "version": "1.0.0",
-  "endpoints": {
-    "a2a": "http://localhost:8010/a2a"
-  }
-}
-```
-
-**RPC Methods:**
-- `a2a.discover` - List available tools
-- `a2a.call` - Execute tool
-
-**Example Call:**
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "a2a.call",
-  "params": {
-    "tool": "get_weather_tool",
-    "arguments": {"city": "London"}
-  }
-}
-```
-
-### LangSearch API
-
-**Endpoint**: `https://api.langsearch.com/v1/web-search`
-
-**Authentication**: Bearer token
-
-**Error handling**: Automatic fallback on 401/429/timeout
+---
 
 ## License
 
