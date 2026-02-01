@@ -229,6 +229,13 @@
             background: #229954;
         }
 
+        .session-item-date {
+            font-size: 0.7rem;
+            color: #95a5a6;
+            margin-top: 4px;
+            opacity: 0.8;
+        }
+
         #sessionSearch {
             flex: 1;
             padding: 0.5rem;
@@ -1355,6 +1362,28 @@
             }));
         }
 
+        function formatSessionDate(timestamp) {
+            if (!timestamp) return '';
+
+            const date = new Date(timestamp);
+            const now = new Date();
+
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const sessionDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+            const diffDays = Math.floor((today - sessionDate) / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+
+            return date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
         function renderSessions(sessions) {
             const list = document.getElementById('sessionsList');
             list.innerHTML = '';
@@ -1405,9 +1434,22 @@
                     setTimeout(() => input.focus(), 10);
                 } else {
                     // Normal mode UI
+                    const textContainer = document.createElement('div');
+                    textContainer.style.flex = '1';
+                    textContainer.style.minWidth = '0';
+                    textContainer.style.display = 'flex';
+                    textContainer.style.flexDirection = 'column';
+
                     const text = document.createElement('span');
                     text.className = 'session-item-text';
                     text.textContent = session.name || 'Untitled Session';
+
+                    const dateLabel = document.createElement('div');
+                    dateLabel.className = 'session-item-date';
+                    dateLabel.textContent = formatSessionDate(session.created_at);
+
+                    textContainer.appendChild(text);
+                    textContainer.appendChild(dateLabel);
 
                     const menuBtn = document.createElement('button');
                     menuBtn.className = 'session-menu-btn';
@@ -1447,7 +1489,7 @@
                     submenu.appendChild(editItem);
                     submenu.appendChild(deleteItem);
 
-                    item.appendChild(text);
+                    item.appendChild(textContainer);
                     item.appendChild(menuBtn);
                     item.appendChild(submenu);
 
