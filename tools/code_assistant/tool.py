@@ -1504,7 +1504,6 @@ def analyze_project_impl(
     analysis['file_counts'] = dict(sorted(file_extensions.items(), key=lambda x: x[1], reverse=True)[:20])
 
     # Detect dependencies and frameworks
-    # Detect dependencies and frameworks
     if include_dependencies:
         # Python dependencies
         req_file = project_root / "requirements.txt"
