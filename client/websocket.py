@@ -36,28 +36,33 @@ async def broadcast_message(message_type, data):
         )
 
 
-async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools, session_manager=None, session_id=None):
+async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools, session_manager=None, session_id=None, system_prompt=None):
     """Process a query in the background"""
     try:
         print(f"\n> {original_prompt}")
         await broadcast_message("user_message", {"text": original_prompt})
 
-        # SESSION-BASED CONTEXT INJECTION
-        if session_manager and session_id:
+        # CROSS-SESSION AWARENESS: Build enhanced system prompt
+        enhanced_system_prompt = system_prompt
+        if session_manager:
             try:
-                from client.context_tracker import integrate_context_tracking
-                integrate_context_tracking(
-                    session_manager=session_manager,
-                    session_id=session_id,
-                    prompt=prompt,
-                    conversation_state=conversation_state,
-                    logger=logger
-                )
+                total_sessions = session_manager.get_user_session_count()
+                recent_topics = session_manager.get_recent_session_topics(limit=5)
+
+                if total_sessions == 1:
+                    session_context = "\n\nThis is your FIRST conversation with this user."
+                else:
+                    session_context = f"\n\nYou've had {total_sessions} sessions. Recent topics:\n"
+                    for topic in recent_topics:
+                        if topic['session_id'] != session_id:  # Skip current
+                            session_context += f"  - {topic['name']}\n"
+
+                enhanced_system_prompt = system_prompt + session_context
             except Exception as e:
-                logger.error(f"Context extraction failed: {e}")
+                logger.error(f"Cross-session context failed: {e}")
 
         agent = agent_ref[0]
-        result = await run_agent_fn(agent, conversation_state, prompt, logger, tools)
+        result = await run_agent_fn(agent, conversation_state, prompt, logger, tools, enhanced_system_prompt)
 
         final_message = result["messages"][-1]
         assistant_text = final_message.content
@@ -432,7 +437,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 # Create background task for query processing
                 current_task = asyncio.create_task(
                     process_query(websocket, prompt, original_prompt, agent_ref, conversation_state,
-                                run_agent_fn, logger, tools, session_manager, current_session_id)
+                                run_agent_fn, logger, tools, session_manager, current_session_id, system_prompt)
                 )
 
                 # Don't await - let it run in background!

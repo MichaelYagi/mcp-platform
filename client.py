@@ -442,6 +442,16 @@ async def main():
 
         # Only proceed if Plex is actually connected
         if plex_connected:
+            # CHECK IF MODEL ALREADY EXISTS
+            model_file = PROJECT_ROOT / "models" / "plex_recommender.pkl"
+
+            if model_file.exists():
+                model_size = model_file.stat().st_size / 1024  # KB
+                logger.info(f"   ✅ ML model already trained ({model_size:.1f} KB)")
+                logger.info("   ⏭️  Skipping auto-training (model ready to use)")
+            else:
+                logger.info("   📥 No ML model found - importing Plex viewing history...")
+
             logger.info("   📥 Importing Plex viewing history...")
 
             try:
@@ -611,8 +621,12 @@ async def main():
         logger.warning("⚠️ Multi-agent system not available")
 
     # Create enhanced agent runner with multi-agent support
-    async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools):
+    async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None):
         """Enhanced agent runner with multi-agent, A2A, and skills support"""
+
+        # Use provided system_prompt or fallback to global SYSTEM_PROMPT
+        if system_prompt is None:
+            system_prompt = SYSTEM_PROMPT
 
         if skills_manager and skills_manager.all_skills:
             conversation_state["messages"] = await inject_relevant_skills_into_messages(
@@ -692,7 +706,8 @@ async def main():
                 user_message,
                 logger,
                 tools,
-                SYSTEM_PROMPT,
+                system_prompt,
+                llm,
                 MAX_MESSAGE_HISTORY
             )
 

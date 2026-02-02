@@ -226,3 +226,47 @@ class SessionManager:
                 'updated_at': row[3]
             }
         return None
+
+    def get_user_session_count(self) -> int:
+        """Get total number of sessions"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM sessions')
+        count = cursor.fetchone()[0]
+        conn.close()
+        return count
+
+
+    def get_recent_session_topics(self, limit: int = 5) -> List[Dict]:
+        """Get topics from recent sessions"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+                       SELECT s.id,
+                              s.name,
+                              s.created_at,
+                              (SELECT content
+                               FROM messages
+                               WHERE session_id = s.id
+                                 AND role = 'user'
+                               ORDER BY created_at ASC LIMIT 1) as first_message
+                       FROM sessions s
+                       ORDER BY s.updated_at DESC
+                           LIMIT ?
+                       ''', (limit,))
+
+        topics = []
+        for row in cursor.fetchall():
+            topics.append({
+                'session_id': row[0],
+                'name': row[1],
+                'created_at': row[2],
+                'first_message': row[3]
+            })
+        conn.close()
+        return topics
+
+
+    def is_first_session(self) -> bool:
+        """Check if this is the very first session"""
+        return self.get_user_session_count() <= 1
