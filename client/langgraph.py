@@ -599,20 +599,19 @@ def create_langgraph_agent(llm_with_tools, tools):
                     metrics["llm_times"].append((time.time(), duration))
                 logger.error(f"⏱️ LLM call timed out after 5m")
 
-                # Return helpful timeout message instead of crashing
                 timeout_message = AIMessage(content="""⏱️ Request timed out after 5 minutes.
 
-                **The model is taking too long to respond.** This usually happens when:
-                - The model is processing too many tools (58 tools detected)
-                - The query is ambiguous and the model is stuck deciding
-                - The model is overloaded
+    **The model is taking too long to respond.** This usually happens when:
+    - The model is processing too many tools (58 tools detected)
+    - The query is ambiguous and the model is stuck deciding
+    - The model is overloaded
 
-                **Try these solutions:**
-                1. Rephrase your question more specifically
-                2. Break complex questions into smaller parts
-                3. Restart the Ollama service: `ollama restart`
+    **Try these solutions:**
+    1. Rephrase your question more specifically
+    2. Break complex questions into smaller parts
+    3. Restart the Ollama service: `ollama restart`
 
-                **Your question:** {question}""".format(question=messages[-1].content if messages else "unknown"))
+    **Your question:** {question}""".format(question=messages[-1].content if messages else "unknown"))
 
                 return {
                     "messages": messages + [timeout_message],
@@ -641,7 +640,6 @@ def create_langgraph_agent(llm_with_tools, tools):
         if user_message:
             user_lower = user_message.lower()
 
-            # Check for explicit langsearch requests
             langsearch_patterns = [
                 r'\buse\s+langsearch\b',
                 r'\busing\s+langsearch\b',
@@ -661,13 +659,11 @@ def create_langgraph_agent(llm_with_tools, tools):
                 langsearch = get_langsearch_client()
 
                 if langsearch.is_available():
-                    # Extract the actual query (remove routing keywords)
                     query = user_message
                     for pattern in langsearch_patterns:
                         query = re.sub(pattern, '', query, flags=re.IGNORECASE)
                     query = query.strip()
 
-                    # Remove common leading words
                     query = re.sub(r'^,?\s*(who|what|where|when|why|how)\s+', r'\1 ', query, flags=re.IGNORECASE)
                     query = query.strip()
 
@@ -683,16 +679,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                             logger.info("✅ LangSearch successful - passing to LLM for processing")
                             search_context = search_result["results"]
 
-                            # Create augmented prompt for LLM to process
                             augmented_prompt = f"""I searched the web using LangSearch and found the following results:
 
-        {search_context}
+    {search_context}
 
-        Based on these search results, please answer the user's question: "{user_message}"
+    Based on these search results, please answer the user's question: "{user_message}"
 
-        Provide a clear, concise answer in English. Extract the most relevant information and present it naturally."""
+    Provide a clear, concise answer in English. Extract the most relevant information and present it naturally."""
 
-                            # Let LLM process the search results
                             augmented_messages = messages + [HumanMessage(content=augmented_prompt)]
                             response = await base_llm.ainvoke(augmented_messages)
 
@@ -726,12 +720,8 @@ def create_langgraph_agent(llm_with_tools, tools):
         # CENTRALIZED PATTERN MATCHING
         # ═══════════════════════════════════════════════════════════
         def match_intent(user_message: str, all_tools: list, base_llm, logger, conversation_state):
-            """
-            Match user intent using centralized pattern configuration.
-            NOW: Check for conversation context FIRST before pattern matching.
-            """
+            """Match user intent using centralized pattern configuration"""
 
-            # Check if we have project context from a system message
             has_project_context = False
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
                 if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
@@ -739,7 +729,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                     logger.info("🎯 Found project context in conversation - using code_assistant")
                     break
 
-            # If we have project context, use code_assistant regardless of query
             if has_project_context:
                 config = INTENT_PATTERNS["code_assistant"]
                 filtered_tools = []
@@ -758,7 +747,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                     logger.info(f"   → {len(filtered_tools)} code tools (context-based routing)")
                     return base_llm.bind_tools(filtered_tools), "code_assistant"
 
-            # Otherwise, do normal pattern matching
             sorted_patterns = sorted(INTENT_PATTERNS.items(), key=lambda x: x[1]["priority"])
 
             for intent_name, config in sorted_patterns:
@@ -788,9 +776,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.info(f"🎯 General query → all {len(all_tools)} tools")
             return base_llm.bind_tools(all_tools), "general"
 
-        # ═══════════════════════════════════════════════════════════
-        # APPLY PATTERN MATCHING
-        # ═══════════════════════════════════════════════════════════
+        # Apply pattern matching
         if user_message:
             all_tools = list(state.get("tools", {}).values())
             llm_to_use, pattern_name = match_intent(
@@ -818,7 +804,6 @@ def create_langgraph_agent(llm_with_tools, tools):
 
         sanitized_messages = []
         for msg in messages:
-            # Handle None content
             content = msg.content if msg.content is not None else ""
             content = str(content) if not isinstance(content, str) else content
 
@@ -838,7 +823,6 @@ def create_langgraph_agent(llm_with_tools, tools):
 
         start_time = time.time()
         try:
-            # Add 5 minutes timeout to prevent hanging
             response = await asyncio.wait_for(
                 llm_to_use.ainvoke(sanitized_messages),
                 timeout=300.0
@@ -849,14 +833,60 @@ def create_langgraph_agent(llm_with_tools, tools):
                 metrics["llm_calls"] += 1
                 metrics["llm_times"].append((time.time(), duration))
 
-            # ═══════════════════════════════════════════════════════════
-            # FALLBACK CHAIN: Tools → LangSearch → Base LLM
-            # ═══════════════════════════════════════════════════════════
+        except Exception as e:
+            # CHECK FOR "DOES NOT SUPPORT TOOLS" ERROR
+            error_msg_str = str(e).lower()
+            if "does not support tools" in error_msg_str:
+                logger.error(f"❌ Model '{current_model}' does not support tool calling")
+
+                all_tools_list = list(state.get("tools", {}).values())
+                tool_count = len(all_tools_list)
+
+                error_response = AIMessage(content=f"""❌ **Model Error**: The model '{current_model}' does not support tool calling.
+
+    This model cannot use the {tool_count} tools available in this system.
+
+    **Recommended models with tool support:**
+    • `qwen2.5:14b` - Best quality, excellent tools (recommended)
+    • `qwen2.5:7b` - Fast, good balance
+    • `llama3.1:8b` - Solid general purpose
+    • `llama3.2:3b` - Lightweight option
+    • `mistral-nemo` - Balanced performance
+
+    **To switch models:**
+    Type: `:model qwen2.5:14b`
+
+    **To install a model:**
+    Run: `ollama pull qwen2.5:14b-instruct-q4_K_M`
+
+    **Current setup:**
+    - Model: {current_model}
+    - Tools available: {tool_count}
+    - Tool support: ❌ Not supported""")
+
+                return {
+                    "messages": messages + [error_response],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": current_model
+                }
+
+            # Handle other exceptions
+            duration = time.time() - start_time
+            if METRICS_AVAILABLE:
+                metrics["llm_errors"] += 1
+                metrics["llm_times"].append((time.time(), duration))
+            logger.error(f"❌ Model call failed: {e}")
+            raise
+
+        # Continue with normal flow - FALLBACK CHAIN
+        try:
             has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
             has_content = hasattr(response, 'content') and response.content and response.content.strip()
 
             if not has_tool_calls and not has_content:
-                # Completely blank - try LangSearch
                 logger.warning("⚠️ LLM returned blank - trying LangSearch")
                 langsearch = get_langsearch_client()
 
@@ -867,14 +897,13 @@ def create_langgraph_agent(llm_with_tools, tools):
                         logger.info("✅ LangSearch successful")
                         search_context = search_result["results"]
                         augmented_prompt = f"""WEB SEARCH RESULTS:
-{search_context}
+    {search_context}
 
-Please answer the question using these search results."""
+    Please answer the question using these search results."""
 
                         retry_messages = messages + [HumanMessage(content=augmented_prompt)]
                         response = await base_llm.ainvoke(retry_messages)
                     else:
-                        # LangSearch failed - use base LLM
                         logger.warning("⚠️ LangSearch failed - using base LLM")
                         response = await asyncio.wait_for(
                             base_llm.ainvoke(messages),
@@ -888,7 +917,6 @@ Please answer the question using these search results."""
                     )
 
             elif not has_tool_calls and has_content:
-                # Has content but no tools - check if needs current info
                 needs_current_info = any(word in user_message.lower() for word in [
                     "current", "who is", "latest", "recent", "today", "now"
                 ])
@@ -905,10 +933,10 @@ Please answer the question using these search results."""
                             search_context = search_result["results"]
                             augmented_prompt = f"""Previous answer: {response.content}
 
-However, here are current web search results:
-{search_context}
+    However, here are current web search results:
+    {search_context}
 
-Please provide an updated answer using these search results."""
+    Please provide an updated answer using these search results."""
 
                             retry_messages = messages + [response, HumanMessage(content=augmented_prompt)]
                             response = await base_llm.ainvoke(retry_messages)
@@ -929,7 +957,6 @@ Please provide an updated answer using these search results."""
                 metrics["llm_times"].append((time.time(), duration))
             logger.error(f"⏱️ LLM call timed out after 5m")
 
-            # Return helpful timeout message instead of crashing
             return {
                 "messages": messages + [AIMessage(
                     content="⏱️ Request timed out after 5 minutes. Please try:\n\n1. Rephrasing your question\n2. Breaking it into smaller parts\n3. Using a simpler query")],
