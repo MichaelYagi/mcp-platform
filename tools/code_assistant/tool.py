@@ -13,6 +13,7 @@ import subprocess
 import logging
 import re
 import os
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -1503,6 +1504,7 @@ def analyze_project_impl(
     analysis['file_counts'] = dict(sorted(file_extensions.items(), key=lambda x: x[1], reverse=True)[:20])
 
     # Detect dependencies and frameworks
+    # Detect dependencies and frameworks
     if include_dependencies:
         # Python dependencies
         req_file = project_root / "requirements.txt"
@@ -1517,6 +1519,18 @@ def analyze_project_impl(
             node_deps = _parse_package_json(package_file)
             analysis['dependencies']['node'] = node_deps
             analysis['frameworks'].extend(_detect_node_frameworks(node_deps))
+
+        # Kotlin/Java dependencies (Gradle)
+        gradle_deps = _parse_gradle_dependencies(project_root)
+        if gradle_deps:
+            analysis['dependencies']['gradle'] = gradle_deps
+            analysis['frameworks'].extend(_detect_kotlin_java_frameworks(gradle_deps))
+
+        # Kotlin/Java dependencies (Maven)
+        maven_deps = _parse_maven_dependencies(project_root)
+        if maven_deps:
+            analysis['dependencies']['maven'] = maven_deps
+            analysis['frameworks'].extend(_detect_kotlin_java_frameworks(maven_deps))
 
     # ========================================================================
     # ARCHITECTURE ANALYSIS
@@ -1995,3 +2009,252 @@ def _build_directory_tree(root_path: Path, max_depth: int, current_depth: int = 
         pass
 
     return tree
+
+def _parse_gradle_dependencies(project_root: Path) -> List[str]:
+    """
+    Parse Gradle build files to extract dependencies.
+
+    Supports:
+    - build.gradle (Groovy DSL)
+    - build.gradle.kts (Kotlin DSL)
+    - Multiple module projects
+
+    Returns:
+        List of dependency strings (e.g., "androidx.compose.ui:ui")
+    """
+    dependencies = []
+
+    # Gradle files to check
+    gradle_files = [
+        'build.gradle',
+        'build.gradle.kts',
+        'app/build.gradle',
+        'app/build.gradle.kts',
+        'settings.gradle',
+        'settings.gradle.kts'
+    ]
+
+    # Also find all build.gradle files in subdirectories
+    try:
+        for gradle_file in project_root.rglob('build.gradle*'):
+            if 'build' not in gradle_file.parts and '.gradle' not in gradle_file.parts:
+                gradle_files.append(str(gradle_file.relative_to(project_root)))
+    except:
+        pass
+
+    for gradle_file_path in gradle_files:
+        gradle_file = project_root / gradle_file_path
+        if not gradle_file.exists():
+            continue
+
+        try:
+            with open(gradle_file, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            # Pattern 1: implementation("group:artifact:version")
+            # Pattern 2: implementation "group:artifact:version"
+            # Pattern 3: implementation 'group:artifact:version'
+
+            import re
+
+            # Match various dependency declaration formats
+            patterns = [
+                r'implementation[(\s]+["\']([^"\']+)["\']',
+                r'api[(\s]+["\']([^"\']+)["\']',
+                r'compileOnly[(\s]+["\']([^"\']+)["\']',
+                r'runtimeOnly[(\s]+["\']([^"\']+)["\']',
+                r'testImplementation[(\s]+["\']([^"\']+)["\']',
+                r'androidTestImplementation[(\s]+["\']([^"\']+)["\']',
+                r'kapt[(\s]+["\']([^"\']+)["\']',
+                r'ksp[(\s]+["\']([^"\']+)["\']',
+            ]
+
+            for pattern in patterns:
+                matches = re.findall(pattern, content)
+                dependencies.extend(matches)
+
+            # Also look for plugins (these indicate frameworks)
+            plugin_patterns = [
+                r'id[(\s]+["\']([^"\']+)["\']',
+                r'apply\s+plugin:\s*["\']([^"\']+)["\']',
+            ]
+
+            for pattern in plugin_patterns:
+                matches = re.findall(pattern, content)
+                dependencies.extend([f"plugin:{m}" for m in matches])
+
+        except Exception as e:
+            logger.debug(f"Failed to parse {gradle_file}: {e}")
+            continue
+
+    # Remove duplicates and clean up
+    dependencies = list(set(dependencies))
+    return dependencies
+
+
+def _parse_maven_dependencies(project_root: Path) -> List[str]:
+    """
+    Parse Maven pom.xml files to extract dependencies.
+
+    Returns:
+        List of dependency strings (e.g., "org.springframework.boot:spring-boot-starter-web")
+    """
+    dependencies = []
+
+    # Find all pom.xml files
+    pom_files = ['pom.xml']
+
+    try:
+        for pom_file in project_root.rglob('pom.xml'):
+            if 'target' not in pom_file.parts:
+                pom_files.append(str(pom_file.relative_to(project_root)))
+    except:
+        pass
+
+    for pom_file_path in pom_files:
+        pom_file = project_root / pom_file_path
+        if not pom_file.exists():
+            continue
+
+        try:
+            tree = ET.parse(pom_file)
+            root = tree.getroot()
+
+            # Handle XML namespaces
+            ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+
+            # Try without namespace first (some pom.xml don't have it)
+            deps = root.findall('.//dependency')
+            if not deps:
+                deps = root.findall('.//m:dependency', ns)
+
+            for dep in deps:
+                group_id = dep.find('groupId') or dep.find('m:groupId', ns)
+                artifact_id = dep.find('artifactId') or dep.find('m:artifactId', ns)
+
+                if group_id is not None and artifact_id is not None:
+                    dep_string = f"{group_id.text}:{artifact_id.text}"
+                    dependencies.append(dep_string)
+
+        except Exception as e:
+            logger.debug(f"Failed to parse {pom_file}: {e}")
+            continue
+
+    # Remove duplicates
+    dependencies = list(set(dependencies))
+    return dependencies
+
+
+def _detect_kotlin_java_frameworks(dependencies: List[str]) -> List[str]:
+    """
+    Detect Kotlin/Java frameworks from Gradle/Maven dependencies.
+
+    Args:
+        dependencies: List of dependency strings (e.g., "androidx.compose.ui:ui")
+
+    Returns:
+        List of detected framework names
+    """
+    frameworks = []
+    seen = set()
+
+    # Framework detection patterns
+    framework_patterns = {
+        # Android
+        'androidx.compose': 'Jetpack Compose',
+        'androidx.navigation': 'Android Navigation',
+        'androidx.room': 'Room Database',
+        'androidx.lifecycle': 'Android Lifecycle',
+        'androidx.work': 'WorkManager',
+        'androidx.paging': 'Paging 3',
+        'androidx.datastore': 'DataStore',
+        'android.arch.lifecycle': 'Android Architecture Components',
+        'com.google.android.material': 'Material Design Components',
+
+        # Dependency Injection
+        'com.google.dagger': 'Dagger',
+        'dagger.hilt': 'Hilt',
+        'org.koin': 'Koin',
+        'io.insert-koin': 'Koin',
+        'javax.inject': 'Javax Inject',
+
+        # Networking
+        'com.squareup.retrofit2': 'Retrofit',
+        'com.squareup.okhttp3': 'OkHttp',
+        'io.ktor': 'Ktor',
+        'org.apache.httpcomponents': 'Apache HttpClient',
+
+        # JSON/Serialization
+        'com.google.code.gson': 'Gson',
+        'com.squareup.moshi': 'Moshi',
+        'com.fasterxml.jackson': 'Jackson',
+        'org.jetbrains.kotlinx:kotlinx-serialization': 'Kotlin Serialization',
+
+        # Coroutines/Async
+        'org.jetbrains.kotlinx:kotlinx-coroutines': 'Kotlin Coroutines',
+        'io.reactivex': 'RxJava',
+        'io.projectreactor': 'Project Reactor',
+
+        # Spring Framework
+        'org.springframework.boot': 'Spring Boot',
+        'org.springframework': 'Spring Framework',
+        'org.springframework.data': 'Spring Data',
+        'org.springframework.security': 'Spring Security',
+        'org.springframework.cloud': 'Spring Cloud',
+
+        # Database/ORM
+        'org.hibernate': 'Hibernate',
+        'org.mybatis': 'MyBatis',
+        'com.querydsl': 'QueryDSL',
+        'org.jooq': 'jOOQ',
+        'com.h2database': 'H2 Database',
+        'org.postgresql': 'PostgreSQL Driver',
+        'mysql:mysql-connector': 'MySQL Driver',
+        'org.mongodb': 'MongoDB Driver',
+
+        # Testing
+        'org.junit.jupiter': 'JUnit 5',
+        'junit:junit': 'JUnit 4',
+        'org.mockito': 'Mockito',
+        'io.mockk': 'MockK',
+        'io.kotest': 'Kotest',
+        'org.assertj': 'AssertJ',
+        'com.google.truth': 'Truth',
+        'org.robolectric': 'Robolectric',
+        'androidx.test.espresso': 'Espresso',
+
+        # Logging
+        'org.slf4j': 'SLF4J',
+        'ch.qos.logback': 'Logback',
+        'org.apache.logging.log4j': 'Log4j',
+
+        # Image Loading
+        'com.github.bumptech.glide': 'Glide',
+        'io.coil-kt': 'Coil',
+        'com.squareup.picasso': 'Picasso',
+
+        # Build/Plugins (from plugin: prefix)
+        'plugin:com.android.application': 'Android Application',
+        'plugin:com.android.library': 'Android Library',
+        'plugin:org.jetbrains.kotlin.android': 'Kotlin Android',
+        'plugin:org.jetbrains.kotlin.jvm': 'Kotlin JVM',
+        'plugin:org.jetbrains.kotlin.plugin.serialization': 'Kotlin Serialization',
+        'plugin:com.google.dagger.hilt.android': 'Hilt',
+        'plugin:org.springframework.boot': 'Spring Boot',
+        'plugin:io.ktor.plugin': 'Ktor',
+        'plugin:kotlin-kapt': 'Kapt (Kotlin Annotation Processing)',
+        'plugin:com.google.devtools.ksp': 'KSP (Kotlin Symbol Processing)',
+    }
+
+    for dep in dependencies:
+        dep_lower = dep.lower()
+
+        # Check each pattern
+        for pattern, framework_name in framework_patterns.items():
+            if pattern.lower() in dep_lower:
+                if framework_name not in seen:
+                    frameworks.append(framework_name)
+                    seen.add(framework_name)
+                break  # Only match once per dependency
+
+    return frameworks
