@@ -183,9 +183,9 @@ MCP Multi-Agent System Flow
         Example: "Research X, analyze Y, then write report"
         
         task_1 (researcher)  ────┐
-                                │
+                                 │
         task_2 (analyst)     ────┼──→  task_4 (writer)
-                                │      dependencies: [1,2,3]
+                                 │     dependencies: [1,2,3]
         task_3 (researcher)  ────┘
         
         Execution order:
@@ -271,15 +271,15 @@ MCP Multi-Agent System Flow
                         └──────┬───────────────┘
                                │
                                ▼
-                ┌──────────────┴────────────────┐
-                │                               │
+                ┌──────────────┴───────────────┐
+                │                              │
         ┌───────▼─────────┐           ┌────────▼────────┐
         │ RESEARCHER      │           │ ANALYST         │
         │ • Search tools  │           │ • Analysis tools│
         │ • Same LLM      │           │ • Same LLM      │
         └───────┬─────────┘           └────────┬────────┘
-                │                               │
-                └───────────┬───────────────────┘
+                │                              │
+                └───────────┬──────────────────┘
                             │
                             ▼
                    ┌────────────────┐
