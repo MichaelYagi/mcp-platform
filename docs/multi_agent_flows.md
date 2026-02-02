@@ -1,4 +1,4 @@
-# MULTI-AGENT ARCHITECTURE
+# MULTI-AGENT FLOWS
 MCP Multi-Agent System Flow
 
     ┌─────────────────────────────────────────────────────────────────────────────┐
