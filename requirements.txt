@@ -27,3 +27,4 @@ fastapi
 uvicorn
 ruff
 black
+gitpython

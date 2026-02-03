@@ -206,11 +206,20 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
 
             AgentRole.RESEARCHER: [
                 "rag_search_tool", "search_entries", "search_semantic",
-                "semantic_media_search_text", "get_weather_tool"
+                "semantic_media_search_text", "get_weather_tool",
+                "github_clone_repo", "github_list_files", "github_cleanup_repo"
             ],
 
             AgentRole.CODER: [
                 "rag_search_tool",
+                # Code analysis tools
+                "analyze_project",
+                "analyze_code_file",
+                "review_code",
+                "scan_project_structure",
+                "get_project_dependencies",
+                # GitHub file access
+                "github_get_file_content"
             ],
 
             AgentRole.ANALYST: [
@@ -1073,10 +1082,57 @@ async def should_use_multi_agent(user_request: str) -> bool:
     """Determine if a request should use multi-agent execution"""
 
     import logging
+    import re
+    from pathlib import Path
+
     logger = logging.getLogger("mcp_client")
 
     request_lower = user_request.lower()
     logger.info(f"🔍 Checking multi-agent for: {request_lower[:100]}")
+
+    # Check model size - Disable for tiny models
+    # This check must come BEFORE any trigger logic
+    try:
+        # Read current model from last_model.txt
+        last_model_file = Path(__file__).parent.parent / "last_model.txt"
+
+        if last_model_file.exists():
+            current_model = last_model_file.read_text().strip().lower()
+
+            # List of tiny models that are too slow for multi-agent
+            tiny_models = [
+                "tinyllama",
+                "tiny-llama",
+                "llama-1b",
+                "phi-1",
+                "phi-2",
+                "qwen-1.5b",
+                "qwen2-1.5b",
+                "gemma-2b",
+                "stablelm-2b",
+            ]
+
+            # Check if current model is tiny
+            for tiny in tiny_models:
+                if tiny in current_model:
+                    logger.warning(f"⚠️ Multi-agent DISABLED: {current_model} is too small/slow")
+                    logger.info(f"   💡 Use qwen2.5:7b or larger for multi-agent")
+                    return False
+
+            # Also check for "1b" or "2b" in model name
+            if "1b" in current_model or "2b" in current_model:
+                logger.warning(f"⚠️ Multi-agent DISABLED: Model too small (< 3B params)")
+                logger.info(f"   💡 Use qwen2.5:7b or larger for multi-agent")
+                return False
+
+    except Exception as e:
+        # If model check fails, continue with multi-agent decision
+        logger.debug(f"Could not check model size: {e}")
+
+    # Repository review is multi-step: clone → analyze → review → cleanup
+    if re.search(r'github\.com/[^\s]+', user_request):
+        logger.info(f"✅ Multi-agent triggered by: GitHub URL")
+        return True
 
     multi_step_indicators = [
         " and then ", " then ", " after that ", " next ",
@@ -1084,7 +1140,6 @@ async def should_use_multi_agent(user_request: str) -> bool:
         "gather.*create", "search.*write", "ingest.*and.*",
     ]
 
-    import re
     for indicator in multi_step_indicators:
         if re.search(indicator, request_lower):
             logger.info(f"✅ Multi-agent triggered by: {indicator}")

@@ -116,6 +116,39 @@ INTENT_PATTERNS = {
         ],
         "priority": 2
     },
+    "github_review": {
+        "pattern": (
+            # GitHub URLs
+            r'\\bgithub\\.com/[^\\s]+'
+            r'|\\breview.*github'
+            r'|\\bclone.*github'
+            r'|\\bcheck.*github\\.com'
+
+            # Repository review
+            r'|\\breview.*(repo|repository)'
+            r'|\\banalyze.*(repo|repository)'
+            r'|\\bcheck.*(repo|repository)'
+
+            # Code from URL
+            r'|\\breview.*https?://'
+            r'|\\banalyze.*https?://'
+
+            # Explicit GitHub references
+            r'|\\bgithub\\s+(repo|repository|project)'
+            r'|\\bfrom\\s+github'
+        ),
+        "tools": [
+            "github_clone_repo",
+            "github_list_files",
+            "github_get_file_content",
+            "github_cleanup_repo",
+            "analyze_project",
+            "analyze_code_file",
+            "review_code",
+            "scan_project_structure"
+        ],
+        "priority": 2
+    },
     "code_assistant": {
         "pattern": (
             # Tech stack queries
