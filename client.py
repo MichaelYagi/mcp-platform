@@ -625,6 +625,44 @@ async def main():
         if system_prompt is None:
             system_prompt = SYSTEM_PROMPT
 
+        if orchestrator:
+            try:
+                from pathlib import Path
+
+                # Read what model SHOULD be used (from last_model.txt)
+                last_model_file = Path(__file__).parent  / "last_model.txt"
+
+                if last_model_file.exists():
+                    expected_model = last_model_file.read_text().strip()
+
+                    # Get what model orchestrator is ACTUALLY using
+                    actual_model = None
+                    if hasattr(orchestrator.base_llm, 'model'):
+                        actual_model = orchestrator.base_llm.model
+                    elif hasattr(orchestrator.base_llm, 'model_name'):
+                        actual_model = orchestrator.base_llm.model_name
+                    elif hasattr(orchestrator.base_llm, 'model_path'):
+                        actual_model = Path(orchestrator.base_llm.model_path).stem
+
+                    # Sync if mismatch
+                    if actual_model and expected_model != actual_model:
+                        logger.info(f"🔄 Multi-agent out of sync!")
+                        logger.info(f"   Expected (last_model.txt): {expected_model}")
+                        logger.info(f"   Actual (orchestrator): {actual_model}")
+                        logger.info(f"   Syncing to: {expected_model}")
+
+                        # Use global llm (which should be synced to last_model.txt)
+                        from client.llm_backend import LLMBackendManager
+                        fresh_llm = LLMBackendManager.create_llm(expected_model, temperature=0)
+
+                        if hasattr(orchestrator, 'update_llm'):
+                            orchestrator.update_llm(fresh_llm)
+                        else:
+                            logger.error(f"❌ orchestrator.update_llm() not found!")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Multi-agent sync check failed: {e}")
+
         if skills_manager and skills_manager.all_skills:
             conversation_state["messages"] = await inject_relevant_skills_into_messages(
                 skills_manager,

@@ -88,6 +88,32 @@ class MultiAgentOrchestrator:
         self.health_monitor = HealthMonitor(logger)
         self.performance_metrics = PerformanceMetrics(logger)
 
+    def update_llm(self, new_llm):
+        """
+        Update the LLM and recreate all agent executors
+        Call this when the model is switched
+        """
+        self.logger.info(f"🔄 Updating multi-agent LLM and recreating agents")
+
+        # Update base LLM
+        self.base_llm = new_llm
+
+        # Recreate all agent executors with new LLM
+        self.agent_executors = self._create_agent_executors()
+
+        # Log which model we're using
+        if hasattr(new_llm, 'model'):
+            model_name = new_llm.model
+        elif hasattr(new_llm, 'model_name'):
+            model_name = new_llm.model_name
+        elif hasattr(new_llm, 'model_path'):
+            from pathlib import Path
+            model_name = Path(new_llm.model_path).stem
+        else:
+            model_name = "unknown"
+
+        self.logger.info(f"✅ Multi-agent agents recreated with: {model_name}")
+
     def _create_agent_executors(self) -> Dict[AgentRole, Dict]:
         """Create agent executors with proper tool calling"""
 
