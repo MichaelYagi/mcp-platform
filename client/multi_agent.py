@@ -611,14 +611,26 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
 
         return status
 
-    async def execute(self, user_request: str) -> str:
+    async def execute(self, user_request: str) -> dict:
         """
         Main entry point for multi-agent execution
         NOW WITH STOP SIGNAL HANDLING
+        NOW RETURNS DICT with current_model
         """
 
         self.logger.info(f"🎭 Multi-agent execution started: {user_request}")
         start_time = time.time()
+
+        # Get current model name from base_llm
+        if hasattr(self.base_llm, 'model'):
+            current_model = self.base_llm.model
+        elif hasattr(self.base_llm, 'model_name'):
+            current_model = self.base_llm.model_name
+        elif hasattr(self.base_llm, 'model_path'):
+            from pathlib import Path
+            current_model = Path(self.base_llm.model_path).stem
+        else:
+            current_model = "unknown"
 
         try:
             # Step 1: Create execution plan
@@ -627,11 +639,21 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             # Check stop after planning
             if is_stop_requested():
                 self.logger.warning("🛑 Stop requested after creating plan - aborting execution")
-                return "Execution stopped by user before tasks could begin."
+                return {
+                    "response": "Execution stopped by user before tasks could begin.",
+                    "current_model": current_model,
+                    "multi_agent": True,
+                    "stopped": True
+                }
 
             if not plan:
                 self.logger.info("📊 Simple query detected, falling back to single agent")
-                return await self._fallback_single_agent(user_request)
+                fallback_response = await self._fallback_single_agent(user_request)
+                return {
+                    "response": fallback_response,
+                    "current_model": current_model,
+                    "multi_agent": True
+                }
 
             # Step 2: Execute tasks
             results = await self._execute_tasks(plan)
@@ -640,7 +662,12 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             if results.get("_stopped", False):
                 stopped_message = results.get("_stopped_message", "Stopped by user")
                 self.logger.warning(f"🛑 Multi-agent execution stopped: {stopped_message}")
-                return f"🛑 **Execution stopped:** {stopped_message}"
+                return {
+                    "response": f"🛑 **Execution stopped:** {stopped_message}",
+                    "current_model": current_model,
+                    "multi_agent": True,
+                    "stopped": True
+                }
 
             # Step 3: Aggregate results
             final_response = await self._aggregate_results(user_request, results)
@@ -648,13 +675,22 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             duration = time.time() - start_time
             self.logger.info(f"✅ Multi-agent execution completed in {duration:.2f}s")
 
-            return final_response
+            return {
+                "response": final_response,
+                "current_model": current_model,
+                "multi_agent": True
+            }
 
         except Exception as e:
             self.logger.error(f"❌ Multi-agent execution failed: {e}, falling back to single agent")
             import traceback
             traceback.print_exc()
-            return await self._fallback_single_agent(user_request)
+            fallback_response = await self._fallback_single_agent(user_request)
+            return {
+                "response": fallback_response,
+                "current_model": current_model,
+                "multi_agent": True
+            }
 
     async def _create_execution_plan(self, user_request: str) -> Optional[List[AgentTask]]:
         """Use orchestrator to create execution plan"""
@@ -705,7 +741,20 @@ If this is a simple task that doesn't need multiple agents, respond with:
             if json_match:
                 content = json_match.group(1)
 
-            plan_data = json.loads(content)
+            # Check if content is empty
+            if not content:
+                self.logger.warning("⚠️ Orchestrator returned empty response, treating as simple task")
+                return None
+
+            # Try parsing with better error handling
+            try:
+                plan_data = json.loads(content)
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"⚠️ Orchestrator returned invalid JSON: {e}")
+                self.logger.debug(f"   Content: {content[:200]}")
+                self.logger.info("   Falling back to single-agent mode")
+                return None
+
             subtasks = plan_data.get("subtasks", [])
 
             if not subtasks:

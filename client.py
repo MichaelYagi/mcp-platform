@@ -635,10 +635,10 @@ async def main():
 
         # Check if A2A should be used (highest priority)
         use_a2a = (
-            A2A_STATE["enabled"] and
-            MULTI_AGENT_AVAILABLE and
-            orchestrator and
-            await should_use_multi_agent(user_message)
+                A2A_STATE["enabled"] and
+                MULTI_AGENT_AVAILABLE and
+                orchestrator and
+                await should_use_multi_agent(user_message)
         )
 
         if use_a2a:
@@ -646,7 +646,18 @@ async def main():
 
             try:
                 # Execute with A2A
-                result_text = await orchestrator.execute_a2a(user_message)
+                result = await orchestrator.execute_a2a(user_message)
+
+                # Handle dict response
+                if isinstance(result, dict):
+                    result_text = result.get("response", str(result))
+                    current_model = result.get("current_model", "unknown")
+                    stopped = result.get("stopped", False)
+                else:
+                    # Backwards compatibility: handle string response
+                    result_text = result
+                    current_model = "unknown"
+                    stopped = False
 
                 # Add to conversation
                 conversation_state["messages"].append(HumanMessage(content=user_message))
@@ -654,7 +665,9 @@ async def main():
 
                 return {
                     "messages": conversation_state["messages"],
-                    "a2a": True
+                    "a2a": True,
+                    "current_model": current_model,
+                    "stopped": stopped
                 }
 
             except Exception as e:
@@ -665,10 +678,10 @@ async def main():
 
         # Check if multi-agent should be used (second priority)
         use_multi = (
-            MULTI_AGENT_STATE["enabled"] and
-            MULTI_AGENT_AVAILABLE and
-            not use_a2a and
-            await should_use_multi_agent(user_message)
+                MULTI_AGENT_STATE["enabled"] and
+                MULTI_AGENT_AVAILABLE and
+                not use_a2a and
+                await should_use_multi_agent(user_message)
         )
 
         if use_multi and orchestrator:
@@ -676,7 +689,18 @@ async def main():
 
             try:
                 # Execute with multi-agent
-                result_text = await orchestrator.execute(user_message)
+                result = await orchestrator.execute(user_message)
+
+                # Handle dict response
+                if isinstance(result, dict):
+                    result_text = result.get("response", str(result))
+                    current_model = result.get("current_model", "unknown")
+                    stopped = result.get("stopped", False)
+                else:
+                    # Backwards compatibility: handle string response
+                    result_text = result
+                    current_model = "unknown"
+                    stopped = False
 
                 # Add to conversation
                 conversation_state["messages"].append(HumanMessage(content=user_message))
@@ -684,7 +708,9 @@ async def main():
 
                 return {
                     "messages": conversation_state["messages"],
-                    "multi_agent": True
+                    "multi_agent": True,
+                    "current_model": current_model,
+                    "stopped": stopped
                 }
 
             except Exception as e:
