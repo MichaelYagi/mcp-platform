@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 ### Choose LLM Backend
 
-**Option A: Ollama (recommended for beginners)**
+**Option A: Ollama (recommended as a start)**
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
@@ -529,5 +529,6 @@ python client.py
 ---
 
 ## License
+
 
 MIT License
