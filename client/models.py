@@ -10,8 +10,8 @@ from client.llm_backend import LLMBackendManager, GGUFModelRegistry
 
 logger = logging.getLogger(__name__)
 
-MODEL_STATE_FILE = "last_model.txt"
-
+from pathlib import Path
+MODEL_STATE_FILE = str(Path(__file__).parent / "last_model.txt")
 
 def get_ollama_models():
     """Get list of Ollama models"""

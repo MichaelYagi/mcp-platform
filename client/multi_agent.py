@@ -1094,7 +1094,7 @@ async def should_use_multi_agent(user_request: str) -> bool:
     # This check must come BEFORE any trigger logic
     try:
         # Read current model from last_model.txt
-        last_model_file = Path(__file__).parent.parent / "last_model.txt"
+        last_model_file = Path(__file__).parent / "last_model.txt"
 
         if last_model_file.exists():
             current_model = last_model_file.read_text().strip().lower()

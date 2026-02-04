@@ -25,3 +25,4 @@ test.py
 /gguf_models.json
 /models/
 /sessions/
+/client/last_model.txt

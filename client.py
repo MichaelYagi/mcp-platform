@@ -630,7 +630,7 @@ async def main():
                 from pathlib import Path
 
                 # Read what model SHOULD be used (from last_model.txt)
-                last_model_file = Path(__file__).parent  / "last_model.txt"
+                last_model_file = Path(__file__).parent  / "client/last_model.txt"
 
                 if last_model_file.exists():
                     expected_model = last_model_file.read_text().strip()
