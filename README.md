@@ -429,8 +429,10 @@ mcp_a2a/
 │   └── ...
 ├── a2a_server.py     # A2A HTTP server
 ├── client.py         # AI agent client
-├── index.html        # Web UI
 ├── client/
+│   ├── ui/
+│   │   ├── index.html      # Web UI
+│   │   └── dashboard.html  # Dashboard UI
 │   ├── langgraph.py  # Agent execution
 │   ├── websocket.py  # WebSocket server
 │   └── ...

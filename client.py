@@ -800,7 +800,7 @@ async def main():
     print()
 
     # Open browser
-    index_path = PROJECT_ROOT / "index.html"
+    index_path = PROJECT_ROOT / "client/ui/index.html"
     utils.open_browser_file(index_path)
 
     # Start HTTP server
