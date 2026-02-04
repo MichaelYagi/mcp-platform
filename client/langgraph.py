@@ -848,7 +848,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                 else:
                     sanitized_messages.append(AIMessage(content=content))
             elif isinstance(msg, ToolMessage):
-                sanitized_messages.append(ToolMessage(content=content, tool_call_id=msg.tool_call_id, name=msg.name))
+                tool_name = msg.name if msg.name is not None else "unknown_tool"
+                sanitized_messages.append(
+                    ToolMessage(content=content, tool_call_id=msg.tool_call_id, name=tool_name))
             elif isinstance(msg, SystemMessage):
                 sanitized_messages.append(SystemMessage(content=content))
             else:
