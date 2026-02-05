@@ -1210,7 +1210,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         if METRICS_AVAILABLE:
             metrics["agent_runs"] += 1
 
-            # CRITICAL: Save the original SystemMessage BEFORE any modifications
+        # Save the original SystemMessage BEFORE any modifications
         original_system_msg = None
         if conversation_state["messages"] and isinstance(conversation_state["messages"][0], SystemMessage):
             original_system_msg = conversation_state["messages"][0]
