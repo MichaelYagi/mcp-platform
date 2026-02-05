@@ -47,8 +47,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Start Ollama server
 ollama serve
 
-# Download a model
-ollama pull llama3.1:8b
+# Download a model (use 14B+ for best results)
+ollama pull qwen2.5:14b
 ```
 
 **Option B: GGUF (local model files)**
@@ -517,6 +517,27 @@ curl http://localhost:8010/.well-known/agent-card.json
 - Check API key at https://langsearch.com
 - System falls back to LLM if unavailable
 
+**Conversation history not working ("what was my last prompt" fails):**
+- **Cause**: Smaller models (7B parameters) often refuse to answer questions about conversation history, even when the data is present in their context
+- **Solution 1 (Recommended)**: Switch to a larger model with better instruction following:
+  ```bash
+  ollama pull qwen2.5:14b
+  :model qwen2.5:14b
+  ```
+- **Solution 2**: Use models known for good instruction following:
+  - `qwen2.5:14b` or `qwen2.5:32b` (excellent, 80-95% success rate)
+  - `llama3.1:8b` (good, ~70% success rate)
+  - `mistral-nemo` (good, ~70% success rate)
+  - Avoid: `qwen2.5:3b`, `qwen2.5:7b` (~10-30% success rate)
+- **Why this happens**: Smaller models prioritize their safety training ("don't claim knowledge you don't have") over system instructions, causing them to deny access to conversation history even when it's available in their context window
+- **Expected behavior with larger models**: 
+  ```
+  You: "what's the weather?"
+  Bot: "It's sunny, 22°C"
+  You: "what was my last prompt?"
+  Bot: "Your last prompt was: what's the weather?"
+  ```
+
 **Tools not appearing:**
 ```bash
 # Check tool is enabled
@@ -531,6 +552,5 @@ python client.py
 ---
 
 ## License
-
 
 MIT License

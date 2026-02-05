@@ -1201,7 +1201,14 @@ def create_langgraph_agent(llm_with_tools, tools):
 
 
 async def run_agent(agent, conversation_state, user_message, logger, tools, system_prompt, llm=None, max_history=20):
-    """Execute the agent with the given user message and track metrics"""
+    """
+    Execute the agent with the given user message and track metrics
+
+    CONVERSATION HISTORY DESIGN:
+    - The SystemMessage in conversation_state["messages"][0] is the source of truth
+    - We preserve it through truncation and never recreate it
+    - If no SystemMessage exists, we create one from system_prompt parameter
+    """
     start_time = time.time()
     clear_stop()
     logger.info("[LangGraph] ✅ Stop signal cleared for new request")
@@ -1210,29 +1217,45 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         if METRICS_AVAILABLE:
             metrics["agent_runs"] += 1
 
-        # Save the original SystemMessage BEFORE any modifications
+        # ═══════════════════════════════════════════════════════════════
+        # STEP 1: Save the original SystemMessage (if it exists)
+        # ═══════════════════════════════════════════════════════════════
         original_system_msg = None
-        if conversation_state["messages"] and isinstance(conversation_state["messages"][0], SystemMessage):
+        has_system_msg = (
+                conversation_state["messages"]
+                and isinstance(conversation_state["messages"][0], SystemMessage)
+        )
+
+        if has_system_msg:
+            # Preserve the existing SystemMessage (may have enhancements)
             original_system_msg = conversation_state["messages"][0]
-            logger.info("[LangGraph] Using existing SystemMessage from conversation_state")
+            logger.info("[LangGraph] Preserving existing SystemMessage")
         else:
-            # No SystemMessage exists - create one from system_prompt
+            # No SystemMessage exists - create one from parameter
             original_system_msg = SystemMessage(content=system_prompt)
             conversation_state["messages"].insert(0, original_system_msg)
-            logger.info("[LangGraph] Created SystemMessage from system_prompt parameter")
+            logger.info("[LangGraph] Created new SystemMessage from parameter")
 
-        # Add user message
+        # ═══════════════════════════════════════════════════════════════
+        # STEP 2: Add user message and truncate
+        # ═══════════════════════════════════════════════════════════════
         conversation_state["messages"].append(HumanMessage(content=user_message))
 
-        # Truncate history (but preserve the system message)
-        conversation_state["messages"] = conversation_state["messages"][-max_history:]
+        # Truncate but keep the system message separate
+        system_msg = conversation_state["messages"][0]  # Save it
+        other_messages = conversation_state["messages"][1:]  # Everything else
 
-        # Ensure the ORIGINAL system message is at the start after truncation
-        if not isinstance(conversation_state["messages"][0], SystemMessage):
-            # Truncation removed the system message - restore the ORIGINAL one
-            conversation_state["messages"].insert(0, original_system_msg)
-            logger.info("[LangGraph] Re-inserted ORIGINAL SystemMessage after truncation")
+        # Truncate the other messages
+        if len(other_messages) > max_history - 1:  # -1 for system message
+            other_messages = other_messages[-(max_history - 1):]
+            logger.info(f"[LangGraph] Truncated to last {max_history} messages")
 
+        # Reconstruct: system message + truncated messages
+        conversation_state["messages"] = [system_msg] + other_messages
+
+        # ═══════════════════════════════════════════════════════════════
+        # STEP 3: Run the agent
+        # ═══════════════════════════════════════════════════════════════
         logger.info(f"🧠 Starting agent with {len(conversation_state['messages'])} messages")
 
         tool_registry = {tool.name: tool for tool in tools}
@@ -1245,15 +1268,20 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "stopped": False
         })
 
+        # ═══════════════════════════════════════════════════════════════
+        # STEP 4: Update conversation state
+        # ═══════════════════════════════════════════════════════════════
         new_messages = result["messages"][len(conversation_state["messages"]):]
         logger.info(f"📨 Agent added {len(new_messages)} new messages")
         conversation_state["messages"].extend(new_messages)
 
+        # ═══════════════════════════════════════════════════════════════
+        # STEP 5: Return results
+        # ═══════════════════════════════════════════════════════════════
         if METRICS_AVAILABLE:
             duration = time.time() - start_time
             metrics["agent_times"].append((time.time(), duration))
 
-            # Extract model name from final state
         final_model = result.get("current_model", "unknown")
 
         if METRICS_AVAILABLE:
@@ -1263,7 +1291,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
         return {
             "messages": conversation_state["messages"],
-            "current_model": final_model  # ← ADD THIS
+            "current_model": final_model
         }
 
     except ValueError as e:
