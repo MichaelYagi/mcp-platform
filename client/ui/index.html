@@ -2095,6 +2095,29 @@
         function formatMessage(text) {
             const blocks = [];
             const inline = [];
+            const mathInline = [];
+            const mathBlock = [];
+
+            // --- Extract LaTeX-style math blocks $$...$$ ---
+            text = text.replace(/\$\$([\s\S]*?)\$\$/g, (m, math) => {
+                const i = mathBlock.length;
+                mathBlock.push(math);
+                return `@@MATHBLOCK_${i}@@`;
+            });
+
+            // --- Extract LaTeX-style math blocks \[...\] ---
+            text = text.replace(/\\\[([\s\S]*?)\\\]/g, (m, math) => {
+                const i = mathBlock.length;
+                mathBlock.push(math);
+                return `@@MATHBLOCK_${i}@@`;
+            });
+
+            // --- Extract LaTeX-style inline math \(...\) ---
+            text = text.replace(/\\\(([\s\S]*?)\\\)/g, (m, math) => {
+                const i = mathInline.length;
+                mathInline.push(math);
+                return `@@MATHINLINE_${i}@@`;
+            });
 
             // --- Extract fenced code blocks ---
             text = text.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (m, lang, code) => {
@@ -2206,6 +2229,152 @@
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
                 return `<pre><code class="language-${block.lang}">${escaped.trim()}</code></pre>`;
+            });
+
+            // --- Restore inline math \(...\) ---
+            text = text.replace(/@@MATHINLINE_(\d+)@@/g, (m, i) => {
+                let math = mathInline[i];
+
+                // Convert LaTeX symbols
+                math = math.replace(/\\pm/g, '±');
+                math = math.replace(/\\mp/g, '∓');
+                math = math.replace(/\\times/g, '×');
+                math = math.replace(/\\div/g, '÷');
+                math = math.replace(/\\cdot/g, '·');
+                math = math.replace(/\\leq/g, '≤');
+                math = math.replace(/\\geq/g, '≥');
+                math = math.replace(/\\neq/g, '≠');
+                math = math.replace(/\\approx/g, '≈');
+                math = math.replace(/\\equiv/g, '≡');
+                math = math.replace(/\\ll/g, '≪');
+                math = math.replace(/\\gg/g, '≫');
+                math = math.replace(/\\propto/g, '∝');
+                math = math.replace(/\\infty/g, '∞');
+                math = math.replace(/\\partial/g, '∂');
+                math = math.replace(/\\nabla/g, '∇');
+                math = math.replace(/\\int/g, '∫');
+                math = math.replace(/\\sum/g, '∑');
+                math = math.replace(/\\prod/g, '∏');
+                math = math.replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)');
+                math = math.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
+                math = math.replace(/\\pi/g, 'π');
+                math = math.replace(/\\theta/g, 'θ');
+                math = math.replace(/\\alpha/g, 'α');
+                math = math.replace(/\\beta/g, 'β');
+                math = math.replace(/\\gamma/g, 'γ');
+                math = math.replace(/\\delta/g, 'δ');
+                math = math.replace(/\\epsilon/g, 'ε');
+                math = math.replace(/\\lambda/g, 'λ');
+                math = math.replace(/\\mu/g, 'μ');
+                math = math.replace(/\\sigma/g, 'σ');
+                math = math.replace(/\\omega/g, 'ω');
+                math = math.replace(/\\Omega/g, 'Ω');
+                math = math.replace(/\\Sigma/g, 'Σ');
+                math = math.replace(/\\Delta/g, 'Δ');
+                math = math.replace(/\\Gamma/g, 'Γ');
+                math = math.replace(/\\rightarrow/g, '→');
+                math = math.replace(/\\leftarrow/g, '←');
+                math = math.replace(/\\Rightarrow/g, '⇒');
+                math = math.replace(/\\Leftarrow/g, '⇐');
+                math = math.replace(/\\leftrightarrow/g, '↔');
+                math = math.replace(/\\Leftrightarrow/g, '⇔');
+                math = math.replace(/\\in/g, '∈');
+                math = math.replace(/\\notin/g, '∉');
+                math = math.replace(/\\subset/g, '⊂');
+                math = math.replace(/\\subseteq/g, '⊆');
+                math = math.replace(/\\supset/g, '⊃');
+                math = math.replace(/\\supseteq/g, '⊇');
+                math = math.replace(/\\cup/g, '∪');
+                math = math.replace(/\\cap/g, '∩');
+                math = math.replace(/\\emptyset/g, '∅');
+                math = math.replace(/\\forall/g, '∀');
+                math = math.replace(/\\exists/g, '∃');
+                math = math.replace(/\\neg/g, '¬');
+                math = math.replace(/\\land/g, '∧');
+                math = math.replace(/\\lor/g, '∨');
+                math = math.replace(/\\oplus/g, '⊕');
+                math = math.replace(/\\otimes/g, '⊗');
+                math = math.replace(/\\degree/g, '°');
+                math = math.replace(/\\circ/g, '∘');
+
+                math = math
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+                return `<strong>${math}</strong>`;
+            });
+
+            // --- Restore block math \[...\] ---
+            text = text.replace(/@@MATHBLOCK_(\d+)@@/g, (m, i) => {
+                let math = mathBlock[i];
+
+                // Convert LaTeX symbols
+                math = math.replace(/\\pm/g, '±');
+                math = math.replace(/\\mp/g, '∓');
+                math = math.replace(/\\times/g, '×');
+                math = math.replace(/\\div/g, '÷');
+                math = math.replace(/\\cdot/g, '·');
+                math = math.replace(/\\leq/g, '≤');
+                math = math.replace(/\\geq/g, '≥');
+                math = math.replace(/\\neq/g, '≠');
+                math = math.replace(/\\approx/g, '≈');
+                math = math.replace(/\\equiv/g, '≡');
+                math = math.replace(/\\ll/g, '≪');
+                math = math.replace(/\\gg/g, '≫');
+                math = math.replace(/\\propto/g, '∝');
+                math = math.replace(/\\infty/g, '∞');
+                math = math.replace(/\\partial/g, '∂');
+                math = math.replace(/\\nabla/g, '∇');
+                math = math.replace(/\\int/g, '∫');
+                math = math.replace(/\\sum/g, '∑');
+                math = math.replace(/\\prod/g, '∏');
+                math = math.replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)');
+                math = math.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
+                math = math.replace(/\\pi/g, 'π');
+                math = math.replace(/\\theta/g, 'θ');
+                math = math.replace(/\\alpha/g, 'α');
+                math = math.replace(/\\beta/g, 'β');
+                math = math.replace(/\\gamma/g, 'γ');
+                math = math.replace(/\\delta/g, 'δ');
+                math = math.replace(/\\epsilon/g, 'ε');
+                math = math.replace(/\\lambda/g, 'λ');
+                math = math.replace(/\\mu/g, 'μ');
+                math = math.replace(/\\sigma/g, 'σ');
+                math = math.replace(/\\omega/g, 'ω');
+                math = math.replace(/\\Omega/g, 'Ω');
+                math = math.replace(/\\Sigma/g, 'Σ');
+                math = math.replace(/\\Delta/g, 'Δ');
+                math = math.replace(/\\Gamma/g, 'Γ');
+                math = math.replace(/\\rightarrow/g, '→');
+                math = math.replace(/\\leftarrow/g, '←');
+                math = math.replace(/\\Rightarrow/g, '⇒');
+                math = math.replace(/\\Leftarrow/g, '⇐');
+                math = math.replace(/\\leftrightarrow/g, '↔');
+                math = math.replace(/\\Leftrightarrow/g, '⇔');
+                math = math.replace(/\\in/g, '∈');
+                math = math.replace(/\\notin/g, '∉');
+                math = math.replace(/\\subset/g, '⊂');
+                math = math.replace(/\\subseteq/g, '⊆');
+                math = math.replace(/\\supset/g, '⊃');
+                math = math.replace(/\\supseteq/g, '⊇');
+                math = math.replace(/\\cup/g, '∪');
+                math = math.replace(/\\cap/g, '∩');
+                math = math.replace(/\\emptyset/g, '∅');
+                math = math.replace(/\\forall/g, '∀');
+                math = math.replace(/\\exists/g, '∃');
+                math = math.replace(/\\neg/g, '¬');
+                math = math.replace(/\\land/g, '∧');
+                math = math.replace(/\\lor/g, '∨');
+                math = math.replace(/\\oplus/g, '⊕');
+                math = math.replace(/\\otimes/g, '⊗');
+                math = math.replace(/\\degree/g, '°');
+                math = math.replace(/\\circ/g, '∘');
+
+                math = math
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;");
+                return `<strong>${math}</strong>`;
             });
 
             return text;
