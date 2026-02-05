@@ -23,6 +23,7 @@ from client import logging_handler, langgraph, models, websocket, cli, utils
 
 from client.a2a_client import A2AClient
 from client.a2a_mcp_bridge import make_a2a_tool
+from client.context_tracker import integrate_context_tracking
 
 # Import multi-agent system
 try:
@@ -65,6 +66,23 @@ CRITICAL RULES:
 1. ALWAYS respond in ENGLISH only
 2. Read the user's intent carefully before choosing a tool
 3. DO NOT make multiple redundant tool calls
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL: YOU HAVE FULL ACCESS TO CONVERSATION HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DO NOT say "I don't have access to history" - YOU DO HAVE ACCESS.
+The message list contains the FULL conversation history in chronological order.
+
+WHEN USER ASKS: "what was my last prompt"
+→ Look at the most recent HumanMessage before the current one
+→ Respond: "Your last prompt was: [exact text]"
+
+Example:
+User: "what's the weather?"
+You: "Sunny, 22°C"
+User: "what was my last prompt"
+You: "Your last prompt was: what's the weather?"  ← DO THIS
 
 TOOL SELECTION:
 
@@ -274,7 +292,26 @@ async def main():
     system_prompt_path = PROJECT_ROOT / "prompts/tool_usage_guide.md"
     if system_prompt_path.exists():
         logger.info(f"⚙️ System prompt loaded from {system_prompt_path}")
-        SYSTEM_PROMPT = system_prompt_path.read_text(encoding="utf-8")
+        file_prompt = system_prompt_path.read_text(encoding="utf-8")
+        # Append conversation history awareness to file-based prompt
+        history_awareness = """
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL: YOU HAVE FULL ACCESS TO CONVERSATION HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DO NOT say "I don't have access to history" - YOU DO HAVE ACCESS.
+
+WHEN USER ASKS: "what was my last prompt"
+→ Look at the most recent HumanMessage before the current one
+→ Respond: "Your last prompt was: [exact text]"
+
+Example:
+User: "what's the weather?"
+You: "Sunny, 22°C"  
+User: "what was my last prompt"
+You: "Your last prompt was: what's the weather?"  ← DO THIS"""
+        SYSTEM_PROMPT = file_prompt + history_awareness
     else:
         logger.warning(f"⚠️  System prompt file not found at {system_prompt_path}, using default")
 
@@ -670,6 +707,24 @@ async def main():
                 conversation_state["messages"],
                 logger
             )
+
+        current_session_id = conversation_state.get("session_id")
+
+        if session_manager and current_session_id:
+            try:
+                context_injected = integrate_context_tracking(
+                    session_manager=session_manager,
+                    session_id=current_session_id,
+                    prompt=user_message,
+                    conversation_state=conversation_state,
+                    logger=logger
+                )
+
+                if context_injected:
+                    logger.info("✅ Context from previous messages injected")
+
+            except Exception as e:
+                logger.warning(f"⚠️ Context tracking failed: {e}")
 
         # Check if A2A should be used (highest priority)
         use_a2a = (

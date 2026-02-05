@@ -1210,14 +1210,28 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         if METRICS_AVAILABLE:
             metrics["agent_runs"] += 1
 
-        if not conversation_state["messages"]:
-            conversation_state["messages"].append(SystemMessage(content=system_prompt))
+            # CRITICAL: Save the original SystemMessage BEFORE any modifications
+        original_system_msg = None
+        if conversation_state["messages"] and isinstance(conversation_state["messages"][0], SystemMessage):
+            original_system_msg = conversation_state["messages"][0]
+            logger.info("[LangGraph] Using existing SystemMessage from conversation_state")
+        else:
+            # No SystemMessage exists - create one from system_prompt
+            original_system_msg = SystemMessage(content=system_prompt)
+            conversation_state["messages"].insert(0, original_system_msg)
+            logger.info("[LangGraph] Created SystemMessage from system_prompt parameter")
 
+        # Add user message
         conversation_state["messages"].append(HumanMessage(content=user_message))
+
+        # Truncate history (but preserve the system message)
         conversation_state["messages"] = conversation_state["messages"][-max_history:]
 
+        # Ensure the ORIGINAL system message is at the start after truncation
         if not isinstance(conversation_state["messages"][0], SystemMessage):
-            conversation_state["messages"].insert(0, SystemMessage(content=system_prompt))
+            # Truncation removed the system message - restore the ORIGINAL one
+            conversation_state["messages"].insert(0, original_system_msg)
+            logger.info("[LangGraph] Re-inserted ORIGINAL SystemMessage after truncation")
 
         logger.info(f"🧠 Starting agent with {len(conversation_state['messages'])} messages")
 

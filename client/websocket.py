@@ -42,8 +42,55 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         print(f"\n> {original_prompt}")
         await broadcast_message("user_message", {"text": original_prompt})
 
+        # Add session_id to conversation_state for context tracking
+        if session_id and "session_id" not in conversation_state:
+            conversation_state["session_id"] = session_id
+
         # CROSS-SESSION AWARENESS: Build enhanced system prompt
         enhanced_system_prompt = system_prompt
+
+        # Add conversation history awareness instruction
+        history_instruction = """
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL: YOU HAVE FULL ACCESS TO CONVERSATION HISTORY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+YOU MUST ANSWER QUESTIONS ABOUT PREVIOUS MESSAGES IN THIS CONVERSATION.
+
+DO NOT say "I don't have access to history" - YOU DO HAVE ACCESS.
+DO NOT say "I cannot retrieve previous prompts" - YOU CAN AND MUST.
+
+The message list you receive contains the FULL conversation history.
+Messages are in chronological order: [SystemMessage, HumanMessage, AIMessage, HumanMessage, ...]
+
+WHEN USER ASKS: "what was my last prompt" or "what did I just ask"
+→ YOU MUST look at the most recent HumanMessage BEFORE the current one
+→ YOU MUST respond with: "Your last prompt was: [exact text from that HumanMessage]"
+
+WHEN USER ASKS: "what did you say about X"
+→ YOU MUST search through previous AIMessages for content about X
+→ YOU MUST summarize what you said
+
+WHEN USER ASKS: "what did we discuss" or "remind me what we talked about"
+→ YOU MUST review recent HumanMessage and AIMessage exchanges
+→ YOU MUST provide a summary
+
+EXAMPLE CONVERSATION:
+User: "what's the weather?"
+You: "The weather is sunny, 22°C"
+User: "what was my last prompt"
+You: "Your last prompt was: what's the weather?"  ← CORRECT ANSWER
+
+DO NOT RESPOND WITH:
+❌ "I don't have access to previous prompts"
+❌ "I cannot retrieve that information"
+❌ "You haven't interacted with me before"
+
+ALL OF THESE ARE INCORRECT. YOU HAVE THE FULL HISTORY IN YOUR CONTEXT."""
+
+        enhanced_system_prompt = system_prompt + history_instruction
+
         if session_manager:
             try:
                 total_sessions = session_manager.get_user_session_count()
@@ -57,11 +104,210 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         if topic['session_id'] != session_id:  # Skip current
                             session_context += f"  - {topic['name']}\n"
 
-                enhanced_system_prompt = system_prompt + session_context
+                enhanced_system_prompt += session_context
             except Exception as e:
                 logger.error(f"Cross-session context failed: {e}")
 
+        # CRITICAL FIX: Update the system message in conversation_state
+        # This ensures the LLM actually sees the updated instructions
+        from langchain_core.messages import SystemMessage
+
+        # Find and update existing system message, or add one if missing
+        system_msg_updated = False
+        for i, msg in enumerate(conversation_state.get("messages", [])):
+            if isinstance(msg, SystemMessage):
+                conversation_state["messages"][i] = SystemMessage(content=enhanced_system_prompt)
+                system_msg_updated = True
+                logger.info("✅ Updated system message with history awareness")
+
+                # DEBUG: Show what's actually in the system message
+                logger.info(f"📋 System message length: {len(enhanced_system_prompt)} chars")
+                logger.info(f"📋 Contains 'CONVERSATION HISTORY AWARENESS': {'CONVERSATION HISTORY AWARENESS' in enhanced_system_prompt}")
+                logger.info(f"📋 Contains 'what was my last prompt': {'what was my last prompt' in enhanced_system_prompt}")
+                logger.info(f"📋 First 300 chars: {enhanced_system_prompt[:300]}")
+                break
+
+        # If no system message exists, add one at the beginning
+        if not system_msg_updated:
+            conversation_state["messages"].insert(0, SystemMessage(content=enhanced_system_prompt))
+            logger.info("✅ Added system message with history awareness")
+            logger.info(f"📋 System message length: {len(enhanced_system_prompt)} chars")
+
+        # Debug: Show message types being sent
+        if logger.level <= 10:  # DEBUG level
+            msg_summary = []
+            for msg in conversation_state.get("messages", []):
+                msg_type = type(msg).__name__
+                content_preview = msg.content[:50] if len(msg.content) > 50 else msg.content
+                msg_summary.append(f"{msg_type}: {content_preview}...")
+            logger.debug(f"   Messages being sent: {len(conversation_state.get('messages', []))} total")
+            for i, summary in enumerate(msg_summary[-5:]):  # Show last 5
+                logger.debug(f"      [{i}] {summary}")
+
         agent = agent_ref[0]
+
+        # CRITICAL: Intercept history questions and answer directly
+        # The LLM refuses to follow instructions, so we'll handle it ourselves
+        history_question_detected = False
+        response_text = None
+
+        from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+        # Check for user's previous prompt questions
+        if any(phrase in prompt.lower() for phrase in [
+            "last prompt", "previous prompt", "what did i just ask",
+            "what was my question", "my last question", "previous question",
+            "what did i say", "my previous message"
+        ]):
+            logger.info("🎯 History question (user prompt) detected - answering directly")
+            history_question_detected = True
+
+            # Find the most recent HumanMessage BEFORE the current one
+            previous_human_message = None
+            for msg in reversed(conversation_state["messages"]):
+                if isinstance(msg, HumanMessage):
+                    previous_human_message = msg.content
+                    break
+
+            if previous_human_message:
+                response_text = f'Your last prompt was: "{previous_human_message}"'
+            else:
+                logger.warning("⚠️ History question but no previous message found")
+                history_question_detected = False
+
+        # Check for assistant's previous response questions
+        elif any(phrase in prompt.lower() for phrase in [
+            "your response", "your answer", "what did you say", "what did you respond",
+            "your last response", "your last answer", "what was your response",
+            "what was your answer", "your reply", "your last reply"
+        ]):
+            logger.info("🎯 History question (assistant response) detected - answering directly")
+            history_question_detected = True
+
+            # Find the most recent AIMessage
+            previous_ai_message = None
+            for msg in reversed(conversation_state["messages"]):
+                if isinstance(msg, AIMessage):
+                    previous_ai_message = msg.content
+                    break
+
+            if previous_ai_message:
+                # Truncate if too long
+                if len(previous_ai_message) > 500:
+                    response_text = f'I said: "{previous_ai_message[:500]}..." (truncated for brevity)\n\nWould you like me to repeat the full response?'
+                else:
+                    response_text = f'I said: "{previous_ai_message}"'
+            else:
+                logger.warning("⚠️ History question but no previous AI message found")
+                history_question_detected = False
+
+        # Check for conversation summary questions
+        elif any(phrase in prompt.lower() for phrase in [
+            "what did we discuss", "what have we talked about", "summarize our conversation",
+            "what have we been discussing", "recap our conversation", "conversation summary"
+        ]):
+            logger.info("🎯 Conversation summary question detected - answering directly")
+            history_question_detected = True
+
+            # Get last 10 exchanges (20 messages: 10 user + 10 assistant)
+            recent_exchanges = []
+            for msg in reversed(conversation_state["messages"]):
+                if isinstance(msg, (HumanMessage, AIMessage)) and not isinstance(msg, SystemMessage):
+                    recent_exchanges.insert(0, msg)
+                    if len(recent_exchanges) >= 20:  # Last 10 exchanges
+                        break
+
+            if recent_exchanges:
+                summary_lines = ["Here's a summary of our recent conversation:\n"]
+                for i, msg in enumerate(recent_exchanges):
+                    if isinstance(msg, HumanMessage):
+                        summary_lines.append(f"You asked: \"{msg.content[:100]}{'...' if len(msg.content) > 100 else ''}\"")
+                    elif isinstance(msg, AIMessage):
+                        summary_lines.append(f"I responded: \"{msg.content[:100]}{'...' if len(msg.content) > 100 else ''}\"")
+
+                response_text = "\n".join(summary_lines)
+            else:
+                response_text = "We haven't had any conversation yet in this session."
+
+        # Check for "what have I asked" questions
+        elif any(phrase in prompt.lower() for phrase in [
+            "what have i asked", "list my questions", "my previous questions",
+            "what questions have i asked", "show my prompts"
+        ]):
+            logger.info("🎯 List of user prompts question detected - answering directly")
+            history_question_detected = True
+
+            # Get all HumanMessages
+            user_prompts = []
+            for msg in conversation_state["messages"]:
+                if isinstance(msg, HumanMessage):
+                    user_prompts.append(msg.content)
+
+            if user_prompts:
+                response_text = "Here are your recent prompts:\n\n"
+                for i, prompt_text in enumerate(user_prompts[-10:], 1):  # Last 10
+                    response_text += f"{i}. \"{prompt_text}\"\n"
+            else:
+                response_text = "You haven't asked any questions yet in this session."
+
+        # Check for topic-specific search: "what did you say about X"
+        elif "what did you say about" in prompt.lower() or "what did i ask about" in prompt.lower():
+            logger.info("🎯 Topic-specific search question detected - answering directly")
+            history_question_detected = True
+
+            # Extract the topic
+            topic = None
+            if "what did you say about" in prompt.lower():
+                topic = prompt.lower().split("what did you say about")[-1].strip().strip("?")
+            elif "what did i ask about" in prompt.lower():
+                topic = prompt.lower().split("what did i ask about")[-1].strip().strip("?")
+
+            if topic:
+                # Search for relevant messages
+                relevant_messages = []
+                for msg in conversation_state["messages"]:
+                    if isinstance(msg, AIMessage) and topic in msg.content.lower():
+                        relevant_messages.append(("assistant", msg.content))
+                    elif isinstance(msg, HumanMessage) and topic in msg.content.lower():
+                        relevant_messages.append(("user", msg.content))
+
+                if relevant_messages:
+                    response_text = f"Here's what we discussed about '{topic}':\n\n"
+                    for role, content in relevant_messages[-5:]:  # Last 5 relevant
+                        preview = content[:200] + "..." if len(content) > 200 else content
+                        if role == "user":
+                            response_text += f"You: \"{preview}\"\n\n"
+                        else:
+                            response_text += f"Me: \"{preview}\"\n\n"
+                else:
+                    response_text = f"We haven't discussed '{topic}' in this conversation yet."
+            else:
+                history_question_detected = False
+
+        # If we detected a history question, answer directly
+        if history_question_detected and response_text:
+            print("\n" + response_text + "\n")
+
+            if session_manager and session_id:
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                model_name = "direct-answer"
+                session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
+
+            await broadcast_message("assistant_message", {
+                "text": response_text,
+                "multi_agent": False,
+                "a2a": False,
+                "model": "direct-answer"
+            })
+
+            await websocket.send(json.dumps({
+                "type": "complete",
+                "stopped": False
+            }))
+
+            return  # Exit early - don't call LLM
+
+        # Normal flow - call LLM
         result = await run_agent_fn(agent, conversation_state, prompt, logger, tools, enhanced_system_prompt)
 
         final_message = result["messages"][-1]
@@ -152,6 +398,41 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 session_id = data.get("session_id")
                 messages = session_manager.get_session_messages(session_id)
                 current_session_id = session_id
+
+                # Load messages into conversation_state for context tracking
+                from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+                # Preserve system prompt if it exists
+                system_msg = None
+                for msg in conversation_state.get("messages", []):
+                    if isinstance(msg, SystemMessage):
+                        system_msg = msg
+                        break
+
+                conversation_state["messages"] = []
+                if system_msg:
+                    conversation_state["messages"].append(system_msg)  # ← Keep system prompt!
+
+                conversation_state["session_id"] = session_id
+
+                MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "30"))
+
+                for msg in messages[-MAX_MESSAGE_HISTORY:]:
+                    if msg["role"] == "system":
+                        conversation_state["messages"].append(
+                            SystemMessage(content=msg["text"])
+                        )
+                    elif msg["role"] == "user":
+                        conversation_state["messages"].append(
+                            HumanMessage(content=msg["text"])
+                        )
+                    elif msg["role"] == "assistant":
+                        conversation_state["messages"].append(
+                            AIMessage(content=msg["text"])
+                        )
+
+                logger.info(f"📥 Loaded {len(conversation_state['messages'])} messages from session {session_id}")
+
                 await websocket.send(json.dumps({
                     "type": "session_loaded",
                     "session_id": session_id,
@@ -161,6 +442,10 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
             if data.get("type") == "new_session":
                 current_session_id = None
+                conversation_state["messages"] = []  # Clear history
+                if "session_id" in conversation_state:
+                    del conversation_state["session_id"]  # Remove old session_id
+                logger.info("🆕 New session started - conversation history cleared")
                 continue
 
             if data.get("type") == "rename_session" and session_manager:
