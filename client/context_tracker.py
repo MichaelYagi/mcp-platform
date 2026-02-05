@@ -3,9 +3,10 @@ Context Tracker - Extracts context from session history for follow-up queries
 """
 
 import re
+import os
 from typing import Dict, Optional, List, Any
 from langchain_core.messages import SystemMessage
-
+MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
 
 class ContextTracker:
     """Tracks and injects context from session database"""
@@ -108,7 +109,7 @@ class ContextTracker:
         context = {}
 
         # Search from most recent to oldest
-        for msg in reversed(messages[-20:]):
+        for msg in reversed(messages[-MAX_MESSAGE_HISTORY:]):
             text = msg["text"]
             role = msg["role"]
 
