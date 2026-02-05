@@ -458,7 +458,7 @@ def router(state):
     """
     last_message = state["messages"][-1]
     logger = logging.getLogger("mcp_client")
-    logger.debug(f"🎯 Router: Last message type = {type(last_message).__name__}")
+    logger.info(f"[LangGraph] 🎯 Router: Last message type = {type(last_message).__name__}")
 
     # Stop signal check
     if is_stop_requested():
@@ -482,7 +482,7 @@ def router(state):
     if isinstance(last_message, AIMessage):
         tool_calls = getattr(last_message, "tool_calls", [])
         if tool_calls and len(tool_calls) > 0:
-            logger.debug(f"🎯 Router: Found {len(tool_calls)} tool calls - routing to TOOLS")
+            logger.info(f"[LangGraph] 🎯 Router: Found {len(tool_calls)} tool calls - routing to TOOLS")
             return "tools"
 
     # Get user's original message
@@ -521,7 +521,7 @@ def router(state):
             return "rag"
 
     # Default: continue to END
-    logger.debug(f"🎯 Router: Continuing to END")
+    logger.info(f"[LangGraph] 🎯 Router: Continuing to END")
     return "continue"
 
 
@@ -607,7 +607,7 @@ def create_langgraph_agent(llm_with_tools, tools):
 
         # If formatting tool results, use base LLM
         if isinstance(last_message, ToolMessage):
-            logger.info("🎯 Formatting tool results")
+            logger.info("[LangGraph] 🎯 Formatting tool results")
             start_time = time.time()
             try:
                 response = await asyncio.wait_for(
@@ -687,7 +687,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             )
 
             if should_use_langsearch:
-                logger.info("🎯 FORCED LANGSEARCH: User explicitly requested langsearch")
+                logger.info("[LangGraph] 🎯 FORCED LANGSEARCH: User explicitly requested langsearch")
 
                 langsearch = get_langsearch_client()
 
@@ -709,7 +709,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                         search_result = await langsearch.search(query)
 
                         if search_result["success"] and search_result["results"]:
-                            logger.info("✅ LangSearch successful - passing to LLM for processing")
+                            logger.info("[LangGraph] ✅ LangSearch successful - passing to LLM for processing")
                             search_context = search_result["results"]
 
                             augmented_prompt = f"""I searched the web using LangSearch and found the following results:
@@ -759,7 +759,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
                 if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
                     has_project_context = True
-                    logger.info("🎯 Found project context in conversation - using code_assistant")
+                    logger.info("[LangGraph] 🎯 Found project context in conversation - using code_assistant")
                     break
 
             if has_project_context:
@@ -929,7 +929,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     search_result = await langsearch.search(user_message)
 
                     if search_result["success"] and search_result["results"]:
-                        logger.info("✅ LangSearch successful")
+                        logger.info("[LangGraph] ✅ LangSearch successful")
                         search_context = search_result["results"]
                         augmented_prompt = f"""WEB SEARCH RESULTS:
     {search_context}
@@ -957,14 +957,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                 ])
 
                 if needs_current_info:
-                    logger.info("🔍 Trying LangSearch fallback for current info")
+                    logger.info("[LangGraph] 🔍 Trying LangSearch fallback for current info")
                     langsearch = get_langsearch_client()
 
                     if langsearch.is_available():
                         search_result = await langsearch.search(user_message)
 
                         if search_result["success"] and search_result["results"]:
-                            logger.info("✅ LangSearch successful - augmenting")
+                            logger.info("[LangGraph] ✅ LangSearch successful - augmenting")
                             search_context = search_result["results"]
                             augmented_prompt = f"""Previous answer: {response.content}
 
@@ -1041,7 +1041,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             }
 
         try:
-            logger.info("📥 Starting ingest operation...")
+            logger.info("[LangGraph] 📥 Starting ingest operation...")
             result = await ingest_tool.ainvoke({"limit": 5})
             msg = AIMessage(content=f"Ingestion complete: {result}")
             return {
@@ -1196,7 +1196,7 @@ def create_langgraph_agent(llm_with_tools, tools):
     workflow.add_edge("rag", END)
 
     app = workflow.compile()
-    logger.info("✅ LangGraph agent compiled successfully")
+    logger.info("[LangGraph] ✅ LangGraph agent compiled successfully")
     return app
 
 
@@ -1204,7 +1204,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
     """Execute the agent with the given user message and track metrics"""
     start_time = time.time()
     clear_stop()
-    logger.info("✅ Stop signal cleared for new request")
+    logger.info("[LangGraph] ✅ Stop signal cleared for new request")
 
     try:
         if METRICS_AVAILABLE:
