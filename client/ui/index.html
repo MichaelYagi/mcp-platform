@@ -2098,284 +2098,98 @@
             const mathInline = [];
             const mathBlock = [];
 
-            // --- Extract LaTeX-style math blocks $$...$$ ---
+            // --- 1. Extract Math and Code (Shield them from formatting) ---
             text = text.replace(/\$\$([\s\S]*?)\$\$/g, (m, math) => {
-                const i = mathBlock.length;
-                mathBlock.push(math);
-                return `@@MATHBLOCK_${i}@@`;
+                const i = mathBlock.length; mathBlock.push(math); return `@@MATHBLOCK_${i}@@`;
             });
-
-            // --- Extract LaTeX-style math blocks \[...\] ---
             text = text.replace(/\\\[([\s\S]*?)\\\]/g, (m, math) => {
-                const i = mathBlock.length;
-                mathBlock.push(math);
-                return `@@MATHBLOCK_${i}@@`;
+                const i = mathBlock.length; mathBlock.push(math); return `@@MATHBLOCK_${i}@@`;
             });
-
-            // --- Extract LaTeX-style inline math \(...\) ---
             text = text.replace(/\\\(([\s\S]*?)\\\)/g, (m, math) => {
-                const i = mathInline.length;
-                mathInline.push(math);
-                return `@@MATHINLINE_${i}@@`;
+                const i = mathInline.length; mathInline.push(math); return `@@MATHINLINE_${i}@@`;
             });
-
-            // --- Extract fenced code blocks ---
             text = text.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (m, lang, code) => {
-                const i = blocks.length;
-                blocks.push({ lang: lang || "code", code });
-                return `@@CODEBLOCK_${i}@@`;
+                const i = blocks.length; blocks.push({ lang: lang || "code", code }); return `@@CODEBLOCK_${i}@@`;
             });
-
-            // --- Extract triple-quoted blocks ---
             text = text.replace(/'''([\s\S]*?)'''/g, (m, code) => {
-                const i = blocks.length;
-                blocks.push({ lang: "code", code });
-                return `@@CODEBLOCK_${i}@@`;
+                const i = blocks.length; blocks.push({ lang: "code", code }); return `@@CODEBLOCK_${i}@@`;
             });
-
-            // --- Extract inline code ---
             text = text.replace(/`([^`]+)`/g, (m, code) => {
-                const i = inline.length;
-                inline.push(code);
-                return `@@INLINE_${i}@@`;
+                const i = inline.length; inline.push(code); return `@@INLINE_${i}@@`;
             });
 
-            // --- Escape HTML ---
-            text = text
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;");
+            // --- 2. Escape HTML and Format Body ---
+            text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-            // --- Headings ---
-            text = text.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>");
-            text = text.replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>");
-            text = text.replace(/^####\s+(.+)$/gm, "<h4>$1</h4>");
-            text = text.replace(/^###\s+(.+)$/gm, "<h3>$1</h3>");
-            text = text.replace(/^##\s+(.+)$/gm, "<h2>$1</h2>");
-            text = text.replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
+            text = text.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>")
+                       .replace(/^#####\s+(.+)$/gm, "<h5>$1</h5>")
+                       .replace(/^####\s+(.+)$/gm, "<h4>$1</h4>")
+                       .replace(/^###\s+(.+)$/gm, "<h3>$1</h3>")
+                       .replace(/^##\s+(.+)$/gm, "<h2>$1</h2>")
+                       .replace(/^#\s+(.+)$/gm, "<h1>$1</h1>");
 
-            // --- Bold / italic / strike ---
-            text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
-            text = text.replace(/___(.+?)___/g, "<strong><em>$1</em></strong>");
-            text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-            text = text.replace(/__(.+?)__/g, "<strong>$1</strong>");
-            text = text.replace(/\*(.+?)\*/g, "<em>$1</em>");
-            text = text.replace(/~~(.+?)~~/g, "<del>$1</del>");
+            text = text.replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+                       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+                       .replace(/\*(.+?)\*/g, "<em>$1</em>")
+                       .replace(/~~(.+?)~~/g, "<del>$1</del>");
 
-            // --- Blockquotes ---
             text = text.replace(/^>\s+(.+)$/gm, "<blockquote>$1</blockquote>");
-            text = text.replace(/(<\/blockquote>)\s*(<blockquote>)/g, "<br>");
-
-            // --- Horizontal rules ---
             text = text.replace(/^([-*_]){3,}$/gm, "<hr>");
+            text = text.replace(/^- /gm, "&bull; ").replace(/^\* /gm, "&bull; ");
 
-            // --- Lists ---
-            text = text.replace(/^- /gm, "&bull; ");
-            text = text.replace(/^\* /gm, "&bull; ");
-
-            // --- TABLES (must run BEFORE line-break conversion) ---
-            text = text.replace(
-                /^(\|.+\|)\s*\n(\|[-:\s|]+\|)\s*\n((?:\|.*\|\s*\n?)*)/gm,
-                (match, header, divider, rows) => {
-                    const makeRow = row =>
-                        "<tr>" +
-                        row
-                            .trim()
-                            .slice(1, -1)
-                            .split("|")
-                            .map(cell => `<td>${cell.trim()}</td>`)
-                            .join("") +
-                        "</tr>";
-
-                    const thead =
-                        "<thead>" +
-                        makeRow(header)
-                            .replace(/<td>/g, "<th>")
-                            .replace(/<\/td>/g, "</th>") +
-                        "</thead>";
-
-                    const tbody =
-                        "<tbody>" +
-                        rows
-                            .trim()
-                            .split("\n")
-                            .filter(r => r.trim().startsWith("|"))
-                            .map(makeRow)
-                            .join("") +
-                        "</tbody>";
-
-                    return `<table>${thead}${tbody}</table>`;
-                }
-            );
-
-            // --- Line breaks (must run AFTER tables) ---
-            text = text.replace(/\n\s*\n/g, "<br><br>");
-            text = text.replace(/\n/g, "<br>");
-
-            // --- Restore inline code ---
-            text = text.replace(/@@INLINE_(\d+)@@/g, (m, i) => {
-                const code = inline[i]
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;");
-                return `<code>${code}</code>`;
+            // --- 3. Tables ---
+            text = text.replace(/^(\|.+\|)\s*\n(\|[-:\s|]+\|)\s*\n((?:\|.*\|\s*\n?)*)/gm, (match, header, divider, rows) => {
+                const makeRow = row => "<tr>" + row.trim().slice(1, -1).split("|").map(cell => `<td>${cell.trim()}</td>`).join("") + "</tr>";
+                const thead = "<thead>" + makeRow(header).replace(/<td>/g, "<th>").replace(/<\/td>/g, "</th>") + "</thead>";
+                const tbody = "<tbody>" + rows.trim().split("\n").filter(r => r.trim().startsWith("|")).map(makeRow).join("") + "</tbody>";
+                return `<table>${thead}${tbody}</table>`;
             });
 
-            // --- Restore code blocks ---
+            text = text.replace(/\n\s*\n/g, "<br><br>").replace(/\n/g, "<br>");
+
+            // --- 4. Restore and Process Math ---
+            const processMath = (math) => {
+                math = math.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+                // Symbols
+                const symbols = {
+                    '\\pm': '±', '\\times': '×', '\\div': '÷', '\\cdot': '·', '\\neq': '≠',
+                    '\\leq': '≤', '\\geq': '≥', '\\approx': '≈', '\\infty': '∞', '\\pi': 'π',
+                    '\\rightarrow': '→', '\\forall': '∀', '\\exists': '∃', '\\degree': '°'
+                };
+                Object.entries(symbols).forEach(([tex, sym]) => { math = math.split(tex).join(sym); });
+
+                // --- THE FIX: N-th Root (e.g., \sqrt[5]{3}) ---
+                // Must happen BEFORE standard sqrt
+                math = math.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, '<sup>$1</sup>√($2)');
+
+                // Standard Square Root
+                math = math.replace(/\\sqrt\{([^}]+)\}/g, '√($1)');
+
+                // Superscripts (Exponents)
+                math = math.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
+                math = math.replace(/\^([a-zA-Z0-9+-]+)/g, '<sup>$1</sup>');
+
+                // Subscripts (e.g., x_2)
+                math = math.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
+                math = math.replace(/_([a-zA-Z0-9+-]+)/g, '<sub>$1</sub>');
+
+                // Fractions
+                math = math.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
+
+                return `<strong>${math}</strong>`;
+            };
+
+            // --- 5. Final Reassembly ---
+            text = text.replace(/@@INLINE_(\d+)@@/g, (m, i) => `<code>${inline[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`);
             text = text.replace(/@@CODEBLOCK_(\d+)@@/g, (m, i) => {
                 const block = blocks[i];
-                const escaped = block.code
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;");
+                const escaped = block.code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 return `<pre><code class="language-${block.lang}">${escaped.trim()}</code></pre>`;
             });
 
-            // --- Restore inline math \(...\) ---
-            text = text.replace(/@@MATHINLINE_(\d+)@@/g, (m, i) => {
-                let math = mathInline[i];
-
-                // Convert LaTeX symbols
-                math = math.replace(/\\pm/g, '±');
-                math = math.replace(/\\mp/g, '∓');
-                math = math.replace(/\\times/g, '×');
-                math = math.replace(/\\div/g, '÷');
-                math = math.replace(/\\cdot/g, '·');
-                math = math.replace(/\\leq/g, '≤');
-                math = math.replace(/\\geq/g, '≥');
-                math = math.replace(/\\neq/g, '≠');
-                math = math.replace(/\\approx/g, '≈');
-                math = math.replace(/\\equiv/g, '≡');
-                math = math.replace(/\\ll/g, '≪');
-                math = math.replace(/\\gg/g, '≫');
-                math = math.replace(/\\propto/g, '∝');
-                math = math.replace(/\\infty/g, '∞');
-                math = math.replace(/\\partial/g, '∂');
-                math = math.replace(/\\nabla/g, '∇');
-                math = math.replace(/\\int/g, '∫');
-                math = math.replace(/\\sum/g, '∑');
-                math = math.replace(/\\prod/g, '∏');
-                math = math.replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)');
-                math = math.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
-                math = math.replace(/\\pi/g, 'π');
-                math = math.replace(/\\theta/g, 'θ');
-                math = math.replace(/\\alpha/g, 'α');
-                math = math.replace(/\\beta/g, 'β');
-                math = math.replace(/\\gamma/g, 'γ');
-                math = math.replace(/\\delta/g, 'δ');
-                math = math.replace(/\\epsilon/g, 'ε');
-                math = math.replace(/\\lambda/g, 'λ');
-                math = math.replace(/\\mu/g, 'μ');
-                math = math.replace(/\\sigma/g, 'σ');
-                math = math.replace(/\\omega/g, 'ω');
-                math = math.replace(/\\Omega/g, 'Ω');
-                math = math.replace(/\\Sigma/g, 'Σ');
-                math = math.replace(/\\Delta/g, 'Δ');
-                math = math.replace(/\\Gamma/g, 'Γ');
-                math = math.replace(/\\rightarrow/g, '→');
-                math = math.replace(/\\leftarrow/g, '←');
-                math = math.replace(/\\Rightarrow/g, '⇒');
-                math = math.replace(/\\Leftarrow/g, '⇐');
-                math = math.replace(/\\leftrightarrow/g, '↔');
-                math = math.replace(/\\Leftrightarrow/g, '⇔');
-                math = math.replace(/\\in/g, '∈');
-                math = math.replace(/\\notin/g, '∉');
-                math = math.replace(/\\subset/g, '⊂');
-                math = math.replace(/\\subseteq/g, '⊆');
-                math = math.replace(/\\supset/g, '⊃');
-                math = math.replace(/\\supseteq/g, '⊇');
-                math = math.replace(/\\cup/g, '∪');
-                math = math.replace(/\\cap/g, '∩');
-                math = math.replace(/\\emptyset/g, '∅');
-                math = math.replace(/\\forall/g, '∀');
-                math = math.replace(/\\exists/g, '∃');
-                math = math.replace(/\\neg/g, '¬');
-                math = math.replace(/\\land/g, '∧');
-                math = math.replace(/\\lor/g, '∨');
-                math = math.replace(/\\oplus/g, '⊕');
-                math = math.replace(/\\otimes/g, '⊗');
-                math = math.replace(/\\degree/g, '°');
-                math = math.replace(/\\circ/g, '∘');
-
-                math = math
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;");
-                return `<strong>${math}</strong>`;
-            });
-
-            // --- Restore block math \[...\] ---
-            text = text.replace(/@@MATHBLOCK_(\d+)@@/g, (m, i) => {
-                let math = mathBlock[i];
-
-                // Convert LaTeX symbols
-                math = math.replace(/\\pm/g, '±');
-                math = math.replace(/\\mp/g, '∓');
-                math = math.replace(/\\times/g, '×');
-                math = math.replace(/\\div/g, '÷');
-                math = math.replace(/\\cdot/g, '·');
-                math = math.replace(/\\leq/g, '≤');
-                math = math.replace(/\\geq/g, '≥');
-                math = math.replace(/\\neq/g, '≠');
-                math = math.replace(/\\approx/g, '≈');
-                math = math.replace(/\\equiv/g, '≡');
-                math = math.replace(/\\ll/g, '≪');
-                math = math.replace(/\\gg/g, '≫');
-                math = math.replace(/\\propto/g, '∝');
-                math = math.replace(/\\infty/g, '∞');
-                math = math.replace(/\\partial/g, '∂');
-                math = math.replace(/\\nabla/g, '∇');
-                math = math.replace(/\\int/g, '∫');
-                math = math.replace(/\\sum/g, '∑');
-                math = math.replace(/\\prod/g, '∏');
-                math = math.replace(/\\sqrt\{([^}]+)\}/g, 'sqrt($1)');
-                math = math.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
-                math = math.replace(/\\pi/g, 'π');
-                math = math.replace(/\\theta/g, 'θ');
-                math = math.replace(/\\alpha/g, 'α');
-                math = math.replace(/\\beta/g, 'β');
-                math = math.replace(/\\gamma/g, 'γ');
-                math = math.replace(/\\delta/g, 'δ');
-                math = math.replace(/\\epsilon/g, 'ε');
-                math = math.replace(/\\lambda/g, 'λ');
-                math = math.replace(/\\mu/g, 'μ');
-                math = math.replace(/\\sigma/g, 'σ');
-                math = math.replace(/\\omega/g, 'ω');
-                math = math.replace(/\\Omega/g, 'Ω');
-                math = math.replace(/\\Sigma/g, 'Σ');
-                math = math.replace(/\\Delta/g, 'Δ');
-                math = math.replace(/\\Gamma/g, 'Γ');
-                math = math.replace(/\\rightarrow/g, '→');
-                math = math.replace(/\\leftarrow/g, '←');
-                math = math.replace(/\\Rightarrow/g, '⇒');
-                math = math.replace(/\\Leftarrow/g, '⇐');
-                math = math.replace(/\\leftrightarrow/g, '↔');
-                math = math.replace(/\\Leftrightarrow/g, '⇔');
-                math = math.replace(/\\in/g, '∈');
-                math = math.replace(/\\notin/g, '∉');
-                math = math.replace(/\\subset/g, '⊂');
-                math = math.replace(/\\subseteq/g, '⊆');
-                math = math.replace(/\\supset/g, '⊃');
-                math = math.replace(/\\supseteq/g, '⊇');
-                math = math.replace(/\\cup/g, '∪');
-                math = math.replace(/\\cap/g, '∩');
-                math = math.replace(/\\emptyset/g, '∅');
-                math = math.replace(/\\forall/g, '∀');
-                math = math.replace(/\\exists/g, '∃');
-                math = math.replace(/\\neg/g, '¬');
-                math = math.replace(/\\land/g, '∧');
-                math = math.replace(/\\lor/g, '∨');
-                math = math.replace(/\\oplus/g, '⊕');
-                math = math.replace(/\\otimes/g, '⊗');
-                math = math.replace(/\\degree/g, '°');
-                math = math.replace(/\\circ/g, '∘');
-
-                math = math
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;");
-                return `<strong>${math}</strong>`;
-            });
+            text = text.replace(/@@MATHINLINE_(\d+)@@/g, (m, i) => processMath(mathInline[i]));
+            text = text.replace(/@@MATHBLOCK_(\d+)@@/g, (m, i) => processMath(mathBlock[i]));
 
             return text;
         }
