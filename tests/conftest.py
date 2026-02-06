@@ -33,10 +33,9 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 def pytest_configure(config):
     """Configure pytest environment"""
-    # Create directories
-    test_dir = Path(__file__).parent
-    (test_dir / "logs").mkdir(exist_ok=True)
-    (test_dir / "results").mkdir(exist_ok=True)
+    # Create results directory (relative to where pytest runs from)
+    results_dir = Path("results")
+    results_dir.mkdir(exist_ok=True)
 
     # Set test markers
     config.addinivalue_line("markers", "unit: Unit tests")
@@ -63,25 +62,8 @@ def pytest_collection_modifyitems(config, items):
 def pytest_sessionfinish(session, exitstatus):
     """Hook that runs after all tests complete - generate HTML from XML"""
     if exitstatus in [0, 1]:  # Success or test failures (but not collection errors)
-        # Find the results directory - could be tests/results or just results
-        test_dir = Path(__file__).parent
-        possible_results_dirs = [
-            test_dir / "results",  # When running from project root
-            test_dir.parent / "results",  # When running from tests/ dir
-        ]
-
-        # Find which one has the XML files
-        results_dir = None
-        for potential_dir in possible_results_dirs:
-            if (potential_dir / "junit.xml").exists() or (potential_dir / "coverage.xml").exists():
-                results_dir = potential_dir
-                break
-
-        # If no XML files found yet, use the first option and create it
-        if results_dir is None:
-            results_dir = test_dir / "results"
-            results_dir.mkdir(exist_ok=True)
-
+        # Results directory is wherever pytest was run from + results/
+        results_dir = Path("results").absolute()
         html_generator = results_dir / "generate_html.py"
 
         if html_generator.exists():
@@ -119,7 +101,6 @@ def pytest_sessionfinish(session, exitstatus):
                 print(f"⚠️  Could not generate HTML reports: {e}")
         else:
             print(f"\n⚠️  HTML generator not found at: {html_generator}")
-            print(f"   Looked in: {results_dir}")
 
 
 # ═══════════════════════════════════════════════════════════════════
