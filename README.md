@@ -399,7 +399,175 @@ curl http://localhost:8010/tool-categories
 
 ---
 
-## 6. Architecture
+## 6. Testing
+
+### Running Tests
+
+The project includes a comprehensive test suite with 44+ tests covering unit, integration, and end-to-end scenarios.
+
+**Run all tests:**
+```bash
+pytest
+```
+
+**Run specific test categories:**
+```bash
+pytest -m unit              # Fast unit tests only
+pytest -m integration       # Integration tests
+pytest -m e2e              # End-to-end tests
+```
+
+**Run with coverage:**
+```bash
+pytest -c tests/pytest.coverage.ini
+```
+
+**Run specific test file:**
+```bash
+pytest tests/unit/test_session_manager.py
+pytest tests/integration/test_websocket_flow.py
+```
+
+### Test Reports
+
+After running tests, reports are automatically generated in `tests/results/`:
+
+- **`junit.xml`** - Test results for CI/CD (Jenkins, GitHub Actions)
+- **`coverage.xml`** - Coverage data for Codecov/Coveralls  
+- **`test-report.html`** - Interactive HTML test report
+- **`coverage-report.html`** - Coverage overview with per-file metrics
+
+**View HTML reports:**
+```bash
+# Test results
+open tests/results/test-report.html
+
+# Coverage report
+open tests/results/coverage-report.html
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py              # Shared fixtures & config
+├── pytest.ini              # Test configuration
+├── unit/                   # Fast, isolated tests
+│   ├── test_session_manager.py
+│   ├── test_models.py
+│   ├── test_context_tracker.py
+│   ├── test_intent_patterns.py
+│   └── test_code_review_tools.py
+├── integration/            # Multiple component tests
+│   ├── test_websocket_flow.py
+│   └── test_langgraph_agent.py
+├── e2e/                   # Full system tests
+│   └── test_full_conversation.py
+└── results/               # Generated reports
+    ├── junit.xml
+    ├── coverage.xml
+    ├── test-report.html
+    ├── coverage-report.html
+    └── generate_html.py
+```
+
+### Writing Tests
+
+Tests use pytest with async support and comprehensive fixtures:
+
+```python
+import pytest
+from unittest.mock import MagicMock
+
+@pytest.mark.unit
+def test_create_session(session_manager):
+    """Test session creation"""
+    session_id = session_manager.create_session("Test Session")
+    
+    assert session_id is not None
+    assert session_id > 0
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_full_workflow(session_manager, mock_llm):
+    """Test complete conversation workflow"""
+    # Test implementation
+    pass
+```
+
+**Available fixtures:**
+- `session_manager` - Temporary database session manager
+- `mock_llm` - Mocked LLM for testing
+- `mock_websocket` - Mocked WebSocket connection
+- `temp_dir` - Temporary directory for test files
+- `sample_python_file` - Sample code for testing
+
+### Test Dependencies
+
+```bash
+# Install test dependencies
+pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist
+```
+
+### CI/CD Integration
+
+**GitHub Actions:**
+```yaml
+- name: Run tests
+  run: pytest
+
+- name: Upload coverage
+  uses: codecov/codecov-action@v3
+  with:
+    files: tests/results/coverage.xml
+```
+
+**GitLab CI:**
+```yaml
+test:
+  script:
+    - pytest
+  artifacts:
+    reports:
+      junit: tests/results/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: tests/results/coverage.xml
+```
+
+### Coverage Goals
+
+- **Current coverage:** ~90% of core client code
+- **Well-tested modules:**
+  - `session_manager.py` (90%+)
+  - `context_tracker.py` (62%+)
+  - `models.py` (40%+)
+  - `query_patterns.py` (66%+)
+
+### Running Tests from PyCharm
+
+1. Right-click `tests/` folder → **Run 'pytest in tests'**
+2. Or use the green play button next to test functions
+3. Reports auto-generate in `tests/results/`
+
+### Troubleshooting Tests
+
+**Import errors:**
+- Ensure you're in the project root: `cd /path/to/mcp_a2a`
+- Activate virtual environment: `source .venv/bin/activate`
+- Install dependencies: `pip install -r requirements.txt`
+
+**Async test failures:**
+- Install pytest-asyncio: `pip install pytest-asyncio`
+- Tests are auto-marked with `@pytest.mark.asyncio`
+
+**Coverage not working:**
+- Install pytest-cov: `pip install pytest-cov`
+- Use coverage config: `pytest -c tests/pytest.coverage.ini`
+
+---
+
+## 7. Architecture
 
 ### Multi-Server Design
 
@@ -441,7 +609,7 @@ mcp_a2a/
 
 ---
 
-## 7. Example Prompts & Troubleshooting
+## 8. Example Prompts & Troubleshooting
 
 ### Example Prompts
 
