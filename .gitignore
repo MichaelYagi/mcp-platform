@@ -26,3 +26,10 @@ test.py
 /models/
 /sessions/
 /client/last_model.txt
+/tests/results/results/coverage.xml
+/tests/results/results/junit.xml
+/tests/.coverage
+/tests/results/test-report.html
+/tests/results/junit.xml
+/tests/results/coverage-report.html
+/tests/results/coverage.xml

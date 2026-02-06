@@ -3,12 +3,18 @@ Shared pytest fixtures and configuration for MCP A2A test suite
 """
 import asyncio
 import os
+import sys
+import subprocess
 import pytest
 import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 from typing import AsyncGenerator, Dict, Any
+
+# Add project root to path so we can import client, servers, etc.
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
 
 # Set test environment variables before any imports
 os.environ["TESTING"] = "true"
@@ -19,6 +25,101 @@ os.environ["DISABLED_TOOLS"] = ""  # Enable all tools for testing
 # Import after env setup
 from client.session_manager import SessionManager
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+
+# ═══════════════════════════════════════════════════════════════════
+# HOOKS: Pytest Configuration
+# ═══════════════════════════════════════════════════════════════════
+
+def pytest_configure(config):
+    """Configure pytest environment"""
+    # Create directories
+    test_dir = Path(__file__).parent
+    (test_dir / "logs").mkdir(exist_ok=True)
+    (test_dir / "results").mkdir(exist_ok=True)
+
+    # Set test markers
+    config.addinivalue_line("markers", "unit: Unit tests")
+    config.addinivalue_line("markers", "integration: Integration tests")
+    config.addinivalue_line("markers", "e2e: End-to-end tests")
+    config.addinivalue_line("markers", "slow: Slow tests (>1 second)")
+    config.addinivalue_line("markers", "requires_ollama: Requires Ollama server")
+    config.addinivalue_line("markers", "requires_db: Requires database")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection"""
+    for item in items:
+        # Auto-mark async tests
+        if asyncio.iscoroutinefunction(item.function):
+            item.add_marker(pytest.mark.asyncio)
+
+        # Auto-mark integration tests (tests with multiple fixtures)
+        if len(item.fixturenames) > 3:
+            if "integration" not in item.keywords:
+                item.add_marker(pytest.mark.integration)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Hook that runs after all tests complete - generate HTML from XML"""
+    if exitstatus in [0, 1]:  # Success or test failures (but not collection errors)
+        # Find the results directory - could be tests/results or just results
+        test_dir = Path(__file__).parent
+        possible_results_dirs = [
+            test_dir / "results",  # When running from project root
+            test_dir.parent / "results",  # When running from tests/ dir
+        ]
+
+        # Find which one has the XML files
+        results_dir = None
+        for potential_dir in possible_results_dirs:
+            if (potential_dir / "junit.xml").exists() or (potential_dir / "coverage.xml").exists():
+                results_dir = potential_dir
+                break
+
+        # If no XML files found yet, use the first option and create it
+        if results_dir is None:
+            results_dir = test_dir / "results"
+            results_dir.mkdir(exist_ok=True)
+
+        html_generator = results_dir / "generate_html.py"
+
+        if html_generator.exists():
+            print("\n" + "=" * 70)
+            print("📊 Generating HTML reports from XML...")
+            print(f"📁 Results directory: {results_dir}")
+            print("=" * 70)
+
+            try:
+                # Run the HTML generator
+                result = subprocess.run(
+                    [sys.executable, str(html_generator)],
+                    cwd=str(results_dir),
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                if result.returncode == 0:
+                    print(result.stdout)
+                    print("=" * 70)
+                    print("✅ HTML reports generated successfully!")
+                    print(f"📁 Location: {results_dir}")
+                    print(f"   🧪 test-report.html")
+                    print(f"   📊 coverage-report.html")
+                    print("=" * 70)
+                else:
+                    print(f"⚠️  HTML generation had issues:")
+                    print(result.stdout)
+                    if result.stderr:
+                        print(result.stderr)
+            except subprocess.TimeoutExpired:
+                print("⚠️  HTML generation timed out")
+            except Exception as e:
+                print(f"⚠️  Could not generate HTML reports: {e}")
+        else:
+            print(f"\n⚠️  HTML generator not found at: {html_generator}")
+            print(f"   Looked in: {results_dir}")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -313,50 +414,6 @@ except:  # Bare except
     file_path = temp_dir / "vulnerable.py"
     file_path.write_text(code)
     return file_path
-
-
-# ═══════════════════════════════════════════════════════════════════
-# FIXTURES: MCP Server
-# ═══════════════════════════════════════════════════════════════════
-
-@pytest.fixture
-def mock_mcp_server():
-    """Mock MCP server instance"""
-    from unittest.mock import MagicMock
-
-    server = MagicMock()
-    server.name = "test-server"
-    server.tools = []
-
-    return server
-
-
-# ═══════════════════════════════════════════════════════════════════
-# HOOKS: Pytest Configuration
-# ═══════════════════════════════════════════════════════════════════
-
-def pytest_configure(config):
-    """Configure pytest environment"""
-    # Set test markers
-    config.addinivalue_line("markers", "unit: Unit tests")
-    config.addinivalue_line("markers", "integration: Integration tests")
-    config.addinivalue_line("markers", "e2e: End-to-end tests")
-    config.addinivalue_line("markers", "slow: Slow tests (>1 second)")
-    config.addinivalue_line("markers", "requires_ollama: Requires Ollama server")
-    config.addinivalue_line("markers", "requires_db: Requires database")
-
-
-def pytest_collection_modifyitems(config, items):
-    """Modify test collection"""
-    for item in items:
-        # Auto-mark async tests
-        if asyncio.iscoroutinefunction(item.function):
-            item.add_marker(pytest.mark.asyncio)
-
-        # Auto-mark integration tests (tests with multiple fixtures)
-        if len(item.fixturenames) > 3:
-            if "integration" not in item.keywords:
-                item.add_marker(pytest.mark.integration)
 
 
 # ═══════════════════════════════════════════════════════════════════
