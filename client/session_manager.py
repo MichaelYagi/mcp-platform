@@ -3,7 +3,8 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+
 
 class SessionManager:
     def __init__(self, db_path: str = None):
@@ -203,6 +204,40 @@ class SessionManager:
 
         conn.commit()
         conn.close()
+
+    def delete_all_sessions(self):
+        """Delete all sessions and all its messages"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM sessions')
+
+        cursor.execute('DELETE FROM messages')
+
+        conn.commit()
+        conn.close()
+
+    def get_sessions(self) -> list[Dict]:
+        """Get session details"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            SELECT id, name, created_at, updated_at 
+            FROM sessions
+        ''')
+
+        sessions = []
+        for row in cursor.fetchall():
+            sessions.append({
+                'id': row[0],
+                'name': row[1] or 'Untitled Session',
+                'created_at': row[2],
+                'updated_at': row[3]
+            })
+
+        conn.close()
+        return sessions
 
     def get_session(self, session_id: int) -> Optional[Dict]:
         """Get session details"""

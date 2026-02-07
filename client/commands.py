@@ -5,12 +5,16 @@ UPDATED: :tools command now filters disabled tools
 """
 from client.langgraph import create_langgraph_agent
 from client.llm_backend import GGUFModelRegistry
+from client.session_manager import SessionManager
 
 
 def get_commands_list():
     """Get list of available commands"""
     return [
         ":commands - List all available commands",
+        ":clear history - Clear all chat history",
+        ":clear session <id> - Clear session history",
+        ":sessions - List all available sessions",
         ":stop - Stop current operation (ingestion, search, etc.)",
         ":stats - Show performance metrics",
         ":tools - List available tools (disabled tools hidden)",
@@ -685,10 +689,37 @@ async def handle_command(
 
         return (True, f"✅ Switched to model: {new_model}\n💬 Chat history cleared", new_agent, new_model)
 
-    # # Clear history
-    # if command == ":clear history":
-    #     conversation_state["messages"] = []
-    #     return (True, "✅ Chat history cleared", None, None)
+    # Clear history
+    if command == ":clear history":
+        conversation_state["messages"] = []
+        sessionmanager = SessionManager()
+        sessionmanager.delete_all_sessions()
+        return (True, "✅ Chat history cleared", None, None)
+
+    # List all sessions
+    if command == ":sessions":
+        conversation_state["messages"] = []
+        sessionmanager = SessionManager()
+        sessions = sessionmanager.get_sessions()
+        session_list = []
+        for session in sessions:
+            session_id = session.get('id', 'No session ID')
+            session_name = session.get('name', 'No session name')
+            session_list.append(f"Session {session_id}: {session_name}")
+        if len(session_list) > 0:
+            return (True, "\n".join(session_list), None, None)
+        else:
+            return (True, "No sessions", None, None)
+
+    # Delete session
+    if command.startswith(":clear session "):
+        session_id = int(command[15:].strip())
+        sessionmanager = SessionManager()
+        session = sessionmanager.get_session(session_id)
+        if session is not None:
+            sessionmanager.delete_session(session_id)
+            return (True, f"✅ Session {session_id} - {session.get('name', 'No session name')} deleted", None, None)
+        return (True, "✅ Session not found", None, None)
 
     # Command not recognized
     return (False, None, None, None)

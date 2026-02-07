@@ -836,13 +836,7 @@ async def rag_node(state):
 # 4-TIER RESEARCH FALLBACK SYSTEM
 # Tools → Direct Access → LangSearch → LLM Knowledge
 async def research_node(state):
-    """
-    Perform source-based research with 4-tier fallback:
-    1. Check if a relevant TOOL exists (e.g., wikipedia_tool, reddit_tool)
-    2. Try DIRECT ACCESS (pre-configured URLs)
-    3. Try LANGSEARCH (find URLs)
-    4. Use LLM KNOWLEDGE (last resort with disclaimer)
-    """
+    """Perform source-based research by fetching website content with error handling"""
     logger = logging.getLogger("mcp_client")
 
     if is_stop_requested():
@@ -884,223 +878,172 @@ async def research_node(state):
 
     llm = state.get("llm")
 
-    # ═══════════════════════════════════════════════════════════════
-    # TIER 1: Check if a TOOL exists for this source (BEST!)
-    # ═══════════════════════════════════════════════════════════════
-    tools_dict = state.get("tools", {})
-    source_normalized = research_source.lower().replace("www.", "").replace(".com", "").replace(".org", "")
-
-    # Map source names to potential tool names
-    tool_mappings = {
-        "wikipedia": ["wikipedia_search", "wiki_search", "wikipedia_tool"],
-        "reddit": ["reddit_search", "reddit_tool"],
-        "github": ["github_search", "github_tool"],
-        "stackoverflow": ["stackoverflow_search", "stack_search"],
-        "rag": ["rag_search_tool"],
-        "knowledge": ["search_entries", "search_semantic"],
-    }
-
-    # Check if we have a matching tool
-    matching_tool = None
-    tool_name_found = None
-
-    for source_key, tool_names in tool_mappings.items():
-        if source_key in source_normalized:
-            for tool_name in tool_names:
-                if tool_name in tools_dict:
-                    matching_tool = tools_dict[tool_name]
-                    tool_name_found = tool_name
-                    break
-            if matching_tool:
-                break
-
-    if matching_tool:
-        logger.info(f"🔧 TIER 1: Found matching tool '{tool_name_found}' for '{research_source}'")
-
-        try:
-            # Call the tool
-            tool_result = await matching_tool.ainvoke({"query": query_cleaned})
-
-            if tool_result and str(tool_result).strip():
-                logger.info(f"✅ TIER 1: Tool returned results")
-
-                # Use LLM to synthesize tool results
-                tool_prompt = f"""I used the '{tool_name_found}' tool to search '{research_source}' and got these results:
-
-{tool_result}
-
-Based on these results from {research_source}, please answer: {query_cleaned}
-
-Provide a comprehensive answer that:
-1. Synthesizes information from the tool results
-2. Maintains accuracy to the source material
-3. Cites the source appropriately
-
-Answer:"""
-
-                tool_messages = state["messages"] + [HumanMessage(content=tool_prompt)]
-                response = await llm.ainvoke(tool_messages)
-
-                return {
-                    "messages": state["messages"] + [response],
-                    "llm": state.get("llm"),
-                    "current_model": state.get("current_model", "unknown")
-                }
-            else:
-                logger.warning(f"⚠️ TIER 1: Tool returned no results, falling back to TIER 2")
-
-        except Exception as e:
-            logger.warning(f"⚠️ TIER 1: Tool failed ({str(e)}), falling back to TIER 2")
-    else:
-        logger.info(f"ℹ️ TIER 1: No tool found for '{research_source}', trying TIER 2")
-
-    # ═══════════════════════════════════════════════════════════════
-    # TIER 2: Try DIRECT ACCESS (pre-configured URLs)
-    # ═══════════════════════════════════════════════════════════════
-    logger.info(f"🎯 TIER 2: Attempting direct access to '{research_source}'")
-
     try:
+        # Fetch content from source
         result = await search_and_fetch_source(research_source, query_cleaned)
 
-        if result.get("success"):
-            # ✅ SUCCESS: We got content from the source
-            fetched_content = result["content"]
-            urls_fetched = result.get("urls_fetched", 0)
-            method = result.get("method", "unknown")
-
-            logger.info(f"✅ TIER 2: Fetched content from {urls_fetched} pages (method: {method})")
-
-            research_prompt = f"""I have fetched content from '{research_source}' to answer your question.
-
-            {fetched_content}
-
-            Question: {query_cleaned}
-
-            **Instructions:**
-            - Write a comprehensive answer based on the content above
-            - Cite using the ACTUAL URL shown above (e.g., "According to Wikipedia (https://en.wikipedia.org/wiki/Donald_Trump)...")
-            - Do NOT use placeholders like "[SOURCE 1]" - use the real URL
-            - Include a References section at the end with the URL(s)
-
-            Your answer:"""
-
-            augmented_messages = state["messages"] + [HumanMessage(content=research_prompt)]
-            response = await llm.ainvoke(augmented_messages)
-
-            return {
-                "messages": state["messages"] + [response],
-                "llm": state.get("llm"),
-                "current_model": state.get("current_model", "unknown")
-            }
-
-        # ═══════════════════════════════════════════════════════════
-        # TIER 2 failed - log why and proceed to TIER 3
-        # ═══════════════════════════════════════════════════════════
-        error_msg = result.get("error", "Unknown error")
-        logger.warning(f"⚠️ TIER 2: Failed to fetch from '{research_source}': {error_msg}")
-        logger.info(f"🧠 TIER 3: Falling back to LLM's training knowledge")
-
-        # ═══════════════════════════════════════════════════════════
-        # TIER 3: Use LLM's training knowledge (LAST RESORT)
-        # ═══════════════════════════════════════════════════════════
-        fallback_prompt = f"""I attempted to access '{research_source}' to answer your question but was unable to retrieve content.
-
-**What I tried:**
-1. ✅ Checked for specialized tools - None available
-2. ❌ Direct access to {research_source} - Failed: {error_msg}
-3. 🧠 Now using my training knowledge (January 2025 cutoff)
-
-**Your question:** {query_cleaned}
-
-I'll answer based on my training knowledge about {research_source} and this topic.
-
-**Important**: This answer is based on my training data, NOT live access to {research_source}. For current information, please visit {research_source} directly.
-
-Answer:"""
-
-        fallback_messages = state["messages"] + [HumanMessage(content=fallback_prompt)]
-        response = await llm.ainvoke(fallback_messages)
-
-        # Add disclaimer footer
-        disclaimer = f"\n\n---\n\n⚠️ **Source Access Failed**\n" \
-                     f"- Could not access {research_source} directly\n" \
-                     f"- Reason: {error_msg}\n" \
-                     f"- This answer is from training data (January 2025)\n" \
-                     f"- For current info, visit {research_source} directly"
-
-        if hasattr(response, 'content'):
-            response.content = response.content + disclaimer
-
-        logger.info(f"✅ TIER 3: Answered from LLM training knowledge with disclaimer")
-
-        return {
-            "messages": state["messages"] + [response],
-            "llm": state.get("llm"),
-            "current_model": state.get("current_model", "unknown")
-        }
-
-    except Exception as e:
-        # ═══════════════════════════════════════════════════════════
-        # TIER 3 (Exception path): Complete failure
-        # ═══════════════════════════════════════════════════════════
-        logger.error(f"❌ TIER 2 exception: {str(e)}")
-        logger.info(f"🧠 TIER 3: Emergency fallback to LLM knowledge")
-
-        emergency_prompt = f"""I encountered an error while trying to research from '{research_source}':
-
-**Error:** {str(e)}
-
-**Your question:** {query_cleaned}
-
-I'll answer based on my training knowledge.
-
-**Disclaimer**: This is based on training data (January 2025), not live access to {research_source}.
-
-Answer:"""
-
-        emergency_messages = state["messages"] + [HumanMessage(content=emergency_prompt)]
-
-        try:
-            response = await llm.ainvoke(emergency_messages)
-
-            error_note = f"\n\n---\n\n⚠️ **Technical Error**\n" \
-                         f"- Could not access {research_source}\n" \
-                         f"- Error: {str(e)}\n" \
-                         f"- Answer is from training data only"
-
-            if hasattr(response, 'content'):
-                response.content = response.content + error_note
-
-            logger.info(f"✅ TIER 3: Emergency fallback succeeded")
-
-            return {
-                "messages": state["messages"] + [response],
-                "llm": state.get("llm"),
-                "current_model": state.get("current_model", "unknown")
-            }
-
-        except Exception as llm_error:
-            # Complete catastrophic failure
-            logger.error(f"❌ TIER 3: Even LLM fallback failed: {llm_error}")
-
+        if not result.get("success"):
+            error_msg = result.get("error", "Unknown error")
             return {
                 "messages": state["messages"] + [AIMessage(
-                    content=f"""❌ **Complete Research Failure**
-
-**Attempted:**
-1. Tool check - No matching tool
-2. Direct access to {research_source} - Failed: {str(e)}
-3. LLM fallback - Failed: {str(llm_error)}
-
-**Please try:**
-- Rephrasing your query
-- Using a different source
-- Asking without specifying a source
-- Checking your internet connection"""
+                    content=f"Unable to research from '{research_source}': {error_msg}"
                 )],
                 "llm": state.get("llm"),
                 "current_model": state.get("current_model", "unknown")
             }
+
+        # Successfully got content
+        fetched_content = result["content"]
+        urls_fetched = result.get("urls_fetched", 0)
+        logger.info(f"✅ Fetched content from {urls_fetched} pages ({len(fetched_content)} chars)")
+
+        # Build research prompt with citation instructions
+        research_prompt = f"""I have fetched content from '{research_source}'.
+
+{fetched_content}
+
+Question: {query_cleaned}
+
+**Instructions:**
+- Write a comprehensive answer based on the content above
+- Cite using the ACTUAL URL: {research_source}
+- Do NOT use placeholders like "[SOURCE 1]"
+- Include a References section at the end
+
+Your answer:"""
+
+        augmented_messages = state["messages"] + [HumanMessage(content=research_prompt)]
+
+        # ATTEMPT 1: Try with full content
+        try:
+            response = await asyncio.wait_for(
+                llm.ainvoke(augmented_messages),
+                timeout=600.0  # 10 minute timeout
+            )
+
+            logger.info("✅ Research synthesis completed")
+
+            return {
+                "messages": state["messages"] + [response],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
+
+        # CATCH: Timeout
+        except asyncio.TimeoutError:
+            logger.warning(f"⏱️ Research timed out, will retry with summarized content")
+
+        # CATCH: Context overflow (ValueError)
+        except ValueError as e:
+            error_str = str(e).lower()
+            if any(phrase in error_str for phrase in [
+                "context window", "exceed", "token", "too long", "maximum context"
+            ]):
+                logger.warning(f"⚠️ Context overflow: {str(e)[:100]}")
+            else:
+                # Different ValueError - re-raise
+                raise
+
+        # CATCH: Other context-related errors
+        except Exception as e:
+            error_str = str(e).lower()
+            if not any(phrase in error_str for phrase in ["context", "token", "length", "exceed"]):
+                # Not a context error - report it
+                logger.error(f"❌ Research failed: {e}")
+                return {
+                    "messages": state["messages"] + [AIMessage(content=f"Research error: {str(e)}")],
+                    "llm": state.get("llm"),
+                    "current_model": state.get("current_model", "unknown")
+                }
+
+        # ATTEMPT 2: Retry with summarization
+        logger.info("🔄 Retrying with content summarization...")
+
+        # Summarize the content
+        summary_prompt = f"""Summarize this content concisely, keeping key facts relevant to: "{query_cleaned}"
+
+{fetched_content}
+
+Provide a structured summary under 1000 words:"""
+
+        try:
+            summary_response = await asyncio.wait_for(
+                llm.ainvoke([HumanMessage(content=summary_prompt)]),
+                timeout=120.0  # 2 minute timeout for summary
+            )
+            summarized_content = summary_response.content
+            logger.info(f"✅ Summarized: {len(fetched_content)} → {len(summarized_content)} chars")
+
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ Summary timed out, using truncation")
+            summarized_content = fetched_content[:2000] + "\n\n[Content truncated]"
+
+        except Exception as e:
+            logger.error(f"❌ Summary failed: {e}, using truncation")
+            summarized_content = fetched_content[:2000] + "\n\n[Content truncated]"
+
+        # Try again with summarized content
+        retry_prompt = f"""I have fetched and SUMMARIZED content from '{research_source}'.
+
+SUMMARIZED CONTENT:
+{summarized_content}
+
+Question: {query_cleaned}
+
+**Instructions:**
+- Write a comprehensive answer based on the summary
+- Cite: {research_source}
+
+Your answer:"""
+
+        retry_messages = state["messages"] + [HumanMessage(content=retry_prompt)]
+
+        try:
+            response = await asyncio.wait_for(
+                llm.ainvoke(retry_messages),
+                timeout=300.0  # 5 minute timeout for retry
+            )
+
+            logger.info("✅ Research completed with summarized content")
+
+            # Add disclaimer
+            if hasattr(response, 'content'):
+                response.content += "\n\n---\n\n⚠️ **Note**: Answer based on summary due to content length."
+
+            return {
+                "messages": state["messages"] + [response],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
+
+        except asyncio.TimeoutError:
+            logger.error("❌ Retry also timed out")
+            return {
+                "messages": state["messages"] + [AIMessage(
+                    content=f"⏱️ Timeout: Research took too long. Try a more specific question."
+                )],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Retry failed: {e}")
+            return {
+                "messages": state["messages"] + [AIMessage(
+                    content=f"❌ Research Failed\n\nCould not process content.\n\n"
+                            f"Error: {str(e)}\n\nTry:\n- More specific question\n- Different source"
+                )],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
+
+    except Exception as e:
+        logger.error(f"❌ Research failed completely: {e}")
+        return {
+            "messages": state["messages"] + [AIMessage(content=f"Research error: {str(e)}")],
+            "llm": state.get("llm"),
+            "current_model": state.get("current_model", "unknown")
+        }
 
 def create_langgraph_agent(llm_with_tools, tools):
     """Create and compile the LangGraph agent"""

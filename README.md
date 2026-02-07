@@ -194,6 +194,9 @@ DISABLED_TOOLS=knowledge_base:*,todo:*  # Disable specific tools/categories
 These work in both CLI and web UI:
 ```
 :commands              - List all available commands
+:clear history         - Clear all chat history
+:clear session <id>    - Clear session
+:sessions              - List all sessions
 :stop                  - Stop current operation
 :stats                 - Show performance metrics
 :tools                 - List available tools (hides disabled)
