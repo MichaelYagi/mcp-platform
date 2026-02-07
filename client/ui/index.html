@@ -2146,6 +2146,7 @@
             });
 
             text = text.replace(/\n\s*\n/g, "<br><br>").replace(/\n/g, "<br>");
+            text = text.replace(/(<\/h[1-6]>)(<br>){2}/g, "$1<br>");
 
             // --- 4. Restore and Process Math ---
             const processMath = (math) => {
