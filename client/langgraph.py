@@ -588,6 +588,21 @@ def create_langgraph_agent(llm_with_tools, tools):
 
     base_llm = llm_with_tools.bound if hasattr(llm_with_tools, 'bound') else llm_with_tools
 
+    # ═══════════════════════════════════════════════════════════════════
+    # HELPER FUNCTION: Extract model name from LLM instance
+    # ═══════════════════════════════════════════════════════════════════
+    def get_model_name(llm):
+        """Extract model name from LLM instance"""
+        if hasattr(llm, 'model'):
+            return llm.model
+        elif hasattr(llm, 'model_name'):
+            return llm.model_name
+        elif hasattr(llm, 'model_path'):
+            from pathlib import Path
+            return Path(llm.model_path).stem
+        else:
+            return "unknown"
+
     async def call_model(state: AgentState):
         if is_stop_requested():
             logger.warning("🛑 call_model: Stop requested")
@@ -597,7 +612,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": state.get("ingest_completed", False),
-                "stopped": True
+                "stopped": True,
+                "current_model": get_model_name(base_llm)
             }
 
         messages = state["messages"]
@@ -623,7 +639,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                     "tools": state.get("tools", {}),
                     "llm": state.get("llm"),
                     "ingest_completed": state.get("ingest_completed", False),
-                    "stopped": state.get("stopped", False)
+                    "stopped": state.get("stopped", False),
+                    "current_model": get_model_name(base_llm)
                 }
             except asyncio.TimeoutError:
                 duration = time.time() - start_time
@@ -651,7 +668,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                     "tools": state.get("tools", {}),
                     "llm": state.get("llm"),
                     "ingest_completed": state.get("ingest_completed", False),
-                    "stopped": state.get("stopped", False)
+                    "stopped": state.get("stopped", False),
+                    "current_model": get_model_name(base_llm)
                 }
 
             except Exception as e:
@@ -728,7 +746,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 "tools": state.get("tools", {}),
                                 "llm": state.get("llm"),
                                 "ingest_completed": state.get("ingest_completed", False),
-                                "stopped": state.get("stopped", False)
+                                "stopped": state.get("stopped", False),
+                                "current_model": get_model_name(base_llm)
                             }
                         else:
                             logger.warning("⚠️ LangSearch returned no results")
@@ -746,7 +765,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                         "tools": state.get("tools", {}),
                         "llm": state.get("llm"),
                         "ingest_completed": state.get("ingest_completed", False),
-                        "stopped": state.get("stopped", False)
+                        "stopped": state.get("stopped", False),
+                        "current_model": get_model_name(base_llm)
                     }
 
         # ═══════════════════════════════════════════════════════════
@@ -822,15 +842,8 @@ def create_langgraph_agent(llm_with_tools, tools):
         else:
             llm_to_use = llm_with_tools
 
-        if hasattr(llm_to_use, 'model'):
-            current_model = llm_to_use.model
-        elif hasattr(llm_to_use, 'model_name'):
-            current_model = llm_to_use.model_name
-        elif hasattr(llm_to_use, 'model_path'):
-            from pathlib import Path
-            current_model = Path(llm_to_use.model_path).stem
-        else:
-            current_model = "unknown"
+        # Extract current model name
+        current_model = get_model_name(llm_to_use)
 
         logger.info(f"🧠 Calling LLM with {len(messages)} messages")
         logger.info(f"🤖 Model: {current_model}")
@@ -951,6 +964,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                         timeout=300.0
                     )
 
+                # Update current_model for fallback path
+                current_model = get_model_name(base_llm)
+
             elif not has_tool_calls and has_content:
                 needs_current_info = any(word in user_message.lower() for word in [
                     "current", "who is", "latest", "recent", "today", "now"
@@ -976,6 +992,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                             retry_messages = messages + [response, HumanMessage(content=augmented_prompt)]
                             response = await base_llm.ainvoke(retry_messages)
 
+                            # Update current_model for this path too
+                            current_model = get_model_name(base_llm)
+
             return {
                 "messages": messages + [response],
                 "tools": state.get("tools", {}),
@@ -999,7 +1018,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "llm": state.get("llm"),
                 "ingest_completed": state.get("ingest_completed", False),
                 "stopped": state.get("stopped", False),
-                "current_model": current_model
+                "current_model": get_model_name(base_llm)
             }
 
         except Exception as e:
@@ -1265,7 +1284,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "tools": tool_registry,
             "llm": llm,
             "ingest_completed": False,
-            "stopped": False
+            "stopped": False,
+            "current_model": "unknown"  # Will be updated by call_model
         })
 
         # ═══════════════════════════════════════════════════════════════
