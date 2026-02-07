@@ -466,14 +466,50 @@ RESEARCH_SOURCE_PATTERN = re.compile(
 )
 
 
-def extract_research_source(content: str):
-    """Extract source name from research request"""
-    match = RESEARCH_SOURCE_PATTERN.search(content)
-    if match:
-        for group in match.groups():
-            if group:
-                return group.strip()
-    return None
+def extract_research_sources(content: str) -> list:
+    """
+    Extract ALL sources from query (handles multiple sources).
+    Returns list of sources, e.g., ['url1', 'url2', 'domain.com']
+    """
+    sources = []
+
+    # Pattern 1: "using X and Y as sources" or "using X as a source"
+    pattern1 = re.compile(
+        r'\busing\s+(.+?)\s+as\s+(a\s+)?(source|sources)\b',
+        re.IGNORECASE
+    )
+    match1 = pattern1.search(content)
+    if match1:
+        source_text = match1.group(1)
+        # Split by "and" or ","
+        parts = re.split(r'\s+and\s+|,\s*', source_text)
+        sources.extend([p.strip() for p in parts if p.strip()])
+
+    # Pattern 2: "based on X and Y"
+    pattern2 = re.compile(
+        r'\bbased\s+on\s+(.+?)(?:\s+write|\s+create|\s+explain|,|$)',
+        re.IGNORECASE
+    )
+    match2 = pattern2.search(content)
+    if match2:
+        source_text = match2.group(1)
+        parts = re.split(r'\s+and\s+|,\s*', source_text)
+        sources.extend([p.strip() for p in parts if p.strip()])
+
+    # Pattern 3: Find all URLs explicitly (backup)
+    url_pattern = re.compile(r'https?://[^\s]+')
+    urls = url_pattern.findall(content)
+    sources.extend(urls)
+
+    # Deduplicate while preserving order
+    unique_sources = []
+    seen = set()
+    for s in sources:
+        if s and s not in seen:
+            unique_sources.append(s)
+            seen.add(s)
+
+    return unique_sources if unique_sources else None
 
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
@@ -741,7 +777,7 @@ def router(state):
     if user_message:
         content = user_message.content
 
-        research_source = extract_research_source(content)
+        research_source = extract_research_sources(content)
         if research_source:
             logger.info(f"🔬 Router: SOURCE-BASED RESEARCH detected: '{research_source}'")
             state["research_source"] = research_source
@@ -836,7 +872,7 @@ async def rag_node(state):
 # 4-TIER RESEARCH FALLBACK SYSTEM
 # Tools → Direct Access → LangSearch → LLM Knowledge
 async def research_node(state):
-    """Perform source-based research by fetching website content with error handling"""
+    """Perform source-based research with multi-source support and error handling"""
     logger = logging.getLogger("mcp_client")
 
     if is_stop_requested():
@@ -864,12 +900,12 @@ async def research_node(state):
 
     query = user_message.content
 
-    # Re-extract source from query
-    research_source = extract_research_source(query)
-    if not research_source:
-        research_source = "web"
+    # Extract ALL sources (supports multiple)
+    sources = extract_research_sources(query)
+    if not sources:
+        sources = ["web"]
 
-    logger.info(f"📚 Research source: '{research_source}'")
+    logger.info(f"📚 Research sources ({len(sources)}): {sources}")
 
     # Clean query
     query_cleaned = RESEARCH_SOURCE_PATTERN.sub('', query).strip()
@@ -879,36 +915,72 @@ async def research_node(state):
     llm = state.get("llm")
 
     try:
-        # Fetch content from source
-        result = await search_and_fetch_source(research_source, query_cleaned)
+        # Fetch from ALL sources
+        all_content = []
+        all_urls = []
+        total_urls_fetched = 0
+        failed_sources = []
 
-        if not result.get("success"):
-            error_msg = result.get("error", "Unknown error")
+        for i, source in enumerate(sources, 1):
+            logger.info(f"🔍 [{i}/{len(sources)}] Fetching from: {source}")
+
+            try:
+                result = await search_and_fetch_source(source, query_cleaned)
+
+                if result.get("success"):
+                    all_content.append(result["content"])
+                    total_urls_fetched += result.get("urls_fetched", 0)
+                    all_urls.append(source)
+                    logger.info(f"✅ [{i}/{len(sources)}] Fetched from {source}")
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    logger.warning(f"⚠️ [{i}/{len(sources)}] Failed: {source} - {error_msg}")
+                    failed_sources.append(f"{source} ({error_msg})")
+
+            except Exception as e:
+                logger.error(f"❌ [{i}/{len(sources)}] Error: {source} - {e}")
+                failed_sources.append(f"{source} (Exception: {str(e)[:50]})")
+
+        # Check if we got any content
+        if not all_content:
+            failed_list = "\n".join([f"  - {s}" for s in failed_sources])
             return {
                 "messages": state["messages"] + [AIMessage(
-                    content=f"Unable to research from '{research_source}': {error_msg}"
+                    content=f"❌ Unable to fetch content from any sources.\n\n"
+                            f"**Attempted:**\n{failed_list}\n\n"
+                            f"Try:\n- Checking the URLs\n- Using different sources\n- Simplifying your query"
                 )],
                 "llm": state.get("llm"),
                 "current_model": state.get("current_model", "unknown")
             }
 
-        # Successfully got content
-        fetched_content = result["content"]
-        urls_fetched = result.get("urls_fetched", 0)
-        logger.info(f"✅ Fetched content from {urls_fetched} pages ({len(fetched_content)} chars)")
+        # Combine all fetched content
+        combined_content = "\n\n".join(all_content)
 
-        # Build research prompt with citation instructions
-        research_prompt = f"""I have fetched content from '{research_source}'.
+        success_count = len(all_content)
+        logger.info(f"✅ Combined content from {success_count}/{len(sources)} sources ({len(combined_content)} chars)")
 
-{fetched_content}
+        if failed_sources:
+            logger.warning(f"⚠️ Failed sources: {failed_sources}")
+
+        # Build research prompt with all sources
+        sources_list = "\n".join([f"  {i + 1}. {url}" for i, url in enumerate(all_urls)])
+
+        research_prompt = f"""I have fetched content from {success_count} source(s):
+
+{sources_list}
+
+CONTENT FROM ALL SOURCES:
+{combined_content}
 
 Question: {query_cleaned}
 
 **Instructions:**
-- Write a comprehensive answer based on the content above
-- Cite using the ACTUAL URL: {research_source}
-- Do NOT use placeholders like "[SOURCE 1]"
-- Include a References section at the end
+- Write a comprehensive answer synthesizing information from ALL {success_count} sources
+- Cite each source using its ACTUAL URL (listed above)
+- Example: "According to the Wikipedia article on Donald Trump (https://...), ..."
+- When information comes from multiple sources, note this
+- Include a References section listing all {success_count} sources at the end
 
 Your answer:"""
 
@@ -922,6 +994,12 @@ Your answer:"""
             )
 
             logger.info("✅ Research synthesis completed")
+
+            # Add note about failed sources if any
+            if failed_sources and hasattr(response, 'content'):
+                failed_note = "\n\n---\n\n⚠️ **Note**: Some sources could not be accessed:\n" + \
+                              "\n".join([f"- {s}" for s in failed_sources])
+                response.content += failed_note
 
             return {
                 "messages": state["messages"] + [response],
@@ -960,9 +1038,9 @@ Your answer:"""
         logger.info("🔄 Retrying with content summarization...")
 
         # Summarize the content
-        summary_prompt = f"""Summarize this content concisely, keeping key facts relevant to: "{query_cleaned}"
+        summary_prompt = f"""Summarize this content from {success_count} sources concisely, keeping key facts relevant to: "{query_cleaned}"
 
-{fetched_content}
+{combined_content}
 
 Provide a structured summary under 1000 words:"""
 
@@ -972,18 +1050,21 @@ Provide a structured summary under 1000 words:"""
                 timeout=120.0  # 2 minute timeout for summary
             )
             summarized_content = summary_response.content
-            logger.info(f"✅ Summarized: {len(fetched_content)} → {len(summarized_content)} chars")
+            logger.info(f"✅ Summarized: {len(combined_content)} → {len(summarized_content)} chars")
 
         except asyncio.TimeoutError:
             logger.warning("⚠️ Summary timed out, using truncation")
-            summarized_content = fetched_content[:2000] + "\n\n[Content truncated]"
+            summarized_content = combined_content[:2000] + "\n\n[Content truncated]"
 
         except Exception as e:
             logger.error(f"❌ Summary failed: {e}, using truncation")
-            summarized_content = fetched_content[:2000] + "\n\n[Content truncated]"
+            summarized_content = combined_content[:2000] + "\n\n[Content truncated]"
 
         # Try again with summarized content
-        retry_prompt = f"""I have fetched and SUMMARIZED content from '{research_source}'.
+        retry_prompt = f"""I have fetched and SUMMARIZED content from {success_count} sources.
+
+Sources:
+{sources_list}
 
 SUMMARIZED CONTENT:
 {summarized_content}
@@ -992,7 +1073,8 @@ Question: {query_cleaned}
 
 **Instructions:**
 - Write a comprehensive answer based on the summary
-- Cite: {research_source}
+- Cite each source by its URL
+- Note this is based on summarized content
 
 Your answer:"""
 
@@ -1006,9 +1088,19 @@ Your answer:"""
 
             logger.info("✅ Research completed with summarized content")
 
-            # Add disclaimer
+            # Add disclaimers
+            disclaimers = [
+                "\n\n---\n\n⚠️ **Note**: Answer based on summary due to content length."
+            ]
+
+            if failed_sources:
+                disclaimers.append(
+                    "\n⚠️ **Some sources unavailable:**\n" +
+                    "\n".join([f"- {s}" for s in failed_sources])
+                )
+
             if hasattr(response, 'content'):
-                response.content += "\n\n---\n\n⚠️ **Note**: Answer based on summary due to content length."
+                response.content += "".join(disclaimers)
 
             return {
                 "messages": state["messages"] + [response],
@@ -1020,7 +1112,8 @@ Your answer:"""
             logger.error("❌ Retry also timed out")
             return {
                 "messages": state["messages"] + [AIMessage(
-                    content=f"⏱️ Timeout: Research took too long. Try a more specific question."
+                    content=f"⏱️ Timeout: Research took too long even with {success_count} sources.\n\n"
+                            f"Try:\n- More specific question\n- Fewer sources\n- Asking about specific sections"
                 )],
                 "llm": state.get("llm"),
                 "current_model": state.get("current_model", "unknown")
@@ -1030,8 +1123,10 @@ Your answer:"""
             logger.error(f"❌ Retry failed: {e}")
             return {
                 "messages": state["messages"] + [AIMessage(
-                    content=f"❌ Research Failed\n\nCould not process content.\n\n"
-                            f"Error: {str(e)}\n\nTry:\n- More specific question\n- Different source"
+                    content=f"❌ Research Failed\n\n"
+                            f"Could not process content from {success_count} sources.\n\n"
+                            f"Error: {str(e)}\n\n"
+                            f"Try:\n- More specific question\n- Fewer sources\n- Different sources"
                 )],
                 "llm": state.get("llm"),
                 "current_model": state.get("current_model", "unknown")
