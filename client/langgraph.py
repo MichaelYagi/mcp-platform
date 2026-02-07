@@ -459,9 +459,9 @@ class AgentState(TypedDict):
 
 # Research source detection
 RESEARCH_SOURCE_PATTERN = re.compile(
-    r'\busing\s+(?P<source>[\w\s\.]+?)\s+as\s+(a\s+)?source\b'
-    r'|\bbased\s+on\s+(?P<source2>[\w\s\.]+?)(?:\s|,|$)'
-    r'|\bfrom\s+(?P<source3>[\w\s\.]+?)\s+(?:find|search|get|tell)\b',
+    r'\busing\s+(?P<source>(?:https?://)?[\w\s\.\-/:]+?)\s+as\s+(a\s+)?source\b'
+    r'|\bbased\s+on\s+(?P<source2>(?:https?://)?[\w\s\.\-/:]+?)(?:\s|,|$)'
+    r'|\bfrom\s+(?P<source3>(?:https?://)?[\w\s\.\-/:]+?)\s+(?:find|search|get|tell)\b',
     re.IGNORECASE
 )
 
@@ -554,51 +554,148 @@ async def fetch_from_source_directly(source: str, query: str) -> dict:
 
 
 async def search_and_fetch_source(source: str, query: str) -> dict:
+    """
+    SMART HYBRID with URL support:
+    1. If source is a URL → Fetch that specific page (NEW!)
+    2. If source is a domain → Try direct URLs
+    3. If no direct URLs → Try LangSearch
+    4. Always return something
+    """
     logger = logging.getLogger("mcp_client")
+
+    # ═══════════════════════════════════════════════════════════════
+    # TIER 2A: Check if source is a specific URL
+    # ═══════════════════════════════════════════════════════════════
+    if source.startswith(('http://', 'https://')):
+        logger.info(f"🎯 Source is a specific URL: {source}")
+        logger.info(f"📄 Fetching specific URL directly")
+
+        try:
+            result = await fetch_url_content(source)
+
+            if result.get("success"):
+                content = result.get("content", "")
+                title = result.get("title", "Untitled")
+
+                combined_content = f"""
+═══════════════════════════════════════════════════════════════
+SOURCE 1: {title}
+URL: {source}
+═══════════════════════════════════════════════════════════════
+
+{content}
+
+"""
+                logger.info(f"✅ Fetched specific URL: {title}")
+
+                return {
+                    "success": True,
+                    "content": combined_content,
+                    "urls_fetched": 1,
+                    "method": "specific_url"
+                }
+            else:
+                logger.warning(f"⚠️ Failed to fetch URL: {result.get('error')}")
+
+                # Extract domain and try that instead
+                from urllib.parse import urlparse
+                parsed = urlparse(source)
+                source = parsed.netloc
+                logger.info(f"🔄 Falling back to domain: {source}")
+                # Continue to TIER 2B below
+
+        except Exception as e:
+            logger.error(f"❌ Exception fetching URL: {e}")
+
+            # Extract domain and continue
+            from urllib.parse import urlparse
+            try:
+                parsed = urlparse(source)
+                source = parsed.netloc
+                logger.info(f"🔄 Exception recovery - using domain: {source}")
+            except:
+                return {"success": False, "error": f"Invalid URL: {source}"}
+
+    # ═══════════════════════════════════════════════════════════════
+    # TIER 2B: Try direct access (pre-configured URLs)
+    # ═══════════════════════════════════════════════════════════════
     direct_result = await fetch_from_source_directly(source, query)
 
     if direct_result.get("success"):
         urls = direct_result.get("urls", [])
         logger.info(f"✅ Got {len(urls)} URLs via direct access")
     else:
+        # ═══════════════════════════════════════════════════════════
+        # TIER 2C: Fall back to LangSearch
+        # ═══════════════════════════════════════════════════════════
         logger.info(f"⚠️ No direct URLs, trying LangSearch")
         langsearch = get_langsearch_client()
+
         if not langsearch.is_available():
             return {"success": False, "error": "No direct URLs and LangSearch unavailable"}
-        search_result = await langsearch.search(f"{source} {query}")
+
+        search_query = f"{source} {query}"
+        logger.info(f"🔍 LangSearch query: {search_query[:100]}...")
+
+        search_result = await langsearch.search(search_query)
+
         if not search_result.get("success"):
             return {"success": False, "error": "LangSearch failed"}
+
         results_data = search_result.get("results")
         if isinstance(results_data, dict):
             urls = [item.get("url") for item in results_data.get("organic", []) if item.get("url")]
+            logger.info(f"📋 LangSearch found {len(urls)} URLs")
         else:
             urls = re.findall(r'https?://[^\s\)]+', str(results_data))
+            logger.info(f"📋 Extracted {len(urls)} URLs from results")
+
         if not urls:
             return {"success": False, "error": "No URLs found"}
 
+    # ═══════════════════════════════════════════════════════════════
+    # TIER 2D: Fetch actual content from discovered URLs
+    # ═══════════════════════════════════════════════════════════════
     unique_urls = list(dict.fromkeys(urls))[:3]
     logger.info(f"📄 Fetching {len(unique_urls)} URLs")
+    for i, url in enumerate(unique_urls, 1):
+        logger.info(f"   {i}. {url}")
 
-    fetch_results = await asyncio.gather(*[fetch_url_content(url) for url in unique_urls])
+    fetch_tasks = [fetch_url_content(url) for url in unique_urls]
+    fetch_results = await asyncio.gather(*fetch_tasks)
 
     combined_content = []
     for i, result in enumerate(fetch_results):
         if result.get("success"):
+            url = unique_urls[i]
+            title = result.get("title", "Untitled")
+            content = result.get("content", "")
             combined_content.append(f"""
 ═══════════════════════════════════════════════════════════════
-SOURCE {i + 1}: {result.get('title', 'Untitled')}
-URL: {unique_urls[i]}
+SOURCE {i + 1}: {title}
+URL: {url}
 ═══════════════════════════════════════════════════════════════
 
-{result.get('content', '')}
+{content}
 
 """)
-            logger.info(f"✅ Fetched: {result.get('title')}")
+            logger.info(f"✅ Fetched: {title}")
+        else:
+            logger.warning(f"⚠️ Failed to fetch {unique_urls[i]}: {result.get('error')}")
 
     if not combined_content:
-        return {"success": False, "error": "Failed to fetch any content"}
+        return {
+            "success": False,
+            "error": "Failed to fetch any content",
+            "attempted_urls": unique_urls
+        }
 
-    return {"success": True, "content": "\n".join(combined_content), "urls_fetched": len(combined_content)}
+    return {
+        "success": True,
+        "content": "\n".join(combined_content),
+        "urls_fetched": len(combined_content),
+        "method": "direct" if direct_result.get("success") else "langsearch"
+    }
 
 def router(state):
     """
