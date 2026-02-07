@@ -477,9 +477,6 @@ def extract_research_source(content: str):
 
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
-    "jw.org": {
-        "fallback_urls": []
-    },
     "wikipedia.org": {
         "fallback_urls": []
     }
