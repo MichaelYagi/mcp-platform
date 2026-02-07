@@ -970,20 +970,19 @@ Answer:"""
 
             logger.info(f"✅ TIER 2: Fetched content from {urls_fetched} pages (method: {method})")
 
-            research_prompt = f"""You are a research assistant. I have fetched ACTUAL CONTENT from '{research_source}'.
+            research_prompt = f"""I have fetched content from '{research_source}' to answer your question.
 
-Below is real content from {urls_fetched} pages:
+            {fetched_content}
 
-{fetched_content}
+            Question: {query_cleaned}
 
-Based on this content, please answer: {query_cleaned}
+            **Instructions:**
+            - Write a comprehensive answer based on the content above
+            - Cite using the ACTUAL URL shown above (e.g., "According to Wikipedia (https://en.wikipedia.org/wiki/Donald_Trump)...")
+            - Do NOT use placeholders like "[SOURCE 1]" - use the real URL
+            - Include a References section at the end with the URL(s)
 
-Provide a comprehensive answer that:
-1. Synthesizes information from the fetched content
-2. Cites specific pages (e.g., "According to [SOURCE 1]...")
-3. Maintains accuracy to the source material
-
-Answer:"""
+            Your answer:"""
 
             augmented_messages = state["messages"] + [HumanMessage(content=research_prompt)]
             response = await llm.ainvoke(augmented_messages)
