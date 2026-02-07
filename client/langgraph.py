@@ -9,6 +9,10 @@ import operator
 import re
 import time
 from typing import TypedDict, Annotated, Sequence
+import requests
+import urllib.parse
+from html.parser import HTMLParser
+from concurrent.futures import ThreadPoolExecutor
 from .stop_signal import is_stop_requested, clear_stop
 from .langsearch_client import get_langsearch_client
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
@@ -450,6 +454,154 @@ class AgentState(TypedDict):
     ingest_completed: bool
     stopped: bool
     current_model: str
+    research_source: str
+
+
+# Research source detection
+RESEARCH_SOURCE_PATTERN = re.compile(
+    r'\busing\s+(?P<source>[\w\s\.]+?)\s+as\s+(a\s+)?source\b'
+    r'|\bbased\s+on\s+(?P<source2>[\w\s\.]+?)(?:\s|,|$)'
+    r'|\bfrom\s+(?P<source3>[\w\s\.]+?)\s+(?:find|search|get|tell)\b',
+    re.IGNORECASE
+)
+
+
+def extract_research_source(content: str):
+    """Extract source name from research request"""
+    match = RESEARCH_SOURCE_PATTERN.search(content)
+    if match:
+        for group in match.groups():
+            if group:
+                return group.strip()
+    return None
+
+# Direct source URLs for known sites
+DIRECT_SOURCE_URLS = {
+    "jw.org": {
+        "fallback_urls": []
+    },
+    "wikipedia.org": {
+        "fallback_urls": []
+    }
+}
+
+
+# HTML text extractor
+class HTMLTextExtractor(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.text_parts = []
+        self.skip_tags = {'script', 'style', 'nav', 'footer', 'header', 'aside', 'noscript'}
+        self.current_tag = None
+        self.title = None
+
+    def handle_starttag(self, tag, attrs):
+        self.current_tag = tag
+        if tag == 'title' and self.title is None:
+            self.title = ""
+
+    def handle_endtag(self, tag):
+        if tag == 'title' and self.title == "":
+            self.title = None
+        self.current_tag = None
+
+    def handle_data(self, data):
+        if self.current_tag in self.skip_tags:
+            return
+        if self.current_tag == 'title' and isinstance(self.title, str):
+            self.title += data
+            return
+        text = data.strip()
+        if text:
+            self.text_parts.append(text)
+
+    def get_text(self):
+        text = '\n'.join(self.text_parts)
+        return re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+
+    def get_title(self):
+        return self.title.strip() if self.title else "Untitled"
+
+
+def fetch_url_content_sync(url: str, timeout: int = 30) -> dict:
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        response = requests.get(url, headers=headers, timeout=timeout)
+        if response.status_code != 200:
+            return {"success": False, "error": f"HTTP {response.status_code}"}
+        parser = HTMLTextExtractor()
+        parser.feed(response.text)
+        text = parser.get_text()
+        if len(text) > 10000:
+            text = text[:10000] + "\n\n[Content truncated...]"
+        if not text or len(text) < 50:
+            return {"success": False, "error": "No content"}
+        return {"success": True, "content": text, "title": parser.get_title(), "url": url}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+async def fetch_url_content(url: str, timeout: int = 30) -> dict:
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        return await loop.run_in_executor(executor, fetch_url_content_sync, url, timeout)
+
+
+async def fetch_from_source_directly(source: str, query: str) -> dict:
+    source_lower = source.lower().replace("www.", "")
+    for known_source, config in DIRECT_SOURCE_URLS.items():
+        if known_source in source_lower:
+            if "fallback_urls" in config and config["fallback_urls"]:
+                return {"success": True, "urls": config["fallback_urls"][:3], "method": "direct"}
+    return {"success": False, "method": "no_config"}
+
+
+async def search_and_fetch_source(source: str, query: str) -> dict:
+    logger = logging.getLogger("mcp_client")
+    direct_result = await fetch_from_source_directly(source, query)
+
+    if direct_result.get("success"):
+        urls = direct_result.get("urls", [])
+        logger.info(f"✅ Got {len(urls)} URLs via direct access")
+    else:
+        logger.info(f"⚠️ No direct URLs, trying LangSearch")
+        langsearch = get_langsearch_client()
+        if not langsearch.is_available():
+            return {"success": False, "error": "No direct URLs and LangSearch unavailable"}
+        search_result = await langsearch.search(f"{source} {query}")
+        if not search_result.get("success"):
+            return {"success": False, "error": "LangSearch failed"}
+        results_data = search_result.get("results")
+        if isinstance(results_data, dict):
+            urls = [item.get("url") for item in results_data.get("organic", []) if item.get("url")]
+        else:
+            urls = re.findall(r'https?://[^\s\)]+', str(results_data))
+        if not urls:
+            return {"success": False, "error": "No URLs found"}
+
+    unique_urls = list(dict.fromkeys(urls))[:3]
+    logger.info(f"📄 Fetching {len(unique_urls)} URLs")
+
+    fetch_results = await asyncio.gather(*[fetch_url_content(url) for url in unique_urls])
+
+    combined_content = []
+    for i, result in enumerate(fetch_results):
+        if result.get("success"):
+            combined_content.append(f"""
+═══════════════════════════════════════════════════════════════
+SOURCE {i + 1}: {result.get('title', 'Untitled')}
+URL: {unique_urls[i]}
+═══════════════════════════════════════════════════════════════
+
+{result.get('content', '')}
+
+""")
+            logger.info(f"✅ Fetched: {result.get('title')}")
+
+    if not combined_content:
+        return {"success": False, "error": "Failed to fetch any content"}
+
+    return {"success": True, "content": "\n".join(combined_content), "urls_fetched": len(combined_content)}
 
 def router(state):
     """
@@ -494,6 +646,12 @@ def router(state):
 
     if user_message:
         content = user_message.content
+
+        research_source = extract_research_source(content)
+        if research_source:
+            logger.info(f"🔬 Router: SOURCE-BASED RESEARCH detected: '{research_source}'")
+            state["research_source"] = research_source
+            return "research"
 
         # Status query check
         if ROUTER_STATUS_QUERY.search(content):
@@ -581,6 +739,275 @@ async def rag_node(state):
         msg = AIMessage(content=f"Error searching knowledge base: {str(e)}")
         return {"messages": state["messages"] + [msg], "llm": state.get("llm")}
 
+# 4-TIER RESEARCH FALLBACK SYSTEM
+# Tools → Direct Access → LangSearch → LLM Knowledge
+async def research_node(state):
+    """
+    Perform source-based research with 4-tier fallback:
+    1. Check if a relevant TOOL exists (e.g., wikipedia_tool, reddit_tool)
+    2. Try DIRECT ACCESS (pre-configured URLs)
+    3. Try LANGSEARCH (find URLs)
+    4. Use LLM KNOWLEDGE (last resort with disclaimer)
+    """
+    logger = logging.getLogger("mcp_client")
+
+    if is_stop_requested():
+        logger.warning("🛑 Research node: Stop requested")
+        return {
+            "messages": state["messages"] + [AIMessage(content="Research cancelled.")],
+            "llm": state.get("llm"),
+            "stopped": True,
+            "current_model": state.get("current_model", "unknown")
+        }
+
+    # Get user message
+    user_message = None
+    for msg in reversed(state["messages"]):
+        if isinstance(msg, HumanMessage):
+            user_message = msg
+            break
+
+    if not user_message:
+        return {
+            "messages": state["messages"] + [AIMessage(content="Error: No query found.")],
+            "llm": state.get("llm"),
+            "current_model": state.get("current_model", "unknown")
+        }
+
+    query = user_message.content
+
+    # Re-extract source from query
+    research_source = extract_research_source(query)
+    if not research_source:
+        research_source = "web"
+
+    logger.info(f"📚 Research source: '{research_source}'")
+
+    # Clean query
+    query_cleaned = RESEARCH_SOURCE_PATTERN.sub('', query).strip()
+    query_cleaned = re.sub(r'\s+', ' ', query_cleaned)
+    logger.info(f"🔬 Research query: '{query_cleaned}'")
+
+    llm = state.get("llm")
+
+    # ═══════════════════════════════════════════════════════════════
+    # TIER 1: Check if a TOOL exists for this source (BEST!)
+    # ═══════════════════════════════════════════════════════════════
+    tools_dict = state.get("tools", {})
+    source_normalized = research_source.lower().replace("www.", "").replace(".com", "").replace(".org", "")
+
+    # Map source names to potential tool names
+    tool_mappings = {
+        "wikipedia": ["wikipedia_search", "wiki_search", "wikipedia_tool"],
+        "reddit": ["reddit_search", "reddit_tool"],
+        "github": ["github_search", "github_tool"],
+        "stackoverflow": ["stackoverflow_search", "stack_search"],
+        "rag": ["rag_search_tool"],
+        "knowledge": ["search_entries", "search_semantic"],
+    }
+
+    # Check if we have a matching tool
+    matching_tool = None
+    tool_name_found = None
+
+    for source_key, tool_names in tool_mappings.items():
+        if source_key in source_normalized:
+            for tool_name in tool_names:
+                if tool_name in tools_dict:
+                    matching_tool = tools_dict[tool_name]
+                    tool_name_found = tool_name
+                    break
+            if matching_tool:
+                break
+
+    if matching_tool:
+        logger.info(f"🔧 TIER 1: Found matching tool '{tool_name_found}' for '{research_source}'")
+
+        try:
+            # Call the tool
+            tool_result = await matching_tool.ainvoke({"query": query_cleaned})
+
+            if tool_result and str(tool_result).strip():
+                logger.info(f"✅ TIER 1: Tool returned results")
+
+                # Use LLM to synthesize tool results
+                tool_prompt = f"""I used the '{tool_name_found}' tool to search '{research_source}' and got these results:
+
+{tool_result}
+
+Based on these results from {research_source}, please answer: {query_cleaned}
+
+Provide a comprehensive answer that:
+1. Synthesizes information from the tool results
+2. Maintains accuracy to the source material
+3. Cites the source appropriately
+
+Answer:"""
+
+                tool_messages = state["messages"] + [HumanMessage(content=tool_prompt)]
+                response = await llm.ainvoke(tool_messages)
+
+                return {
+                    "messages": state["messages"] + [response],
+                    "llm": state.get("llm"),
+                    "current_model": state.get("current_model", "unknown")
+                }
+            else:
+                logger.warning(f"⚠️ TIER 1: Tool returned no results, falling back to TIER 2")
+
+        except Exception as e:
+            logger.warning(f"⚠️ TIER 1: Tool failed ({str(e)}), falling back to TIER 2")
+    else:
+        logger.info(f"ℹ️ TIER 1: No tool found for '{research_source}', trying TIER 2")
+
+    # ═══════════════════════════════════════════════════════════════
+    # TIER 2: Try DIRECT ACCESS (pre-configured URLs)
+    # ═══════════════════════════════════════════════════════════════
+    logger.info(f"🎯 TIER 2: Attempting direct access to '{research_source}'")
+
+    try:
+        result = await search_and_fetch_source(research_source, query_cleaned)
+
+        if result.get("success"):
+            # ✅ SUCCESS: We got content from the source
+            fetched_content = result["content"]
+            urls_fetched = result.get("urls_fetched", 0)
+            method = result.get("method", "unknown")
+
+            logger.info(f"✅ TIER 2: Fetched content from {urls_fetched} pages (method: {method})")
+
+            research_prompt = f"""You are a research assistant. I have fetched ACTUAL CONTENT from '{research_source}'.
+
+Below is real content from {urls_fetched} pages:
+
+{fetched_content}
+
+Based on this content, please answer: {query_cleaned}
+
+Provide a comprehensive answer that:
+1. Synthesizes information from the fetched content
+2. Cites specific pages (e.g., "According to [SOURCE 1]...")
+3. Maintains accuracy to the source material
+
+Answer:"""
+
+            augmented_messages = state["messages"] + [HumanMessage(content=research_prompt)]
+            response = await llm.ainvoke(augmented_messages)
+
+            return {
+                "messages": state["messages"] + [response],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
+
+        # ═══════════════════════════════════════════════════════════
+        # TIER 2 failed - log why and proceed to TIER 3
+        # ═══════════════════════════════════════════════════════════
+        error_msg = result.get("error", "Unknown error")
+        logger.warning(f"⚠️ TIER 2: Failed to fetch from '{research_source}': {error_msg}")
+        logger.info(f"🧠 TIER 3: Falling back to LLM's training knowledge")
+
+        # ═══════════════════════════════════════════════════════════
+        # TIER 3: Use LLM's training knowledge (LAST RESORT)
+        # ═══════════════════════════════════════════════════════════
+        fallback_prompt = f"""I attempted to access '{research_source}' to answer your question but was unable to retrieve content.
+
+**What I tried:**
+1. ✅ Checked for specialized tools - None available
+2. ❌ Direct access to {research_source} - Failed: {error_msg}
+3. 🧠 Now using my training knowledge (January 2025 cutoff)
+
+**Your question:** {query_cleaned}
+
+I'll answer based on my training knowledge about {research_source} and this topic.
+
+**Important**: This answer is based on my training data, NOT live access to {research_source}. For current information, please visit {research_source} directly.
+
+Answer:"""
+
+        fallback_messages = state["messages"] + [HumanMessage(content=fallback_prompt)]
+        response = await llm.ainvoke(fallback_messages)
+
+        # Add disclaimer footer
+        disclaimer = f"\n\n---\n\n⚠️ **Source Access Failed**\n" \
+                     f"- Could not access {research_source} directly\n" \
+                     f"- Reason: {error_msg}\n" \
+                     f"- This answer is from training data (January 2025)\n" \
+                     f"- For current info, visit {research_source} directly"
+
+        if hasattr(response, 'content'):
+            response.content = response.content + disclaimer
+
+        logger.info(f"✅ TIER 3: Answered from LLM training knowledge with disclaimer")
+
+        return {
+            "messages": state["messages"] + [response],
+            "llm": state.get("llm"),
+            "current_model": state.get("current_model", "unknown")
+        }
+
+    except Exception as e:
+        # ═══════════════════════════════════════════════════════════
+        # TIER 3 (Exception path): Complete failure
+        # ═══════════════════════════════════════════════════════════
+        logger.error(f"❌ TIER 2 exception: {str(e)}")
+        logger.info(f"🧠 TIER 3: Emergency fallback to LLM knowledge")
+
+        emergency_prompt = f"""I encountered an error while trying to research from '{research_source}':
+
+**Error:** {str(e)}
+
+**Your question:** {query_cleaned}
+
+I'll answer based on my training knowledge.
+
+**Disclaimer**: This is based on training data (January 2025), not live access to {research_source}.
+
+Answer:"""
+
+        emergency_messages = state["messages"] + [HumanMessage(content=emergency_prompt)]
+
+        try:
+            response = await llm.ainvoke(emergency_messages)
+
+            error_note = f"\n\n---\n\n⚠️ **Technical Error**\n" \
+                         f"- Could not access {research_source}\n" \
+                         f"- Error: {str(e)}\n" \
+                         f"- Answer is from training data only"
+
+            if hasattr(response, 'content'):
+                response.content = response.content + error_note
+
+            logger.info(f"✅ TIER 3: Emergency fallback succeeded")
+
+            return {
+                "messages": state["messages"] + [response],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
+
+        except Exception as llm_error:
+            # Complete catastrophic failure
+            logger.error(f"❌ TIER 3: Even LLM fallback failed: {llm_error}")
+
+            return {
+                "messages": state["messages"] + [AIMessage(
+                    content=f"""❌ **Complete Research Failure**
+
+**Attempted:**
+1. Tool check - No matching tool
+2. Direct access to {research_source} - Failed: {str(e)}
+3. LLM fallback - Failed: {str(llm_error)}
+
+**Please try:**
+- Rephrasing your query
+- Using a different source
+- Asking without specifying a source
+- Checking your internet connection"""
+                )],
+                "llm": state.get("llm"),
+                "current_model": state.get("current_model", "unknown")
+            }
 
 def create_langgraph_agent(llm_with_tools, tools):
     """Create and compile the LangGraph agent"""
@@ -1206,6 +1633,7 @@ def create_langgraph_agent(llm_with_tools, tools):
     workflow.add_node("tools", call_tools_with_stop_check)
     workflow.add_node("rag", rag_node)
     workflow.add_node("ingest", ingest_node)
+    workflow.add_node("research", research_node)
 
     workflow.set_entry_point("agent")
     workflow.add_conditional_edges(
@@ -1215,12 +1643,14 @@ def create_langgraph_agent(llm_with_tools, tools):
             "tools": "tools",
             "rag": "rag",
             "ingest": "ingest",
+            "research": "research",
             "continue": END
         }
     )
     workflow.add_edge("tools", "agent")
     workflow.add_edge("ingest", END)
     workflow.add_edge("rag", END)
+    workflow.add_edge("research", END)
 
     app = workflow.compile()
     logger.info("[LangGraph] ✅ LangGraph agent compiled successfully")
@@ -1294,7 +1724,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "llm": llm,
             "ingest_completed": False,
             "stopped": False,
-            "current_model": "unknown"  # Will be updated by call_model
+            "current_model": "unknown",
+            "research_source": "web"
         })
 
         # ═══════════════════════════════════════════════════════════════
