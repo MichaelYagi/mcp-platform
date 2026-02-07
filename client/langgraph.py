@@ -1192,7 +1192,15 @@ def create_langgraph_agent(llm_with_tools, tools):
             "stopped": is_stop_requested()
         }
 
-    # Build graph
+    # State machine for agent
+    # Build graph:
+    # Each node is a function,
+    # Edges define control flows between nodes depending on what the model decides
+    # router decides:
+    #   ├── "tools"  → tools → agent → router → …
+    #   ├── "rag"    → rag → END
+    #   ├── "ingest" → ingest → END
+    #   └── "continue" → END
     workflow = StateGraph(AgentState)
     workflow.add_node("agent", call_model)
     workflow.add_node("tools", call_tools_with_stop_check)
@@ -1279,6 +1287,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
         tool_registry = {tool.name: tool for tool in tools}
 
+        # Agent runtime - feeds message into the model
         result = await agent.ainvoke({
             "messages": conversation_state["messages"],
             "tools": tool_registry,
