@@ -197,6 +197,77 @@ def flush_batch():
 
     logger.info(f"✅ Batch saved successfully")
 
+def should_refresh_source(source: str, max_age_days: int = 30) -> bool:
+    """
+    Check if source should be refreshed based on age.
+
+    Args:
+        source: Source URL
+        max_age_days: Maximum age in days before refresh
+
+    Returns:
+        True if should refresh, False if recent enough
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+                       SELECT created_at
+                       FROM documents
+                       WHERE source = ?
+                       ORDER BY created_at DESC LIMIT 1
+                       """, (source,))
+
+        row = cursor.fetchone()
+
+        if not row:
+            return True  # Not found, should fetch
+
+        # Check age
+        from datetime import datetime, timedelta
+        created_at = datetime.fromisoformat(row[0])
+        age = datetime.now() - created_at
+
+        if age.days > max_age_days:
+            logger.info(f"🔄 Source is {age.days} days old, refreshing...")
+            return True
+
+        logger.info(f"⏭️  Source is recent ({age.days} days old), skipping")
+        return False
+
+    except Exception as e:
+        logger.error(f"❌ Error checking age: {e}")
+        return True  # Default to fetching on error
+
+
+def has_source(source: str) -> bool:
+    """
+    Check if a source URL already exists in RAG.
+
+    Args:
+        source: Source URL to check
+
+    Returns:
+        True if source exists, False otherwise
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+                       SELECT COUNT(*)
+                       FROM documents
+                       WHERE source = ? LIMIT 1
+                       """, (source,))
+
+        count = cursor.fetchone()[0]
+        return count > 0
+
+    except Exception as e:
+        logger.error(f"❌ Error checking source: {e}")
+        return False  # Default to allowing storage on error
+
 def batch_insert_documents(documents: List[Dict[str, Any]]) -> int:
     """
     Optimized batch insert with binary embeddings.

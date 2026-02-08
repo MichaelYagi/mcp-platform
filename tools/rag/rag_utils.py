@@ -82,27 +82,29 @@ def _initialize_database(conn: sqlite3.Connection):
 def load_rag_db() -> List[Dict[str, Any]]:
     """
     Load all documents from the RAG database.
-
-    Note: This loads everything into memory for compatibility.
-    For large databases, consider using query-based retrieval instead.
-
-    Returns:
-        List of document dictionaries with embeddings
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, text, embedding, source, length, word_count
-            FROM documents
-            ORDER BY created_at
-        """)
+                       SELECT id, text, embedding, source, length, word_count
+                       FROM documents
+                       ORDER BY created_at
+                       """)
 
         documents = []
         for row in cursor.fetchall():
-            # Deserialize embedding from blob
-            embedding = json.loads(row['embedding'])
+            # Handle both binary and JSON embeddings
+            embedding_data = row['embedding']
+
+            if isinstance(embedding_data, bytes):
+                # Binary format (new) - convert from bytes to list
+                import numpy as np
+                embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
+            else:
+                # JSON format (old) - deserialize
+                embedding = json.loads(embedding_data)
 
             doc = {
                 "id": row['id'],
@@ -234,29 +236,28 @@ def get_document_count() -> int:
 
 
 def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
-    """
-    Get all documents from a specific source.
-
-    Args:
-        source: Source identifier (e.g., "plex:12345:Movie Title")
-
-    Returns:
-        List of matching documents
-    """
+    """Get all documents from a specific source."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, text, embedding, source, length, word_count
-            FROM documents
-            WHERE source = ?
-            ORDER BY created_at
-        """, (source,))
+                       SELECT id, text, embedding, source, length, word_count
+                       FROM documents
+                       WHERE source = ?
+                       ORDER BY created_at
+                       """, (source,))
 
         documents = []
         for row in cursor.fetchall():
-            embedding = json.loads(row['embedding'])
+            embedding_data = row['embedding']
+
+            # Handle both binary and JSON formats
+            if isinstance(embedding_data, bytes):
+                import numpy as np
+                embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
+            else:
+                embedding = json.loads(embedding_data)
 
             doc = {
                 "id": row['id'],
@@ -275,7 +276,6 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"❌ Error getting documents by source: {e}")
         return []
-
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
     """

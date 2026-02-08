@@ -13,6 +13,8 @@ import requests
 import urllib.parse
 from html.parser import HTMLParser
 from concurrent.futures import ThreadPoolExecutor
+
+from tools.rag.rag_vector_db import should_refresh_source
 from .stop_signal import is_stop_requested, clear_stop
 from .langsearch_client import get_langsearch_client
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
@@ -606,8 +608,8 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
     # Helper function to store in RAG
     # ═══════════════════════════════════════════════════════════════
     async def store_in_rag(content: str, metadata: dict):
-        """Store fetched content in RAG for future queries"""
-        if not rag_add_tool:  # ← Now has access to outer scope's rag_add_tool
+        """Store fetched content in RAG (with deduplication)"""
+        if not rag_add_tool:
             logger.debug("ℹ️ RAG tool not provided, skipping storage")
             return False
 
@@ -616,11 +618,20 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
                 logger.warning("⚠️ Skipping RAG storage: empty content")
                 return False
 
+            # ═══════════════════════════════════════════════════════════
+            # CHECK IF URL ALREADY EXISTS IN RAG
+            # ═══════════════════════════════════════════════════════════
+            source_url = metadata.get("url", "")
+            if source_url:
+                if not should_refresh_source(source_url, max_age_days=30):
+                    logger.info(f"⏭️  Skipping recent content: {metadata.get('title')[:50]}")
+                    return False
+
             rag_entry = {
                 "text": str(content),
                 "metadata": {
                     "source_type": metadata.get("source_type", "unknown"),
-                    "url": metadata.get("url", ""),
+                    "url": source_url,
                     "title": metadata.get("title", "Untitled"),
                     "domain": metadata.get("domain", ""),
                     "query": metadata.get("query", ""),
