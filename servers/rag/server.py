@@ -91,24 +91,43 @@ def rag_add_tool(text: str, source: str | None = None, chunk_size: int = 500) ->
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-def rag_search_tool(query: str, top_k: int = 5, min_score: float = 0.0) -> str:
+def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: float = 0.0) -> str:
     """
     Search the RAG database using semantic similarity with STOP SIGNAL support.
+
+    Args:
+        query (str): Search query text (primary parameter)
+        text (str): Alternative parameter for search query (fallback)
+        top_k (int): Number of results to return (default: 5)
+        min_score (float): Minimum similarity score (default: 0.0)
+
+    Returns:
+        JSON string with search results
     """
-    logger.info(f"🛠 [server] rag_search_tool called with query: {query}, top_k: {top_k}")
+    # Accept either parameter
+    search_query = query or text
+
+    if not search_query or not search_query.strip():
+        return json.dumps({
+            "error": "No search query provided",
+            "message": "Please provide a search term using 'query' parameter",
+            "example": {"query": "search term", "top_k": 5}
+        }, indent=2)
+
+    logger.info(f"🛠 [server] rag_search_tool called with query: {search_query}, top_k: {top_k}")
 
     # Check stop BEFORE expensive search
     if is_stop_requested():
         logger.warning("🛑 rag_search_tool: Stop requested - skipping search")
         return json.dumps({
             "results": [],
-            "query": query,
+            "query": search_query,
             "total_results": 0,
             "stopped": True,
             "message": "Search cancelled by user"
         }, indent=2)
 
-    result = rag_search(query, top_k, min_score)
+    result = rag_search(search_query, top_k, min_score)
     return json.dumps(result, indent=2)
 
 @mcp.tool()
