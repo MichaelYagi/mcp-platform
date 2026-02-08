@@ -589,7 +589,7 @@ async def fetch_from_source_directly(source: str, query: str) -> dict:
     return {"success": False, "method": "no_config"}
 
 
-async def search_and_fetch_source(source: str, query: str) -> dict:
+async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) -> dict:
     """
     SMART HYBRID with URL support AND homepage detection:
     1. If source is a URL → Check if homepage
@@ -597,9 +597,45 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
        b. If specific page → Fetch that page
     2. If source is a domain → Try direct URLs
     3. If no direct URLs → Try LangSearch
-    4. Always return something
+    4. Store all fetched content in RAG
+    5. Always return something
     """
     logger = logging.getLogger("mcp_client")
+
+    # ═══════════════════════════════════════════════════════════════
+    # Helper function to store in RAG
+    # ═══════════════════════════════════════════════════════════════
+    async def store_in_rag(content: str, metadata: dict):
+        """Store fetched content in RAG for future queries"""
+        if not rag_add_tool:  # ← Now has access to outer scope's rag_add_tool
+            logger.debug("ℹ️ RAG tool not provided, skipping storage")
+            return False
+
+        try:
+            if not content:
+                logger.warning("⚠️ Skipping RAG storage: empty content")
+                return False
+
+            rag_entry = {
+                "text": str(content),
+                "metadata": {
+                    "source_type": metadata.get("source_type", "unknown"),
+                    "url": metadata.get("url", ""),
+                    "title": metadata.get("title", "Untitled"),
+                    "domain": metadata.get("domain", ""),
+                    "query": metadata.get("query", ""),
+                    "fetch_method": metadata.get("fetch_method", "unknown"),
+                    "timestamp": metadata.get("timestamp", time.time())
+                }
+            }
+
+            await rag_add_tool.ainvoke(rag_entry)
+            logger.debug(f"✅ Stored in RAG: {metadata.get('title', 'content')[:50]}")
+            return True
+
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to store in RAG: {e}")
+            return False
 
     # ═══════════════════════════════════════════════════════════════
     # CHECK IF SOURCE IS A URL
@@ -617,7 +653,6 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
         # ═══════════════════════════════════════════════════════════
         is_homepage = (
                 path in ['/', '', '/en/', '/en', '/index.html', '/index.php'] or
-                # domain in ['/en/', '/en', 'en/', '.en.', '.en', 'en.'] or
                 path.count('/') <= 1  # Only domain + maybe one level
         )
 
@@ -644,23 +679,19 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
                 search_result = await langsearch.search(search_query)
 
                 if search_result.get("success"):
-
-                    # Now try the extraction
                     data = search_result.get("results", {})
 
                     if isinstance(data, dict):
                         web_pages = data.get("webPages", {})
                         value = web_pages.get("value", [])
-                        # Extract summaries with URLs
+
                         summaries = []
                         for i, item in enumerate(value):
-
                             if isinstance(item, dict):
                                 url = item.get("url", "")
                                 title = item.get("name", "Untitled")
                                 summary = item.get("summary", "")
 
-                                # Only include if from target domain
                                 if domain in url and summary:
                                     summaries.append({
                                         "url": url,
@@ -671,31 +702,57 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
 
                         if summaries:
                             logger.info(f"✅ Site search found {len(summaries)} pages with content on {domain}")
-                            # Take top 3-5 summaries
+
                             top_summaries = summaries[:5]
+
+                            # ═══════════════════════════════════════════════════
+                            # STORE ALL SUMMARIES IN RAG CONCURRENTLY
+                            # ═══════════════════════════════════════════════════
+                            if rag_add_tool:
+                                storage_tasks = []
+                                for item in top_summaries:
+                                    task = store_in_rag(
+                                        content=item['summary'],
+                                        metadata={
+                                            "source_type": "web_search",
+                                            "url": item['url'],
+                                            "title": item['title'],
+                                            "domain": domain,
+                                            "query": cleaned_query,
+                                            "fetch_method": "langsearch_summary",
+                                            "timestamp": time.time()
+                                        }
+                                    )
+                                    storage_tasks.append(task)
+
+                                # Store all in parallel
+                                results = await asyncio.gather(*storage_tasks, return_exceptions=True)
+                                stored_count = sum(1 for r in results if r is True)
+                                logger.info(f"✅ Stored {stored_count}/{len(top_summaries)} summaries in RAG")
 
                             # Build combined content from summaries
                             combined_content = []
                             for i, item in enumerate(top_summaries, 1):
                                 logger.info(f"   {i}. {item['title']}")
-
                                 combined_content.append(f"""
-        ═══════════════════════════════════════════════════════════════
-        SOURCE {i}: {item['title']}
-        URL: {item['url']}
-        ═══════════════════════════════════════════════════════════════
+                        ═══════════════════════════════════════════════════════════════
+                        SOURCE {i}: {item['title']}
+                        URL: {item['url']}
+                        ═══════════════════════════════════════════════════════════════
 
-        {item['summary']}
+                        {item['summary']}
 
-        """)
+                        """)
 
-                            note = f"\n\n**Note**: Auto-searched {domain} and found {len(top_summaries)} relevant page(s)."
+                            note = f"\n\n**Note**: Auto-searched {domain} and found {len(top_summaries)} relevant page(s). All content stored in RAG."
 
                             return {
                                 "success": True,
                                 "content": "\n".join(combined_content) + note,
                                 "urls_fetched": len(top_summaries),
-                                "method": "langsearch_summaries"
+                                "method": "langsearch_summaries",
+                                "stored_in_rag": True,
+                                "rag_entries": stored_count
                             }
                         else:
                             logger.warning(f"⚠️ Site search found no relevant pages on {domain}")
@@ -715,7 +772,20 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
                 content = result.get("content", "")
                 title = result.get("title", "Untitled")
 
-                # Add warning that this is just a homepage
+                # Store homepage in RAG
+                await store_in_rag(
+                    content=content,
+                    metadata={
+                        "source_type": "homepage",
+                        "url": source,
+                        "title": title,
+                        "domain": domain,
+                        "query": query,
+                        "fetch_method": "homepage_fallback",
+                        "timestamp": time.time()
+                    }
+                )
+
                 warning = f"""
 ⚠️ **Homepage Warning**: The source URL was a homepage with limited content.
 Site search found no relevant articles. Results may be limited.
@@ -742,7 +812,8 @@ URL: {source}
                     "success": True,
                     "content": combined_content,
                     "urls_fetched": 1,
-                    "method": "homepage_fallback"
+                    "method": "homepage_fallback",
+                    "stored_in_rag": True
                 }
             else:
                 return {
@@ -762,6 +833,19 @@ URL: {source}
                 content = result.get("content", "")
                 title = result.get("title", "Untitled")
 
+                # Store specific page in RAG
+                await store_in_rag(
+                    content=content,
+                    metadata={
+                        "source_type": "web_page",
+                        "url": source,
+                        "title": title,
+                        "query": query,
+                        "fetch_method": "direct_fetch",
+                        "timestamp": time.time()
+                    }
+                )
+
                 combined_content = f"""
 ═══════════════════════════════════════════════════════════════
 SOURCE 1: {title}
@@ -777,20 +861,16 @@ URL: {source}
                     "success": True,
                     "content": combined_content,
                     "urls_fetched": 1,
-                    "method": "specific_url"
+                    "method": "specific_url",
+                    "stored_in_rag": True
                 }
             else:
                 logger.warning(f"⚠️ Failed to fetch URL: {result.get('error')}")
-
-                # Extract domain and try that instead
                 source = parsed.netloc
                 logger.info(f"🔄 Falling back to domain: {source}")
-                # Continue to direct access below
 
         except Exception as e:
             logger.error(f"❌ Exception fetching URL: {e}")
-
-            # Extract domain and continue
             try:
                 source = parsed.netloc
                 logger.info(f"🔄 Exception recovery - using domain: {source}")
@@ -844,11 +924,28 @@ URL: {source}
     fetch_results = await asyncio.gather(*fetch_tasks)
 
     combined_content = []
+    stored_count = 0
+
     for i, result in enumerate(fetch_results):
         if result.get("success"):
             url = unique_urls[i]
             title = result.get("title", "Untitled")
             content = result.get("content", "")
+
+            # Store each fetched page in RAG
+            await store_in_rag(
+                content=content,
+                metadata={
+                    "source_type": "web_page",
+                    "url": url,
+                    "title": title,
+                    "query": query,
+                    "fetch_method": "multi_fetch",
+                    "timestamp": time.time()
+                }
+            )
+            stored_count += 1
+
             combined_content.append(f"""
 ═══════════════════════════════════════════════════════════════
 SOURCE {i + 1}: {title}
@@ -873,7 +970,9 @@ URL: {url}
         "success": True,
         "content": "\n".join(combined_content),
         "urls_fetched": len(combined_content),
-        "method": "direct" if direct_result.get("success") else "langsearch"
+        "method": "direct" if direct_result.get("success") else "langsearch",
+        "stored_in_rag": stored_count > 0,
+        "rag_entries": stored_count
     }
 
 def router(state):
@@ -1015,7 +1114,7 @@ async def rag_node(state):
 # 4-TIER RESEARCH FALLBACK SYSTEM
 # Tools → Direct Access → LangSearch → LLM Knowledge
 async def research_node(state):
-    """Perform source-based research with multi-source support and error handling"""
+    """Perform source-based research with multi-source support and RAG storage"""
     logger = logging.getLogger("mcp_client")
 
     if is_stop_requested():
@@ -1057,24 +1156,46 @@ async def research_node(state):
 
     llm = state.get("llm")
 
+    # ═══════════════════════════════════════════════════════════════
+    # GET RAG TOOL FOR STORAGE
+    # ═══════════════════════════════════════════════════════════════
+    tools_dict = state.get("tools", {})
+    rag_add_tool = tools_dict.get("rag_add_tool")
+
+    if rag_add_tool:
+        logger.info("✅ RAG tool available - will store fetched content")
+    else:
+        logger.debug("ℹ️ RAG tool not available - skipping storage")
+
     try:
         # Fetch from ALL sources
         all_content = []
         all_urls = []
         total_urls_fetched = 0
         failed_sources = []
+        total_rag_entries = 0
 
         for i, source in enumerate(sources, 1):
             logger.info(f"🔍 [{i}/{len(sources)}] Fetching from: {source}")
 
             try:
-                result = await search_and_fetch_source(source, query_cleaned)
+                # ═══════════════════════════════════════════════════
+                # PASS RAG TOOL TO search_and_fetch_source
+                # ═══════════════════════════════════════════════════
+                result = await search_and_fetch_source(source, query_cleaned, rag_add_tool)
 
                 if result.get("success"):
                     all_content.append(result["content"])
                     total_urls_fetched += result.get("urls_fetched", 0)
                     all_urls.append(source)
-                    logger.info(f"✅ [{i}/{len(sources)}] Fetched from {source}")
+
+                    # Track RAG storage
+                    if result.get("stored_in_rag"):
+                        rag_count = result.get("rag_entries", 1)
+                        total_rag_entries += rag_count
+                        logger.info(f"✅ [{i}/{len(sources)}] Fetched from {source} ({rag_count} entries stored in RAG)")
+                    else:
+                        logger.info(f"✅ [{i}/{len(sources)}] Fetched from {source}")
                 else:
                     error_msg = result.get("error", "Unknown error")
                     logger.warning(f"⚠️ [{i}/{len(sources)}] Failed: {source} - {error_msg}")
@@ -1101,7 +1222,16 @@ async def research_node(state):
         combined_content = "\n\n".join(all_content)
 
         success_count = len(all_content)
-        logger.info(f"✅ Combined content from {success_count}/{len(sources)} sources ({len(combined_content)} chars)")
+
+        # ═══════════════════════════════════════════════════════════
+        # LOG RAG STORAGE SUMMARY
+        # ═══════════════════════════════════════════════════════════
+        if total_rag_entries > 0:
+            logger.info(
+                f"✅ Combined content from {success_count}/{len(sources)} sources ({len(combined_content)} chars, {total_rag_entries} RAG entries)")
+        else:
+            logger.info(
+                f"✅ Combined content from {success_count}/{len(sources)} sources ({len(combined_content)} chars)")
 
         if failed_sources:
             logger.warning(f"⚠️ Failed sources: {failed_sources}")
@@ -1138,11 +1268,21 @@ Your answer:"""
 
             logger.info("✅ Research synthesis completed")
 
-            # Add note about failed sources if any
-            if failed_sources and hasattr(response, 'content'):
-                failed_note = "\n\n---\n\n⚠️ **Note**: Some sources could not be accessed:\n" + \
-                              "\n".join([f"- {s}" for s in failed_sources])
-                response.content += failed_note
+            # ═══════════════════════════════════════════════════════
+            # ADD RAG STORAGE NOTE TO RESPONSE
+            # ═══════════════════════════════════════════════════════
+            notes = []
+
+            if failed_sources:
+                notes.append("⚠️ **Note**: Some sources could not be accessed:\n" +
+                             "\n".join([f"- {s}" for s in failed_sources]))
+
+            if total_rag_entries > 0:
+                notes.append(
+                    f"💾 **Note**: All fetched content ({total_rag_entries} pages) has been stored in RAG for future reference.")
+
+            if notes and hasattr(response, 'content') and response.content:  # ← Check response.content is not None
+                response.content += "\n\n---\n\n" + "\n\n".join(notes)
 
             return {
                 "messages": state["messages"] + [response],
@@ -1233,17 +1373,21 @@ Your answer:"""
 
             # Add disclaimers
             disclaimers = [
-                "\n\n---\n\n⚠️ **Note**: Answer based on summary due to content length."
+                "⚠️ **Note**: Answer based on summary due to content length."
             ]
 
             if failed_sources:
                 disclaimers.append(
-                    "\n⚠️ **Some sources unavailable:**\n" +
+                    "⚠️ **Some sources unavailable:**\n" +
                     "\n".join([f"- {s}" for s in failed_sources])
                 )
 
+            if total_rag_entries > 0:
+                disclaimers.append(
+                    f"💾 **Note**: All fetched content ({total_rag_entries} pages) has been stored in RAG for future reference.")
+
             if hasattr(response, 'content'):
-                response.content += "".join(disclaimers)
+                response.content += "\n\n---\n\n" + "\n\n".join(disclaimers)
 
             return {
                 "messages": state["messages"] + [response],

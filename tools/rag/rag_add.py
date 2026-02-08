@@ -1,173 +1,263 @@
 """
-RAG Add Tool
-Adds text to the RAG vector database with embedding generation
+RAG Add Tool - OPTIMIZED
+Concurrent embeddings + batch inserts + proper error handling
 """
 
+import asyncio
 import logging
+import time
 from typing import Dict, Any, List
 
 logger = logging.getLogger("mcp_server")
 
+# Safe limits for embedding models
+MAX_CHUNK_TOKENS = 350  # Conservative limit (bge-large has ~512 max)
+MAX_CHUNK_CHARS = MAX_CHUNK_TOKENS * 4  # ~1400 characters
+
 
 def estimate_tokens(text: str) -> int:
-    """
-    Estimate token count (rough approximation).
-    Rule of thumb: 1 token ≈ 4 characters for English text
-    """
+    """Estimate token count (1 token ≈ 4 characters)"""
     return len(text) // 4
 
 
-def split_text_safe(text: str, max_tokens: int = 400) -> List[str]:
+def split_text_safe(text: str, max_tokens: int = MAX_CHUNK_TOKENS) -> List[str]:
     """
-    Split text into token-safe chunks.
+    Split text into token-safe chunks with proper boundary detection.
 
     Args:
         text: Text to split
-        max_tokens: Maximum tokens per chunk (default: 400, safe for 512 limit)
+        max_tokens: Maximum tokens per chunk (default: 350)
 
     Returns:
-        List of text chunks
+        List of text chunks guaranteed to be under token limit
     """
-    # Convert tokens to characters (4 chars ≈ 1 token)
-    max_chars = max_tokens * 4  # 400 tokens = 1600 chars
+    max_chars = max_tokens * 4
 
     if len(text) <= max_chars:
-        return [text]
+        # Verify it's actually safe
+        if estimate_tokens(text) <= max_tokens:
+            return [text]
 
     chunks = []
-    start = 0
+    paragraphs = text.split('\n\n')
+    current_chunk = ""
 
-    while start < len(text):
-        # Get chunk
-        end = min(start + max_chars, len(text))
+    for para in paragraphs:
+        # If paragraph itself is too large, split by sentences
+        if len(para) > max_chars:
+            sentences = []
+            for delimiter in ['. ', '! ', '? ', '\n']:
+                para = para.replace(delimiter, delimiter + '|SPLIT|')
 
-        # If not the last chunk, try to break at sentence boundary
-        if end < len(text):
-            # Look for sentence endings in the last 20% of chunk
-            search_start = start + int(max_chars * 0.8)
-            for punct in ['. ', '! ', '? ', '\n\n']:
-                last_punct = text.rfind(punct, search_start, end)
-                if last_punct > start:
-                    end = last_punct + len(punct)
-                    break
+            for sentence in para.split('|SPLIT|'):
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
 
-        chunk = text[start:end].strip()
-        if chunk:
-            # Double-check token count
-            estimated_tokens = estimate_tokens(chunk)
-            if estimated_tokens > max_tokens:
-                logger.warning(f"⚠️  Chunk has ~{estimated_tokens} tokens, splitting smaller...")
-                # Force split at even smaller size
-                smaller_max = max_tokens * 3  # 1200 chars for safety
-                sub_end = start + smaller_max
-                chunk = text[start:sub_end].strip()
-
-            chunks.append(chunk)
-            start = end
+                # If current chunk + sentence is too big, flush current
+                if len(current_chunk) + len(sentence) > max_chars:
+                    if current_chunk:
+                        chunks.append(current_chunk.strip())
+                    current_chunk = sentence
+                else:
+                    current_chunk += (" " + sentence if current_chunk else sentence)
         else:
-            start = end
+            # Normal paragraph
+            if len(current_chunk) + len(para) > max_chars:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = para
+            else:
+                current_chunk += ("\n\n" + para if current_chunk else para)
 
-    return chunks
+    # Add final chunk
+    if current_chunk:
+        chunks.append(current_chunk.strip())
 
-def split_text_by_chars(text: str, max_chars: int = 2800, overlap: int = 200) -> List[str]:
-    """
-    Split text into chunks by character count (safer than word count).
+    # Safety check: verify all chunks are under limit
+    safe_chunks = []
+    for chunk in chunks:
+        if estimate_tokens(chunk) > max_tokens:
+            # Force split at even smaller size
+            logger.warning(f"⚠️ Chunk too large ({estimate_tokens(chunk)} tokens), force-splitting...")
+            sub_chunks = force_split_chunk(chunk, max_tokens // 2)
+            safe_chunks.extend(sub_chunks)
+        else:
+            safe_chunks.append(chunk)
 
-    Args:
-        text: Text to split
-        max_chars: Maximum characters per chunk (default: 4000, ~375 tokens)
+    return safe_chunks
 
-    Returns:
-        List of text chunks
-        :param text:
-        :param max_chars:
-        :param overlap:
-    """
-    if len(text) <= max_chars:
-        return [text]
 
+def force_split_chunk(text: str, max_tokens: int) -> List[str]:
+    """Force split a chunk at character boundaries"""
+    max_chars = max_tokens * 4
     chunks = []
-    start = 0
 
-    while start < len(text):
-        # Get chunk
-        end = start + max_chars
-
-        # If not the last chunk, try to break at sentence boundary
-        if end < len(text):
-            # Look for sentence endings near the end
-            for punct in ['. ', '! ', '? ', '\n']:
-                last_punct = text.rfind(punct, start, end)
-                if last_punct > start + (max_chars * 0.8):  # At least 80% of max size
-                    end = last_punct + 1
-                    break
-
-        chunk = text[start:end].strip()
+    for i in range(0, len(text), max_chars):
+        chunk = text[i:i + max_chars].strip()
         if chunk:
             chunks.append(chunk)
 
-        # Move start with overlap (for context continuity)
-        start = end - overlap if end < len(text) else len(text)
-
     return chunks
+
+
+async def generate_embeddings_concurrent(texts: List[str]) -> List[tuple]:
+    """
+    Generate embeddings for all chunks concurrently.
+
+    Args:
+        texts: List of text chunks
+
+    Returns:
+        List of tuples (success: bool, result: embedding or error)
+    """
+    from langchain_ollama import OllamaEmbeddings
+
+    embeddings_model = OllamaEmbeddings(model="bge-large")
+
+    async def embed_one(text: str, index: int) -> tuple:
+        """Embed single text chunk"""
+        try:
+            # Run in thread pool since ollama is sync
+            loop = asyncio.get_event_loop()
+            embedding = await loop.run_in_executor(
+                None,
+                embeddings_model.embed_query,
+                text
+            )
+            return (True, embedding, index)
+        except Exception as e:
+            logger.error(f"❌ Embedding failed for chunk {index}: {e}")
+            return (False, str(e), index)
+
+    # Generate all embeddings concurrently
+    tasks = [embed_one(text, i) for i, text in enumerate(texts)]
+    results = await asyncio.gather(*tasks)
+
+    return results
 
 
 def rag_add(text: str, source: str = None, chunk_size: int = 400) -> Dict[str, Any]:
     """
-    Add text to RAG database with token-safe chunking.
+    Add text to RAG with threaded embedding generation and batch insert.
+    Pure sync - works in any context.
 
     Args:
         text: Text to add
-        source: Source identifier (e.g., "plex:12345")
-        chunk_size: Maximum TOKENS per chunk (default: 400 tokens = ~1600 chars)
+        source: Source identifier
+        chunk_size: Maximum tokens per chunk
 
     Returns:
-        Dictionary with success status and metadata
+        Dictionary with results
     """
-    from tools.rag.rag_vector_db import add_to_rag_batch, flush_batch
+    from tools.rag.rag_vector_db import batch_insert_documents
+    from concurrent.futures import ThreadPoolExecutor
 
-    logger.info(f"📝 Adding text to RAG (length: {len(text)}, max_tokens: {chunk_size}) for {source}")
+    start_time = time.time()
+
+    # Override unsafe chunk sizes
+    safe_chunk_size = min(chunk_size, MAX_CHUNK_TOKENS)
+    if chunk_size > MAX_CHUNK_TOKENS:
+        logger.warning(f"⚠️ Chunk size {chunk_size} reduced to safe limit {MAX_CHUNK_TOKENS}")
+
+    logger.info(f"📝 Adding text to RAG (length: {len(text)}, max_tokens: {safe_chunk_size}) for {source}")
 
     try:
-        # Split into token-safe chunks
-        chunks = split_text_safe(text, max_tokens=chunk_size)
+        # Split into safe chunks
+        chunks = split_text_safe(text, max_tokens=safe_chunk_size)
         logger.info(f"📦 Split into {len(chunks)} chunks")
 
-        # Add each chunk
-        added_count = 0
+        # Generate embeddings using thread pool (NOT async)
+        embed_start = time.time()
+        results = _generate_embeddings_threaded(chunks)
+        embed_duration = time.time() - embed_start
+
+        # Separate successful and failed
+        successful_docs = []
         failed_count = 0
 
-        for i, chunk in enumerate(chunks):
-            chunk_length = len(chunk)
-            estimated_tokens = estimate_tokens(chunk)
-            logger.debug(f"  Chunk {i + 1}: {chunk_length} chars (~{estimated_tokens} tokens)")
-
-            try:
-                add_to_rag_batch(chunk, source=source)
-                added_count += 1
-            except Exception as e:
-                logger.error(f"❌ Failed to add chunk {i + 1} ({estimated_tokens} tokens): {e}")
+        for success, result, index in results:
+            if success:
+                successful_docs.append({
+                    'text': chunks[index],
+                    'embedding': result,
+                    'source': source,
+                    'length': len(chunks[index]),
+                    'word_count': len(chunks[index].split())
+                })
+            else:
                 failed_count += 1
 
-        # Flush batch after all chunks
-        flush_batch()
+        logger.info(f"⚡ Generated {len(successful_docs)} embeddings in {embed_duration:.2f}s ({failed_count} failed)")
 
-        if failed_count > 0:
-            logger.warning(f"⚠️  Added {added_count} chunks, {failed_count} failed")
+        # Batch insert
+        if successful_docs:
+            insert_start = time.time()
+            inserted = batch_insert_documents(successful_docs)
+            insert_duration = time.time() - insert_start
+            logger.info(f"💾 Batch inserted {inserted} documents in {insert_duration:.2f}s")
         else:
-            logger.info(f"✅ Added {added_count} chunks to RAG")
+            inserted = 0
+            insert_duration = 0
 
-        return {
-            "success": added_count > 0,
-            "chunks_added": added_count,
+        total_duration = time.time() - start_time
+
+        result = {
+            "success": inserted > 0,
+            "chunks_added": inserted,
             "chunks_failed": failed_count,
             "source": source,
-            "original_length": len(text)
+            "original_length": len(text),
+            "processing_time_seconds": round(total_duration, 2),
+            "embedding_time_seconds": round(embed_duration, 2),
+            "insert_time_seconds": round(insert_duration, 2)
         }
 
+        if failed_count > 0:
+            logger.warning(f"⚠️ Added {inserted} chunks, {failed_count} failed")
+        else:
+            logger.info(f"✅ Successfully added {inserted} chunks")
+
+        return result
+
     except Exception as e:
-        logger.error(f"❌ Error adding to RAG: {e}")
+        logger.error(f"❌ Error in rag_add: {e}")
         return {
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "chunks_added": 0,
+            "chunks_failed": 0
         }
+
+
+def _generate_embeddings_threaded(texts: List[str]) -> List[tuple]:
+    """
+    Generate embeddings using ThreadPoolExecutor (pure sync, no asyncio).
+
+    Args:
+        texts: List of text chunks
+
+    Returns:
+        List of tuples (success: bool, result: embedding or error, index: int)
+    """
+    from langchain_ollama import OllamaEmbeddings
+    from concurrent.futures import ThreadPoolExecutor
+
+    embeddings_model = OllamaEmbeddings(model="bge-large")
+
+    def embed_one(args: tuple) -> tuple:
+        """Embed single text chunk"""
+        text, index = args
+        try:
+            embedding = embeddings_model.embed_query(text)
+            return (True, embedding, index)
+        except Exception as e:
+            logger.error(f"❌ Embedding failed for chunk {index}: {e}")
+            return (False, str(e), index)
+
+    # Use ThreadPoolExecutor with map for ordered results
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        indexed_texts = [(text, i) for i, text in enumerate(texts)]
+        results = list(executor.map(embed_one, indexed_texts))
+
+    return results

@@ -2,13 +2,12 @@
 RAG Vector Database
 Handles storage and retrieval of embeddings
 """
-
+import json
 import logging
 import uuid
 from typing import Dict, Any, List
 from langchain_ollama import OllamaEmbeddings
-
-from .rag_utils import load_rag_db, save_rag_db
+from .rag_utils import load_rag_db, save_rag_db, get_connection
 
 logger = logging.getLogger("mcp_server")
 
@@ -197,3 +196,52 @@ def flush_batch():
     _pending_chunks = []
 
     logger.info(f"✅ Batch saved successfully")
+
+def batch_insert_documents(documents: List[Dict[str, Any]]) -> int:
+    """
+    Optimized batch insert with binary embeddings.
+    """
+    import uuid
+    import numpy as np
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Prepare data with binary embeddings (MUCH faster than JSON)
+        batch_data = []
+        for doc in documents:
+            doc_id = str(uuid.uuid4())
+
+            # Convert embedding to numpy array then bytes
+            embedding_array = np.array(doc['embedding'], dtype=np.float32)
+            embedding_bytes = embedding_array.tobytes()
+
+            batch_data.append((
+                doc_id,
+                doc['text'],
+                embedding_bytes,  # Binary, not JSON!
+                doc.get('source'),
+                doc.get('length'),
+                doc.get('word_count')
+            ))
+
+        # Fast transaction
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.executemany("""
+                           INSERT INTO documents
+                               (id, text, embedding, source, length, word_count)
+                           VALUES (?, ?, ?, ?, ?, ?)
+                           """, batch_data)
+        cursor.execute("COMMIT")
+
+        logger.debug(f"💾 Batch inserted {len(batch_data)} documents")
+        return len(batch_data)
+
+    except Exception as e:
+        logger.error(f"❌ Batch insert failed: {e}")
+        try:
+            cursor.execute("ROLLBACK")
+        except:
+            pass
+        return 0
