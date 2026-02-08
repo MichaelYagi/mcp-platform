@@ -1090,8 +1090,10 @@ async def should_use_multi_agent(user_request: str) -> bool:
     request_lower = user_request.lower()
     logger.info(f"🔍 Checking multi-agent for: {request_lower[:100]}")
 
+    # ═══════════════════════════════════════════════════════════════
     # Check model size - Disable for tiny models
     # This check must come BEFORE any trigger logic
+    # ═══════════════════════════════════════════════════════════════
     try:
         # Read current model from last_model.txt
         last_model_file = Path(__file__).parent / "last_model.txt"
@@ -1099,35 +1101,46 @@ async def should_use_multi_agent(user_request: str) -> bool:
         if last_model_file.exists():
             current_model = last_model_file.read_text().strip().lower()
 
-            # List of tiny models that are too slow for multi-agent
-            tiny_models = [
-                "tinyllama",
-                "tiny-llama",
-                "llama-1b",
-                "phi-1",
-                "phi-2",
-                "qwen-1.5b",
-                "qwen2-1.5b",
-                "gemma-2b",
-                "stablelm-2b",
-            ]
+            # Extract model size using pattern matching
+            # Pattern: look for number followed by 'b' (billions) after colon or dash
+            # Examples: qwen2.5:32b-instruct → 32, llama3.1:8b → 8
+            size_pattern = r':(\d+)b(?:-|instruct|$|\s)'
+            match = re.search(size_pattern, current_model)
 
-            # Check if current model is tiny
-            for tiny in tiny_models:
-                if tiny in current_model:
-                    logger.warning(f"⚠️ Multi-agent DISABLED: {current_model} is too small/slow")
+            if match:
+                size_b = int(match.group(1))
+                logger.debug(f"Detected model size: {size_b}B parameters")
+
+                if size_b < 3:
+                    logger.warning(f"⚠️ Multi-agent DISABLED: Model too small ({size_b}B < 3B params)")
                     logger.info(f"   💡 Use qwen2.5:7b or larger for multi-agent")
                     return False
+            else:
+                # Fallback: Check for tiny model names if pattern matching fails
+                tiny_models = [
+                    "tinyllama",
+                    "tiny-llama",
+                    "phi-1",
+                    "phi-2",
+                    "gemma-2b",
+                    "stablelm-2b",
+                    "qwen2-1.5b",
+                    "llama-1b",
+                ]
 
-            # Also check for "1b" or "2b" in model name
-            if "1b" in current_model or "2b" in current_model:
-                logger.warning(f"⚠️ Multi-agent DISABLED: Model too small (< 3B params)")
-                logger.info(f"   💡 Use qwen2.5:7b or larger for multi-agent")
-                return False
+                for tiny in tiny_models:
+                    if tiny in current_model:
+                        logger.warning(f"⚠️ Multi-agent DISABLED: {current_model} is too small/slow")
+                        logger.info(f"   💡 Use qwen2.5:7b or larger for multi-agent")
+                        return False
 
     except Exception as e:
         # If model check fails, continue with multi-agent decision
         logger.debug(f"Could not check model size: {e}")
+
+    # ═══════════════════════════════════════════════════════════════
+    # Multi-agent triggers
+    # ═══════════════════════════════════════════════════════════════
 
     # Repository review is multi-step: clone → analyze → review → cleanup
     if re.search(r'github\.com/[^\s]+', user_request):

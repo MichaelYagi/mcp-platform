@@ -591,8 +591,10 @@ async def fetch_from_source_directly(source: str, query: str) -> dict:
 
 async def search_and_fetch_source(source: str, query: str) -> dict:
     """
-    SMART HYBRID with URL support:
-    1. If source is a URL → Fetch that specific page (NEW!)
+    SMART HYBRID with URL support AND homepage detection:
+    1. If source is a URL → Check if homepage
+       a. If homepage → Auto-search site for relevant pages
+       b. If specific page → Fetch that page
     2. If source is a domain → Try direct URLs
     3. If no direct URLs → Try LangSearch
     4. Always return something
@@ -600,10 +602,156 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
     logger = logging.getLogger("mcp_client")
 
     # ═══════════════════════════════════════════════════════════════
-    # TIER 2A: Check if source is a specific URL
+    # CHECK IF SOURCE IS A URL
     # ═══════════════════════════════════════════════════════════════
     if source.startswith(('http://', 'https://')):
-        logger.info(f"🎯 Source is a specific URL: {source}")
+        logger.info(f"🎯 Source is a URL: {source}")
+
+        from urllib.parse import urlparse
+        parsed = urlparse(source)
+        domain = parsed.netloc
+        path = parsed.path
+
+        # ═══════════════════════════════════════════════════════════
+        # DETECT HOMEPAGE
+        # ═══════════════════════════════════════════════════════════
+        is_homepage = (
+                path in ['/', '', '/en/', '/en', '/index.html', '/index.php'] or
+                path.count('/') <= 1  # Only domain + maybe one level
+        )
+
+        if is_homepage:
+            logger.info(f"🏠 Homepage detected: {source}")
+            logger.info(f"🔍 Auto-searching {source} for relevant content")
+
+            # Clean query
+            cleaned_query = query
+            action_patterns = [
+                r'create\s+(?:a\s+)?(?:\d+\s+)?(?:minute\s+)?(?:talk|essay|article)\s+(?:on|about)\s+',
+                r'write\s+(?:a\s+)?(?:\d+\s+)?(?:page\s+)?(?:essay|article)\s+(?:on|about)\s+',
+                r'tell\s+me\s+about\s+',
+            ]
+            for pattern in action_patterns:
+                cleaned_query = re.sub(pattern, '', cleaned_query, flags=re.IGNORECASE)
+            cleaned_query = cleaned_query.strip()
+
+            search_query = f"site:{source} {cleaned_query}"
+            logger.info(f"🔍 Site search: {search_query}")
+
+            try:
+                langsearch = get_langsearch_client()
+                search_result = await langsearch.search(search_query)
+
+                if search_result.get("success"):
+
+                    # Now try the extraction
+                    data = search_result.get("results", {})
+
+                    if isinstance(data, dict):
+                        web_pages = data.get("webPages", {})
+                        value = web_pages.get("value", [])
+                        # Extract summaries with URLs
+                        summaries = []
+                        for i, item in enumerate(value):
+
+                            if isinstance(item, dict):
+                                url = item.get("url", "")
+                                title = item.get("name", "Untitled")
+                                summary = item.get("summary", "")
+
+                                # Only include if from target domain
+                                if domain in url and summary:
+                                    summaries.append({
+                                        "url": url,
+                                        "title": title,
+                                        "summary": summary
+                                    })
+                                    logger.info(f"   ✅ Added: {title}")
+
+                        if summaries:
+                            logger.info(f"✅ Site search found {len(summaries)} pages with content on {domain}")
+                            # Take top 3-5 summaries
+                            top_summaries = summaries[:5]
+
+                            # Build combined content from summaries
+                            combined_content = []
+                            for i, item in enumerate(top_summaries, 1):
+                                logger.info(f"   {i}. {item['title']}")
+
+                                combined_content.append(f"""
+        ═══════════════════════════════════════════════════════════════
+        SOURCE {i}: {item['title']}
+        URL: {item['url']}
+        ═══════════════════════════════════════════════════════════════
+
+        {item['summary']}
+
+        """)
+
+                            note = f"\n\n**Note**: Auto-searched {domain} and found {len(top_summaries)} relevant page(s)."
+
+                            return {
+                                "success": True,
+                                "content": "\n".join(combined_content) + note,
+                                "urls_fetched": len(top_summaries),
+                                "method": "langsearch_summaries"
+                            }
+                        else:
+                            logger.warning(f"⚠️ Site search found no relevant pages on {domain}")
+                    logger.warning(f"⚠️ Site search found no relevant pages on {domain}")
+
+            except Exception as e:
+                logger.error(f"❌ Site search failed: {e}")
+
+            # ═══════════════════════════════════════════════════════
+            # FALLBACK: Fetch homepage anyway with warning
+            # ═══════════════════════════════════════════════════════
+            logger.info(f"📄 Site search failed, fetching homepage as fallback")
+
+            result = await fetch_url_content(source)
+
+            if result.get("success"):
+                content = result.get("content", "")
+                title = result.get("title", "Untitled")
+
+                # Add warning that this is just a homepage
+                warning = f"""
+⚠️ **Homepage Warning**: The source URL was a homepage with limited content.
+Site search found no relevant articles. Results may be limited.
+
+For better results, try:
+- Using a specific article URL from {domain}
+- Searching the site manually first
+- Providing more specific keywords
+
+"""
+
+                combined_content = f"""
+═══════════════════════════════════════════════════════════════
+SOURCE 1: {title} (Homepage)
+URL: {source}
+═══════════════════════════════════════════════════════════════
+
+{content}
+
+{warning}
+"""
+
+                return {
+                    "success": True,
+                    "content": combined_content,
+                    "urls_fetched": 1,
+                    "method": "homepage_fallback"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Homepage fetch failed: {result.get('error')}"
+                }
+
+        # ═══════════════════════════════════════════════════════════
+        # NOT A HOMEPAGE - Fetch specific URL directly
+        # ═══════════════════════════════════════════════════════════
         logger.info(f"📄 Fetching specific URL directly")
 
         try:
@@ -634,36 +782,32 @@ URL: {source}
                 logger.warning(f"⚠️ Failed to fetch URL: {result.get('error')}")
 
                 # Extract domain and try that instead
-                from urllib.parse import urlparse
-                parsed = urlparse(source)
                 source = parsed.netloc
                 logger.info(f"🔄 Falling back to domain: {source}")
-                # Continue to TIER 2B below
+                # Continue to direct access below
 
         except Exception as e:
             logger.error(f"❌ Exception fetching URL: {e}")
 
             # Extract domain and continue
-            from urllib.parse import urlparse
             try:
-                parsed = urlparse(source)
                 source = parsed.netloc
                 logger.info(f"🔄 Exception recovery - using domain: {source}")
             except:
                 return {"success": False, "error": f"Invalid URL: {source}"}
 
     # ═══════════════════════════════════════════════════════════════
-    # TIER 2B: Try direct access (pre-configured URLs)
+    # REST OF EXISTING CODE (Direct access, LangSearch fallback)
     # ═══════════════════════════════════════════════════════════════
+
+    # Try direct access (pre-configured URLs)
     direct_result = await fetch_from_source_directly(source, query)
 
     if direct_result.get("success"):
         urls = direct_result.get("urls", [])
         logger.info(f"✅ Got {len(urls)} URLs via direct access")
     else:
-        # ═══════════════════════════════════════════════════════════
-        # TIER 2C: Fall back to LangSearch
-        # ═══════════════════════════════════════════════════════════
+        # Fall back to LangSearch
         logger.info(f"⚠️ No direct URLs, trying LangSearch")
         langsearch = get_langsearch_client()
 
@@ -689,9 +833,7 @@ URL: {source}
         if not urls:
             return {"success": False, "error": "No URLs found"}
 
-    # ═══════════════════════════════════════════════════════════════
-    # TIER 2D: Fetch actual content from discovered URLs
-    # ═══════════════════════════════════════════════════════════════
+    # Fetch actual content from discovered URLs
     unique_urls = list(dict.fromkeys(urls))[:3]
     logger.info(f"📄 Fetching {len(unique_urls)} URLs")
     for i, url in enumerate(unique_urls, 1):

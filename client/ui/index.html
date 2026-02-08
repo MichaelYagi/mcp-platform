@@ -479,8 +479,30 @@
             padding: 0.75rem 1rem;
             border-radius: 10px;
             white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
             line-height: 1.4;
             font-size: 0.95rem;
+        }
+
+        /* Fix code block wrapping */
+        pre {
+            white-space: pre-wrap;       /* Wrap long lines */
+            word-break: break-word;      /* Break long words */
+            overflow-wrap: break-word;   /* Break URLs */
+            overflow-x: auto;            /* Fallback scrollbar */
+            max-width: 100%;             /* Respect container */
+            margin: 0.5rem 0;            /* Spacing */
+            padding: 0.75rem;            /* Internal padding */
+            background: rgba(0, 0, 0, 0.05);  /* Subtle background */
+            border-radius: 6px;          /* Rounded corners */
+        }
+
+        pre code {
+            white-space: pre-wrap;       /* Inherit wrapping */
+            word-break: break-word;      /* Break long words */
+            overflow-wrap: break-word;   /* Break URLs */
+            display: block;              /* Block formatting */
         }
 
         .user {
