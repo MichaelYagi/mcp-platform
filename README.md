@@ -646,6 +646,39 @@ mcp_a2a/
 > Latest AI developments
 ```
 
+**RAG (Retrieval-Augmented Generation):**
+
+*Automatic ingestion from web research:*
+```
+> Write a report about quantum computing using 
+  https://en.wikipedia.org/wiki/Quantum_computing and
+  https://en.wikipedia.org/wiki/Quantum_algorithm as sources
+
+✅ Fetches both Wikipedia pages
+✅ Automatically stores content in RAG (16 chunks, ~2.5s)
+✅ Generates report using the content
+💾 Content available for future searches
+```
+
+*Retrieving stored content:*
+```
+> Use the rag_search_tool to search for "quantum entanglement"
+> What do you have in the RAG about algorithm complexity?
+> Search the rag for information about superposition
+```
+
+*Checking RAG status:*
+```
+> What's in the rag database?
+> Show rag stats
+```
+
+**How RAG works:**
+- When you research topics using URLs, content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
+- URLs are deduplicated - the same page won't be stored twice
+- Semantic search finds the most relevant content even if exact keywords don't match
+- Search returns top 5 results with similarity scores and source URLs
+
 ### Troubleshooting
 
 **Ollama models not appearing:**
@@ -688,13 +721,25 @@ curl http://localhost:8010/.well-known/agent-card.json
 - Check API key at https://langsearch.com
 - System falls back to LLM if unavailable
 
+**RAG search returns wrong results:**
+- RAG uses semantic similarity - it returns the closest matches even if they're not exact
+- If searching for content that doesn't exist, it returns the most similar available content
+- Check what's in the database: `> show rag stats`
+- Content is only stored after researching URLs or manually adding via `rag_add_tool`
+
+**RAG ingestion is slow:**
+- Current performance: ~2.5 seconds for 16 chunks (10,000 characters)
+- Embeddings: ~0.5-2s (concurrent processing with 5 workers)
+- Database insert: ~0.02s (binary embeddings with batch inserts)
+- If slower, check Ollama is running: `ollama list`
+
 **Conversation history not working ("what was my last prompt" fails):**
 - **Cause**: Smaller models (7B parameters) often refuse to answer questions about conversation history, even when the data is present in their context
 - **Solution 1 (Recommended)**: Switch to a larger model with better instruction following:
-  ```bash
+```bash
   ollama pull qwen2.5:14b
   :model qwen2.5:14b
-  ```
+```
 - **Solution 2**: Use models known for good instruction following:
   - `qwen2.5:14b` or `qwen2.5:32b` (excellent, 80-95% success rate)
   - `llama3.1:8b` (good, ~70% success rate)
@@ -702,12 +747,12 @@ curl http://localhost:8010/.well-known/agent-card.json
   - Avoid: `qwen2.5:3b`, `qwen2.5:7b` (~10-30% success rate)
 - **Why this happens**: Smaller models prioritize their safety training ("don't claim knowledge you don't have") over system instructions, causing them to deny access to conversation history even when it's available in their context window
 - **Expected behavior with larger models**: 
-  ```
+```
   You: "what's the weather?"
   Bot: "It's sunny, 22°C"
   You: "what was my last prompt?"
   Bot: "Your last prompt was: what's the weather?"
-  ```
+```
 
 **Tools not appearing:**
 ```bash
