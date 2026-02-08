@@ -67,28 +67,6 @@ INTENT_PATTERNS = {
         "tools": [],  # NO TOOLS - just answer from knowledge
         "priority": 4  # Lower priority than specific intents
     },
-    "rag_status": {
-        "pattern": (
-            r'\bhow\s+many\s+.*(ingested|in\s+rag)\b'
-            r'|\bwhat\s+(has|was)\s+been\s+ingested\b'
-            r'|\bitems?\s+(have\s+been|were)\s+ingested\b'
-            r'|\bcount\s+.*(items?|in\s+rag)\b'
-            r'|\btotal\s+.*(items?|in\s+rag)\b'
-            r'|\b(show|list|display)\s+rag\b'
-            r'|\brag\s+(status|contents?|info|summary|overview|report)\b'
-            r'|\bwhat(\'s| is)\s+in\s+(the\s+)?rag\b'
-            r'|\bgive\s+me\s+rag\s+(stats|status|info|details)\b'
-            r'|\bwhat\s+has\s+been\s+ingested\s+so\s+far\b'
-            r'|\bwhat\s+did\s+you\s+ingest\b'
-            r'|\bshow\s+me\s+everything\s+in\s+rag\b'
-            r'|\brag\s+items\b'
-            r'|\brag\s+dump\b'
-            r'|\brag\s+data\b'
-            r'|\bcurrent\s+rag\s+state\b'
-        ),
-        "tools": ["rag_status_tool", "rag_diagnose_tool"],
-        "priority": 1
-    },
     "ingest": {
         "pattern": (
             r'\bingest\b'
@@ -298,6 +276,49 @@ INTENT_PATTERNS = {
             "find_scene_by_title"
         ],
         "priority": 2  # HIGHER priority than ml_recommendation!
+    },
+    "rag": {
+        "pattern": (
+            # Status queries
+            r'\bhow\s+many\s+.*(ingested|in\s+rag)\b'
+            r'|\bwhat\s+(has|was)\s+been\s+ingested\b'
+            r'|\bitems?\s+(have\s+been|were)\s+ingested\b'
+            r'|\bcount\s+.*(items?|in\s+rag)\b'
+            r'|\btotal\s+.*(items?|in\s+rag)\b'
+            r'|\b(show|list|display)\s+rag\b'
+            r'|\brag\s+(status|contents?|info|summary|overview|report|stats)\b'
+            r'|\bwhat(\'s| is)\s+in\s+(the\s+)?rag\b'
+            r'|\bgive\s+me\s+rag\s+(stats|status|info|details)\b'
+    
+            # Search queries
+            r'|\bsearch\s+(the\s+)?rag\b'
+            r'|\bfind\s+in\s+rag\b'
+            r'|\blook\s+up\s+in\s+rag\b'
+            r'|\brag\s+search\b'
+            r'|\bquery\s+(the\s+)?rag\b'
+            r'|\bdo\s+you\s+have\s+.*\s+in\s+rag\b'
+            r'|\bwhat\s+do\s+you\s+have\s+(about|on)\b'
+    
+            # Browse/list queries
+            r'|\bbrowse\s+(the\s+)?rag\b'
+            r'|\bshow\s+rag\s+(content|documents|entries|sources)\b'
+            r'|\blist\s+rag\s+(sources|documents|content)\b'
+            r'|\bwhat\s+sources\s+.*(in\s+)?rag\b'
+            r'|\brag_list_sources\b'
+            r'|\brag_browse\b'
+    
+            # General RAG references
+            r'|\brag\s+(database|storage|data)\b'
+        ),
+        "tools": [
+            "rag_search_tool",
+            "rag_status_tool",
+            "rag_list_sources_tool",
+            "rag_browse_tool",
+            "rag_diagnose_tool",
+            "rag_add_tool"
+        ],
+        "priority": 2
     },
     "ml_recommendation": {
         "pattern": (
@@ -629,6 +650,7 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
 
             rag_entry = {
                 "text": str(content),
+                "source": source_url,
                 "metadata": {
                     "source_type": metadata.get("source_type", "unknown"),
                     "url": source_url,

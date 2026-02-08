@@ -203,6 +203,155 @@ def rag_status_tool() -> str:
         logger.error(f"❌ Error getting RAG status: {e}")
         return json.dumps({"error": str(e)}, indent=2)
 
+
+@mcp.tool()
+@check_tool_enabled(category="rag")
+def rag_browse_tool(limit: int = 10) -> str:
+    """
+    Browse recent documents in the RAG database with previews.
+
+    Args:
+        limit (int, optional): Number of documents to show (default: 10, max: 50)
+
+    Returns:
+        JSON string with:
+        - documents: Array of recent documents with previews
+        - total_shown: Number of documents shown
+        - total_in_database: Total documents available
+
+    Use to see what content has been stored recently and what topics are available.
+    """
+    logger.info(f"🛠 [server] rag_browse_tool called with limit: {limit}")
+
+    try:
+        from tools.rag.rag_vector_db import get_connection
+
+        # Clamp limit
+        limit = min(max(1, limit), 50)
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Get total count
+        cursor.execute("SELECT COUNT(*) FROM documents")
+        total_count = cursor.fetchone()[0]
+
+        # Get recent documents with previews
+        cursor.execute("""
+                       SELECT id,
+                              SUBSTR(text, 1, 200) as preview,
+                              source,
+                              word_count,
+                              created_at
+                       FROM documents
+                       ORDER BY created_at DESC LIMIT ?
+                       """, (limit,))
+
+        documents = []
+        for row in cursor.fetchall():
+            # Extract readable title from source
+            source = row[2] or "Unknown source"
+            if source.startswith('http'):
+                title = source.split('/')[-1].replace('_', ' ')
+            else:
+                title = source
+
+            documents.append({
+                "id": row[0],
+                "preview": row[1] + "...",
+                "source": source,
+                "title": title,
+                "words": row[3],
+                "created": row[4]
+            })
+
+        result = {
+            "documents": documents,
+            "total_shown": len(documents),
+            "total_in_database": total_count,
+            "summary": f"Showing {len(documents)} of {total_count} documents"
+        }
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        logger.error(f"❌ Error browsing RAG: {e}")
+        return json.dumps({"error": str(e)}, indent=2)
+
+@mcp.tool()
+@check_tool_enabled(category="rag")
+def rag_list_sources_tool() -> str:
+    """
+    List all unique sources stored in the RAG database with document counts.
+
+    Returns:
+        JSON string with:
+        - sources: Array of sources with their document counts and sample titles
+        - total_sources: Number of unique sources
+        - total_documents: Total documents across all sources
+
+    Use to see what content is available in RAG for searching.
+    """
+    logger.info(f"🛠 [server] rag_list_sources_tool called")
+
+    try:
+        from tools.rag.rag_vector_db import get_connection
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        # Get sources with counts and sample text
+        cursor.execute("""
+                       SELECT source,
+                              COUNT(*)                  as doc_count,
+                              SUM(word_count)           as total_words,
+                              MIN(SUBSTR(text, 1, 100)) as sample_text
+                       FROM documents
+                       WHERE source IS NOT NULL
+                         AND source != ''
+                       GROUP BY source
+                       ORDER BY doc_count DESC
+                       """)
+
+        sources = []
+        total_docs = 0
+
+        for row in cursor.fetchall():
+            source = row[0]
+            doc_count = row[1]
+            total_words = row[2]
+            sample_text = row[3]
+
+            # Extract title from URL or use source as-is
+            if source.startswith('http'):
+                # Extract page title from URL
+                title = source.split('/')[-1].replace('_', ' ')
+            else:
+                title = source
+
+            sources.append({
+                "source": source,
+                "title": title,
+                "documents": doc_count,
+                "words": total_words,
+                "sample": sample_text[:100] + "..." if len(sample_text) > 100 else sample_text
+            })
+
+            total_docs += doc_count
+
+        result = {
+            "sources": sources,
+            "total_sources": len(sources),
+            "total_documents": total_docs,
+            "summary": f"{len(sources)} unique sources with {total_docs} total documents"
+        }
+
+        return json.dumps(result, indent=2)
+
+    except Exception as e:
+        logger.error(f"❌ Error listing sources: {e}")
+        return json.dumps({"error": str(e)}, indent=2)
+
 skill_registry = None
 
 @mcp.tool()
