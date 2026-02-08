@@ -617,7 +617,7 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
         # ═══════════════════════════════════════════════════════════
         is_homepage = (
                 path in ['/', '', '/en/', '/en', '/index.html', '/index.php'] or
-                domain in ['/en/', '/en', 'en/', '.en.', '.en', 'en.'] or
+                # domain in ['/en/', '/en', 'en/', '.en.', '.en', 'en.'] or
                 path.count('/') <= 1  # Only domain + maybe one level
         )
 
