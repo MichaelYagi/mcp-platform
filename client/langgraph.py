@@ -622,7 +622,7 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
 
         if is_homepage:
             logger.info(f"🏠 Homepage detected: {source}")
-            logger.info(f"🔍 Auto-searching {source} for relevant content")
+            logger.info(f"🔍 Auto-searching {domain}{path} for relevant content")
 
             # Clean query
             cleaned_query = query
@@ -635,7 +635,7 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
                 cleaned_query = re.sub(pattern, '', cleaned_query, flags=re.IGNORECASE)
             cleaned_query = cleaned_query.strip()
 
-            search_query = f"site:{source} {cleaned_query}"
+            search_query = f"site:{domain}{path} {cleaned_query}"
             logger.info(f"🔍 Site search: {search_query}")
 
             try:
