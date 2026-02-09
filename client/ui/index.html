@@ -2176,13 +2176,25 @@
 
                 // Symbols
                 const symbols = {
-                    '\\pm': '±', '\\times': '×', '\\div': '÷', '\\cdot': '·', '\\neq': '≠',
-                    '\\leq': '≤', '\\geq': '≥', '\\approx': '≈', '\\infty': '∞', '\\pi': 'π',
-                    '\\rightarrow': '→', '\\forall': '∀', '\\exists': '∃', '\\degree': '°'
+                    '\\pm': '±',
+                    '\\times': '×',
+                    '\\div': '÷',
+                    '\\cdot': '·',
+                    '\\neq': '≠',
+                    '\\leq': '≤',
+                    '\\geq': '≥',
+                    '\\approx': '≈',
+                    '\\infty': '∞',
+                    '\\pi': 'π',
+                    '\\rightarrow': '→',
+                    '\\forall': '∀',
+                    '\\exists': '∃',
+                    '\\degree': '°',
+                    '\\phi': 'Φ'
                 };
                 Object.entries(symbols).forEach(([tex, sym]) => { math = math.split(tex).join(sym); });
 
-                // --- THE FIX: N-th Root (e.g., \sqrt[5]{3}) ---
+                // N-th Root (e.g., \sqrt[5]{3}) ---
                 // Must happen BEFORE standard sqrt
                 math = math.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, '<sup>$1</sup>√($2)');
 

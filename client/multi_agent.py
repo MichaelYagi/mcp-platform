@@ -665,7 +665,7 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             from pathlib import Path
             current_model = Path(self.base_llm.model_path).stem
         else:
-            current_model = "unknown"
+            current_model = "MCP Error"
 
         try:
             # Step 1: Create execution plan

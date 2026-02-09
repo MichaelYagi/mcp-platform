@@ -1352,7 +1352,7 @@ Your answer:"""
                 return {
                     "messages": state["messages"] + [AIMessage(content=f"Research error: {str(e)}")],
                     "llm": state.get("llm"),
-                    "current_model": state.get("current_model", "unknown")
+                    "current_model": state.get("current_model", "MCP Error")
                 }
 
         # ATTEMPT 2: Retry with summarization
@@ -2288,13 +2288,41 @@ This model cannot handle your current workload.""")
         # Re-raise if not context overflow
         raise
 
+
     except Exception as e:
+
         if METRICS_AVAILABLE:
             metrics["agent_errors"] += 1
             duration = time.time() - start_time
             metrics["agent_times"].append((time.time(), duration))
 
+        error_str = str(e)
+
+        # Handle Ollama-specific crash
+
+        if "model runner has unexpectedly stopped" in error_str:
+            logger.error("❌ Ollama model crashed - likely out of memory")
+
+            error_msg = AIMessage(content="""❌ Model crashed due to resource limitations.
+
+    **Common causes:**
+    - Out of memory (RAM/VRAM)
+    - Model too large for your system
+    - Ollama server overloaded
+
+    **Solutions:**
+    1. Restart Ollama: `ollama serve`
+    2. Try a smaller model: `:model llama3.2:3b`
+    3. Close other applications to free memory
+    4. Check Ollama logs for details
+    
+    **Quick fix:** `:model llama3.2:3b` for a lighter model.""")
+
+            conversation_state["messages"].append(error_msg)
+            return {"messages": conversation_state["messages"], "error": "ollama_crash"}
+
+        # Generic error handling
         logger.exception(f"❌ Unexpected error in agent execution")
-        error_msg = AIMessage(content=f"An error occurred: {str(e)}")
+        error_msg = AIMessage(content=f"An error occurred: {error_str}")
         conversation_state["messages"].append(error_msg)
         return {"messages": conversation_state["messages"]}
