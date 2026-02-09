@@ -971,12 +971,52 @@ URL: {source}
             return {"success": False, "error": "LangSearch failed"}
 
         results_data = search_result.get("results")
+
+        # Try to extract URLs from the LangSearch response
+        urls = []
+
+        # Method 1: If results_data is a dict with structured data
         if isinstance(results_data, dict):
-            urls = [item.get("url") for item in results_data.get("organic", []) if item.get("url")]
-            logger.info(f"📋 LangSearch found {len(urls)} URLs")
-        else:
-            urls = re.findall(r'https?://[^\s\)]+', str(results_data))
-            logger.info(f"📋 Extracted {len(urls)} URLs from results")
+            # Try webPages.value structure (Bing-style)
+            web_pages = results_data.get("webPages", {})
+            if isinstance(web_pages, dict):
+                for item in web_pages.get("value", []):
+                    if isinstance(item, dict) and item.get("url"):
+                        urls.append(item["url"])
+
+            # Try organic results structure
+            if not urls:
+                for item in results_data.get("organic", []):
+                    if isinstance(item, dict) and item.get("url"):
+                        urls.append(item["url"])
+
+            # Try raw_response if available
+            if not urls:
+                raw = search_result.get("raw_response", {})
+                if isinstance(raw, dict):
+                    web_pages = raw.get("webPages", {})
+                    if isinstance(web_pages, dict):
+                        for item in web_pages.get("value", []):
+                            if isinstance(item, dict) and item.get("url"):
+                                urls.append(item["url"])
+
+        # Method 2: Extract URLs via regex from string representation
+        if not urls:
+            # Convert to string and extract all URLs
+            results_str = str(results_data)
+            # More robust regex that handles URLs in JSON
+            url_pattern = r'(?:url["\']?\s*[:=]\s*["\']?)?(https?://[^\s\'">\)]+)'
+            matches = re.findall(url_pattern, results_str, re.IGNORECASE)
+
+            # Filter out duplicates and clean
+            seen = set()
+            for match in matches:
+                url = match.strip('",}]')  # Clean trailing JSON chars
+                if url and url not in seen and url.startswith('http'):
+                    urls.append(url)
+                    seen.add(url)
+
+        logger.info(f"📋 LangSearch found {len(urls)} URLs")
 
         if not urls:
             return {"success": False, "error": "No URLs found"}
