@@ -586,10 +586,39 @@ class HTMLTextExtractor(HTMLParser):
 
 def fetch_url_content_sync(url: str, timeout: int = 30) -> dict:
     try:
+        # ✅ Comprehensive URL encoding for special characters
+        from urllib.parse import urlparse, quote, urlunparse
+
+        # Parse the URL into components
+        parsed = urlparse(url)
+
+        # Encode the path component (handles all special chars)
+        # safe='/' keeps slashes as path separators
+        # Everything else gets encoded: parentheses, spaces, quotes, etc.
+        encoded_path = quote(parsed.path, safe='/')
+
+        # Encode query string if present
+        encoded_query = quote(parsed.query, safe='&=') if parsed.query else ''
+
+        # Encode fragment if present
+        encoded_fragment = quote(parsed.fragment, safe='') if parsed.fragment else ''
+
+        # Reconstruct the full URL with encoded parts
+        encoded_url = urlunparse((
+            parsed.scheme,  # http/https - no encoding needed
+            parsed.netloc,  # domain - no encoding needed
+            encoded_path,  # path - encoded
+            parsed.params,  # params - usually empty
+            encoded_query,  # query string - encoded
+            encoded_fragment  # fragment - encoded
+        ))
+
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-        response = requests.get(url, headers=headers, timeout=timeout)
+        response = requests.get(encoded_url, headers=headers, timeout=timeout)
+
         if response.status_code != 200:
             return {"success": False, "error": f"HTTP {response.status_code}"}
+
         parser = HTMLTextExtractor()
         parser.feed(response.text)
         text = parser.get_text()
