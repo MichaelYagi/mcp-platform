@@ -504,9 +504,8 @@ def extract_research_sources(content: str) -> list:
     match1 = pattern1.search(content)
     if match1:
         source_text = match1.group(1)
-        # Split by "and" or ","
         parts = re.split(r'\s+and\s+|,\s*', source_text)
-        sources.extend([p.strip() for p in parts if p.strip()])
+        sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
 
     # Pattern 2: "based on X and Y"
     pattern2 = re.compile(
@@ -517,17 +516,23 @@ def extract_research_sources(content: str) -> list:
     if match2:
         source_text = match2.group(1)
         parts = re.split(r'\s+and\s+|,\s*', source_text)
-        sources.extend([p.strip() for p in parts if p.strip()])
+        sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
 
     # Pattern 3: Find all URLs explicitly (backup)
     url_pattern = re.compile(r'https?://[^\s]+')
     urls = url_pattern.findall(content)
-    sources.extend(urls)
+
+    # Clean URLs - remove trailing punctuation
+    for url in urls:
+        cleaned_url = url.rstrip(',.;:!?')
+        if cleaned_url:
+            sources.append(cleaned_url)
 
     # Deduplicate while preserving order
     unique_sources = []
     seen = set()
     for s in sources:
+        s = s.strip()  # Extra safety
         if s and s not in seen:
             unique_sources.append(s)
             seen.add(s)
