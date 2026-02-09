@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 
 GGUF_MODELS_FILE = "gguf_models.json"
 
+_CURRENT_LLM = None
+_CURRENT_MODEL_NAME = None
 
 class LLMBackendManager:
     """Factory for creating LLM instances"""
@@ -28,6 +30,7 @@ class LLMBackendManager:
     def create_llm(model_name: str, temperature: float = 0, **kwargs) -> BaseChatModel:
         """
         Create LLM instance - auto-detects backend
+        Uses last_model.txt as source of truth - only reloads if model changed
 
         Args:
             model_name: Model name (Ollama) or alias (GGUF)
@@ -41,10 +44,25 @@ class LLMBackendManager:
             FileNotFoundError: If GGUF file doesn't exist
             RuntimeError: If GGUF file is corrupted/invalid
         """
+        global _CURRENT_LLM, _CURRENT_MODEL_NAME
+
+        # ✅ CHECK: Is this the same model we already loaded?
+        if _CURRENT_MODEL_NAME == model_name and _CURRENT_LLM is not None:
+            logger.info(f"✅ Model already loaded: {model_name} (no reload)")
+            return _CURRENT_LLM
+
+        # Different model - need to load
+        logger.info(f"🔄 Loading new model: {model_name}")
+
         backend = LLMBackendManager.get_backend_type()
 
         if backend == "ollama":
-            return ChatOllama(model=model_name, temperature=temperature, **kwargs)
+            llm = ChatOllama(model=model_name, temperature=temperature, **kwargs)
+
+            # Save to cache
+            _CURRENT_LLM = llm
+            _CURRENT_MODEL_NAME = model_name
+            return llm
 
         elif backend == "gguf":
             try:
@@ -137,6 +155,10 @@ class LLMBackendManager:
 
                 logger.info(f"✅ GGUF model loaded successfully")
                 print(f"✅ Model loaded!")
+
+                # Save to cache
+                _CURRENT_LLM = llm
+                _CURRENT_MODEL_NAME = model_name
                 return llm
 
             except concurrent.futures.TimeoutError:
@@ -181,7 +203,6 @@ class LLMBackendManager:
 
         else:
             raise ValueError(f"Unknown backend: {backend}")
-
 
 class GGUFModelRegistry:
     """Manages GGUF model registry"""
