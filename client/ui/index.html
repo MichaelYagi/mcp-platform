@@ -2222,7 +2222,7 @@
             };
 
             // --- 5. Final Reassembly ---
-            text = text.replace(/@@INLINE_(\d+)@@/g, (m, i) => `<code>${inline[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`);
+            text = text.replace(/@@INLINE_(\d+)@@/g, (m, i) => `<code style="display: inline-block; padding: 3px 8px; background: rgba(0, 0, 0, 0.05); border-radius: 4px; font-family: monospace;">${inline[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`);
             text = text.replace(/@@CODEBLOCK_(\d+)@@/g, (m, i) => {
                 const block = blocks[i];
                 const escaped = block.code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
