@@ -487,22 +487,22 @@
 
         /* Fix code block wrapping */
         pre {
-            white-space: pre-wrap;       /* Wrap long lines */
-            word-break: break-word;      /* Break long words */
-            overflow-wrap: break-word;   /* Break URLs */
-            overflow-x: auto;            /* Fallback scrollbar */
-            max-width: 100%;             /* Respect container */
-            margin: 0.5rem 0;            /* Spacing */
-            padding: 0.75rem;            /* Internal padding */
-            background: rgba(0, 0, 0, 0.05);  /* Subtle background */
-            border-radius: 6px;          /* Rounded corners */
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            overflow-x: auto;
+            max-width: 100%;
+            margin: 0.5rem 0;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 6px;
         }
 
         pre code {
-            white-space: pre-wrap;       /* Inherit wrapping */
-            word-break: break-word;      /* Break long words */
-            overflow-wrap: break-word;   /* Break URLs */
-            display: block;              /* Block formatting */
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            display: block;
         }
 
         .code-inline {
@@ -765,6 +765,17 @@
                 opacity: 1;
             }
 
+            /* ── NEW: USER filter button color ── */
+            .filter-btn.USER.active {
+                background: #e67e22;
+            }
+
+            /* ── NEW: ASSISTANT filter button color ── */
+            .filter-btn.ASSISTANT.active {
+                background: #2ecc71;
+                color: #1e1e1e;
+            }
+
             .filter-btn.INFO.active {
                 background: #569cd6;
             }
@@ -803,6 +814,18 @@
                 background: #2d2d2d;
             }
 
+            /* ── NEW: USER log entry ── */
+            .log-entry.USER {
+                border-left-color: #e67e22;
+                background: rgba(230, 126, 34, 0.07);
+            }
+
+            /* ── NEW: ASSISTANT log entry ── */
+            .log-entry.ASSISTANT {
+                border-left-color: #2ecc71;
+                background: rgba(46, 204, 113, 0.05);
+            }
+
             .log-entry.INFO {
                 border-left-color: #569cd6;
             }
@@ -830,9 +853,18 @@
 
             .log-level {
                 font-weight: bold;
-                min-width: 60px;
+                min-width: 70px;
                 white-space: nowrap;
                 font-size: 0.75rem;
+            }
+
+            /* ── NEW: USER / ASSISTANT label colors ── */
+            .log-level.USER {
+                color: #e67e22;
+            }
+
+            .log-level.ASSISTANT {
+                color: #2ecc71;
             }
 
             .log-level.INFO {
@@ -1192,13 +1224,6 @@
             <select id="modelSelect">
                 <option value="llama3.1:8b">Llama 3.1 8B</option>
             </select>
-<!--            <div class="mode-toggle-container">-->
-<!--                <label class="toggle-switch">-->
-<!--                    <input type="checkbox" id="multiAgentToggle" onchange="toggleMultiAgent()">-->
-<!--                    <span class="toggle-slider"></span>-->
-<!--                </label>-->
-<!--                <span class="mode-status single" id="modeStatus">Single Agent</span>-->
-<!--            </div>-->
             <button id="chatToggle" onclick="toggleSessionsSidebar()">💬 Chats</button>
             <button id="monitorToggle" onclick="toggleSystemMonitor()">📊 System</button>
             <button id="logToggle" onclick="toggleLogPanel()">📋 Logs</button>
@@ -1246,6 +1271,9 @@
             </div>
 
             <div id="logFilters">
+                <!-- ── NEW: USER and ASSISTANT filter buttons ── -->
+                <button class="filter-btn USER active" data-level="USER" onclick="toggleLogFilter('USER')">USER</button>
+                <button class="filter-btn ASSISTANT active" data-level="ASSISTANT" onclick="toggleLogFilter('ASSISTANT')">ASSISTANT</button>
                 <button class="filter-btn DEBUG active" data-level="DEBUG" onclick="toggleLogFilter('DEBUG')">DEBUG</button>
                 <button class="filter-btn INFO active" data-level="INFO" onclick="toggleLogFilter('INFO')">INFO</button>
                 <button class="filter-btn WARNING active" data-level="WARNING" onclick="toggleLogFilter('WARNING')">WARNING</button>
@@ -1322,11 +1350,9 @@
         const chat = document.getElementById("chat");
         const input = document.getElementById("input");
         const sendBtn = document.getElementById("sendBtn");
-        // const stopBtn = document.getElementById("stopBtn");
         sendBtn.disabled = true;
 
         const modelSelect = document.getElementById("modelSelect");
-        // const multiAgentToggle = document.getElementById("multiAgentToggle");
         const modeStatus = document.getElementById("modeStatus");
 
         let isProcessing = false;
@@ -1340,12 +1366,10 @@
         let openMenuSessionId = null;
         let editingSessionId = null;
 
-        // multiAgentToggle.checked = multiAgentEnabled;
-        // updateModeStatus();
-
         let logPanelOpen = false;
         let logAutoscroll = true;
-        let logFilters = new Set(['DEBUG', 'INFO', 'WARNING', 'ERROR']);
+        // ── UPDATED: USER and ASSISTANT included in default active filters ──
+        let logFilters = new Set(['USER', 'ASSISTANT', 'DEBUG', 'INFO', 'WARNING', 'ERROR']);
         let logWs = null;
 
         let systemMonitorOpen = false;
@@ -1373,12 +1397,9 @@
 
         // Close menu when clicking outside
         document.addEventListener('click', (e) => {
-            // Don't close if clicking menu button or submenu
             if (e.target.closest('.session-menu-btn') || e.target.closest('.session-submenu')) {
                 return;
             }
-
-            // Close menu if clicking outside
             if (openMenuSessionId !== null) {
                 openMenuSessionId = null;
                 if (allSessions && allSessions.length > 0) {
@@ -1391,41 +1412,25 @@
             currentSessionId = null;
             localStorage.setItem(CURRENT_SESSION_KEY, '');
             chat.innerHTML = "";
-
-            // Close the sidebar
             toggleSessionsSidebar();
-
-            // Tell server to start new session
-            ws.send(JSON.stringify({
-                type: "new_session"
-            }));
+            ws.send(JSON.stringify({ type: "new_session" }));
         }
 
         function loadSessions() {
-            ws.send(JSON.stringify({
-                type: "list_sessions"
-            }));
+            ws.send(JSON.stringify({ type: "list_sessions" }));
         }
 
         function formatSessionDate(timestamp) {
             if (!timestamp) return '';
-
             const date = new Date(timestamp);
             const now = new Date();
-
             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const sessionDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
             const diffDays = Math.floor((today - sessionDate) / (1000 * 60 * 60 * 24));
-
             if (diffDays === 0) return 'Today';
             if (diffDays === 1) return 'Yesterday';
-
             return date.toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
+                weekday: 'long', month: 'short', day: 'numeric', year: 'numeric'
             });
         }
 
@@ -1436,15 +1441,10 @@
             sessions.forEach(session => {
                 const item = document.createElement('div');
                 item.className = 'session-item';
-                if (session.id === currentSessionId) {
-                    item.classList.add('active');
-                }
+                if (session.id === currentSessionId) item.classList.add('active');
 
-                // Check if in edit mode
                 if (editingSessionId === session.id) {
-                    // Edit mode UI
                     item.classList.add('editing');
-
                     const input = document.createElement('input');
                     input.type = 'text';
                     input.className = 'session-edit-input';
@@ -1457,28 +1457,19 @@
                     const saveBtn = document.createElement('button');
                     saveBtn.textContent = '✓';
                     saveBtn.className = 'session-edit-btn';
-                    saveBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        saveSessionRename(session.id, input.value);
-                    };
+                    saveBtn.onclick = (e) => { e.stopPropagation(); saveSessionRename(session.id, input.value); };
 
                     const cancelBtn = document.createElement('button');
                     cancelBtn.textContent = '✕';
                     cancelBtn.className = 'session-edit-cancel';
-                    cancelBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        cancelSessionEdit();
-                    };
+                    cancelBtn.onclick = (e) => { e.stopPropagation(); cancelSessionEdit(); };
 
                     actions.appendChild(saveBtn);
                     actions.appendChild(cancelBtn);
                     item.appendChild(input);
                     item.appendChild(actions);
-
-                    // Focus input
                     setTimeout(() => input.focus(), 10);
                 } else {
-                    // Normal mode UI
                     const textContainer = document.createElement('div');
                     textContainer.style.flex = '1';
                     textContainer.style.minWidth = '0';
@@ -1499,74 +1490,43 @@
                     const menuBtn = document.createElement('button');
                     menuBtn.className = 'session-menu-btn';
                     menuBtn.textContent = '⋮';
-                    menuBtn.onclick = (e) => {
-                        console.log('Menu button clicked!', session.id);
-                        e.stopPropagation();
-                        toggleSessionMenu(session.id);
-                    };
-                    if (openMenuSessionId === session.id) {
-                        menuBtn.classList.add('active');
-                    }
+                    menuBtn.onclick = (e) => { e.stopPropagation(); toggleSessionMenu(session.id); };
+                    if (openMenuSessionId === session.id) menuBtn.classList.add('active');
 
                     const submenu = document.createElement('div');
                     submenu.className = 'session-submenu';
-                    if (openMenuSessionId === session.id) {
-                        submenu.classList.add('open');
-                        console.log('Adding open class to submenu for session', session.id);
-                    }
+                    if (openMenuSessionId === session.id) submenu.classList.add('open');
 
                     const editItem = document.createElement('div');
                     editItem.className = 'session-submenu-item';
                     editItem.innerHTML = '✏️ Edit';
-                    editItem.onclick = (e) => {
-                        e.stopPropagation();
-                        startSessionEdit(session.id);
-                    };
+                    editItem.onclick = (e) => { e.stopPropagation(); startSessionEdit(session.id); };
 
                     const deleteItem = document.createElement('div');
                     deleteItem.className = 'session-submenu-item delete';
                     deleteItem.innerHTML = '🗑️ Delete';
-                    deleteItem.onclick = (e) => {
-                        e.stopPropagation();
-                        deleteSession(session.id);
-                    };
+                    deleteItem.onclick = (e) => { e.stopPropagation(); deleteSession(session.id); };
 
                     submenu.appendChild(editItem);
                     submenu.appendChild(deleteItem);
-
                     item.appendChild(textContainer);
                     item.appendChild(menuBtn);
                     item.appendChild(submenu);
-
                     item.onclick = () => selectSession(session.id);
                 }
-
                 list.appendChild(item);
             });
         }
 
-
         function filterSessions() {
             const searchTerm = document.getElementById('sessionSearch').value;
-            if (!searchTerm) {
-                renderSessions(allSessions);
-                return;
-            }
-
+            if (!searchTerm) { renderSessions(allSessions); return; }
             const regex = new RegExp(searchTerm, 'i');
-            const filtered = allSessions.filter(s => regex.test(s.name));
-            renderSessions(filtered);
+            renderSessions(allSessions.filter(s => regex.test(s.name)));
         }
 
         function toggleSessionMenu(sessionId) {
-            console.log('toggleSessionMenu called with sessionId:', sessionId);
-            console.log('Current openMenuSessionId:', openMenuSessionId);
-            if (openMenuSessionId === sessionId) {
-                openMenuSessionId = null;
-            } else {
-                openMenuSessionId = sessionId;
-            }
-            console.log('New openMenuSessionId:', openMenuSessionId);
+            openMenuSessionId = (openMenuSessionId === sessionId) ? null : sessionId;
             renderSessions(allSessions);
         }
 
@@ -1582,33 +1542,15 @@
         }
 
         function saveSessionRename(sessionId, newName) {
-            if (!newName || !newName.trim()) {
-                alert('Session name cannot be empty');
-                return;
-            }
-
-            ws.send(JSON.stringify({
-                type: 'rename_session',
-                session_id: sessionId,
-                name: newName.trim()
-            }));
-
+            if (!newName || !newName.trim()) { alert('Session name cannot be empty'); return; }
+            ws.send(JSON.stringify({ type: 'rename_session', session_id: sessionId, name: newName.trim() }));
             editingSessionId = null;
         }
 
         function deleteSession(sessionId) {
-            if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.')) {
-                return;
-            }
-
-            ws.send(JSON.stringify({
-                type: 'delete_session',
-                session_id: sessionId
-            }));
-
+            if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.')) return;
+            ws.send(JSON.stringify({ type: 'delete_session', session_id: sessionId }));
             openMenuSessionId = null;
-
-            // If deleting current session, clear the chat
             if (sessionId === currentSessionId) {
                 currentSessionId = null;
                 localStorage.setItem(CURRENT_SESSION_KEY, '');
@@ -1616,13 +1558,8 @@
             }
         }
 
-
         function selectSession(sessionId) {
-            ws.send(JSON.stringify({
-                type: "load_session",
-                session_id: sessionId
-            }));
-
+            ws.send(JSON.stringify({ type: "load_session", session_id: sessionId }));
             currentSessionId = sessionId;
             localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
         }
@@ -1630,28 +1567,6 @@
         // -------------------------
         // Multi-Agent Functions
         // -------------------------
-        // function toggleMultiAgent() {
-        //     multiAgentEnabled = multiAgentToggle.checked;
-        //     saveMultiAgentSetting(multiAgentEnabled);
-        //     updateModeStatus();
-        //
-        //     const command = multiAgentEnabled ? ":multi on" : ":multi off";
-        //     ws.send(JSON.stringify({
-        //         type: "user",
-        //         text: command
-        //     }));
-        // }
-
-        // function updateModeStatus() {
-        //     if (multiAgentEnabled) {
-        //         modeStatus.textContent = "Multi-Agent";
-        //         modeStatus.className = "mode-status multi";
-        //     } else {
-        //         modeStatus.textContent = "Single Agent";
-        //         modeStatus.className = "mode-status single";
-        //     }
-        // }
-
         function loadMultiAgentSetting() {
             const saved = localStorage.getItem(MULTI_AGENT_KEY);
             return saved === null ? false : saved === "true";
@@ -1662,21 +1577,10 @@
         }
 
         function updateStatusWithMode() {
-            // let baseStatus = modelSelect.value ? "Model: " + modelSelect.value : "Connected";
-
-            // if (lastResponseWasMultiAgent) {
-            //     status.innerHTML = baseStatus + ' <span class="status-badge multi">Multi-Agent</span>';
-            // } else if (multiAgentEnabled) {
-            //     status.innerHTML = baseStatus + ' <span class="status-badge multi" style="opacity: 0.5;">Multi-Agent</span>';
-            // } else {
-            //     status.innerHTML = baseStatus + ' <span class="status-badge single">Single Agent</span>';
-            // }
-
             status.innerHTML = modelSelect.value ? "Model: " + modelSelect.value : "Connected";
         }
 
-        function stopProcessing() {
-        }
+        function stopProcessing() {}
 
         function resetControlButtons() {
             isProcessing = false;
@@ -1694,55 +1598,26 @@
             logPanelOpen = !logPanelOpen;
             const panel = document.getElementById('logPanel');
             const button = document.getElementById('logToggle');
-
-            if (logPanelOpen) {
-                panel.classList.add('open');
-                button.textContent = '✖ Logs';
-            } else {
-                panel.classList.remove('open');
-                button.textContent = '📋 Logs';
-            }
+            if (logPanelOpen) { panel.classList.add('open'); button.textContent = '✖ Logs'; }
+            else { panel.classList.remove('open'); button.textContent = '📋 Logs'; }
         }
 
         function connectLogWebSocket() {
             const hostname = window.location.hostname || 'localhost';
             const wsUrl = `ws://${hostname}:8766`;
-
-            try {
-                logWs = new WebSocket(wsUrl);
-            } catch (error) {
-                console.error('Failed to create WebSocket:', error);
-                updateLogStatus(false);
-                return;
-            }
-
-            logWs.onopen = () => {
-                updateLogStatus(true);
-            };
-
+            try { logWs = new WebSocket(wsUrl); } catch (error) { updateLogStatus(false); return; }
+            logWs.onopen = () => updateLogStatus(true);
             logWs.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                if (data.type === 'log') {
-                    addLogEntry(data);
-                }
+                if (data.type === 'log') addLogEntry(data);
             };
-
-            logWs.onerror = (error) => {
-                updateLogStatus(false);
-            };
-
-            logWs.onclose = (event) => {
-                updateLogStatus(false);
-                if (logPanelOpen) {
-                    setTimeout(connectLogWebSocket, 3000);
-                }
-            };
+            logWs.onerror = () => updateLogStatus(false);
+            logWs.onclose = () => { updateLogStatus(false); if (logPanelOpen) setTimeout(connectLogWebSocket, 3000); };
         }
 
         function updateLogStatus(connected) {
             const indicator = document.getElementById('logStatusIndicator');
             const text = document.getElementById('logStatusText');
-
             if (connected) {
                 indicator.classList.add('connected');
                 text.textContent = 'Live';
@@ -1756,42 +1631,39 @@
 
         function addLogEntry(entry) {
             const container = document.getElementById('logContainer');
-
             const logEntry = document.createElement('div');
             logEntry.className = `log-entry ${entry.level}`;
             logEntry.dataset.level = entry.level;
 
-            if (!logFilters.has(entry.level)) {
-                logEntry.style.display = 'none';
-            }
+            if (!logFilters.has(entry.level)) logEntry.style.display = 'none';
 
             const timestamp = new Date(entry.timestamp).toLocaleTimeString('en-US', {
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
+                hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
             });
+
+            // Truncate long USER/ASSISTANT messages for readability
+            let displayMessage = entry.message;
+            if ((entry.level === 'USER' || entry.level === 'ASSISTANT') && displayMessage.length > 300) {
+                displayMessage = displayMessage.slice(0, 300) + '…';
+            }
 
             logEntry.innerHTML = `
                 <span class="log-timestamp">${timestamp}</span>
                 <span class="log-level ${entry.level}">${entry.level}</span>
-                <span class="log-message">${escapeHtml(entry.message)}</span>
+                <span class="log-message">${escapeHtml(displayMessage)}</span>
             `;
 
             container.appendChild(logEntry);
-
-            while (container.children.length > 500) {
-                container.removeChild(container.firstChild);
-            }
-
-            if (logAutoscroll) {
-                container.scrollTop = container.scrollHeight;
-            }
+            while (container.children.length > 500) container.removeChild(container.firstChild);
+            if (logAutoscroll) container.scrollTop = container.scrollHeight;
         }
 
-        function clearLogs() {
-            document.getElementById('logContainer').innerHTML = '';
+        // ── NEW: inject a synthetic log entry for USER / ASSISTANT chat events ──
+        function addLocalLogEntry(level, message) {
+            addLogEntry({ level, message, timestamp: Date.now() });
         }
+
+        function clearLogs() { document.getElementById('logContainer').innerHTML = ''; }
 
         function toggleAutoscroll() {
             logAutoscroll = !logAutoscroll;
@@ -1800,18 +1672,10 @@
 
         function toggleLogFilter(level) {
             const btn = document.querySelector(`.filter-btn[data-level="${level}"]`);
-
-            if (logFilters.has(level)) {
-                logFilters.delete(level);
-                btn.classList.remove('active');
-            } else {
-                logFilters.add(level);
-                btn.classList.add('active');
-            }
-
+            if (logFilters.has(level)) { logFilters.delete(level); btn.classList.remove('active'); }
+            else { logFilters.add(level); btn.classList.add('active'); }
             document.querySelectorAll('.log-entry').forEach(entry => {
-                const entryLevel = entry.dataset.level;
-                entry.style.display = logFilters.has(entryLevel) ? 'flex' : 'none';
+                entry.style.display = logFilters.has(entry.dataset.level) ? 'flex' : 'none';
             });
         }
 
@@ -1828,48 +1692,33 @@
             systemMonitorOpen = !systemMonitorOpen;
             const panel = document.getElementById('systemMonitor');
             const button = document.getElementById('monitorToggle');
-
-            if (systemMonitorOpen) {
-                panel.classList.add('open');
-                button.textContent = '✖ System';
-            } else {
-                panel.classList.remove('open');
-                button.textContent = '📊 System';
-            }
+            if (systemMonitorOpen) { panel.classList.add('open'); button.textContent = '✖ System'; }
+            else { panel.classList.remove('open'); button.textContent = '📊 System'; }
         }
 
         function updateProgressBar(elementId, percent) {
             const bar = document.getElementById(elementId);
             bar.style.width = percent + '%';
-
             bar.classList.remove('high', 'critical');
-            if (percent > 80) {
-                bar.classList.add('critical');
-            } else if (percent > 60) {
-                bar.classList.add('high');
-            }
+            if (percent > 80) bar.classList.add('critical');
+            else if (percent > 60) bar.classList.add('high');
         }
 
         function updateSystemStats(stats) {
             if (!systemStatsEnabled) return;
-
             if (stats.cpu) {
                 document.getElementById('cpuPercent').textContent = stats.cpu.usage_percent;
                 document.getElementById('cpuFreq').textContent = stats.cpu.frequency_ghz.toFixed(2);
                 updateProgressBar('cpuBar', stats.cpu.usage_percent);
             }
-
             if (stats.gpu) {
-                const gpuStats = document.getElementById('gpuStats');
-                gpuStats.style.display = 'block';
-
+                document.getElementById('gpuStats').style.display = 'block';
                 document.getElementById('gpuPercent').textContent = stats.gpu.usage_percent;
                 document.getElementById('gpuTemp').textContent = stats.gpu.temperature_c;
                 document.getElementById('gpuMemory').textContent =
                     Math.round(stats.gpu.memory_used_mb) + '/' + Math.round(stats.gpu.memory_total_mb);
                 updateProgressBar('gpuBar', stats.gpu.usage_percent);
             }
-
             if (stats.memory) {
                 document.getElementById('memPercent').textContent = stats.memory.percent;
                 document.getElementById('memUsed').textContent = stats.memory.used_gb.toFixed(1);
@@ -1883,7 +1732,6 @@
         // -------------------------
         function showThinking() {
             if (thinkingIndicator) return;
-
             thinkingIndicator = document.createElement("div");
             thinkingIndicator.className = "thinking";
             thinkingIndicator.innerHTML = '<div class="thinking-dots"><span>.</span><span>.</span><span>.</span></div>';
@@ -1908,37 +1756,22 @@
         const hostname = window.location.hostname || 'localhost';
         const ws = new WebSocket(`ws://${hostname}:8765`);
 
-        ws.onerror = (event) => {
-            status.textContent = "WebSocket error";
-            hideThinking();
-        };
-
-        ws.onclose = (event) => {
-            status.textContent = "Disconnected";
-            sendBtn.disabled = true;
-            hideThinking();
-        };
+        ws.onerror = () => { status.textContent = "WebSocket error"; hideThinking(); };
+        ws.onclose = () => { status.textContent = "Disconnected"; sendBtn.disabled = true; hideThinking(); };
 
         ws.onopen = () => {
             sendBtn.disabled = false;
             updateStatusWithMode();
-
             ws.send(JSON.stringify({ type: "list_models" }));
             ws.send(JSON.stringify({ type: "subscribe_system_stats" }));
-
             connectLogWebSocket();
 
-            // Load last session if exists
             const savedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
             if (savedSessionId && savedSessionId !== '') {
                 const sessionId = parseInt(savedSessionId);
                 if (!isNaN(sessionId)) {
-                    // Request session list first
                     ws.send(JSON.stringify({ type: "list_sessions" }));
-                    // Then load the specific session
-                    setTimeout(() => {
-                        selectSession(sessionId);
-                    }, 100);
+                    setTimeout(() => selectSession(sessionId), 100);
                 }
             }
         };
@@ -1946,63 +1779,34 @@
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
-            if (data.type === 'system_stats') {
-                updateSystemStats(data);
-                return;
-            }
-
-            if (data.type === 'subscribed' && data.subscription === 'system_stats') {
-                return;
-            }
-
-            // Session management responses
-            if (data.type === 'sessions_list') {
-                allSessions = data.sessions;
-                renderSessions(allSessions);
-                return;
-            }
+            if (data.type === 'system_stats') { updateSystemStats(data); return; }
+            if (data.type === 'subscribed' && data.subscription === 'system_stats') return;
+            if (data.type === 'sessions_list') { allSessions = data.sessions; renderSessions(allSessions); return; }
 
             if (data.type === 'session_loaded') {
                 chat.innerHTML = "";
                 currentSessionId = data.session_id;
                 localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
-                data.messages.forEach(msg => {
-                    addMessage(msg.text, msg.role, false, false, msg.model);
-                });
+                data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model));
                 renderSessions(allSessions);
                 return;
             }
-
             if (data.type === 'session_created') {
                 currentSessionId = data.session_id;
                 localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
                 return;
             }
-
             if (data.type === 'session_name_updated') {
-                // Update the session name in the local list
                 const session = allSessions.find(s => s.id === data.session_id);
-                if (session) {
-                    session.name = data.name;
-                    if (sessionsSidebarOpen) {
-                        renderSessions(allSessions);
-                    }
-                }
+                if (session) { session.name = data.name; if (sessionsSidebarOpen) renderSessions(allSessions); }
                 return;
             }
-
             if (data.type === 'session_renamed') {
-                // Update the session name in the local list
                 const session = allSessions.find(s => s.id === data.session_id);
-                if (session) {
-                    session.name = data.name;
-                    renderSessions(allSessions);
-                }
+                if (session) { session.name = data.name; renderSessions(allSessions); }
                 return;
             }
-
             if (data.type === 'session_deleted') {
-                // Remove session from local list
                 allSessions = allSessions.filter(s => s.id !== data.session_id);
                 renderSessions(allSessions);
                 return;
@@ -2019,7 +1823,6 @@
                     }
                     return;
                 }
-
                 addMessage(data.text, "user", false);
                 showThinking();
                 isProcessing = true;
@@ -2038,10 +1841,13 @@
                 }
 
                 hideThinking();
-
                 lastResponseWasMultiAgent = data.multi_agent === true;
-
                 addMessage(data.text, "assistant", false, lastResponseWasMultiAgent, data.model);
+
+                // ── NEW: log assistant response to log panel ──
+                const modelLabel = data.model ? `[${data.model}] ` : '';
+                addLocalLogEntry('ASSISTANT', modelLabel + data.text);
+
                 isProcessing = false;
                 sendBtn.style.display = 'flex';
                 sendBtn.disabled = false;
@@ -2057,12 +1863,8 @@
                 sendBtn.disabled = false;
                 sendBtn.style.opacity = '1';
                 sendBtn.style.cursor = "pointer";
-
-                if (data.stopped) {
-                    status.textContent = "Stopped";
-                } else {
-                    updateStatusWithMode();
-                }
+                if (data.stopped) status.textContent = "Stopped";
+                else updateStatusWithMode();
                 return;
             }
 
@@ -2077,31 +1879,17 @@
             if (data.type === "models_list") {
                 const select = document.getElementById("modelSelect");
                 select.innerHTML = "";
-
                 data.all_models.forEach(modelData => {
                     const opt = document.createElement("option");
                     opt.value = modelData.name;
-
-                    // Add backend prefix and size for GGUF
-                    const modelSource = modelData.backend === 'gguf' ? 'GGUF ' : 'Ollama ';
-                    const sizeInfo = modelData.backend === 'gguf'
-                        ? ` ${(modelData.size_mb / 1024).toFixed(1)} GB`
-                        : '';
-
-                    opt.textContent = modelData.name + (modelData.backend === 'gguf'
-                        ? " [" + modelSource + sizeInfo + "]"
-                        : '');
-
+                    const sizeInfo = modelData.backend === 'gguf' ? ` ${(modelData.size_mb / 1024).toFixed(1)} GB` : '';
+                    opt.textContent = modelData.name + (modelData.backend === 'gguf' ? ` [GGUF ${sizeInfo}]` : '');
                     select.appendChild(opt);
                 });
-
                 if (data.last_used && data.all_models.some(m => m.name === data.last_used)) {
                     select.value = data.last_used;
-                    if (!isProcessing) {
-                        updateStatusWithMode();
-                    }
+                    if (!isProcessing) updateStatusWithMode();
                 }
-
             }
         };
 
@@ -2109,17 +1897,11 @@
         // Model switching
         // -------------------------
         modelSelect.addEventListener("change", (e) => {
-            const model = e.target.value;
-
             status.textContent = "Switching model…";
             sendBtn.disabled = true;
             isProcessing = true;
             showThinking();
-
-            ws.send(JSON.stringify({
-                type: "switch_model",
-                model
-            }));
+            ws.send(JSON.stringify({ type: "switch_model", model: e.target.value }));
         });
 
         // -------------------------
@@ -2131,7 +1913,6 @@
             const mathInline = [];
             const mathBlock = [];
 
-            // --- 1. Extract Math and Code (Shield them from formatting) ---
             text = text.replace(/\$\$([\s\S]*?)\$\$/g, (m, math) => {
                 const i = mathBlock.length; mathBlock.push(math); return `@@MATHBLOCK_${i}@@`;
             });
@@ -2143,18 +1924,14 @@
             });
             text = text.replace(/([ \t]*)```(\w+)?\s*\n?([\s\S]*?)```/g, (m, indent, lang, code) => {
                 const indentLen = indent.length;
-
                 const lines = code.split('\n');
-
                 const dedented = lines
                     .map(line => {
                         if (line.trim().length === 0) return '';
-                        // Strip the same indentation as the opening backticks
                         return line.startsWith(indent) ? line.slice(indentLen) : line.trimStart();
                     })
                     .join('\n')
                     .trim();
-
                 const i = blocks.length;
                 blocks.push({ lang: lang || "code", code: dedented });
                 return `@@CODEBLOCK_${i}@@`;
@@ -2166,7 +1943,6 @@
                 const i = inline.length; inline.push(code); return `@@INLINE_${i}@@`;
             });
 
-            // --- 2. Escape HTML and Format Body ---
             text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
             text = text.replace(/^######\s+(.+)$/gm, "<h6>$1</h6>")
@@ -2185,7 +1961,6 @@
             text = text.replace(/^([-*_]){3,}$/gm, "<hr>");
             text = text.replace(/^- /gm, "&bull; ").replace(/^\* /gm, "&bull; ");
 
-            // --- 3. Tables ---
             text = text.replace(/^(\|.+\|)\s*\n(\|[-:\s|]+\|)\s*\n((?:\|.*\|\s*\n?)*)/gm, (match, header, divider, rows) => {
                 const makeRow = row => "<tr>" + row.trim().slice(1, -1).split("|").map(cell => `<td>${cell.trim()}</td>`).join("") + "</tr>";
                 const thead = "<thead>" + makeRow(header).replace(/<td>/g, "<th>").replace(/<\/td>/g, "</th>") + "</thead>";
@@ -2196,59 +1971,32 @@
             text = text.replace(/\n\s*\n/g, "<br><br>").replace(/\n/g, "<br>");
             text = text.replace(/(<\/h[1-6]>)(<br>){2}/g, "$1<br>");
 
-            // --- 4. Restore and Process Math ---
             const processMath = (math) => {
                 math = math.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-                // Symbols
                 const symbols = {
-                    '\\pm': '±',
-                    '\\times': '×',
-                    '\\div': '÷',
-                    '\\cdot': '·',
-                    '\\neq': '≠',
-                    '\\leq': '≤',
-                    '\\geq': '≥',
-                    '\\approx': '≈',
-                    '\\infty': '∞',
-                    '\\pi': 'π',
-                    '\\rightarrow': '→',
-                    '\\forall': '∀',
-                    '\\exists': '∃',
-                    '\\degree': '°',
-                    '\\phi': 'Φ'
+                    '\\pm': '±', '\\times': '×', '\\div': '÷', '\\cdot': '·',
+                    '\\neq': '≠', '\\leq': '≤', '\\geq': '≥', '\\approx': '≈',
+                    '\\infty': '∞', '\\pi': 'π', '\\rightarrow': '→',
+                    '\\forall': '∀', '\\exists': '∃', '\\degree': '°', '\\phi': 'Φ'
                 };
                 Object.entries(symbols).forEach(([tex, sym]) => { math = math.split(tex).join(sym); });
-
-                // N-th Root (e.g., \sqrt[5]{3}) ---
-                // Must happen BEFORE standard sqrt
                 math = math.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g, '<sup>$1</sup>√($2)');
-
-                // Standard Square Root
                 math = math.replace(/\\sqrt\{([^}]+)\}/g, '√($1)');
-
-                // Superscripts (Exponents)
                 math = math.replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>');
                 math = math.replace(/\^([a-zA-Z0-9+-]+)/g, '<sup>$1</sup>');
-
-                // Subscripts (e.g., x_2)
                 math = math.replace(/_\{([^}]+)\}/g, '<sub>$1</sub>');
                 math = math.replace(/_([a-zA-Z0-9+-]+)/g, '<sub>$1</sub>');
-
-                // Fractions
                 math = math.replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1)/($2)');
-
                 return `<strong>${math}</strong>`;
             };
 
-            // --- 5. Final Reassembly ---
-            text = text.replace(/@@INLINE_(\d+)@@/g, (m, i) => `<code class="code-inline">${inline[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`);
+            text = text.replace(/@@INLINE_(\d+)@@/g, (m, i) =>
+                `<code class="code-inline">${inline[i].replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code>`);
             text = text.replace(/@@CODEBLOCK_(\d+)@@/g, (m, i) => {
                 const block = blocks[i];
                 const escaped = block.code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 return `<pre><code class="language-${block.lang}">${escaped.trim()}</code></pre>`;
             });
-
             text = text.replace(/@@MATHINLINE_(\d+)@@/g, (m, i) => processMath(mathInline[i]));
             text = text.replace(/@@MATHBLOCK_(\d+)@@/g, (m, i) => processMath(mathBlock[i]));
 
@@ -2259,27 +2007,17 @@
         // Add message to UI
         // -------------------------
         function addMessage(text, role, saveToDb = false, isMultiAgent = false, modelName = null) {
-            if (text.startsWith("[TextContent(")) {
-                return;
-            }
-
-            if (text.trim() === "") {
-                return;
-            }
+            if (text.startsWith("[TextContent(")) return;
+            if (text.trim() === "") return;
 
             const div = document.createElement("div");
             div.className = `msg ${role}`;
-
-            if (role === "assistant" && isMultiAgent) {
-                div.className += " multi-agent";
-            }
+            if (role === "assistant" && isMultiAgent) div.className += " multi-agent";
 
             if (role === "user") {
                 div.textContent = text;
             } else {
                 div.innerHTML = formatMessage(text);
-
-                // Add model name badge
                 if (modelName) {
                     const modelBadge = document.createElement("div");
                     modelBadge.className = "model-badge";
@@ -2290,10 +2028,7 @@
 
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
-
-            if (saveToDb) {
-                saveMessageToSession(role, text);
-            }
+            if (saveToDb) saveMessageToSession(role, text);
         }
 
         // -------------------------
@@ -2307,51 +2042,37 @@
             const text = input.value.trim();
 
             if (isProcessing && text !== ":stop") {
-                sendBtn.style.opacity = '1';
-                sendBtn.disabled = false;
-                sendBtn.style.cursor = "pointer";
+                sendBtn.style.opacity = '1'; sendBtn.disabled = false; sendBtn.style.cursor = "pointer";
                 return;
             }
-
             if (!text) {
-                sendBtn.style.opacity = '1';
-                sendBtn.disabled = false;
-                sendBtn.style.cursor = "pointer";
+                sendBtn.style.opacity = '1'; sendBtn.disabled = false; sendBtn.style.cursor = "pointer";
                 return;
             }
-
             if (ws.readyState !== WebSocket.OPEN) {
                 status.textContent = "Cannot send: WebSocket not connected";
-                sendBtn.style.opacity = '1';
-                sendBtn.disabled = false;
-                sendBtn.style.cursor = "pointer";
+                sendBtn.style.opacity = '1'; sendBtn.disabled = false; sendBtn.style.cursor = "pointer";
                 return;
             }
 
             addMessage(text, "user", false);
 
-            input.value = "";
+            // ── NEW: log user prompt to the log panel ──
+            addLocalLogEntry('USER', text);
 
+            input.value = "";
             lastSentMessage = text;
 
             if (text === ":stop") {
-                ws.send(JSON.stringify({
-                    type: "user",
-                    text: ":stop"
-                }));
-
+                ws.send(JSON.stringify({ type: "user", text: ":stop" }));
                 isProcessing = false;
                 status.textContent = "Stop signal sent...";
-                sendBtn.style.opacity = '1';
-                sendBtn.disabled = false;
-                sendBtn.style.cursor = "pointer";
-
+                sendBtn.style.opacity = '1'; sendBtn.disabled = false; sendBtn.style.cursor = "pointer";
                 return;
             }
 
             const quickCommands = [':commands', ':tools', ':model', ':models', ':stats',
                                   ':multi', ':a2a', ':health', ':metrics'];
-
             const isQuickCommand = quickCommands.some(cmd => text.startsWith(cmd));
 
             isProcessing = true;
@@ -2359,27 +2080,17 @@
             status.textContent = "Processing…";
             lastResponseWasMultiAgent = false;
 
-            if (!isQuickCommand) {
-                showThinking();
-            }
+            if (!isQuickCommand) showThinking();
 
-            ws.send(JSON.stringify({
-                type: "user",
-                text,
-                session_id: currentSessionId
-            }));
+            ws.send(JSON.stringify({ type: "user", text, session_id: currentSessionId }));
         }
 
         // -------------------------
         // Enter key handling
         // -------------------------
         sendBtn.addEventListener('click', send);
-
         input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                send();
-            }
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
         });
     </script>
 
