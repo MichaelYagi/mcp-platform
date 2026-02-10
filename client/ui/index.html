@@ -1212,6 +1212,30 @@
                     height: 36px;
                     font-size: 1.4rem;
                 }
+
+                /* Logs and System panels: full-width overlay on mobile */
+                #logPanel.open,
+                #systemMonitor.open {
+                    width: 100%;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    height: 100%;
+                    z-index: 1000;
+                    border-left: none;
+                }
+
+                /* Show mobile close buttons */
+                .mobile-close {
+                    display: flex !important;
+                }
+
+                /* Chat bubbles fill full width on mobile */
+                .msg {
+                    max-width: 100%;
+                }
             }
         }
     </style>
