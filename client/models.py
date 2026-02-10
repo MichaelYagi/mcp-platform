@@ -157,7 +157,7 @@ async def switch_model(model_name, tools, logger, create_agent_fn, a2a_state=Non
 
     try:
         # This will raise specific errors for invalid models
-        new_llm = LLMBackendManager.create_llm(model_name, temperature=0)
+        new_llm = LLMBackendManager.create_llm(model_name, temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")))
 
     except ValueError as e:
         # Model not found or invalid configuration
@@ -286,7 +286,7 @@ async def reload_current_model(tools, logger, create_agent_fn, a2a_state=None):
         logger.info(f"🔄 Reloading model from last_model.txt: {backend}/{model_name}")
 
         # Create LLM
-        llm = LLMBackendManager.create_llm(model_name, temperature=0)
+        llm = LLMBackendManager.create_llm(model_name, temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")))
 
         # Bind tools and create agent
         llm_with_tools = llm.bind_tools(tools)

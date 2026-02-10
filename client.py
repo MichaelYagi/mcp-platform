@@ -374,7 +374,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     logger.info(f"🤖 Using {backend}/{model_name}")
 
     # Initialize LLM
-    llm = LLMBackendManager.create_llm(model_name, temperature=0)
+    llm = LLMBackendManager.create_llm(model_name, temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")))
 
     mcp_agent = MCPAgent(
         llm=llm,
@@ -690,7 +690,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
                         # Use global llm (which should be synced to last_model.txt)
                         from client.llm_backend import LLMBackendManager
-                        fresh_llm = LLMBackendManager.create_llm(expected_model, temperature=0)
+                        fresh_llm = LLMBackendManager.create_llm(expected_model, temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")))
 
                         if hasattr(orchestrator, 'update_llm'):
                             orchestrator.update_llm(fresh_llm)

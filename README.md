@@ -141,8 +141,8 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 Create `.env` in project root:
 ```bash
 # === LLM Backend ===
-LLM_BACKEND=ollama              # "ollama" or "gguf"
 MAX_MESSAGE_HISTORY=30          # Chat history limit (default: 20)
+LLM_TEMPERATURE=0.3             # Model temperature 0 to 1 (default: 0.3)
 
 # === GGUF Configuration (if using GGUF backend) ===
 GGUF_GPU_LAYERS=-1              # -1 = all GPU, 0 = CPU only, N = N layers on GPU

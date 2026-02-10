@@ -623,7 +623,7 @@ def generate_code_impl(
         llm = ChatOllama(
             model=model_name,
             base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-            temperature=0.3
+            temperature=float(os.getenv("LLM_TEMPERATURE", "0.3"))
         )
 
         response = llm.invoke(prompt)
