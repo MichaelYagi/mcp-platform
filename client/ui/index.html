@@ -2141,8 +2141,23 @@
             text = text.replace(/\\\(([\s\S]*?)\\\)/g, (m, math) => {
                 const i = mathInline.length; mathInline.push(math); return `@@MATHINLINE_${i}@@`;
             });
-            text = text.replace(/```(\w+)?\s*\n?([\s\S]*?)```/g, (m, lang, code) => {
-                const i = blocks.length; blocks.push({ lang: lang || "code", code }); return `@@CODEBLOCK_${i}@@`;
+            text = text.replace(/([ \t]*)```(\w+)?\s*\n?([\s\S]*?)```/g, (m, indent, lang, code) => {
+                const indentLen = indent.length;
+
+                const lines = code.split('\n');
+
+                const dedented = lines
+                    .map(line => {
+                        if (line.trim().length === 0) return '';
+                        // Strip the same indentation as the opening backticks
+                        return line.startsWith(indent) ? line.slice(indentLen) : line.trimStart();
+                    })
+                    .join('\n')
+                    .trim();
+
+                const i = blocks.length;
+                blocks.push({ lang: lang || "code", code: dedented });
+                return `@@CODEBLOCK_${i}@@`;
             });
             text = text.replace(/'''([\s\S]*?)'''/g, (m, code) => {
                 const i = blocks.length; blocks.push({ lang: "code", code }); return `@@CODEBLOCK_${i}@@`;
