@@ -1682,7 +1682,7 @@
             if (logAutoscroll) container.scrollTop = container.scrollHeight;
         }
 
-        // ── NEW: inject a synthetic log entry for USER / ASSISTANT chat events ──
+        // Inject a synthetic log entry for USER / ASSISTANT chat events ──
         function addLocalLogEntry(level, message) {
             addLogEntry({ level, message, timestamp: Date.now() });
         }
@@ -1758,7 +1758,7 @@
             if (thinkingIndicator) return;
             thinkingIndicator = document.createElement("div");
             thinkingIndicator.className = "thinking";
-            thinkingIndicator.innerHTML = '<div class="thinking-dots"><span>.</span><span>.</span><span>.</span></div>';
+            thinkingIndicator.innerHTML = '<div class="thinking-dots"><span>&bull;</span><span>&bull;</span><span>&bull;</span></div>';
             sendBtn.style.opacity = '0.5';
             sendBtn.style.cursor = 'not-allowed';
             chat.appendChild(thinkingIndicator);
