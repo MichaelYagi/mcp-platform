@@ -769,13 +769,11 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             try:
                 from pathlib import Path
 
-                # Read what model SHOULD be used (from last_model.txt)
-                last_model_file = Path(__file__).parent  / "client/last_model.txt"
+                last_model_file = Path(__file__).parent / "client/last_model.txt"
 
                 if last_model_file.exists():
                     expected_model = last_model_file.read_text().strip()
 
-                    # Get what model orchestrator is ACTUALLY using
                     actual_model = None
                     if hasattr(orchestrator.base_llm, 'model'):
                         actual_model = orchestrator.base_llm.model
@@ -784,16 +782,15 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     elif hasattr(orchestrator.base_llm, 'model_path'):
                         actual_model = Path(orchestrator.base_llm.model_path).stem
 
-                    # Sync if mismatch
                     if actual_model and expected_model != actual_model:
                         logger.info(f"🔄 Multi-agent out of sync!")
                         logger.info(f"   Expected (last_model.txt): {expected_model}")
                         logger.info(f"   Actual (orchestrator): {actual_model}")
                         logger.info(f"   Syncing to: {expected_model}")
 
-                        # Use global llm (which should be synced to last_model.txt)
                         from client.llm_backend import LLMBackendManager
-                        fresh_llm = LLMBackendManager.create_llm(expected_model, temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")))
+                        fresh_llm = LLMBackendManager.create_llm(expected_model, temperature=float(
+                            os.getenv("LLM_TEMPERATURE", "0.3")))
 
                         if hasattr(orchestrator, 'update_llm'):
                             orchestrator.update_llm(fresh_llm)
@@ -803,13 +800,43 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             except Exception as e:
                 logger.warning(f"⚠️ Multi-agent sync check failed: {e}")
 
+        # ═══════════════════════════════════════════════════════════
+        # SKILL INJECTION — capture what was injected for multi-agent
+        # ═══════════════════════════════════════════════════════════
+        skill_context = None
         if skills_manager and skills_manager.all_skills:
+            # Snapshot system message content before injection
+            pre_inject_content = (
+                conversation_state["messages"][0].content
+                if conversation_state["messages"] and
+                   hasattr(conversation_state["messages"][0], 'type') and
+                   conversation_state["messages"][0].type == "system"
+                else None
+            )
+
             conversation_state["messages"] = await inject_relevant_skills_into_messages(
                 skills_manager,
                 user_message,
                 conversation_state["messages"],
                 logger
             )
+
+            # Extract injected skill content so multi-agent can use it too
+            post_inject_content = (
+                conversation_state["messages"][0].content
+                if conversation_state["messages"] and
+                   hasattr(conversation_state["messages"][0], 'type') and
+                   conversation_state["messages"][0].type == "system"
+                else None
+            )
+
+            if post_inject_content and post_inject_content != pre_inject_content:
+                # Pull out only the injected skill portion
+                if pre_inject_content:
+                    skill_context = post_inject_content[len(pre_inject_content):]
+                else:
+                    skill_context = post_inject_content
+                logger.info("📚 Skill context captured for multi-agent")
 
         current_session_id = conversation_state.get("session_id")
 
@@ -841,21 +868,17 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             logger.info("🔗 Using A2A execution")
 
             try:
-                # Execute with A2A
                 result = await orchestrator.execute_a2a(user_message)
 
-                # Handle dict response
                 if isinstance(result, dict):
                     result_text = result.get("response", str(result))
                     current_model = result.get("current_model", "unknown")
                     stopped = result.get("stopped", False)
                 else:
-                    # Backwards compatibility: handle string response
                     result_text = result
                     current_model = "unknown"
                     stopped = False
 
-                # Add to conversation
                 conversation_state["messages"].append(HumanMessage(content=user_message))
                 conversation_state["messages"].append(AIMessage(content=result_text))
 
@@ -884,21 +907,18 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             logger.info("🎭 Using MULTI-AGENT execution")
 
             try:
-                # Execute with multi-agent
-                result = await orchestrator.execute(user_message)
+                # Pass skill_context so orchestrator follows the skill workflow
+                result = await orchestrator.execute(user_message, skill_context=skill_context)
 
-                # Handle dict response
                 if isinstance(result, dict):
                     result_text = result.get("response", str(result))
                     current_model = result.get("current_model", "unknown")
                     stopped = result.get("stopped", False)
                 else:
-                    # Backwards compatibility: handle string response
                     result_text = result
                     current_model = "unknown"
                     stopped = False
 
-                # Add to conversation
                 conversation_state["messages"].append(HumanMessage(content=user_message))
                 conversation_state["messages"].append(AIMessage(content=result_text))
 
@@ -918,7 +938,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         if not use_multi and not use_a2a:
             logger.info("🤖 Using SINGLE-AGENT execution")
 
-            # Use existing single agent flow
             return await langgraph.run_agent(
                 agent,
                 conversation_state,

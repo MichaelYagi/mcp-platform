@@ -141,8 +141,20 @@ If this is a simple task that doesn't need multiple agents, respond with:
 {{"subtasks": []}}""",
 
             AgentRole.RESEARCHER: """You are a Researcher Agent focused on gathering accurate information.
-ALWAYS use your available tools to search for information.
-Never make up information - use tools to find real data.""",
+            ALWAYS use your available tools to search for information.
+            Never make up information - use tools to find real data.
+
+            CRITICAL: Call tools ONE AT A TIME. Wait for each result before calling the next.
+            NEVER call multiple tools simultaneously.
+            NEVER call search_entries, rag_search_tool, or knowledge base tools for GitHub tasks.
+
+            GITHUB REVIEW WORKFLOW — follow this exact sequence:
+            1. github_clone_repo(url) → get local_path
+            2. analyze_project(project_path=local_path) → get tech stack
+            3. github_list_files(local_path=local_path, extensions=["py"]) → get file list
+            4. review_code(path=local_path+"/key_file.py") → review important files
+            5. github_cleanup_repo(local_path=local_path) → cleanup
+            """,
 
             AgentRole.CODER: """You are a Coder Agent focused on writing quality code.
 Use tools when you need to look up code examples or documentation.""",
@@ -205,9 +217,18 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             AgentRole.ORCHESTRATOR: [],
 
             AgentRole.RESEARCHER: [
-                "rag_search_tool", "search_entries", "search_semantic",
-                "semantic_media_search_text", "get_weather_tool",
-                "github_clone_repo", "github_list_files", "github_cleanup_repo"
+                "rag_search_tool",
+                "semantic_media_search_text",
+                "get_weather_tool",
+                "github_clone_repo",
+                "github_list_files",
+                "github_get_file_content",
+                "github_cleanup_repo",
+                # Code review tools — needed for GitHub review workflow
+                "analyze_project",
+                "analyze_code_file",
+                "review_code",
+                "scan_project_structure",
             ],
 
             AgentRole.CODER: [
@@ -646,7 +667,7 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
 
         return status
 
-    async def execute(self, user_request: str) -> dict:
+    async def execute(self, user_request: str, skill_context: str = None) -> dict:
         """
         Main entry point for multi-agent execution
         NOW WITH STOP SIGNAL HANDLING
@@ -669,7 +690,7 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
 
         try:
             # Step 1: Create execution plan
-            plan = await self._create_execution_plan(user_request)
+            plan = await self._create_execution_plan(user_request, skill_context=skill_context)
 
             # Check stop after planning
             if is_stop_requested():
@@ -691,7 +712,7 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
                 }
 
             # Step 2: Execute tasks
-            results = await self._execute_tasks(plan)
+            results = await self._execute_tasks(plan, skill_context=skill_context)
 
             # Check if execution was stopped
             if results.get("_stopped", False):
@@ -727,8 +748,17 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
                 "multi_agent": True
             }
 
-    async def _create_execution_plan(self, user_request: str) -> Optional[List[AgentTask]]:
+    async def _create_execution_plan(self, user_request: str, skill_context: str = None) -> Optional[List[AgentTask]]:
         """Use orchestrator to create execution plan"""
+
+        skill_section = ""
+        if skill_context:
+            skill_section = f"""
+        IMPORTANT: A relevant skill has been provided. Follow its workflow exactly when creating the plan.
+
+        {skill_context}
+
+        """
 
         self.logger.info("📋 Creating execution plan...")
 
@@ -738,26 +768,27 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             return None
 
         # Orchestrator has no tools, use base LLM
-        planning_prompt = f"""Given this user request: "{user_request}"
+        planning_prompt = f"""{skill_section}Given this user request: "{user_request}"
 
-Create an execution plan by breaking it into subtasks.
+        Create an execution plan by breaking it into subtasks.
 
-Respond ONLY with JSON in this format:
-{{
-  "subtasks": [
-    {{
-      "id": "task_1",
-      "role": "researcher",
-      "description": "Detailed task description",
-      "dependencies": []
-    }}
-  ]
-}}
+        Role selection guide:
+        - researcher: Gather information, search web, GitHub clone+list+analyze
+        - coder: Write code, review code files, fix bugs  
+        - analyst: Analyze data, compare results
+        - writer: Write reports, summaries
+        - planner: Manage todos and tasks
+        - plex_ingester: Ingest Plex media
 
-Available roles: researcher, coder, analyst, writer, planner, plex_ingester
+        For GitHub repository REVIEW requests, use this plan:
+        {{
+          "subtasks": [
+            {{"id": "task_1", "role": "researcher", "description": "Clone the repo, analyze project structure, list Python files, review key source files using review_code, then cleanup", "dependencies": []}}
+          ]
+        }}
 
-If this is a simple task that doesn't need multiple agents, respond with:
-{{"subtasks": []}}"""
+        Respond ONLY with JSON...
+        """
 
         try:
             response = await self.base_llm.ainvoke([
@@ -828,7 +859,7 @@ If this is a simple task that doesn't need multiple agents, respond with:
             traceback.print_exc()
             return None
 
-    async def _execute_tasks(self, tasks: List[AgentTask]) -> Dict[str, Any]:
+    async def _execute_tasks(self, tasks: List[AgentTask], skill_context: str = None) -> Dict[str, Any]:
         """
         Execute tasks respecting dependencies
         WITH COMPREHENSIVE STOP SIGNAL CHECKING
@@ -862,7 +893,7 @@ If this is a simple task that doesn't need multiple agents, respond with:
             self.logger.info(f"⚙️ Executing {len(ready_tasks)} parallel tasks...")
 
             task_coroutines = [
-                self._execute_single_task(task, results)
+                self._execute_single_task(task, results, skill_context=skill_context)
                 for task in ready_tasks
             ]
 
@@ -889,7 +920,7 @@ If this is a simple task that doesn't need multiple agents, respond with:
 
         return results
 
-    async def _execute_single_task(self, task: AgentTask, previous_results: Dict) -> str:
+    async def _execute_single_task(self, task: AgentTask, previous_results: Dict, skill_context: str = None) -> str:
         """
         Execute a single agent task WITH TOOL EXECUTION
         NOW WITH STOP SIGNAL CHECK BEFORE EXECUTION
@@ -933,8 +964,19 @@ Complete this task using your available tools."""
                 self.logger.info(f"🔧 Running {task.role.value} with tool execution enabled...")
 
                 # Build messages with system prompt
+                skill_section = ""
+                if skill_context:
+                    skill_section = f"""
+                RELEVANT SKILL - FOLLOW THIS WORKFLOW EXACTLY:
+                {skill_context}
+
+                CRITICAL: Use ONLY the tools listed in the skill workflow above.
+                Do NOT call search_entries, rag_search_tool, or any knowledge base tools.
+                Call tools ONE AT A TIME. Wait for each result before calling the next.
+                """
+
                 messages = [
-                    SystemMessage(content=system_prompt),
+                    SystemMessage(content=system_prompt + skill_section),
                     HumanMessage(content=task_input)
                 ]
 
