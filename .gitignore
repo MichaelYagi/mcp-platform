@@ -33,3 +33,4 @@ test.py
 /tests/results/junit.xml
 /tests/results/coverage-report.html
 /tests/results/coverage.xml
+/client/external_servers.json
