@@ -3,6 +3,7 @@ MCP Client - Main Entry Point (WITH MULTI-AGENT INTEGRATION + MULTI-A2A SUPPORT)
 """
 
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -241,10 +242,43 @@ async def register_all_a2a_endpoints(mcp_agent, logger):
 # MCP SERVER AUTO-DISCOVERY
 # ═════════════════════════════════════════════════════════════════════
 
+def is_wsl2():
+    """Check if running in WSL2"""
+    try:
+        with open("/proc/version", "r") as f:
+            return "microsoft" in f.read().lower()
+    except:
+        return False
+
+
+def convert_path_for_platform(path: str) -> str:
+    """Convert WSL2 path to Windows path if needed"""
+    if is_wsl2():
+        return path  # Running in WSL2, use as-is
+
+    # Running on Windows, convert /mnt/c/... to C:\...
+    if path.startswith("/mnt/c/"):
+        path = path.replace("/mnt/c/", "C:\\")
+        path = path.replace("/", "\\")
+
+    return path
+
+
+def convert_classpath_for_platform(classpath: str) -> str:
+    """Convert Java classpath separators and paths for platform"""
+    if is_wsl2():
+        return classpath  # WSL2 uses : separator
+
+    # Windows: split by :, convert each path, rejoin with ;
+    paths = classpath.split(":")
+    windows_paths = [convert_path_for_platform(p) for p in paths]
+    return ";".join(windows_paths)
+
 def auto_discover_servers(servers_dir: Path):
     """Auto-discover all servers by scanning servers/ directory"""
     mcp_servers = {}
 
+    # Scan local servers/ directory
     for server_dir in servers_dir.iterdir():
         if server_dir.is_dir():
             server_file = server_dir / "server.py"
@@ -256,6 +290,62 @@ def auto_discover_servers(servers_dir: Path):
                     "cwd": str(PROJECT_ROOT),
                     "env": {"CLIENT_IP": utils.get_public_ip()}
                 }
+
+    # External servers from config file (outside the loop!)
+    external_config = PROJECT_ROOT / "client" / "external_servers.json"
+    if external_config.exists():
+        try:
+            config = json.loads(external_config.read_text(encoding="utf-8"))
+            for name, cfg in config.get("external_servers", {}).items():
+                if not cfg.get("enabled", True):
+                    continue
+
+                transport = cfg.get("transport", "sse")
+
+                if transport == "stdio":
+                    command = convert_path_for_platform(cfg["command"])
+                    args = cfg.get("args", [])
+
+                    # Skip if command doesn't exist on this platform
+                    if not Path(command).exists():
+                        print(f"⏭️  Skipping '{name}' - command not found: {command}")
+                        continue
+
+                    # If server bridges to a port, verify it's reachable before adding
+                    port = cfg.get("env", {}).get("IJ_MCP_SERVER_PORT")
+                    if port:
+                        import socket
+                        host = cfg.get("env", {}).get("IJ_MCP_SERVER_HOST", "127.0.0.1")
+                        try:
+                            with socket.create_connection((host, int(port)), timeout=2.0):
+                                pass
+                            print(f"✅ External stdio server added: {name} (port {port} reachable)")
+                        except (ConnectionRefusedError, OSError) as e:
+                            print(f"⏭️  Skipping '{name}' - port {port} not reachable: {e}")
+                            continue
+
+                    converted_args = []
+                    for arg in args:
+                        if ";" in arg and ".jar" in arg:
+                            converted_args.append(convert_classpath_for_platform(arg))
+                        else:
+                            converted_args.append(arg)
+
+                    mcp_servers[name] = {
+                        "command": command,
+                        "args": converted_args,
+                        "env": cfg.get("env", {}),
+                        "cwd": cfg.get("cwd", str(PROJECT_ROOT))
+                    }
+                    if not port:  # Already printed above if port check passed
+                        print(f"✅ External stdio server added: {name}")
+
+                elif transport == "sse":
+                    mcp_servers[name] = {"url": cfg["url"], "transport": "sse"}
+                    print(f"✅ External SSE server added: {name}")
+
+        except Exception as e:
+            print(f"⚠️  Failed to load external_servers.json: {e}")
 
     return mcp_servers
 
@@ -384,7 +474,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     )
 
     mcp_agent.debug = True
-    await mcp_agent.initialize()
+    try:
+        await mcp_agent.initialize()
+    except Exception as e:
+        logger.error(f"❌ Some MCP servers failed to initialize: {e}")
 
     from client.session_manager import SessionManager
     session_manager = SessionManager()
@@ -654,6 +747,14 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     else:
         logger.warning("⚠️ Multi-agent system not available")
 
+    def user_requested_specific_tool(message: str, tools_list: list) -> bool:
+        """Check if user explicitly named a tool they want to use"""
+        message_lower = message.lower()
+        for tool_item in tools_list:
+            if hasattr(tool_item, 'name') and tool_item.name.lower() in message_lower:
+                return True
+        return False
+
     # Create enhanced agent runner with multi-agent support
     async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None):
         """Enhanced agent runner with multi-agent, A2A, and skills support"""
@@ -661,6 +762,13 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # Use provided system_prompt or fallback to global SYSTEM_PROMPT
         if system_prompt is None:
             system_prompt = SYSTEM_PROMPT
+
+        if user_requested_specific_tool(user_message, tools):
+            logger.info("🎯 User requested specific tool - bypassing multi-agent")
+            return await langgraph.run_agent(
+                agent, conversation_state, user_message,
+                logger, tools, system_prompt, llm, MAX_MESSAGE_HISTORY
+            )
 
         if orchestrator:
             try:
