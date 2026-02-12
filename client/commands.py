@@ -589,9 +589,11 @@ async def handle_command(
                     tool_name = getattr(tool, 'name', str(tool))
                     tool_desc = getattr(tool, 'description', 'No description')
                     desc_line = tool_desc.split('\n')[0][:70] if tool_desc else 'No description'
-                    output.append(f"  ✓ {tool_name}")
-                    if desc_line and desc_line != 'No description':
-                        output.append(f"    {desc_line}")
+                    if tool_name != "read_skill" and tool_name != "list_skills":
+                        output.append(f"  ✓ {tool_name}")
+
+                        if desc_line and desc_line != 'No description':
+                            output.append(f"    {desc_line}")
 
                 total_enabled += len(enabled)
 

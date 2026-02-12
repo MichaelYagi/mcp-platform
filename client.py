@@ -114,37 +114,6 @@ GLOBAL_CONVERSATION_STATE = {
     "loop_count": 0
 }
 
-def is_wsl2():
-    """Check if running in WSL2"""
-    try:
-        with open("/proc/version", "r") as f:
-            return "microsoft" in f.read().lower()
-    except:
-        return False
-
-
-def convert_path_for_platform(path: str) -> str:
-    """Convert WSL2 path to Windows path if needed"""
-    if is_wsl2():
-        return path  # Running in WSL2, use as-is
-
-    # Running on Windows, convert /mnt/c/... to C:\...
-    if path.startswith("/mnt/c/"):
-        path = path.replace("/mnt/c/", "C:\\")
-        path = path.replace("/", "\\")
-
-    return path
-
-
-def convert_classpath_for_platform(classpath: str) -> str:
-    """Convert Java classpath separators and paths for platform"""
-    if is_wsl2():
-        return classpath  # WSL2 uses : separator
-
-    # Windows: split by :, convert each path, rejoin with ;
-    paths = classpath.split(":")
-    windows_paths = [convert_path_for_platform(p) for p in paths]
-    return ";".join(windows_paths)
 
 # ═════════════════════════════════════════════════════════════════════
 # A2A MULTI-ENDPOINT SUPPORT
@@ -273,73 +242,20 @@ async def register_all_a2a_endpoints(mcp_agent, logger):
 # ═════════════════════════════════════════════════════════════════════
 
 def auto_discover_servers(servers_dir: Path):
-    """Auto-discover local servers + load external servers from config"""
-    import platform
-    import json
-
+    """Auto-discover all servers by scanning servers/ directory"""
     mcp_servers = {}
 
-    # --- Local stdio servers (your existing servers/ directory) ---
     for server_dir in servers_dir.iterdir():
         if server_dir.is_dir():
             server_file = server_dir / "server.py"
             if server_file.exists():
                 server_name = server_dir.name
-
-                # Skip github on native Windows (WSL2-only)
-                if platform.system() == "Windows" and not is_wsl2() and server_name == "github":
-                    print(f"⏭️  Skipping '{server_name}' (WSL2-only)")
-                    continue
-
                 mcp_servers[server_name] = {
                     "command": utils.get_venv_python(PROJECT_ROOT),
                     "args": [str(server_file)],
                     "cwd": str(PROJECT_ROOT),
                     "env": {"CLIENT_IP": utils.get_public_ip()}
                 }
-
-    # --- External servers from config file ---
-    external_config = PROJECT_ROOT / "client" / "external_servers.json"
-    if external_config.exists():
-        try:
-            config = json.loads(external_config.read_text(encoding="utf-8"))
-            for name, cfg in config.get("external_servers", {}).items():
-                if not cfg.get("enabled", True):
-                    continue
-
-                transport = cfg.get("transport", "sse")
-
-                if transport == "stdio":
-                    command = convert_path_for_platform(cfg["command"])
-                    args = cfg.get("args", [])
-
-                    # Skip if command doesn't exist on this platform
-                    if not Path(command).exists():
-                        print(f"⏭️  Skipping '{name}' - not available on this platform")
-                        continue
-
-                    converted_args = []
-                    for arg in args:
-                        if ";" in arg and ".jar" in arg:
-                            converted_args.append(convert_classpath_for_platform(arg))
-                        else:
-                            converted_args.append(arg)
-
-                    mcp_servers[name] = {
-                        "command": command,
-                        "args": converted_args,
-                        "env": cfg.get("env", {}),
-                        "cwd": cfg.get("cwd", str(PROJECT_ROOT))
-                    }
-                    print(f"✅ External stdio server added: {name}")
-
-                elif transport == "sse":
-                    # No path conversion needed for URLs
-                    mcp_servers[name] = {"url": cfg["url"], "transport": "sse"}
-                    print(f"✅ External SSE server added: {name}")
-
-        except Exception as e:
-            print(f"⚠️  Failed to load external_servers.json: {e}")
 
     return mcp_servers
 
