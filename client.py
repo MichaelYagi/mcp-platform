@@ -340,9 +340,23 @@ def auto_discover_servers(servers_dir: Path):
                     if not port:  # Already printed above if port check passed
                         print(f"✅ External stdio server added: {name}")
 
+
                 elif transport == "sse":
-                    mcp_servers[name] = {"url": cfg["url"], "transport": "sse"}
-                    print(f"✅ External SSE server added: {name}")
+                    url = cfg["url"]
+                    # Quick DNS/TCP check before registering
+                    try:
+                        from urllib.parse import urlparse
+                        import socket
+                        parsed = urlparse(url)
+                        host = parsed.hostname
+                        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                        with socket.create_connection((host, port), timeout=3.0):
+                            pass
+                        mcp_servers[name] = {"url": url, "transport": "sse"}
+                        print(f"✅ External SSE server added: {name}")
+                    except (ConnectionRefusedError, OSError) as e:
+                        print(f"⏭️  Skipping '{name}' - unreachable: {e}")
+                        continue
 
         except Exception as e:
             print(f"⚠️  Failed to load external_servers.json: {e}")
@@ -478,6 +492,24 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         await mcp_agent.initialize()
     except Exception as e:
         logger.error(f"❌ Some MCP servers failed to initialize: {e}")
+        # Don't give up — collect tools from whatever sessions succeeded
+        try:
+            recovered = []
+            if hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
+                for server_name, session in mcp_agent.client.sessions.items():
+                    try:
+                        session_tools = await session.list_tools()
+                        recovered.extend(session_tools)
+                        logger.info(f"   ✅ Recovered {len(session_tools)} tools from: {server_name}")
+                    except Exception as se:
+                        logger.warning(f"   ⚠️  Skipping session {server_name}: {se}")
+            if recovered:
+                mcp_agent._tools = recovered
+                logger.info(f"⚠️  Partial initialization: {len(recovered)} tools recovered")
+            else:
+                logger.warning("⚠️  No tools recovered — all servers may have failed")
+        except Exception as re:
+            logger.error(f"❌ Recovery failed: {re}")
 
     from client.session_manager import SessionManager
     session_manager = SessionManager()

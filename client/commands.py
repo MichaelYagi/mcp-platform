@@ -490,145 +490,129 @@ async def handle_command(
         except ImportError:
             return (True, "📊 Stats system not available", None, None)
 
-    # Tools command - UPDATED to filter disabled tools
+    # Tools command - UPDATED to use mcp_agent session map with fallback
     if command == ":tools" or command == ":tools --all":
         show_all = command == ":tools --all"
 
         if not tools:
-            return (True, "No tools available", None, None)
+            return (True, "No tools available (all servers may have failed to initialize)", None, None)
 
         try:
             from tools.tool_control import is_tool_enabled, get_disabled_tools
 
-            # Group tools by server/category for better filtering
+            # ── Build tool→server map from MCP client sessions ──────────
+            # This gives us accurate grouping including external servers
+            # (e.g. deepwiki tools appear under "deepwiki" not "other")
+            tool_to_server = {}
+            if mcp_agent and hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
+                for server_name, session in mcp_agent.client.sessions.items():
+                    try:
+                        session_tools = await session.list_tools()
+                        for t in session_tools:
+                            tool_to_server[t.name] = server_name
+                    except Exception:
+                        pass  # Skip broken/unavailable sessions silently
+
+            # ── Pattern matching fallback for anything not in session map ─
+            category_patterns = {
+                'todo': ['todo', 'task'],
+                'knowledge_base': ['entry', 'entries', 'knowledge'],
+                'plex': ['plex', 'media', 'scene', 'semantic_media', 'import_plex',
+                         'train_recommender', 'recommend', 'record_viewing',
+                         'auto_train', 'auto_recommend'],
+                'rag': ['rag_'],
+                'system': ['system', 'hardware', 'process'],
+                'location': ['location', 'time', 'weather'],
+                'text': ['text', 'summarize', 'chunk', 'explain', 'concept'],
+                'code': ['code', 'debug'],
+            }
+
+            # ── Group tools by server ────────────────────────────────────
             tools_by_server = {}
+            for tool in tools:
+                tool_name = getattr(tool, 'name', str(tool))
 
-            # Try to extract server info from agent if available
-            if hasattr(agent_ref, 'tools_by_server'):
-                # We have server information
-                for server_name, server_tools in agent_ref.tools_by_server.items():
-                    # Extract category from server name (e.g., "todo-server" -> "todo")
-                    category = server_name.replace("-server", "").replace("_", "")
+                # Skip internal skill management tools
+                if tool_name in ("read_skill", "list_skills"):
+                    continue
 
-                    for tool in server_tools.values():
-                        tool_name = getattr(tool, 'name', str(tool))
-                        enabled = is_tool_enabled(tool_name, category)
-
-                        if server_name not in tools_by_server:
-                            tools_by_server[server_name] = {'enabled': [], 'disabled': []}
-
-                        if enabled:
-                            tools_by_server[server_name]['enabled'].append(tool)
-                        else:
-                            tools_by_server[server_name]['disabled'].append(tool)
-            else:
-                # Fallback: Infer category from tool name patterns
-                category_patterns = {
-                    'todo': ['todo', 'task'],
-                    'knowledge_base': ['entry', 'entries', 'knowledge'],
-                    'plex': ['plex', 'media', 'scene', 'semantic_media', 'import_plex', 'train_recommender', 'recommend', 'record_viewing', 'auto_train', 'auto_recommend'],
-                    'rag': ['rag_'],
-                    'system': ['system', 'hardware', 'process'],
-                    'location': ['location', 'time', 'weather'],
-                    'text': ['text', 'summarize', 'chunk', 'explain', 'concept'],
-                    'code': ['code', 'debug'],
-                }
-
-                # Group tools by inferred category
-                tools_by_category = {}
-                for tool in tools:
-                    tool_name = getattr(tool, 'name', str(tool))
-
-                    # Try to match tool to a category
-                    matched_category = 'other'
-                    for category, patterns in category_patterns.items():
-                        if any(pattern in tool_name.lower() for pattern in patterns):
-                            matched_category = category
+                # Session map first (accurate), then pattern match, then 'other'
+                server_name = tool_to_server.get(tool_name)
+                if not server_name:
+                    server_name = 'other'
+                    for cat, patterns in category_patterns.items():
+                        if any(p in tool_name.lower() for p in patterns):
+                            server_name = cat
                             break
 
-                    if matched_category not in tools_by_category:
-                        tools_by_category[matched_category] = {'enabled': [], 'disabled': []}
+                enabled = is_tool_enabled(tool_name, server_name)
 
-                    # Check if tool is enabled for this category
-                    if is_tool_enabled(tool_name, matched_category):
-                        tools_by_category[matched_category]['enabled'].append(tool)
-                    else:
-                        tools_by_category[matched_category]['disabled'].append(tool)
+                if server_name not in tools_by_server:
+                    tools_by_server[server_name] = {'enabled': [], 'disabled': []}
 
-                tools_by_server = tools_by_category
+                if enabled:
+                    tools_by_server[server_name]['enabled'].append(tool)
+                else:
+                    tools_by_server[server_name]['disabled'].append(tool)
 
-            # Build output
+            # ── Build output ─────────────────────────────────────────────
             output = ["\n" + "=" * 60]
-            if show_all:
-                output.append("ALL TOOLS (including disabled)")
-            else:
-                output.append("AVAILABLE TOOLS")
+            output.append("ALL TOOLS (including disabled)" if show_all else "AVAILABLE TOOLS")
             output.append("=" * 60)
-            output.append("")
 
             total_enabled = 0
             total_disabled = 0
 
-            # Show tools grouped by server
             for server_name in sorted(tools_by_server.keys()):
                 server_data = tools_by_server[server_name]
                 enabled = server_data['enabled']
                 disabled = server_data['disabled']
 
-                # Skip servers with no enabled tools (unless --all)
+                # Skip servers with no enabled tools unless --all
                 if not enabled and not show_all:
                     continue
 
-                # Show server name if we have multiple servers
-                if len(tools_by_server) > 1 and server_name != 'all':
-                    output.append(f"\n{server_name}:")
-                    output.append("-" * 60)
+                output.append(f"\n{server_name}:")
 
-                # Show enabled tools
                 for tool in enabled:
                     tool_name = getattr(tool, 'name', str(tool))
-                    tool_desc = getattr(tool, 'description', 'No description')
-                    desc_line = tool_desc.split('\n')[0][:70] if tool_desc else 'No description'
-                    if tool_name != "read_skill" and tool_name != "list_skills":
-                        output.append(f"  ✓ {tool_name}")
-
-                        if desc_line and desc_line != 'No description':
-                            output.append(f"    {desc_line}")
+                    tool_desc = getattr(tool, 'description', '') or ''
+                    desc_line = tool_desc.split('\n')[0][:70]
+                    output.append(f"  ✓ {tool_name}")
+                    if desc_line:
+                        output.append(f"    {desc_line}")
 
                 total_enabled += len(enabled)
 
-                # Show disabled tools if --all flag
                 if show_all and disabled:
-                    if enabled:  # Add separator if we showed enabled tools
+                    if enabled:
                         output.append("")
                     output.append("  DISABLED:")
                     for tool in disabled:
                         tool_name = getattr(tool, 'name', str(tool))
-                        tool_desc = getattr(tool, 'description', 'No description')
-                        desc_line = tool_desc.split('\n')[0][:70] if tool_desc else 'No description'
+                        tool_desc = getattr(tool, 'description', '') or ''
+                        desc_line = tool_desc.split('\n')[0][:70]
                         output.append(f"  ✗ {tool_name} [DISABLED]")
-                        if desc_line and desc_line != 'No description':
+                        if desc_line:
                             output.append(f"    {desc_line}")
 
                 total_disabled += len(disabled)
 
-            # Summary
             output.append("")
             output.append("=" * 60)
             output.append(f"Available: {total_enabled} tools")
 
             if total_disabled > 0:
-                output.append(f"Disabled: {total_disabled} tools (hidden)")
+                output.append(f"Disabled: {total_disabled} tools")
                 if not show_all:
-                    output.append("\nUse ':tools --all' to see disabled tools")
-                output.append("\nCheck DISABLED_TOOLS in .env to modify")
+                    output.append("Use ':tools --all' to see disabled tools")
+                output.append("Check DISABLED_TOOLS in .env to modify")
 
             output.append("=" * 60)
 
             return (True, "\n".join(output), None, None)
 
         except ImportError:
-            # Fallback if tool_control not available
             tool_list = "\n".join([f"  - {tool.name}" for tool in tools])
             return (True, f"Available tools:\n{tool_list}", None, None)
 
