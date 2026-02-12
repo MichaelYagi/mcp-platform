@@ -490,21 +490,16 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     # DISTRIBUTED SKILLS DISCOVERY
     # ═══════════════════════════════════════════════════════════════
 
-    # COMMENT THIS OUT IF YOU DON'T USE SKILLS:
-    # skills_manager = DistributedSkillsManager(client)
-    # await skills_manager.discover_all_skills()
+    skills_manager = DistributedSkillsManager(client)
+    await skills_manager.discover_all_skills()
 
-    # if skills_manager.all_skills:
-    #     skills_summary = skills_manager.get_skills_summary()
-    #     SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + skills_summary
-    #     logger.info(f"📚 System prompt enhanced with {len(skills_manager.all_skills)} distributed skill(s)")
-    # else:
-    #     logger.warning("⚠️  No skills discovered from servers")
-    #     skills_manager = None  # Disable if no skills found
-
-    # Replace with:
-    skills_manager = None
-    logger.info("⚠️  Skills discovery disabled (manual optimization)")
+    if skills_manager.all_skills:
+        skills_summary = skills_manager.get_skills_summary()
+        SYSTEM_PROMPT = SYSTEM_PROMPT + "\n\n" + skills_summary
+        logger.info(f"📚 System prompt enhanced with {len(skills_manager.all_skills)} distributed skill(s)")
+    else:
+        logger.warning("⚠️  No skills discovered from servers")
+        skills_manager = None  # Disable if no skills found
 
     # ═════════════════════════════════════════════════════════════════
     # MULTI-A2A REGISTRATION (UPDATED)

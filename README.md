@@ -327,7 +327,68 @@ INTENT_PATTERNS = {
 }
 ```
 
-### Step 5: Test & Deploy
+### Step 5: Add External MCP Servers (Optional)
+
+To connect external or third-party MCP servers without writing a local server, create
+`client/external_servers.json`. The client auto-discovers this file on startup — no code
+changes needed.
+
+**SSE transport** (remote HTTP-based servers):
+```json
+{
+    "external_servers": {
+        "deepwiki": {
+            "transport": "sse",
+            "url": "https://mcp.deepwiki.com/mcp",
+            "enabled": true,
+            "notes": "DeepWiki — reads wiki content from GitHub repos"
+        }
+    }
+}
+```
+
+**Stdio transport** (local process servers, e.g. IDE integrations):
+```json
+{
+    "external_servers": {
+        "pycharm": {
+            "transport": "stdio",
+            "command": "/usr/lib/jvm/jdk-17.0.12-oracle-x64/bin/java",
+            "args": [
+                "-classpath",
+                "/path/to/pycharm/plugins/mcpserver/lib/mcpserver-frontend.jar",
+                "com.intellij.mcpserver.stdio.McpStdioRunnerKt"
+            ],
+            "env": {
+                "IJ_MCP_SERVER_PORT": "64342"
+            },
+            "enabled": true,
+            "notes": "PyCharm MCP integration — requires PyCharm to be running"
+        }
+    }
+}
+```
+
+**Field reference:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `transport` | ✅ | `"sse"` or `"stdio"` |
+| `url` | SSE only | Full URL to the SSE endpoint |
+| `command` | stdio only | Path to the executable |
+| `args` | stdio only | Command-line arguments as an array |
+| `env` | No | Environment variables passed to the process |
+| `cwd` | No | Working directory (defaults to project root) |
+| `enabled` | No | `false` skips the server without removing it (default: `true`) |
+| `notes` | No | Human-readable description, ignored by the client |
+
+> **WSL2 note:** If running the client in WSL2 and connecting to a Windows-hosted stdio
+> process, set `IJ_MCP_SERVER_HOST` in `env` to the Windows host IP
+> (`cat /etc/resolv.conf | grep nameserver`). Stdio servers with `IJ_MCP_SERVER_PORT`
+> are port-checked before registration — if unreachable the server is skipped cleanly
+> rather than crashing the client.
+
+### Step 6: Test & Deploy
 ```bash
 # Restart client (auto-discovers new server)
 python client.py

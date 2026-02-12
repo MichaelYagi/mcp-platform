@@ -4,6 +4,7 @@ Discovers and aggregates skills from all connected MCP servers
 NOW USING SHARED QUERY PATTERNS
 """
 
+import re
 import json
 import logging
 from typing import Dict, List, Optional
@@ -152,9 +153,37 @@ class DistributedSkillsManager:
 
         return summary
 
+    # ─────────────────────────────────────────────────────────────
+    # EXPLICIT SKILL TRIGGERS
+    # Patterns that directly force a specific skill regardless of
+    # keyword overlap scores. Add new entries as needed.
+    # ─────────────────────────────────────────────────────────────
+    FORCED_SKILL_PATTERNS: List[dict] = [
+        {
+            "pattern": r'github\.com/',
+            "skill": "github_review",
+            "reason": "GitHub URL detected"
+        },
+        {
+            "pattern": r'\breview\b.*github\.com|github\.com.*\breview\b',
+            "skill": "github_review",
+            "reason": "GitHub review request"
+        },
+        {
+            "pattern": r'\b(clone|analyze|audit)\b.*github\.com|github\.com.*(clone|analyze|audit)\b',
+            "skill": "github_review",
+            "reason": "GitHub clone/analyze request"
+        },
+    ]
+
     def find_relevant_skills(self, user_query: str, max_skills: int = 3) -> List[dict]:
         """
-        Find skills relevant to user query using keyword matching.
+        Find skills relevant to user query.
+
+        Uses two strategies:
+        1. Forced matches — explicit regex patterns that guarantee a skill
+           is included regardless of keyword overlap (e.g. GitHub URLs)
+        2. Scored matches — keyword overlap between query and skill metadata
 
         Args:
             user_query: User's query text
@@ -166,31 +195,50 @@ class DistributedSkillsManager:
         query_lower = user_query.lower()
         query_words = set(query_lower.split())
 
+        forced = set()
+        results = []
+
+        # ── Strategy 1: Forced pattern matches ──────────────────
+        for trigger in self.FORCED_SKILL_PATTERNS:
+            if re.search(trigger["pattern"], query_lower):
+                skill_name = trigger["skill"]
+                if skill_name in self.all_skills and skill_name not in forced:
+                    self.logger.info(
+                        f"📚 Forced skill match: {skill_name} ({trigger['reason']})"
+                    )
+                    forced.add(skill_name)
+                    results.append(self.all_skills[skill_name])
+
+        # ── Strategy 2: Scored keyword matches ──────────────────
         scores = []
         for skill_name, skill_info in self.all_skills.items():
-            # Score based on keyword matches
+            if skill_name in forced:
+                continue  # Already included
+
             desc_lower = skill_info['description'].lower()
             desc_words = set(desc_lower.split())
 
-            # Count matches (require at least 2 word matches to avoid noise)
             matches = len(query_words & desc_words)
 
             # Boost if skill name appears in query
             if skill_name.lower() in query_lower:
                 matches += 5
 
-            # Boost if tool names match
+            # Boost if any of the skill's tool names appear in query
             for tool in skill_info.get('tools', []):
                 if tool.lower() in query_lower:
                     matches += 3
 
-            # Only include skills with meaningful matches (threshold of 2)
             if matches >= 2:
                 scores.append((matches, skill_info))
 
-        # Sort by score and return top results
         scores.sort(key=lambda x: x[0], reverse=True)
-        return [info for score, info in scores[:max_skills]]
+
+        # Fill remaining slots with scored matches
+        remaining = max_skills - len(results)
+        results.extend(info for _, info in scores[:remaining])
+
+        return results
 
     def list_all_skills(self) -> List[dict]:
         """Get list of all skills with metadata"""
@@ -226,8 +274,15 @@ async def inject_relevant_skills_into_messages(
         logger.info("📚 General knowledge query detected - skipping skill injection")
         return messages
 
-    # Check if query needs tools at all
-    if not needs_tools(user_query):
+    # Forced skill patterns always bypass the needs_tools check —
+    # a bare GitHub URL looks like "no tools needed" to the generic
+    # classifier but we know it requires the github_review workflow.
+    has_forced_match = any(
+        re.search(trigger["pattern"], user_query.lower())
+        for trigger in DistributedSkillsManager.FORCED_SKILL_PATTERNS
+    )
+
+    if not has_forced_match and not needs_tools(user_query):
         logger.info("📚 Query doesn't need tools - skipping skill injection")
         return messages
 
