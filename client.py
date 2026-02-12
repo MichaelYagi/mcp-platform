@@ -2,16 +2,16 @@
 MCP Client - Main Entry Point (WITH MULTI-AGENT INTEGRATION + MULTI-A2A SUPPORT)
 """
 
-import asyncio
 import json
 import logging
-import os
 import sys
+import asyncio
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from mcp_use.client.client import MCPClient
 from mcp_use.agents.mcpagent import MCPAgent
 from client.distributed_skills_manager import (
@@ -115,6 +115,34 @@ GLOBAL_CONVERSATION_STATE = {
     "loop_count": 0
 }
 
+def is_wsl2():
+    """Check if running in WSL2"""
+    try:
+        with open("/proc/version", "r") as f:
+            return "microsoft" in f.read().lower()
+    except:
+        return False
+
+def convert_path_for_platform(path: str) -> str:
+    """Convert WSL2 path to Windows path if needed"""
+    if is_wsl2():
+        return path  # Running in WSL2, use as-is
+
+    # Running on Windows, convert /mnt/c/... to C:\...
+    if path.startswith("/mnt/c/"):
+        path = path.replace("/mnt/c/", "C:\\")
+        path = path.replace("/", "\\")
+    return path
+
+def convert_classpath_for_platform(classpath: str) -> str:
+    """Convert Java classpath separators and paths for platform"""
+    if is_wsl2():
+        return classpath  # WSL2 uses : separator
+
+    # Windows: split by :, convert each path, rejoin with ;
+    paths = classpath.split(":")
+    windows_paths = [convert_path_for_platform(p) for p in paths]
+    return ";".join(windows_paths)
 
 # ═════════════════════════════════════════════════════════════════════
 # A2A MULTI-ENDPOINT SUPPORT
@@ -263,103 +291,119 @@ def convert_path_for_platform(path: str) -> str:
 
     return path
 
+async def verify_transport_reachable(host: str, port: int, timeout: float = 2.0) -> bool:
+    """Check if a TCP port is open."""
+    try:
+        # Use asyncio to avoid blocking the event loop during the socket check
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=timeout
+        )
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
+        return False
 
-def convert_classpath_for_platform(classpath: str) -> str:
-    """Convert Java classpath separators and paths for platform"""
-    if is_wsl2():
-        return classpath  # WSL2 uses : separator
 
-    # Windows: split by :, convert each path, rejoin with ;
-    paths = classpath.split(":")
-    windows_paths = [convert_path_for_platform(p) for p in paths]
-    return ";".join(windows_paths)
-
-def auto_discover_servers(servers_dir: Path):
-    """Auto-discover all servers by scanning servers/ directory"""
+async def auto_discover_servers(servers_dir: Path, logger):
+    """
+    Auto-discover and verify MCP servers.
+    Returns a dictionary of verified server configurations.
+    """
     mcp_servers = {}
 
-    # Scan local servers/ directory
-    for server_dir in servers_dir.iterdir():
-        if server_dir.is_dir():
-            server_file = server_dir / "server.py"
-            if server_file.exists():
-                server_name = server_dir.name
-                mcp_servers[server_name] = {
-                    "command": utils.get_venv_python(PROJECT_ROOT),
-                    "args": [str(server_file)],
-                    "cwd": str(PROJECT_ROOT),
-                    "env": {"CLIENT_IP": utils.get_public_ip()}
-                }
+    # 1. Scan local servers/ directory
+    if servers_dir.exists():
+        for server_dir in servers_dir.iterdir():
+            if server_dir.is_dir():
+                server_file = server_dir / "server.py"
+                if server_file.exists():
+                    server_name = server_dir.name
+                    venv_python = utils.get_venv_python(PROJECT_ROOT)
 
-    # External servers from config file (outside the loop!)
+                    # Verify Python executable exists
+                    if os.path.exists(venv_python):
+                        mcp_servers[server_name] = {
+                            "command": venv_python,
+                            "args": [str(server_file)],
+                            "cwd": str(PROJECT_ROOT),
+                            "env": {"CLIENT_IP": utils.get_public_ip()}
+                        }
+                    else:
+                        logger.warning(f"⏭️  Skipping local '{server_name}': Venv python not found at {venv_python}")
+
+    # 2. Process external_servers.json
     external_config = PROJECT_ROOT / "client" / "external_servers.json"
-    if external_config.exists():
-        try:
-            config = json.loads(external_config.read_text(encoding="utf-8"))
-            for name, cfg in config.get("external_servers", {}).items():
-                if not cfg.get("enabled", True):
+    if not external_config.exists():
+        return mcp_servers
+
+    try:
+        config_data = json.loads(external_config.read_text(encoding="utf-8"))
+        external_definitions = config_data.get("external_servers", {})
+
+        # We'll collect verification tasks to run them in parallel
+        verification_tasks = []
+        server_meta = []
+
+        for name, cfg in external_definitions.items():
+            if not cfg.get("enabled", True):
+                continue
+
+            transport = cfg.get("transport", "stdio")
+
+            if transport == "stdio":
+                command = convert_path_for_platform(cfg["command"])
+                # Check if command exists/is executable
+                if not Path(command).exists():
+                    logger.warning(f"⏭️  Skipping '{name}': Command path does not exist: {command}")
                     continue
 
-                transport = cfg.get("transport", "sse")
-
-                if transport == "stdio":
-                    command = convert_path_for_platform(cfg["command"])
-                    args = cfg.get("args", [])
-
-                    # Skip if command doesn't exist on this platform
-                    if not Path(command).exists():
-                        print(f"⏭️  Skipping '{name}' - command not found: {command}")
-                        continue
-
-                    # If server bridges to a port, verify it's reachable before adding
-                    port = cfg.get("env", {}).get("IJ_MCP_SERVER_PORT")
-                    if port:
-                        import socket
-                        host = cfg.get("env", {}).get("IJ_MCP_SERVER_HOST", "127.0.0.1")
-                        try:
-                            with socket.create_connection((host, int(port)), timeout=2.0):
-                                pass
-                            print(f"✅ External stdio server added: {name} (port {port} reachable)")
-                        except (ConnectionRefusedError, OSError) as e:
-                            print(f"⏭️  Skipping '{name}' - port {port} not reachable: {e}")
-                            continue
-
-                    converted_args = []
-                    for arg in args:
-                        if ";" in arg and ".jar" in arg:
-                            converted_args.append(convert_classpath_for_platform(arg))
-                        else:
-                            converted_args.append(arg)
-
+                # Check if this is a bridged stdio server (waiting on a port)
+                port = cfg.get("env", {}).get("IJ_MCP_SERVER_PORT")
+                if port:
+                    host = cfg.get("env", {}).get("IJ_MCP_SERVER_HOST", "127.0.0.1")
+                    verification_tasks.append(verify_transport_reachable(host, int(port)))
+                    server_meta.append((name, cfg, "bridge"))
+                else:
+                    # Pure local stdio, no network check needed
                     mcp_servers[name] = {
                         "command": command,
-                        "args": converted_args,
+                        "args": [convert_classpath_for_platform(a) if ";" in a else a for a in cfg.get("args", [])],
                         "env": cfg.get("env", {}),
                         "cwd": cfg.get("cwd", str(PROJECT_ROOT))
                     }
-                    if not port:  # Already printed above if port check passed
-                        print(f"✅ External stdio server added: {name}")
+                    logger.info(f"✅ External stdio server verified: {name}")
 
+            elif transport == "sse":
+                url = cfg.get("url")
+                parsed = urlparse(url)
+                host = parsed.hostname
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
-                elif transport == "sse":
-                    url = cfg["url"]
-                    # Quick DNS/TCP check before registering
-                    try:
-                        from urllib.parse import urlparse
-                        import socket
-                        parsed = urlparse(url)
-                        host = parsed.hostname
-                        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-                        with socket.create_connection((host, port), timeout=3.0):
-                            pass
-                        mcp_servers[name] = {"url": url, "transport": "sse"}
-                        print(f"✅ External SSE server added: {name}")
-                    except (ConnectionRefusedError, OSError) as e:
-                        print(f"⏭️  Skipping '{name}' - unreachable: {e}")
-                        continue
+                verification_tasks.append(verify_transport_reachable(host, port))
+                server_meta.append((name, cfg, "sse"))
 
-        except Exception as e:
-            print(f"⚠️  Failed to load external_servers.json: {e}")
+        # Execute all network checks in parallel
+        results = await asyncio.gather(*verification_tasks, return_exceptions=True)
+
+        for (name, cfg, s_type), is_ok in zip(server_meta, results):
+            if is_ok is True:
+                if s_type == "sse":
+                    mcp_servers[name] = {"url": cfg["url"], "transport": "sse"}
+                else:  # bridge
+                    mcp_servers[name] = {
+                        "command": convert_path_for_platform(cfg["command"]),
+                        "args": cfg.get("args", []),
+                        "env": cfg.get("env", {}),
+                        "cwd": cfg.get("cwd", str(PROJECT_ROOT))
+                    }
+                logger.info(f"✅ External {s_type} server verified: {name}")
+            else:
+                logger.warning(f"⏭️  Skipping '{name}': Host unreachable or connection refused.")
+
+    except Exception as e:
+        logger.error(f"⚠️  Error processing external config: {e}")
 
     return mcp_servers
 
@@ -385,7 +429,7 @@ async def main():
     logging_handler.set_event_loop(asyncio.get_running_loop())
 
     # Setup MCP client with auto-discovered servers
-    mcp_servers = auto_discover_servers(PROJECT_ROOT / "servers")
+    mcp_servers = await auto_discover_servers(PROJECT_ROOT / "servers", logger)
     client = MCPClient.from_dict({
         "mcpServers": mcp_servers
     })
