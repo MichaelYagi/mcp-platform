@@ -285,6 +285,23 @@ async def verify_transport_reachable(host: str, port: int, timeout: float = 2.0)
     except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
         return False
 
+def resolve_env_placeholder(server_name: str, placeholder: str) -> str:
+    """
+    Resolve <$PLACEHOLDER> using ES_{SERVER_NAME_CAPS}_{PLACEHOLDER} convention.
+    Falls back to the placeholder as-is if env var not found.
+    """
+    env_key = f"ES_{server_name.upper()}_{placeholder.upper()}"
+    return os.getenv(env_key, f"<${placeholder}>")
+
+
+def resolve_headers(server_name: str, headers: dict) -> dict:
+    """Resolve all <$PLACEHOLDER> values in headers for a given server."""
+    import re
+    resolved = {}
+    for key, value in headers.items():
+        def replacer(match):
+            return resolve_env_placeholder(server_name, match.group(1))
+        resolved[key] = re.sub(r'<\$([A-Z0-9_a-z]+)>', replacer, value)
 
 async def auto_discover_servers(servers_dir: Path, logger):
     """
@@ -360,17 +377,28 @@ async def auto_discover_servers(servers_dir: Path, logger):
                 parsed = urlparse(url)
                 host = parsed.hostname
                 port = parsed.port or (443 if parsed.scheme == "https" else 80)
-
                 verification_tasks.append(verify_transport_reachable(host, port))
                 server_meta.append((name, cfg, "sse"))
+
+            elif transport == "http":
+                url = cfg.get("url")
+                parsed = urlparse(url)
+                host = parsed.hostname
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                verification_tasks.append(verify_transport_reachable(host, port))
+                server_meta.append((name, cfg, "http"))
 
         # Execute all network checks in parallel
         results = await asyncio.gather(*verification_tasks, return_exceptions=True)
 
         for (name, cfg, s_type), is_ok in zip(server_meta, results):
             if is_ok is True:
-                if s_type == "sse":
-                    mcp_servers[name] = {"url": cfg["url"], "transport": "sse"}
+                if s_type in ("sse", "http"):
+                    entry = {"url": cfg["url"], "transport": s_type}
+                    headers = cfg.get("headers")
+                    if headers:
+                        entry["headers"] = resolve_headers(name, headers)
+                    mcp_servers[name] = entry
                 else:  # bridge
                     mcp_servers[name] = {
                         "command": convert_path_for_platform(cfg["command"]),
