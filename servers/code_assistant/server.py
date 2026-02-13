@@ -88,19 +88,8 @@ def analyze_code_file(file_path: str, language: str = "auto", deep_analysis: boo
         deep_analysis (bool): Use deep AST analysis for Python (default: True)
 
     Returns:
-        JSON with:
-        - language: Detected language
-        - total_issues: Number of issues found
-        - errors: Count of error-severity issues
-        - warnings: Count of warning-severity issues
-        - issues: List of issues with:
-          - severity: "error", "warning", or "info"
-          - type: Issue type (e.g., "MutableDefault", "BareExcept")
-          - line: Line number
-          - message: Description of the issue
-          - suggestion: How to fix it
-          - fix: (optional) Automatic fix description
-        - fixable: Number of issues that can be auto-fixed
+        A JSON string containing the detected language, total issue count,
+        and a detailed list of identified bugs/warnings with line numbers.
 
     Example:
         analyze_code_file("myapp/server.py")
