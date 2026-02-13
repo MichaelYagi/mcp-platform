@@ -115,35 +115,6 @@ GLOBAL_CONVERSATION_STATE = {
     "loop_count": 0
 }
 
-def is_wsl2():
-    """Check if running in WSL2"""
-    try:
-        with open("/proc/version", "r") as f:
-            return "microsoft" in f.read().lower()
-    except:
-        return False
-
-def convert_path_for_platform(path: str) -> str:
-    """Convert WSL2 path to Windows path if needed"""
-    if is_wsl2():
-        return path  # Running in WSL2, use as-is
-
-    # Running on Windows, convert /mnt/c/... to C:\...
-    if path.startswith("/mnt/c/"):
-        path = path.replace("/mnt/c/", "C:\\")
-        path = path.replace("/", "\\")
-    return path
-
-def convert_classpath_for_platform(classpath: str) -> str:
-    """Convert Java classpath separators and paths for platform"""
-    if is_wsl2():
-        return classpath  # WSL2 uses : separator
-
-    # Windows: split by :, convert each path, rejoin with ;
-    paths = classpath.split(":")
-    windows_paths = [convert_path_for_platform(p) for p in paths]
-    return ";".join(windows_paths)
-
 # ═════════════════════════════════════════════════════════════════════
 # A2A MULTI-ENDPOINT SUPPORT
 # ═════════════════════════════════════════════════════════════════════
@@ -278,6 +249,15 @@ def is_wsl2():
     except:
         return False
 
+def convert_classpath_for_platform(classpath: str) -> str:
+    """Convert Java classpath separators and paths for platform"""
+    if is_wsl2():
+        return classpath  # WSL2 uses : separator
+
+    # Windows: split by :, convert each path, rejoin with ;
+    paths = classpath.split(":")
+    windows_paths = [convert_path_for_platform(p) for p in paths]
+    return ";".join(windows_paths)
 
 def convert_path_for_platform(path: str) -> str:
     """Convert WSL2 path to Windows path if needed"""
