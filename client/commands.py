@@ -500,9 +500,8 @@ async def handle_command(
         try:
             from tools.tool_control import is_tool_enabled, get_disabled_tools
 
-            # ── Build tool→server map from MCP client sessions ──────────
-            # This gives us accurate grouping including external servers
-            # (e.g. deepwiki tools appear under "deepwiki" not "other")
+            # ── Build tool→server map from live session queries ──────────
+            # Works for servers that respond successfully (e.g. deepwiki)
             tool_to_server = {}
             if mcp_agent and hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
                 for server_name, session in mcp_agent.client.sessions.items():
@@ -511,9 +510,9 @@ async def handle_command(
                         for t in session_tools:
                             tool_to_server[t.name] = server_name
                     except Exception:
-                        pass  # Skip broken/unavailable sessions silently
+                        pass  # Session failed (e.g. 500) — handled by source_server below
 
-            # ── Pattern matching fallback for anything not in session map ─
+            # ── Pattern matching last resort ─────────────────────────────
             category_patterns = {
                 'todo': ['todo', 'task'],
                 'knowledge_base': ['entry', 'entries', 'knowledge'],
@@ -536,8 +535,15 @@ async def handle_command(
                 if tool_name in ("read_skill", "list_skills"):
                     continue
 
-                # Session map first (accurate), then pattern match, then 'other'
+                # 1. Live session query (most accurate)
                 server_name = tool_to_server.get(tool_name)
+
+                # 2. Load-time tag set in client.py (catches servers whose
+                #    session.list_tools() fails at display time, e.g. coingecko)
+                if not server_name:
+                    server_name = (tool.metadata or {}).get('source_server')
+
+                # 3. Pattern matching last resort
                 if not server_name:
                     server_name = 'other'
                     for cat, patterns in category_patterns.items():

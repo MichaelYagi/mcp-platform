@@ -540,6 +540,25 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     logger.info("💾 Session manager initialized")
 
     tools = mcp_agent._tools
+
+    # ── Tag each tool with its source server via tool_connector ─────
+    server_name_map = {}
+    if hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
+        for sname, session in mcp_agent.client.sessions.items():
+            connector = getattr(session, 'connector', None) or getattr(session, '_connector', None)
+            if connector:
+                server_name_map[id(connector)] = sname
+
+    for tool in tools:
+        connector = getattr(tool, 'tool_connector', None)
+        if connector:
+            sname = server_name_map.get(id(connector))
+            if sname:
+                if tool.metadata is None:
+                    tool.metadata = {}
+                tool.metadata['source_server'] = sname
+
+    logger.info(f"🏷️  Tagged {sum(1 for t in tools if t.metadata and 'source_server' in t.metadata)}/{len(tools)} tools with source_server")
     logger.info(f"🛠️  Local MCP tools loaded: {len(tools)}")
 
     # ═══════════════════════════════════════════════════════════════
