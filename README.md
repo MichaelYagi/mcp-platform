@@ -212,6 +212,7 @@ These work in both CLI and web UI:
 :a2a on                - Enable agent-to-agent mode
 :a2a off               - Disable agent-to-agent mode
 :a2a status            - Check A2A system status
+:health                - Health overview of all servers and tools
 :env                   - Show environment configuration
 ```
 

@@ -30,9 +30,8 @@ def get_commands_list():
         ":a2a on - Enable agent-to-agent mode",
         ":a2a off - Disable agent-to-agent mode",
         ":a2a status - Check A2A system status",
-        ":env - Show environment configuration",
         ":health - Health overview of all servers and tools",
-        ":health <name> - Deep-dive health check for a server or tool",
+        ":env - Show environment configuration"
     ]
 
 
