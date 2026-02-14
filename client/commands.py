@@ -497,6 +497,13 @@ async def handle_command(
         if not tools:
             return (True, "No tools available (all servers may have failed to initialize)", None, None)
 
+        from pathlib import Path
+        import json as _json
+        _ext_cfg = Path(__file__).parent / "external_servers.json"
+        external_server_names = set(
+            _json.loads(_ext_cfg.read_text()).get("external_servers", {}).keys()
+        ) if _ext_cfg.exists() else set()
+
         try:
             from tools.tool_control import is_tool_enabled, get_disabled_tools
 
@@ -583,7 +590,9 @@ async def handle_command(
                 if not enabled and not show_all:
                     continue
 
-                output.append(f"\n{server_name}:")
+                is_external = server_name in external_server_names
+                label = " [external]" if is_external else ""
+                output.append(f"\n{server_name}{label}:")
 
                 for tool in enabled:
                     tool_name = getattr(tool, 'name', str(tool))
