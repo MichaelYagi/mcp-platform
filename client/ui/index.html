@@ -1941,6 +1941,7 @@
         function formatMessage(text) {
             const blocks = [];
             const inline = [];
+            const links = [];
             const mathInline = [];
             const mathBlock = [];
 
@@ -1972,6 +1973,14 @@
             });
             text = text.replace(/`([^`]+)`/g, (m, code) => {
                 const i = inline.length; inline.push(code); return `@@INLINE_${i}@@`;
+            });
+            text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, (m, label, url) => {
+                const i = links.length; links.push({ label, url }); return `@@LINK_${i}@@`;
+            });
+            text = text.replace(/(?<!\]\()(?<!")https?:\/\/[^\s<>"]+/g, (url) => {
+                const trailing = url.match(/[.,;:!?'")\]]+$/)?.[0] || '';
+                const cleanUrl = url.slice(0, url.length - trailing.length);
+                const i = links.length; links.push({ label: cleanUrl, url: cleanUrl }); return `@@LINK_${i}@@${trailing}`;
             });
 
             text = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -2030,6 +2039,8 @@
             });
             text = text.replace(/@@MATHINLINE_(\d+)@@/g, (m, i) => processMath(mathInline[i]));
             text = text.replace(/@@MATHBLOCK_(\d+)@@/g, (m, i) => processMath(mathBlock[i]));
+            text = text.replace(/@@LINK_(\d+)@@/g, (m, i) =>
+                `<a href="${links[i].url}" target="_blank">${links[i].label}</a>`);
 
             return text;
         }
