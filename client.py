@@ -616,7 +616,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     logger.info(f"   ✅ Recovered {len(session_tools)} tools from: {server_name}")
                 except Exception as se:
                     logger.warning(f"   ⚠️  Skipping session {server_name}: {se}")
-        if recovered:
+        if recovered and not mcp_agent._tools:
             from langchain_core.tools import StructuredTool
             import inspect
 

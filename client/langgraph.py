@@ -1727,6 +1727,11 @@ def create_langgraph_agent(llm_with_tools, tools):
         def match_intent(user_message: str, all_tools: list, base_llm, logger, conversation_state):
             """Match user intent using centralized pattern configuration"""
 
+            for tool in all_tools:
+                if hasattr(tool, 'name') and tool.name.lower() in user_message.lower():
+                    logger.info(f"🎯 Explicit tool name detected → binding only: {tool.name}")
+                    return base_llm.bind_tools([tool]), "explicit_tool"
+
             has_project_context = False
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
                 if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
