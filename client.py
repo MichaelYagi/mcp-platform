@@ -464,6 +464,8 @@ async def main():
     SERVER_LOG_FILE = LOG_DIR / "mcp-server.log"
 
     logging_handler.setup_logging(CLIENT_LOG_FILE)
+    logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)
+    logging.getLogger("mcp.client.sse").setLevel(logging.WARNING)
     logger = logging.getLogger("mcp_client")
 
     # Set event loop for logging
@@ -619,20 +621,30 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             import inspect
 
             def _make_tool(t):
-                schema = dict(t.inputSchema) if t.inputSchema else {"properties": {}, "type": "object"}
-                schema.pop("title", None)
+                from pydantic import create_model
+                from langchain_core.tools import StructuredTool
                 source = (t.meta or {}).get('source_server') if isinstance(t.meta, dict) else None
-
+                schema = t.inputSchema or {}
+                props = schema.get('properties', {})
+                required = schema.get('required', [])
+                fields = {}
+                type_map = {'string': str, 'integer': int, 'number': float, 'boolean': bool, 'array': list, 'object': dict}
+                for fname, finfo in props.items():
+                    py_type = type_map.get(finfo.get('type', 'string'), str)
+                    if fname in required:
+                        fields[fname] = (py_type, ...)
+                    else:
+                        fields[fname] = (py_type, None)
+                args_model = create_model(f"{t.name}Args", **fields) if fields else None
                 async def _run(**kwargs): return f"Tool {t.name} called"
-
                 _run.__name__ = t.name
                 return StructuredTool(
                     name=t.name,
                     description=(t.description or "").strip(),
-                    args_schema=None,
+                    args_schema=args_model,
                     func=lambda **kw: None,
                     coroutine=_run,
-                    metadata={"inputSchema": schema, "source_server": source},
+                    metadata={"source_server": source},
                 )
 
             mcp_agent._tools = [_make_tool(t) for t in recovered]
