@@ -7,9 +7,10 @@ import logging
 import sys
 import asyncio
 import os
+import re as _re
+
 from pathlib import Path
 from urllib.parse import urlparse
-
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, AIMessage
 from mcp_use.client.client import MCPClient
@@ -114,6 +115,25 @@ GLOBAL_CONVERSATION_STATE = {
     "messages": [],
     "loop_count": 0
 }
+
+
+class _OAuthSkipper(logging.Handler):
+    """Suppress OAuth browser-open prompts and mark those hostnames to skip."""
+    PATTERN = _re.compile(r'opening\s+browser.*?https?://([^/?#\s]+)', _re.IGNORECASE)
+
+    def __init__(self):
+        super().__init__(); self.blocked = set()
+
+    def emit(self, r):
+        m = self.PATTERN.search(r.getMessage())
+        if m: self.blocked.add(m.group(1).lower())
+
+    def write(self, text):  # stdout intercept
+        m = self.PATTERN.search(text)
+        if m: self.blocked.add(m.group(1).lower())
+
+    def flush(self):
+        pass
 
 # ═════════════════════════════════════════════════════════════════════
 # A2A MULTI-ENDPOINT SUPPORT
@@ -394,11 +414,24 @@ async def auto_discover_servers(servers_dir: Path, logger):
         for (name, cfg, s_type), is_ok in zip(server_meta, results):
             if is_ok is True:
                 if s_type in ("sse", "http"):
-                    entry = {"url": cfg["url"], "transport": s_type}
-                    headers = cfg.get("headers")
-                    if headers:
-                        entry["headers"] = resolve_headers(name, headers)
-                    mcp_servers[name] = entry
+                    url = cfg["url"]
+                    auth_blocked = False
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient(timeout=3.0) as hc:
+                            r = await hc.get(url, headers={"Accept": "text/event-stream"})
+                            if r.status_code == 401:
+                                logger.warning(f"⏭️  Skipping '{name}': OAuth required (401)")
+                                auth_blocked = True
+                    except Exception:
+                        pass  # let mcp_use try
+
+                    if not auth_blocked:
+                        entry = {"url": url, "transport": s_type}
+                        headers = cfg.get("headers")
+                        if headers:
+                            entry["headers"] = resolve_headers(name, headers)
+                        mcp_servers[name] = entry
                 else:  # bridge
                     mcp_servers[name] = {
                         "command": convert_path_for_platform(cfg["command"]),
@@ -539,29 +572,75 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         system_prompt=SYSTEM_PROMPT
     )
 
-    mcp_agent.debug = True
+    _skipper = _OAuthSkipper()
+    logging.getLogger("mcp_use").addHandler(_skipper)
+    _real_stdout, sys.stdout = sys.stdout, _skipper
+
+    mcp_agent.debug = False
     try:
         await mcp_agent.initialize()
     except Exception as e:
         logger.error(f"❌ Some MCP servers failed to initialize: {e}")
-        # Don't give up — collect tools from whatever sessions succeeded
-        try:
-            recovered = []
-            if hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
-                for server_name, session in mcp_agent.client.sessions.items():
-                    try:
-                        session_tools = await session.list_tools()
-                        recovered.extend(session_tools)
-                        logger.info(f"   ✅ Recovered {len(session_tools)} tools from: {server_name}")
-                    except Exception as se:
-                        logger.warning(f"   ⚠️  Skipping session {server_name}: {se}")
-            if recovered:
-                mcp_agent._tools = recovered
-                logger.info(f"⚠️  Partial initialization: {len(recovered)} tools recovered")
-            else:
-                logger.warning("⚠️  No tools recovered — all servers may have failed")
-        except Exception as re:
-            logger.error(f"❌ Recovery failed: {re}")
+    finally:
+        sys.stdout = _real_stdout
+        logging.getLogger("mcp_use").removeHandler(_skipper)
+
+    if _skipper.blocked:
+        before = len(mcp_agent._tools)
+        mcp_agent._tools = [
+            t for t in mcp_agent._tools
+            if urlparse(getattr(getattr(t, 'tool_connector', None), 'url', '') or
+                        getattr(getattr(t, 'tool_connector', None), 'base_url', '') or '').hostname
+               not in _skipper.blocked
+        ]
+        removed = before - len(mcp_agent._tools)
+        for h in _skipper.blocked:
+            logger.warning(f"⏭️  Skipped '{h}': OAuth sign-in required")
+        if removed:
+            logger.warning(f"   Removed {removed} tools from OAuth-blocked server(s)")
+
+    # Don't give up — collect tools from whatever sessions succeeded
+    try:
+        recovered = []
+        if hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
+            for server_name, session in mcp_agent.client.sessions.items():
+                try:
+                    session_tools = await session.list_tools()
+                    for t in session_tools:
+                        if t.meta is None:
+                            t.meta = {}
+                        t.meta['source_server'] = server_name
+                    recovered.extend(session_tools)
+                    logger.info(f"   ✅ Recovered {len(session_tools)} tools from: {server_name}")
+                except Exception as se:
+                    logger.warning(f"   ⚠️  Skipping session {server_name}: {se}")
+        if recovered:
+            from langchain_core.tools import StructuredTool
+            import inspect
+
+            def _make_tool(t):
+                schema = dict(t.inputSchema) if t.inputSchema else {"properties": {}, "type": "object"}
+                schema.pop("title", None)
+                source = (t.meta or {}).get('source_server') if isinstance(t.meta, dict) else None
+
+                async def _run(**kwargs): return f"Tool {t.name} called"
+
+                _run.__name__ = t.name
+                return StructuredTool(
+                    name=t.name,
+                    description=(t.description or "").strip(),
+                    args_schema=None,
+                    func=lambda **kw: None,
+                    coroutine=_run,
+                    metadata={"inputSchema": schema, "source_server": source},
+                )
+
+            mcp_agent._tools = [_make_tool(t) for t in recovered]
+            logger.info(f"⚠️  Partial initialization: {len(mcp_agent._tools)} tools recovered")
+        else:
+            logger.warning("⚠️  No tools recovered — all servers may have failed")
+    except Exception as re:
+        logger.error(f"❌ Recovery failed: {re}")
 
     from client.session_manager import SessionManager
     session_manager = SessionManager()
@@ -586,7 +665,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     tool.metadata = {}
                 tool.metadata['source_server'] = sname
 
-    logger.info(f"🏷️  Tagged {sum(1 for t in tools if t.metadata and 'source_server' in t.metadata)}/{len(tools)} tools with source_server")
     logger.info(f"🛠️  Local MCP tools loaded: {len(tools)}")
 
     # ═══════════════════════════════════════════════════════════════

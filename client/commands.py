@@ -541,7 +541,12 @@ async def handle_command(
                 # 2. Load-time tag set in client.py (catches servers whose
                 #    session.list_tools() fails at display time, e.g. coingecko)
                 if not server_name:
-                    server_name = (tool.metadata or {}).get('source_server')
+                    try:
+                        meta = getattr(tool, 'meta', None) or getattr(tool, 'metadata', None)
+                        if isinstance(meta, dict):
+                            server_name = meta.get('source_server')
+                    except Exception:
+                        pass
 
                 # 3. Pattern matching last resort
                 if not server_name:
