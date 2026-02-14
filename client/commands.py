@@ -30,7 +30,9 @@ def get_commands_list():
         ":a2a on - Enable agent-to-agent mode",
         ":a2a off - Disable agent-to-agent mode",
         ":a2a status - Check A2A system status",
-        ":env - Show environment configuration"
+        ":env - Show environment configuration",
+        ":health - Health overview of all servers and tools",
+        ":health <name> - Deep-dive health check for a server or tool",
     ]
 
 
@@ -91,29 +93,6 @@ async def handle_multi_agent_commands(command: str, orchestrator, multi_agent_st
     Handle multi-agent commands
     Returns result string or None if command not handled
     """
-    # if command == ":multi on":
-    #     if orchestrator:
-    #         multi_agent_state["enabled"] = True
-    #         return "✅ Multi-agent mode enabled\n   Complex queries will be broken down automatically"
-    #     return "❌ Multi-agent orchestrator not available"
-    #
-    # elif command == ":multi off":
-    #     if orchestrator:
-    #         multi_agent_state["enabled"] = False
-    #         return "🤖 Multi-agent mode disabled\n   Using single-agent execution"
-    #     return "❌ Multi-agent orchestrator not available"
-    #
-    # elif command == ":multi status":
-    #     if not orchestrator:
-    #         return "❌ Multi-agent orchestrator not available"
-    #
-    #     if multi_agent_state["enabled"]:
-    #         return "Multi-agent mode: ENABLED\n   Complex queries are automatically distributed to specialized agents"
-    #     else:
-    #         return "Multi-agent mode: DISABLED\n   Use ':multi on' to enable"
-    #
-    # return None
-
     multi_agent_state["enabled"] = True
     return "✅ Multi-agent mode enabled\n   Complex queries will be broken down automatically"
 
@@ -146,13 +125,11 @@ async def handle_gguf_commands(command: str):
     if cmd == "add" and len(parts) >= 2:
         path = parts[1]
 
-        # Auto-extract alias from filename if not provided
         if len(parts) >= 3:
             alias = parts[2]
         else:
-            # Extract filename without extension as alias
             from pathlib import Path
-            filename = Path(path).stem  # Gets filename without .gguf extension
+            filename = Path(path).stem
             alias = filename
 
         try:
@@ -167,212 +144,11 @@ async def handle_gguf_commands(command: str):
         return f"✅ Removed: {alias}"
 
     elif cmd == "list":
-        # This will be handled by showing all models
         return "list_all_models"  # Special signal
 
     else:
         return "❌ Invalid GGUF command. Use ':gguf help' for usage"
 
-
-# SAFE VERSION OF HEALTH COMMANDS - Replace in commands.py
-
-async def handle_health_commands(command: str, orchestrator):
-    """Handle health monitoring commands"""
-    if not orchestrator or not hasattr(orchestrator, 'health_monitor') or not orchestrator.health_monitor:
-        return (True, "❌ Health monitoring not available", None, None)
-
-    if command == ":health":
-        summary = orchestrator.health_monitor.get_health_summary()
-
-        # Handle empty/no agents case
-        if summary.get("status") == "no_agents" or not summary.get("total_agents"):
-            return (True, "❌ No agents registered yet. Enable A2A first with ':a2a on'", None, None)
-
-        output = ["🏥 AGENT HEALTH SUMMARY", "=" * 60, ""]
-        output.append(f"Overall Status: {summary.get('status', 'unknown').upper()}")
-        output.append(f"Total Agents: {summary.get('total_agents', 0)}")
-        output.append(f"  💚 Healthy: {summary.get('healthy', 0)}")
-        output.append(f"  💛 Degraded: {summary.get('degraded', 0)}")
-        output.append(f"  🔴 Unhealthy: {summary.get('unhealthy', 0)}")
-        output.append(f"  ⚫ Offline: {summary.get('offline', 0)}")
-        output.append("")
-        output.append(f"Performance:")
-        output.append(f"  Total Tasks: {summary.get('total_tasks', 0)}")
-        output.append(f"  Total Errors: {summary.get('total_errors', 0)}")
-        output.append(f"  Avg Response Time: {summary.get('avg_response_time', 0):.2f}s")
-        output.append(f"  Recent Alerts (5min): {summary.get('recent_alerts', 0)}")
-        output.append("=" * 60)
-
-        return (True, "\n".join(output), None, None)
-
-    elif command == ":health alerts":
-        alerts = orchestrator.health_monitor.get_recent_alerts(limit=10)
-
-        if not alerts:
-            return (True, "✅ No recent alerts", None, None)
-
-        import time
-        output = ["🚨 RECENT ALERTS", "=" * 60, ""]
-        for alert in alerts:
-            output.append(f"{alert.level.value.upper()} | {alert.agent_id}")
-            output.append(f"  {alert.message}")
-            output.append(f"  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(alert.timestamp))}")
-            output.append("")
-
-        return (True, "\n".join(output), None, None)
-
-    elif command.startswith(":health "):
-        agent_id = command[8:].strip()
-        health = orchestrator.health_monitor.get_agent_health(agent_id)
-
-        # Try with _1 suffix if not found
-        if not health:
-            health = orchestrator.health_monitor.get_agent_health(f"{agent_id}_1")
-            if health:
-                agent_id = f"{agent_id}_1"
-
-        if not health:
-            return (True,
-                    f"❌ Agent '{agent_id}' not found. Available agents: {', '.join(orchestrator.health_monitor.agent_metrics.keys())}",
-                    None, None)
-
-        import time
-        status_icon = {"healthy": "💚", "degraded": "💛", "unhealthy": "🔴", "offline": "⚫"}.get(health.status.value, "❓")
-
-        output = [f"🏥 HEALTH REPORT: {agent_id}", "=" * 60, ""]
-        output.append(f"Status: {status_icon} {health.status.value.upper()}")
-        output.append(f"Uptime: {health.uptime / 60:.1f} minutes")
-        output.append(f"Last Heartbeat: {time.time() - health.last_heartbeat:.1f}s ago")
-        output.append("")
-        output.append(f"Tasks:")
-        output.append(f"  Completed: {health.tasks_completed}")
-        output.append(f"  Failed: {health.tasks_failed}")
-        if health.tasks_completed + health.tasks_failed > 0:
-            success_rate = health.tasks_completed / (health.tasks_completed + health.tasks_failed)
-            output.append(f"  Success Rate: {success_rate:.1%}")
-        output.append("")
-        output.append(f"Performance:")
-        output.append(f"  Avg Response Time: {health.avg_response_time:.2f}s")
-        output.append(f"  Queue Size: {health.queue_size}")
-        output.append(f"  Error Count: {health.error_count}")
-
-        if health.last_error:
-            output.append(f"\nLast Error: {health.last_error}")
-            if health.last_error_time:
-                output.append(f"  {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(health.last_error_time))}")
-
-        output.append("=" * 60)
-
-        return (True, "\n".join(output), None, None)
-
-    return (False, None, None, None)
-
-async def handle_metrics_commands(command: str, orchestrator):
-    """Handle performance metrics commands"""
-    if not orchestrator or not orchestrator.performance_metrics:
-        return (True, "❌ Performance metrics not available", None, None)
-
-    if command == ":metrics":
-        report = orchestrator.performance_metrics.get_summary_report()
-        return (True, report, None, None)
-
-    elif command == ":metrics comparative":
-        stats = orchestrator.performance_metrics.get_comparative_stats()
-
-        output = ["📊 COMPARATIVE PERFORMANCE", "=" * 60, ""]
-
-        if "overall" in stats:
-            output.append("Overall Statistics:")
-            output.append(f"  Avg Success Rate: {stats['overall']['avg_success_rate']:.1%}")
-            output.append(f"  Avg Duration: {stats['overall']['avg_duration']:.2f}s")
-            output.append(f"  Best Performer: {stats['overall']['best_performer']}")
-            output.append(f"  Fastest Agent: {stats['overall']['fastest_agent']}")
-            output.append("")
-
-        output.append("Per-Agent:")
-        for agent_id, data in stats['agents'].items():
-            output.append(f"  {agent_id:15} | Success: {data['success_rate']:5.1%} | Avg: {data['avg_duration']:5.2f}s")
-
-        return (True, "\n".join(output), None, None)
-
-    elif command == ":metrics bottlenecks":
-        analysis = orchestrator.performance_metrics.get_bottleneck_analysis()
-
-        if not analysis["bottlenecks"]:
-            return (True, "✅ No performance bottlenecks detected", None, None)
-
-        output = ["⚠️  PERFORMANCE BOTTLENECKS", "=" * 60, ""]
-
-        for bottleneck in analysis["bottlenecks"]:
-            output.append(f"{bottleneck['agent_id']}:")
-            for issue in bottleneck["issues"]:
-                output.append(f"  - {issue}")
-            output.append("")
-
-        return (True, "\n".join(output), None, None)
-
-    return (False, None, None, None)
-
-async def handle_negotiation_commands(command: str, orchestrator):
-    """Handle negotiation commands"""
-    if not orchestrator or not orchestrator.negotiation_engine:
-        return (True, "❌ Negotiation engine not available", None, None)
-
-    if command == ":negotiations":
-        stats = orchestrator.negotiation_engine.get_statistics()
-
-        output = ["🤝 NEGOTIATION STATISTICS", "=" * 60, ""]
-        output.append(f"Total Proposals: {stats['total_proposals']}")
-        output.append(f"Accepted: {stats['accepted']}")
-        output.append(f"Rejected: {stats['rejected']}")
-        output.append(f"Expired: {stats['expired']}")
-        output.append(f"Success Rate: {stats['success_rate']:.1%}")
-        output.append(f"Active: {stats['active_negotiations']}")
-        output.append("=" * 60)
-
-        return (True, "\n".join(output), None, None)
-
-    return (False, None, None, None)
-
-async def handle_routing_commands(command: str, orchestrator):
-    """Handle message routing commands"""
-    if not orchestrator or not orchestrator.message_router:
-        return (True, "❌ Message router not available", None, None)
-
-    if command == ":routing":
-        stats = orchestrator.message_router.get_routing_stats()
-
-        output = ["📡 MESSAGE ROUTING STATISTICS", "=" * 60, ""]
-        output.append(f"Total Routed: {stats['total_routed']}")
-        output.append(f"Failed Routes: {stats['failed_routes']}")
-        output.append(f"Retries: {stats['retries']}")
-        output.append(f"Timeouts: {stats['timeouts']}")
-        output.append(f"Pending: {stats['pending_messages']}")
-        output.append(f"Completed: {stats['completed_messages']}")
-        output.append("=" * 60)
-
-        return (True, "\n".join(output), None, None)
-
-    elif command == ":routing queues":
-        status = orchestrator.message_router.get_queue_status()
-
-        if not status:
-            return (True, "No queues active", None, None)
-
-        output = ["📬 MESSAGE QUEUE STATUS", "=" * 60, ""]
-
-        for agent_id, queue_data in status.items():
-            output.append(f"{agent_id}:")
-            output.append(f"  Queue Size: {queue_data['queue_size']}")
-            output.append(f"  Pending: {queue_data['pending']}")
-            output.append(f"  Critical: {queue_data['priorities']['critical']}")
-            output.append(f"  High: {queue_data['priorities']['high']}")
-            output.append(f"  Normal: {queue_data['priorities']['normal']}")
-            output.append("")
-
-        return (True, "\n".join(output), None, None)
-
-    return (False, None, None, None)
 
 def is_command(text: str) -> bool:
     """Check if text is a command"""
@@ -392,7 +168,7 @@ async def handle_command(
     orchestrator=None,
     multi_agent_state=None,
     a2a_state=None,
-    mcp_agent=None  # ← ADDED mcp_agent parameter
+    mcp_agent=None
 ):
     """
     Main command handler compatible with existing CLI/WebSocket interface
@@ -406,7 +182,6 @@ async def handle_command(
         result = await handle_gguf_commands(command)
         if result:
             if result == "list_all_models":
-                # Show all models instead
                 models_module.print_all_models()
                 return (True, "", None, None)
             return (True, result, None, None)
@@ -422,29 +197,58 @@ async def handle_command(
         from client.env_display import format_env_display
         return True, format_env_display(), None, None
 
-    # Health commands
+    # Health commands — MCP server/tool health check
     if command.startswith(":health"):
-        result = await handle_health_commands(command, orchestrator)
-        if result[0]:  # If handled
-            return result
+        from client.health import run_health_check
+        from pathlib import Path
+        project_root = Path(__file__).parent.parent
+        result = await run_health_check(command[7:].strip(), mcp_agent, tools, project_root)
+        return (True, result, None, None)
 
-    # Metrics commands
+    # Metrics commands (A2A - no-op if not available)
     if command.startswith(":metrics"):
-        result = await handle_metrics_commands(command, orchestrator)
-        if result[0]:  # If handled
-            return result
+        if orchestrator and hasattr(orchestrator, 'performance_metrics') and orchestrator.performance_metrics:
+            if command == ":metrics":
+                report = orchestrator.performance_metrics.get_summary_report()
+                return (True, report, None, None)
+            elif command == ":metrics comparative":
+                stats = orchestrator.performance_metrics.get_comparative_stats()
+                output = ["📊 COMPARATIVE PERFORMANCE", "=" * 60, ""]
+                if "overall" in stats:
+                    output.append(f"  Avg Success Rate: {stats['overall']['avg_success_rate']:.1%}")
+                    output.append(f"  Avg Duration: {stats['overall']['avg_duration']:.2f}s")
+                    output.append(f"  Best Performer: {stats['overall']['best_performer']}")
+                    output.append("")
+                for agent_id, data in stats.get('agents', {}).items():
+                    output.append(f"  {agent_id:15} | Success: {data['success_rate']:5.1%} | Avg: {data['avg_duration']:5.2f}s")
+                return (True, "\n".join(output), None, None)
+        return (True, "📊 Metrics not available (A2A mode only)", None, None)
 
-    # Negotiation commands
+    # Negotiation commands (A2A - no-op if not available)
     if command.startswith(":negotiations"):
-        result = await handle_negotiation_commands(command, orchestrator)
-        if result[0]:  # If handled
-            return result
+        if orchestrator and hasattr(orchestrator, 'negotiation_engine') and orchestrator.negotiation_engine:
+            stats = orchestrator.negotiation_engine.get_statistics()
+            output = ["🤝 NEGOTIATION STATISTICS", "=" * 60, ""]
+            output.append(f"Total Proposals: {stats['total_proposals']}")
+            output.append(f"Accepted: {stats['accepted']}")
+            output.append(f"Rejected: {stats['rejected']}")
+            output.append(f"Success Rate: {stats['success_rate']:.1%}")
+            output.append(f"Active: {stats['active_negotiations']}")
+            return (True, "\n".join(output), None, None)
+        return (True, "🤝 Negotiations not available (A2A mode only)", None, None)
 
-    # Routing commands
+    # Routing commands (A2A - no-op if not available)
     if command.startswith(":routing"):
-        result = await handle_routing_commands(command, orchestrator)
-        if result[0]:  # If handled
-            return result
+        if orchestrator and hasattr(orchestrator, 'message_router') and orchestrator.message_router:
+            if command == ":routing":
+                stats = orchestrator.message_router.get_routing_stats()
+                output = ["📡 MESSAGE ROUTING STATISTICS", "=" * 60, ""]
+                output.append(f"Total Routed: {stats['total_routed']}")
+                output.append(f"Failed Routes: {stats['failed_routes']}")
+                output.append(f"Pending: {stats['pending_messages']}")
+                output.append(f"Completed: {stats['completed_messages']}")
+                return (True, "\n".join(output), None, None)
+        return (True, "📡 Routing not available (A2A mode only)", None, None)
 
     # Multi-agent commands
     if command.startswith(":multi"):
@@ -490,7 +294,7 @@ async def handle_command(
         except ImportError:
             return (True, "📊 Stats system not available", None, None)
 
-    # Tools command - UPDATED to use mcp_agent session map with fallback
+    # Tools command
     if command == ":tools" or command == ":tools --all":
         show_all = command == ":tools --all"
 
@@ -498,40 +302,15 @@ async def handle_command(
             return (True, "No tools available (all servers may have failed to initialize)", None, None)
 
         from pathlib import Path
-        import json as _json
-        _ext_cfg = Path(__file__).parent / "external_servers.json"
-        external_server_names = set(
-            _json.loads(_ext_cfg.read_text()).get("external_servers", {}).keys()
-        ) if _ext_cfg.exists() else set()
+        from client.tool_utils import load_external_server_names, resolve_tool_server
+        project_root = Path(__file__).parent.parent
+        external_server_names = load_external_server_names(project_root)
 
         try:
             from tools.tool_control import is_tool_enabled, get_disabled_tools
 
-            # ── Build tool→server map from live session queries ──────────
-            # Works for servers that respond successfully (e.g. deepwiki)
-            tool_to_server = {}
-            if mcp_agent and hasattr(mcp_agent, 'client') and hasattr(mcp_agent.client, 'sessions'):
-                for server_name, session in mcp_agent.client.sessions.items():
-                    try:
-                        session_tools = await session.list_tools()
-                        for t in session_tools:
-                            tool_to_server[t.name] = server_name
-                    except Exception:
-                        pass  # Session failed (e.g. 500) — handled by source_server below
-
-            # ── Pattern matching last resort ─────────────────────────────
-            category_patterns = {
-                'todo': ['todo', 'task'],
-                'knowledge_base': ['entry', 'entries', 'knowledge'],
-                'plex': ['plex', 'media', 'scene', 'semantic_media', 'import_plex',
-                         'train_recommender', 'recommend', 'record_viewing',
-                         'auto_train', 'auto_recommend'],
-                'rag': ['rag_'],
-                'system': ['system', 'hardware', 'process'],
-                'location': ['location', 'time', 'weather'],
-                'text': ['text', 'summarize', 'chunk', 'explain', 'concept'],
-                'code': ['code', 'debug'],
-            }
+            # ── Resolve tool→server via shared utility ───────────────────
+            tool_to_server = await resolve_tool_server(tools, mcp_agent, project_root)
 
             # ── Group tools by server ────────────────────────────────────
             tools_by_server = {}
@@ -542,11 +321,10 @@ async def handle_command(
                 if tool_name in ("read_skill", "list_skills"):
                     continue
 
-                # 1. Live session query (most accurate)
+                # 1. Resolved map (live session + metadata + pattern)
                 server_name = tool_to_server.get(tool_name)
 
-                # 2. Load-time tag set in client.py (catches servers whose
-                #    session.list_tools() fails at display time, e.g. coingecko)
+                # 2. Explicit metadata check (belt-and-suspenders for coingecko etc.)
                 if not server_name:
                     try:
                         meta = getattr(tool, 'meta', None) or getattr(tool, 'metadata', None)
@@ -555,13 +333,9 @@ async def handle_command(
                     except Exception:
                         pass
 
-                # 3. Pattern matching last resort
+                # 3. Last resort
                 if not server_name:
                     server_name = 'other'
-                    for cat, patterns in category_patterns.items():
-                        if any(p in tool_name.lower() for p in patterns):
-                            server_name = cat
-                            break
 
                 enabled = is_tool_enabled(tool_name, server_name)
 
@@ -586,7 +360,6 @@ async def handle_command(
                 enabled = server_data['enabled']
                 disabled = server_data['disabled']
 
-                # Skip servers with no enabled tools unless --all
                 if not enabled and not show_all:
                     continue
 
@@ -656,7 +429,6 @@ async def handle_command(
 
         models_module.print_all_models()
 
-        # Show if current agent might be out of sync
         if model_name != last_model:
             output.append(f"\n⚠️  WARNING: Agent might be out of sync!")
             output.append(f"   Active: {model_name}")
@@ -666,7 +438,6 @@ async def handle_command(
         return (True, "\n".join(output) if output else "", None, None)
 
     if command == ":models":
-        # Legacy - show all models
         models_module.print_all_models()
         return (True, "", None, None)
 
@@ -676,7 +447,6 @@ async def handle_command(
         if logger:
             logger.info(f"Switching to model: {new_model}")
 
-        # Use the unified switch_model that auto-detects backend
         new_agent = await models_module.switch_model(
             new_model,
             tools,
@@ -687,11 +457,6 @@ async def handle_command(
 
         if new_agent is None:
             return (True, f"❌ Model '{new_model}' not loaded", None, None)
-
-        # Clear conversation history when switching models
-        # conversation_state["messages"] = []
-        # if logger:
-        #     logger.info("✅ Chat history cleared after model switch")
 
         return (True, f"✅ Switched to model: {new_model}\n💬 Chat history cleared", new_agent, new_model)
 

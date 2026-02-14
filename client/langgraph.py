@@ -2129,9 +2129,13 @@ def create_langgraph_agent(llm_with_tools, tools):
                 )
                 tool_messages.append(result_msg)
                 logger.info(f"✅ Tool {tool_name} completed in {tool_duration:.2f}s")
+                from client.health import record_tool_call
+                record_tool_call(tool_name, tool_duration)
 
             except Exception as e:
                 logger.error(f"❌ Tool {tool_name} failed: {e}")
+                from client.health import record_tool_call
+                record_tool_call(tool_name, 0.0, error=str(e))
                 if METRICS_AVAILABLE:
                     metrics["tool_errors"][tool_name] += 1
                 error_msg = ToolMessage(
