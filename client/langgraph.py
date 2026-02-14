@@ -1169,7 +1169,7 @@ async def rag_node(state):
     if is_stop_requested():
         logger.warning("🛑 RAG node: Stop requested")
         msg = AIMessage(content="Search cancelled by user.")
-        return {"messages": state["messages"] + [msg], "llm": state.get("llm"), "stopped": True}
+        return {"messages": [msg], "llm": state.get("llm"), "stopped": True}
 
     user_message = None
     for msg in reversed(state["messages"]):
@@ -1180,7 +1180,7 @@ async def rag_node(state):
     if not user_message:
         logger.error("❌ No user message found in RAG node")
         msg = AIMessage(content="Error: Could not find user's question.")
-        return {"messages": state["messages"] + [msg], "llm": state.get("llm")}
+        return {"messages": [msg], "llm": state.get("llm")}
 
     # Find rag_search_tool
     tools_dict = state.get("tools", {})
@@ -1193,7 +1193,7 @@ async def rag_node(state):
     if not rag_search_tool:
         logger.error(f"❌ RAG search tool not found")
         msg = AIMessage(content="RAG search is not available.")
-        return {"messages": state["messages"] + [msg], "llm": state.get("llm")}
+        return {"messages": [msg], "llm": state.get("llm")}
 
     try:
         # Call RAG search
@@ -1211,12 +1211,12 @@ async def rag_node(state):
         llm = state.get("llm")
         response = await llm.ainvoke(augmented_messages)
 
-        return {"messages": state["messages"] + [response], "llm": state.get("llm")}
+        return {"messages": [response], "llm": state.get("llm")}
 
     except Exception as e:
         logger.error(f"❌ Error in RAG node: {e}")
         msg = AIMessage(content=f"Error searching knowledge base: {str(e)}")
-        return {"messages": state["messages"] + [msg], "llm": state.get("llm")}
+        return {"messages": [msg], "llm": state.get("llm")}
 
 # 4-TIER RESEARCH FALLBACK SYSTEM
 # Tools → Direct Access → LangSearch → LLM Knowledge
@@ -1227,7 +1227,7 @@ async def research_node(state):
     if is_stop_requested():
         logger.warning("🛑 Research node: Stop requested")
         return {
-            "messages": state["messages"] + [AIMessage(content="Research cancelled.")],
+            "messages": [AIMessage(content="Research cancelled.")],
             "llm": state.get("llm"),
             "stopped": True,
             "current_model": state.get("current_model", "unknown")
@@ -1242,7 +1242,7 @@ async def research_node(state):
 
     if not user_message:
         return {
-            "messages": state["messages"] + [AIMessage(content="Error: No query found.")],
+            "messages": [AIMessage(content="Error: No query found.")],
             "llm": state.get("llm"),
             "current_model": state.get("current_model", "unknown")
         }
@@ -1316,7 +1316,7 @@ async def research_node(state):
         if not all_content:
             failed_list = "\n".join([f"  - {s}" for s in failed_sources])
             return {
-                "messages": state["messages"] + [AIMessage(
+                "messages": [AIMessage(
                     content=f"❌ Unable to fetch content from any sources.\n\n"
                             f"**Attempted:**\n{failed_list}\n\n"
                             f"Try:\n- Checking the URLs\n- Using different sources\n- Simplifying your query"
@@ -1388,11 +1388,11 @@ Your answer:"""
                 notes.append(
                     f"💾 **Note**: All fetched content ({total_rag_entries} pages) has been stored in RAG for future reference.")
 
-            if notes and hasattr(response, 'content') and response.content:  # ← Check response.content is not None
+            if notes and hasattr(response, 'content') and response.content:
                 response.content += "\n\n---\n\n" + "\n\n".join(notes)
 
             return {
-                "messages": state["messages"] + [response],
+                "messages": [response],
                 "llm": state.get("llm"),
                 "current_model": state.get("current_model", "unknown")
             }
@@ -1409,17 +1409,15 @@ Your answer:"""
             ]):
                 logger.warning(f"⚠️ Context overflow: {str(e)[:100]}")
             else:
-                # Different ValueError - re-raise
                 raise
 
         # CATCH: Other context-related errors
         except Exception as e:
             error_str = str(e).lower()
             if not any(phrase in error_str for phrase in ["context", "token", "length", "exceed"]):
-                # Not a context error - report it
                 logger.error(f"❌ Research failed: {e}")
                 return {
-                    "messages": state["messages"] + [AIMessage(content=f"Research error: {str(e)}")],
+                    "messages": [AIMessage(content=f"Research error: {str(e)}")],
                     "llm": state.get("llm"),
                     "current_model": state.get("current_model", "MCP Error")
                 }
@@ -1427,7 +1425,6 @@ Your answer:"""
         # ATTEMPT 2: Retry with summarization
         logger.info("🔄 Retrying with content summarization...")
 
-        # Summarize the content
         summary_prompt = f"""Summarize this content from {success_count} sources concisely, keeping key facts relevant to: "{query_cleaned}"
 
 {combined_content}
@@ -1437,7 +1434,7 @@ Provide a structured summary under 1000 words:"""
         try:
             summary_response = await asyncio.wait_for(
                 llm.ainvoke([HumanMessage(content=summary_prompt)]),
-                timeout=120.0  # 2 minute timeout for summary
+                timeout=120.0
             )
             summarized_content = summary_response.content
             logger.info(f"✅ Summarized: {len(combined_content)} → {len(summarized_content)} chars")
@@ -1450,7 +1447,6 @@ Provide a structured summary under 1000 words:"""
             logger.error(f"❌ Summary failed: {e}, using truncation")
             summarized_content = combined_content[:2000] + "\n\n[Content truncated]"
 
-        # Try again with summarized content
         retry_prompt = f"""I have fetched and SUMMARIZED content from {success_count} sources.
 
 Sources:
@@ -1473,12 +1469,11 @@ Your answer:"""
         try:
             response = await asyncio.wait_for(
                 llm.ainvoke(retry_messages),
-                timeout=300.0  # 5 minute timeout for retry
+                timeout=300.0
             )
 
             logger.info("✅ Research completed with summarized content")
 
-            # Add disclaimers
             disclaimers = [
                 "⚠️ **Note**: Answer based on summary due to content length."
             ]
@@ -1497,7 +1492,7 @@ Your answer:"""
                 response.content += "\n\n---\n\n" + "\n\n".join(disclaimers)
 
             return {
-                "messages": state["messages"] + [response],
+                "messages": [response],
                 "llm": state.get("llm"),
                 "current_model": state.get("current_model", "unknown")
             }
@@ -1505,7 +1500,7 @@ Your answer:"""
         except asyncio.TimeoutError:
             logger.error("❌ Retry also timed out")
             return {
-                "messages": state["messages"] + [AIMessage(
+                "messages": [AIMessage(
                     content=f"⏱️ Timeout: Research took too long even with {success_count} sources.\n\n"
                             f"Try:\n- More specific question\n- Fewer sources\n- Asking about specific sections"
                 )],
@@ -1516,7 +1511,7 @@ Your answer:"""
         except Exception as e:
             logger.error(f"❌ Retry failed: {e}")
             return {
-                "messages": state["messages"] + [AIMessage(
+                "messages": [AIMessage(
                     content=f"❌ Research Failed\n\n"
                             f"Could not process content from {success_count} sources.\n\n"
                             f"Error: {str(e)}\n\n"
@@ -1529,7 +1524,7 @@ Your answer:"""
     except Exception as e:
         logger.error(f"❌ Research failed completely: {e}")
         return {
-            "messages": state["messages"] + [AIMessage(content=f"Research error: {str(e)}")],
+            "messages": [AIMessage(content=f"Research error: {str(e)}")],
             "llm": state.get("llm"),
             "current_model": state.get("current_model", "unknown")
         }
@@ -1560,7 +1555,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.warning("🛑 call_model: Stop requested")
             empty_response = AIMessage(content="Operation cancelled by user.")
             return {
-                "messages": state["messages"] + [empty_response],
+                "messages": [empty_response],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": state.get("ingest_completed", False),
@@ -1587,7 +1582,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     metrics["llm_calls"] += 1
                     metrics["llm_times"].append((time.time(), duration))
                 return {
-                    "messages": messages + [response],
+                    "messages": [response],
                     "tools": state.get("tools", {}),
                     "llm": state.get("llm"),
                     "ingest_completed": state.get("ingest_completed", False),
@@ -1616,7 +1611,7 @@ def create_langgraph_agent(llm_with_tools, tools):
     **Your question:** {question}""".format(question=messages[-1].content if messages else "unknown"))
 
                 return {
-                    "messages": messages + [timeout_message],
+                    "messages": [timeout_message],
                     "tools": state.get("tools", {}),
                     "llm": state.get("llm"),
                     "ingest_completed": state.get("ingest_completed", False),
@@ -1694,7 +1689,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                             response = await base_llm.ainvoke(augmented_messages)
 
                             return {
-                                "messages": messages + [response],
+                                "messages": [response],
                                 "tools": state.get("tools", {}),
                                 "llm": state.get("llm"),
                                 "ingest_completed": state.get("ingest_completed", False),
@@ -1713,7 +1708,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                         content="LangSearch is not available. Please check configuration."
                     )
                     return {
-                        "messages": messages + [error_response],
+                        "messages": [error_response],
                         "tools": state.get("tools", {}),
                         "llm": state.get("llm"),
                         "ingest_completed": state.get("ingest_completed", False),
@@ -1870,7 +1865,7 @@ def create_langgraph_agent(llm_with_tools, tools):
     - Tool support: ❌ Not supported""")
 
                 return {
-                    "messages": messages + [error_response],
+                    "messages": [error_response],
                     "tools": state.get("tools", {}),
                     "llm": state.get("llm"),
                     "ingest_completed": state.get("ingest_completed", False),
@@ -1921,7 +1916,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                         timeout=300.0
                     )
 
-                # Update current_model for fallback path
                 current_model = get_model_name(base_llm)
 
             elif not has_tool_calls and has_content:
@@ -1948,12 +1942,10 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                             retry_messages = messages + [response, HumanMessage(content=augmented_prompt)]
                             response = await base_llm.ainvoke(retry_messages)
-
-                            # Update current_model for this path too
                             current_model = get_model_name(base_llm)
 
             return {
-                "messages": messages + [response],
+                "messages": [response],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": state.get("ingest_completed", False),
@@ -1969,7 +1961,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.error(f"⏱️ LLM call timed out after 5m")
 
             return {
-                "messages": messages + [AIMessage(
+                "messages": [AIMessage(
                     content="⏱️ Request timed out after 5 minutes. Please try:\n\n1. Rephrasing your question\n2. Breaking it into smaller parts\n3. Using a simpler query")],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
@@ -1992,7 +1984,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.warning("🛑 ingest_node: Stop requested")
             msg = AIMessage(content="Ingestion cancelled by user.")
             return {
-                "messages": state["messages"] + [msg],
+                "messages": [msg],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": True,
@@ -2009,7 +2001,7 @@ def create_langgraph_agent(llm_with_tools, tools):
         if not ingest_tool:
             msg = AIMessage(content="Ingestion tool not available.")
             return {
-                "messages": state["messages"] + [msg],
+                "messages": [msg],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": True,
@@ -2021,7 +2013,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             result = await ingest_tool.ainvoke({"limit": 5})
             msg = AIMessage(content=f"Ingestion complete: {result}")
             return {
-                "messages": state["messages"] + [msg],
+                "messages": [msg],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": True,
@@ -2031,7 +2023,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.error(f"❌ Error in ingest_node: {e}")
             msg = AIMessage(content=f"Ingestion failed: {str(e)}")
             return {
-                "messages": state["messages"] + [msg],
+                "messages": [msg],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": True,
@@ -2046,7 +2038,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.warning("🛑 call_tools: Stop requested")
             empty_response = AIMessage(content="Tool execution cancelled by user.")
             return {
-                "messages": state["messages"] + [empty_response],
+                "messages": [empty_response],
                 "tools": state.get("tools", {}),
                 "llm": state.get("llm"),
                 "ingest_completed": state.get("ingest_completed", False),
@@ -2146,7 +2138,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 tool_messages.append(error_msg)
 
         return {
-            "messages": state["messages"] + tool_messages,
+            "messages": tool_messages,
             "tools": state.get("tools", {}),
             "llm": state.get("llm"),
             "ingest_completed": state.get("ingest_completed", False),
@@ -2264,10 +2256,14 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
         # ═══════════════════════════════════════════════════════════════
         # STEP 4: Update conversation state
+        # result["messages"] is the correct final accumulated state.
+        # operator.add in AgentState already concatenated correctly.
+        # extend() caused duplicates to snowball over long sessions.
         # ═══════════════════════════════════════════════════════════════
-        new_messages = result["messages"][len(conversation_state["messages"]):]
-        logger.info(f"📨 Agent added {len(new_messages)} new messages")
-        conversation_state["messages"].extend(new_messages)
+        input_count = len(conversation_state["messages"])
+        truly_new = result["messages"][input_count:]
+        logger.info(f"📨 Agent added {len(truly_new)} new messages")
+        conversation_state["messages"] = result["messages"]
 
         # ═══════════════════════════════════════════════════════════════
         # STEP 5: Return results
@@ -2292,7 +2288,6 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         # Handle context window overflow gracefully
         error_str = str(e)
         if "exceed context window" in error_str or "Requested tokens" in error_str:
-            # Extract token counts from error message
             import re
             match = re.search(r'Requested tokens \((\d+)\) exceed context window of (\d+)', error_str)
 
@@ -2307,20 +2302,16 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                 available = None
                 logger.error(f"❌ Context window overflow")
 
-            # Calculate how many messages to drop
             current_msg_count = len(conversation_state["messages"])
-            if current_msg_count > 3:  # Keep at least system + user message
-                # Drop half the history
+            if current_msg_count > 3:
                 new_limit = max(3, current_msg_count // 2)
                 logger.warning(f"⚠️  Auto-recovery: Reducing history from {current_msg_count} to {new_limit} messages")
 
-                # Keep system message + trim history + keep latest user message
                 system_msg = conversation_state["messages"][0] if isinstance(conversation_state["messages"][0],
                                                                              SystemMessage) else None
                 user_msg = conversation_state["messages"][-1]
                 middle_msgs = conversation_state["messages"][1:-1]
 
-                # Take most recent middle messages
                 trimmed_middle = middle_msgs[-(new_limit - 2):] if len(middle_msgs) > (new_limit - 2) else middle_msgs
 
                 if system_msg:
@@ -2341,7 +2332,6 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
 **You can retry your request now.**""")
             else:
-                # Can't trim further - conversation too short but still overflowing
                 logger.error(f"❌ Cannot auto-recover: conversation already minimal ({current_msg_count} messages)")
                 error_msg = AIMessage(content=f"""❌ Context window overflow - this model is too small for your task.
 
@@ -2363,7 +2353,6 @@ This model cannot handle your current workload.""")
 
             return {"messages": conversation_state["messages"]}
 
-        # Re-raise if not context overflow
         raise
 
 
@@ -2375,8 +2364,6 @@ This model cannot handle your current workload.""")
             metrics["agent_times"].append((time.time(), duration))
 
         error_str = str(e)
-
-        # Handle Ollama-specific crash
 
         if "model runner has unexpectedly stopped" in error_str:
             logger.error("❌ Ollama model crashed - likely out of memory")
@@ -2399,7 +2386,6 @@ This model cannot handle your current workload.""")
             conversation_state["messages"].append(error_msg)
             return {"messages": conversation_state["messages"], "error": "ollama_crash"}
 
-        # Generic error handling
         logger.exception(f"❌ Unexpected error in agent execution")
         error_msg = AIMessage(content=f"An error occurred: {error_str}")
         conversation_state["messages"].append(error_msg)
