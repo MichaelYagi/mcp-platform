@@ -769,7 +769,7 @@ mcp_a2a/
 
 *More Examples:*
 ```
-> Using https://some_link_to_chicken_nachos as a source, ingest the information using rag_add_tool
+> Create a document using https://some_link_to_chicken_nachos as a source
 > Show RAG content for nachos
 > Ingest 3 items from Plex
 ```
