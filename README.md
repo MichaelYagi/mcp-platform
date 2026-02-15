@@ -768,7 +768,7 @@ mcp_a2a/
 ```
 > Open and read https://some_link_to_chicken_nachos and ingest the information using rag_add_tool
 > Use rag_search_tool to search for nachos
-> Ingest the next 3 items from Plex
+> Ingest the 3 items from Plex
 ```
 
 **How RAG works:**

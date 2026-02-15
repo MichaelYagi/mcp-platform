@@ -946,7 +946,8 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             context_info = ""
             for dep_id in task.dependencies:
                 if dep_id in previous_results:
-                    context_info += f"\n\nResult from {dep_id}:\n{previous_results[dep_id]}"
+                    context_info += f"\n\nOUTPUT FROM {dep_id} (use this data directly):\n{previous_results[dep_id]}\n"
+                    context_info += f"IMPORTANT: Extract any IDs, titles, or structured data from the above and use them in your tool calls. Do not invent new IDs.\n"
 
             # Create input for agent
             task_input = f"""Task: {task.description}

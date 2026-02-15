@@ -87,7 +87,7 @@ Show: {item['show_title']}
 Episode: {item['episode_title']}
 Season {item['season']}, Episode {item['episode_number']}
 Year: {item['year']}
-Summary: {item['summary']}
+Summary: {item.get('summary', '')}
 """.strip()
     else:
         genres = ", ".join(item.get('genres', []))
@@ -96,7 +96,7 @@ Title: {item['title']}
 Type: Movie
 Year: {item['year']}
 Genres: {genres}
-Summary: {item['summary']}
+Summary: {item.get('summary', '')}
 """.strip()
 
 def stream_subtitles(rating_key: str) -> Iterator[str]:
