@@ -769,7 +769,7 @@ mcp_a2a/
 
 *GitHub analysis:*
 ```
-> Analyze architecture of https://github.com/user/repo
+> Analyze architecture at https://github.com/user/repo
 ```
 
 *More Examples:*
