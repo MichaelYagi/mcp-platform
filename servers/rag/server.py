@@ -91,7 +91,7 @@ def rag_add_tool(text: str, source: str | None = None, chunk_size: int = 500) ->
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: float = 0.0) -> str:
+def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: float = 0.3) -> str:
     """
     Search the RAG database using semantic similarity with STOP SIGNAL support.
 

@@ -10,14 +10,14 @@ logger = logging.getLogger("mcp_server")
 embeddings_model = OllamaEmbeddings(model="bge-large")
 
 
-def rag_search(query: str, top_k: int = 5, min_score: float = 0.0) -> Dict[str, Any]:
+def rag_search(query: str, top_k: int = 5, min_score: float = 0.3) -> Dict[str, Any]:
     """
     Search the RAG database for relevant documents.
 
     Args:
         query: The search query
         top_k: Number of results to return (default: 5)
-        min_score: Minimum similarity score (default: 0.0)
+        min_score: Minimum similarity score (default: 0.3)
 
     Returns:
         Dictionary with search results
