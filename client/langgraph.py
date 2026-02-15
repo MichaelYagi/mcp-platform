@@ -1111,10 +1111,14 @@ def router(state):
 
     # If LLM just formatted tool results, don't re-route
     if isinstance(last_message, AIMessage):
+        # ── Check for research sentinel ──
+        if last_message.content == "__RESEARCH__":
+            logger.info("🔬 Router: Research sentinel detected → research node")
+            return "research"
+
         tool_calls = getattr(last_message, "tool_calls", [])
-        if tool_calls and len(tool_calls) > 0:
+        if tool_calls:
             return "tools"
-        # if no tool calls, it's a formatting pass - go to END
         return "continue"
 
     # Get user's original message
@@ -1563,6 +1567,29 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "stopped": True,
                 "current_model": get_model_name(base_llm)
             }
+
+        # detect research intent before calling LLM
+        user_message = None
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                user_message = msg.content
+                break
+        if user_message:
+            sources = extract_research_sources(user_message)
+            if sources:
+                logger.info(f"🔬 call_model: Research sources detected → delegating to research_node")
+                state["research_source"] = sources
+                # Return a sentinel AIMessage with no tool calls and no content
+                # so the router's "continue" path triggers research
+                return {
+                    "messages": [AIMessage(content="__RESEARCH__")],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": False,
+                    "stopped": False,
+                    "current_model": get_model_name(base_llm),
+                    "research_source": sources
+                }
 
         messages = state["messages"]
         from langchain_core.messages import ToolMessage
