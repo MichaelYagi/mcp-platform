@@ -1109,12 +1109,13 @@ def router(state):
             logger.info(f"🛑 Router: {last_message.name} result received - ending execution")
             return "continue"
 
-    # If LLM made tool calls, execute them
+    # If LLM just formatted tool results, don't re-route
     if isinstance(last_message, AIMessage):
         tool_calls = getattr(last_message, "tool_calls", [])
         if tool_calls and len(tool_calls) > 0:
-            logger.info(f"[LangGraph] 🎯 Router: Found {len(tool_calls)} tool calls - routing to TOOLS")
             return "tools"
+        # if no tool calls, it's a formatting pass - go to END
+        return "continue"
 
     # Get user's original message
     user_message = None
@@ -1979,6 +1980,15 @@ def create_langgraph_agent(llm_with_tools, tools):
             raise
 
     async def ingest_node(state: AgentState):
+        # Extract limit from user message
+        limit = 5  # default
+        for msg in reversed(state["messages"]):
+            if isinstance(msg, HumanMessage):
+                m = re.search(r'\b(\d+)\b', msg.content)
+                if m:
+                    limit = int(m.group(1))
+                break
+
         """Handle ingestion operations"""
         if is_stop_requested():
             logger.warning("🛑 ingest_node: Stop requested")
@@ -2011,7 +2021,42 @@ def create_langgraph_agent(llm_with_tools, tools):
         try:
             logger.info("[LangGraph] 📥 Starting ingest operation...")
             result = await ingest_tool.ainvoke({"limit": 5})
-            msg = AIMessage(content=f"Ingestion complete: {result}")
+
+            # Parse the TextContent result into readable summary
+            try:
+                import json
+                raw = result[0].text if isinstance(result, list) else result
+                data = json.loads(raw) if isinstance(raw, str) else raw
+
+                successful = data.get("successful_items", [])
+                failed = data.get("failed_items", [])
+                stats = data.get("stats", {})
+
+                lines = [
+                    f"✅ Ingested {data.get('successful', 0)}/{data.get('total_attempted', 0)} items "
+                    f"({data.get('duration', 0):.1f}s)",
+                    f"📊 Library: {stats.get('successfully_ingested', 0)} total ingested, "
+                    f"{stats.get('remaining_unprocessed', 0)} remaining",
+                ]
+                if successful:
+                    lines.append("\n✅ **Successful:**")
+                    for item in successful:
+                        lines.append(f"  • {item['title']} ({item.get('chunks', 0)} chunks)")
+                if failed:
+                    no_subs = [f['title'] for f in failed if 'subtitle' in f.get('reason', '').lower()]
+                    errors = [f for f in failed if 'subtitle' not in f.get('reason', '').lower()]
+                    if no_subs:
+                        lines.append(f"\n⚠️ **No subtitles** ({len(no_subs)}): {', '.join(no_subs[:5])}"
+                                     + (" ..." if len(no_subs) > 5 else ""))
+                    if errors:
+                        lines.append(f"\n❌ **Errors** ({len(errors)}):")
+                        for f in errors:
+                            lines.append(f"  • {f['title']}: {f['reason']}")
+
+                msg = AIMessage(content="\n".join(lines))
+            except Exception:
+                msg = AIMessage(content=f"Ingestion complete: {result}")
+
             return {
                 "messages": [msg],
                 "tools": state.get("tools", {}),
@@ -2113,6 +2158,37 @@ def create_langgraph_agent(llm_with_tools, tools):
                 if isinstance(result, list) and len(result) > 0:
                     if hasattr(result[0], 'text'):
                         result = result[0].text
+
+                # plain JSON string if it was TextContent
+                if tool_name in ("plex_ingest_batch", "plex_ingest_items"):
+                    try:
+                        data = json.loads(result) if isinstance(result, str) else result
+                        successful = data.get("successful_items", [])
+                        failed = data.get("failed_items", [])
+                        stats = data.get("stats", {})
+                        lines = [
+                            f"✅ Ingested {data.get('successful', 0)}/{data.get('total_attempted', 0)} items "
+                            f"({data.get('duration', 0):.1f}s)",
+                            f"📊 Library: {stats.get('successfully_ingested', 0)} total ingested, "
+                            f"{stats.get('remaining_unprocessed', 0)} remaining",
+                        ]
+                        if successful:
+                            lines.append("\nSuccessful:")
+                            for item in successful:
+                                lines.append(f"  • {item['title']} ({item.get('chunks', 0)} chunks)")
+                        if failed:
+                            no_subs = [f['title'] for f in failed if 'subtitle' in f.get('reason', '').lower()]
+                            errors = [f for f in failed if 'subtitle' not in f.get('reason', '').lower()]
+                            if no_subs:
+                                lines.append(f"\n⚠️ No subtitles ({len(no_subs)}): {', '.join(no_subs[:5])}"
+                                             + (" ..." if len(no_subs) > 5 else ""))
+                            if errors:
+                                lines.append(f"\n❌ Errors ({len(errors)}):")
+                                for f in errors:
+                                    lines.append(f"  • {f['title']}: {f['reason']}")
+                        result = "\n".join(lines)
+                    except Exception:
+                        pass
 
                 result_msg = ToolMessage(
                     content=str(result),

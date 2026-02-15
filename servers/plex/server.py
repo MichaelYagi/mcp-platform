@@ -370,7 +370,7 @@ async def plex_ingest_items(item_ids: str) -> str:
 
         # Process in parallel using existing parallelization
         # Note: ingest_batch_parallel_conservative should also check stop internally
-        results = await ingest_batch_parallel_conservative(media_items, target_success_count=5)
+        results = await ingest_batch_parallel_conservative(media_items, target_success_count=limit)
 
         duration = time.time() - start_time
 
