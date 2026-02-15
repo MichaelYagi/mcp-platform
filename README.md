@@ -47,6 +47,9 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Start Ollama server
 ollama serve
 
+# Model required for RAG ingestion
+ollama pull bge-large
+
 # Download a model (use 14B+ for best results)
 ollama pull qwen2.5:14b
 ```
