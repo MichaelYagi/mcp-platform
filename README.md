@@ -769,8 +769,8 @@ mcp_a2a/
 
 *More Examples:*
 ```
-> Open and read https://some_link_to_chicken_nachos and ingest the information using rag_add_tool
-> Use rag_search_tool to search for nachos
+> Using https://some_link_to_chicken_nachos as a source, ingest the information using rag_add_tool
+> Show RAG content for chicken
 > Ingest 3 items from Plex
 ```
 
