@@ -736,7 +736,7 @@ mcp_a2a/
 
 **Web Search (via LangSearch):**
 ```
-> Who won the 2024 NBA championship?
+> Who won the <current_year> NBA championship?
 > Latest AI developments
 ```
 
@@ -758,20 +758,26 @@ mcp_a2a/
 ```
 > Use the rag_search_tool to search for "quantum entanglement"
 > What do you have in the RAG about algorithm complexity?
-> Search the rag for information about superposition
+> Search the RAG for information about superposition
 ```
 
 *Checking RAG status:*
 ```
-> What's in the rag database?
-> Show rag stats
+> Use rag_list_sources_tool
+> Show RAG stats
+```
+
+*GitHub analysis:*
+```
+> Analyze architecture of https://github.com/user/repo
 ```
 
 *More Examples:*
 ```
 > Create a document using https://some_link_to_chicken_nachos as a source
-> Show RAG content for nachos
+> Search RAG for nachos
 > Ingest 3 items from Plex
+> Use rag_list_sources_tool to see what sources were used
 ```
 
 **How RAG works:**
