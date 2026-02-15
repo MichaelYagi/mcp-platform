@@ -764,6 +764,12 @@ mcp_a2a/
 > Show rag stats
 ```
 
+*More Examples:*
+```
+> Open and read https://some_link_to_chicken_nachos and ingest the information using rag_add_tool
+> Use rag_search_tool to search for nachos
+```
+
 **How RAG works:**
 - When you research topics using URLs, content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
 - URLs are deduplicated - the same page won't be stored twice
