@@ -1446,11 +1446,11 @@ Provide a structured summary under 1000 words:"""
 
         except asyncio.TimeoutError:
             logger.warning("⚠️ Summary timed out, using truncation")
-            summarized_content = combined_content[:2000] + "\n\n[Content truncated]"
+            summarized_content = combined_content[:1500] + "\n\n[Content truncated]"
 
         except Exception as e:
             logger.error(f"❌ Summary failed: {e}, using truncation")
-            summarized_content = combined_content[:2000] + "\n\n[Content truncated]"
+            summarized_content = combined_content[:1500] + "\n\n[Content truncated]"
 
         retry_prompt = f"""I have fetched and SUMMARIZED content from {success_count} sources.
 
