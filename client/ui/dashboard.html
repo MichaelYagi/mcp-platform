@@ -189,6 +189,13 @@
 
         .status-text { font-size: 0.9rem; color: var(--label-color); }
 
+        .status-note {
+            margin-left: auto;
+            font-size: 0.8rem;
+            color: var(--subtitle-color);
+            font-style: italic;
+        }
+
         .metrics-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1.5rem; margin-bottom: 2rem;
@@ -254,6 +261,7 @@
             .chart-container { padding: 1rem; }
             .chart-wrapper   { height: 200px; }
             .tools-grid      { grid-template-columns: 1fr; }
+            .status-note { display: none; }
         }
         @media (max-width: 480px) {
             #header h1   { font-size: 1rem; }
@@ -274,6 +282,7 @@
         <div class="status-bar">
             <div class="status-indicator" id="statusIndicator"></div>
             <div class="status-text" id="statusText">Connecting to metrics stream...</div>
+            <div class="status-note">ℹ️ Metrics reset on server restart</div>
         </div>
 
         <div class="metrics-grid">
