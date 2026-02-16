@@ -12,7 +12,7 @@ def get_commands_list():
     """Get list of available commands"""
     return [
         ":commands - List all available commands",
-        ":clear history - Clear all chat history",
+        ":clear sessions - Clear all chat history",
         ":clear session <id> - Clear session history",
         ":sessions - List all available sessions",
         ":stop - Stop current operation (ingestion, search, etc.)",
@@ -460,7 +460,7 @@ async def handle_command(
         return (True, f"✅ Switched to model: {new_model}\n💬 Chat history cleared", new_agent, new_model)
 
     # Clear history
-    if command == ":clear history":
+    if command == ":clear sessions":
         conversation_state["messages"] = []
         sessionmanager = SessionManager()
         sessionmanager.delete_all_sessions()
