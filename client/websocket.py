@@ -10,8 +10,6 @@ import os
 import socket
 import websockets
 
-from langchain_core.messages import HumanMessage
-
 from client.commands import handle_command, handle_a2a_commands
 from client.langgraph import create_langgraph_agent
 from client.stop_signal import request_stop
@@ -25,6 +23,7 @@ except ImportError:
 
 CONNECTED_WEBSOCKETS = set()
 SYSTEM_MONITOR_CLIENTS = set()
+IS_PROCESSING = False  # Module-level: True while any query is being processed
 
 
 async def broadcast_message(message_type, data):
@@ -40,6 +39,8 @@ async def broadcast_message(message_type, data):
 async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools,
                         session_manager=None, session_id=None, system_prompt=None):
     """Process a query in the background"""
+    global IS_PROCESSING
+    IS_PROCESSING = True
     try:
         print(f"\n> {original_prompt}")
         await broadcast_message("user_message", {"text": original_prompt})
@@ -49,7 +50,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             conversation_state["session_id"] = session_id
 
         # ═══════════════════════════════════════════════════════════════
-        # Intercept history questions for weaker models (7B)
+        # WORKAROUND: Intercept history questions for weaker models (7B)
         # Some models refuse to follow instructions even when correct
         # ═══════════════════════════════════════════════════════════════
         agent = agent_ref[0]
@@ -260,6 +261,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             "type": "complete",
             "stopped": False
         }))
+    finally:
+        IS_PROCESSING = False
 
 async def websocket_handler(websocket, agent_ref, tools, logger, conversation_state, run_agent_fn,
                             models_module, model_name, system_prompt, orchestrator=None,
@@ -476,6 +479,16 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
             if data.get("type") == "user" or "text" in data:
                 original_prompt = data.get("text")
                 prompt = original_prompt
+
+                # Block new prompts while a query is in flight (allow :stop through)
+                if IS_PROCESSING and original_prompt != ":stop":
+                    await websocket.send(json.dumps({
+                        "type": "assistant_message",
+                        "text": "\u23f3 A response is already being processed. Please wait, or send `:stop` to cancel.",
+                        "model": None
+                    }))
+                    await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                    continue
 
                 if data.get("session_id"):
                     current_session_id = data.get("session_id")
