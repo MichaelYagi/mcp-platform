@@ -37,6 +37,12 @@
             font-weight: 600;
         }
 
+        #headerLeft {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
         #topBar {
             display: flex;
             align-items: center;
@@ -124,7 +130,53 @@
             height: 38px;
         }
 
-        #logToggle, #monitorToggle, #dashboardBtn, #chatToggle {
+        /* Hamburger button */
+        #hamburgerBtn {
+            width: 38px;
+            height: 38px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 8px;
+            transition: background 0.2s;
+            flex-shrink: 0;
+        }
+
+        #hamburgerBtn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        #hamburgerBtn .bar {
+            display: block;
+            width: 18px;
+            height: 2px;
+            background: white;
+            border-radius: 2px;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+            transform-origin: center;
+        }
+
+        /* Animate bars into X when sidebar is open */
+        #hamburgerBtn.open .bar:nth-child(1) {
+            transform: translateY(7px) rotate(45deg);
+        }
+
+        #hamburgerBtn.open .bar:nth-child(2) {
+            opacity: 0;
+            transform: scaleX(0);
+        }
+
+        #hamburgerBtn.open .bar:nth-child(3) {
+            transform: translateY(-7px) rotate(-45deg);
+        }
+
+        #logToggle, #monitorToggle, #dashboardBtn {
             padding: 0.5rem 1rem;
             color: white;
             border: none;
@@ -138,14 +190,6 @@
             justify-content: center;
             text-decoration: none;
             line-height: 1;
-        }
-
-        #chatToggle {
-            background: #e67e22;
-        }
-
-        #chatToggle:hover {
-            background: #d35400;
         }
 
         #logToggle {
@@ -1129,6 +1173,10 @@
                 align-items: stretch;
             }
 
+            #headerLeft {
+                justify-content: center;
+            }
+
             #header h1 {
                 font-size: 1.1rem;
                 text-align: center;
@@ -1143,6 +1191,11 @@
             #topBar button {
                 font-size: 0.85rem;
                 padding: 0.5rem 0.75rem;
+            }
+
+            #hamburgerBtn {
+                width: 44px;
+                height: 44px;
             }
 
             #modelSelect {
@@ -1249,13 +1302,19 @@
 </head>
 <body>
     <div id="header">
-        <h1>Model Context Protocol Client</h1>
+        <div id="headerLeft">
+            <button id="hamburgerBtn" onclick="toggleSessionsSidebar()" title="Chats" aria-label="Toggle chat sessions">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </button>
+            <h1>Model Context Protocol Client</h1>
+        </div>
         <div id="topBar">
             <label for="modelSelect" id="modelSelectLabel" style="color: white;">Model:</label>
             <select id="modelSelect">
                 <option value="llama3.1:8b">Llama 3.1 8B</option>
             </select>
-            <button id="chatToggle" onclick="toggleSessionsSidebar()">💬 Chats</button>
             <button id="monitorToggle" onclick="toggleSystemMonitor()">📊 System</button>
             <button id="logToggle" onclick="toggleLogPanel()">📋 Logs</button>
             <a href="./dashboard.html" id="dashboardBtn">📈 Dashboard</a>
@@ -1412,15 +1471,15 @@
         function toggleSessionsSidebar() {
             sessionsSidebarOpen = !sessionsSidebarOpen;
             const sidebar = document.getElementById('sessionsSidebar');
-            const button = document.getElementById('chatToggle');
+            const btn = document.getElementById('hamburgerBtn');
 
             if (sessionsSidebarOpen) {
                 sidebar.classList.add('open');
-                button.textContent = '✖ Chats';
+                btn.classList.add('open');
                 loadSessions();
             } else {
                 sidebar.classList.remove('open');
-                button.textContent = '💬 Chats';
+                btn.classList.remove('open');
                 openMenuSessionId = null;
                 editingSessionId = null;
             }
