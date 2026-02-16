@@ -23,7 +23,6 @@ def get_commands_list():
         ":model - List all available models (Ollama + GGUF)",
         ":model <model> - Switch to model (auto-detects backend)",
         ":models - List available models (legacy)",
-        ":sync - Sync agent to model in last_model.txt",
         ":gguf add <path> - Register a GGUF model",
         ":gguf remove <alias> - Remove a GGUF model",
         ":gguf list - List registered GGUF models",

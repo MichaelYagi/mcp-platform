@@ -208,7 +208,6 @@ These work in both CLI and web UI:
 :model                 - List all available models
 :model <name>          - Switch to a model (auto-detects backend)
 :models                - List models (legacy)
-:sync                  - Sync to model in last_model.txt
 :gguf add <path>       - Register a GGUF model
 :gguf remove <alias>   - Remove a GGUF model
 :gguf list             - List registered GGUF models
