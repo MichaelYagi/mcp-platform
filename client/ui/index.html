@@ -486,6 +486,27 @@
             border: 1px solid rgba(255,255,255,0.25);
         }
 
+        /* Dropdown swatches use same colors as button swatches */
+        .theme-option[data-theme="default"] .theme-opt-swatch:nth-child(1) { background: #2c3e50; }
+        .theme-option[data-theme="default"] .theme-opt-swatch:nth-child(2) { background: #3498db; }
+        .theme-option[data-theme="default"] .theme-opt-swatch:nth-child(3) { background: #27ae60; }
+
+        .theme-option[data-theme="midnight"] .theme-opt-swatch:nth-child(1) { background: #0d1117; }
+        .theme-option[data-theme="midnight"] .theme-opt-swatch:nth-child(2) { background: #00b4d8; }
+        .theme-option[data-theme="midnight"] .theme-opt-swatch:nth-child(3) { background: #0f7a4e; }
+
+        .theme-option[data-theme="forest"] .theme-opt-swatch:nth-child(1) { background: #1a2e1a; }
+        .theme-option[data-theme="forest"] .theme-opt-swatch:nth-child(2) { background: #52b788; }
+        .theme-option[data-theme="forest"] .theme-opt-swatch:nth-child(3) { background: #00693E; }
+
+        .theme-option[data-theme="crimson"] .theme-opt-swatch:nth-child(1) { background: #1c1c1e; }
+        .theme-option[data-theme="crimson"] .theme-opt-swatch:nth-child(2) { background: #e63946; }
+        .theme-option[data-theme="crimson"] .theme-opt-swatch:nth-child(3) { background: #6a0572; }
+
+        .theme-option[data-theme="optimus"] .theme-opt-swatch:nth-child(1) { background: #0047AB; }
+        .theme-option[data-theme="optimus"] .theme-opt-swatch:nth-child(2) { background: #D92121; }
+        .theme-option[data-theme="optimus"] .theme-opt-swatch:nth-child(3) { background: #ffcc00; }
+
         /* checkmark for active theme */
         .theme-option .check {
             margin-left: auto;
@@ -942,7 +963,7 @@
                 top: 0; left: 0; right: 0; bottom: 0;
                 height: 100%; z-index: 1000; border-right: none;
             }
-            #statusRow { margin-bottom: 4rem; }
+            #statusRow { margin-bottom: 3.5rem; }
             .sessions-header { padding: 0.75rem 1rem; }
             .sessions-header h2 { font-size: 0.95rem; }
             .session-close-btn { display: block; padding: 0.3rem 0.6rem; font-size: 0.75rem; min-height: 44px; }
@@ -1017,45 +1038,45 @@
                     <div id="themeDropdown">
                         <div class="theme-option" data-theme="default" onclick="applyTheme('default')">
                             <div class="theme-option-swatches">
-                                <div class="theme-opt-swatch" style="background:#2c3e50"></div>
-                                <div class="theme-opt-swatch" style="background:#3498db"></div>
-                                <div class="theme-opt-swatch" style="background:#27ae60"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
                             </div>
                             Default
                             <span class="check">✓</span>
                         </div>
                         <div class="theme-option" data-theme="midnight" onclick="applyTheme('midnight')">
                             <div class="theme-option-swatches">
-                                <div class="theme-opt-swatch" style="background:#0d1117"></div>
-                                <div class="theme-opt-swatch" style="background:#00b4d8"></div>
-                                <div class="theme-opt-swatch" style="background:#0f7a4e"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
                             </div>
                             Midnight
                             <span class="check">✓</span>
                         </div>
                         <div class="theme-option" data-theme="forest" onclick="applyTheme('forest')">
                             <div class="theme-option-swatches">
-                                <div class="theme-opt-swatch" style="background:#1a2e1a"></div>
-                                <div class="theme-opt-swatch" style="background:#52b788"></div>
-                                <div class="theme-opt-swatch" style="background:#00693E"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
                             </div>
                             Forest
                             <span class="check">✓</span>
                         </div>
                         <div class="theme-option" data-theme="crimson" onclick="applyTheme('crimson')">
                             <div class="theme-option-swatches">
-                                <div class="theme-opt-swatch" style="background:#1c1c1e"></div>
-                                <div class="theme-opt-swatch" style="background:#e63946"></div>
-                                <div class="theme-opt-swatch" style="background:#6a0572"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
                             </div>
                             Crimson
                             <span class="check">✓</span>
                         </div>
                         <div class="theme-option" data-theme="optimus" onclick="applyTheme('optimus')">
                             <div class="theme-option-swatches">
-                                <div class="theme-opt-swatch" style="background:#0047AB"></div>
-                                <div class="theme-opt-swatch" style="background:#D92121"></div>
-                                <div class="theme-opt-swatch" style="background:#ffcc00"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
+                                <div class="theme-opt-swatch"></div>
                             </div>
                             Optimus Prime
                             <span class="check">✓</span>
