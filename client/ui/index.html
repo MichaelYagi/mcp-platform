@@ -1910,13 +1910,62 @@
             if (data.type === "models_list") {
                 const select = document.getElementById("modelSelect");
                 select.innerHTML = "";
-                data.all_models.forEach(modelData => {
+
+                // Separate and sort
+                const ollamaModels = data.all_models
+                    .filter(m => m.backend !== "gguf")
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                const ggufModels = data.all_models
+                    .filter(m => m.backend === "gguf")
+                    .sort((a, b) => a.name.localeCompare(b.name));
+
+                // Build all option labels first so we can measure the longest
+                const ollamaLabels = ollamaModels.map(m => m.name);
+                const ggufLabels = ggufModels.map(m =>
+                    `${m.name} [GGUF ${(m.size_mb / 1024).toFixed(1)} GB]`
+                );
+
+                const allLabels = [...ollamaLabels, ...ggufLabels];
+
+                // Determine the longest label length
+                const longest = allLabels.reduce((a, b) => (b.length > a ? b.length : a), 0);
+
+                // Separator width = 70% of longest label
+                const sepLength = Math.max(10, Math.floor(longest * 0.7));
+                const separatorText = "─".repeat(sepLength);
+
+                // Add Ollama models
+                ollamaModels.forEach(modelData => {
                     const opt = document.createElement("option");
                     opt.value = modelData.name;
-                    const sizeInfo = modelData.backend === 'gguf' ? ` ${(modelData.size_mb / 1024).toFixed(1)} GB` : '';
-                    opt.textContent = modelData.name + (modelData.backend === 'gguf' ? ` [GGUF ${sizeInfo}]` : '');
+                    opt.textContent = modelData.name;
                     select.appendChild(opt);
                 });
+
+                // Add separator only if both groups exist
+                if (ollamaModels.length > 0 && ggufModels.length > 0) {
+                    const sep = document.createElement("option");
+                    sep.disabled = true;
+                    sep.value = "";
+                    sep.textContent = separatorText;
+                    sep.style.color = "#888";
+                    sep.style.fontStyle = "italic";
+                    select.appendChild(sep);
+                }
+
+                // Add GGUF models
+                ggufModels.forEach(modelData => {
+                    const opt = document.createElement("option");
+                    opt.value = modelData.name;
+
+                    const sizeInfo = ` ${(modelData.size_mb / 1024).toFixed(1)} GB`;
+                    opt.textContent = `${modelData.name} [GGUF ${sizeInfo}]`;
+
+                    select.appendChild(opt);
+                });
+
+                // Restore last used model
                 if (data.last_used && data.all_models.some(m => m.name === data.last_used)) {
                     select.value = data.last_used;
                     if (!isProcessing) updateStatusWithMode();
