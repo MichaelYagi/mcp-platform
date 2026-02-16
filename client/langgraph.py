@@ -234,7 +234,9 @@ INTENT_PATTERNS = {
     "time": {
         "pattern": (
             r'\bwhat\s+time\b'
+            r'\bwhat\s+date\b'
             r'|\bcurrent\s+time\b'
+            r'|\bcurrent\s+date\b'
             r'|\btime\s+now\b'
             r'|\btime\s+is\s+it\b'
         ),
