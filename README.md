@@ -570,6 +570,14 @@ mcp_a2a/
 > Analyze architecture at https://github.com/user/repo
 ```
 
+*More Examples:*
+```
+> Create a document using https://some_link_to_chicken_nachos as a source
+> Search RAG for nachos
+> Ingest 3 items from Plex
+> Use rag_list_sources_tool to see what sources were used
+```
+
 **How RAG works:**
 - Content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
 - URLs are deduplicated — the same page won't be stored twice
