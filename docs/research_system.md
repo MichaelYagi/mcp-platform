@@ -32,9 +32,9 @@ The 4-Tier Research System is an intelligent source-based research framework tha
 └─────────────────────────────────────────────────────────────────┘
                     ↓ IF NO URLS CONFIGURED
 ┌─────────────────────────────────────────────────────────────────┐
-│ TIER 2B: LANGSEARCH FALLBACK (Okay - Dynamic Discovery)         │
+│ TIER 2B: OLLAMA SEARCH FALLBACK (Okay - Dynamic Discovery)      │
 ├─────────────────────────────────────────────────────────────────┤
-│ • Uses LangSearch to find URLs on the source                    │
+│ • Uses Ollama Search to find URLs on the source                 │
 │ • Fetches discovered pages                                      │
 │ • Time: ~8 seconds                                              │
 │ • Quality: * * * (Depends on search results)                    │
@@ -233,7 +233,7 @@ in computer science that develops and studies intelligent machines...
 
 ### Advantages
 - ✅ **Real Content**: Actual current webpage text
-- ✅ **No Search Dependency**: Doesn't require LangSearch
+- ✅ **No Search Dependency**: Doesn't require Ollama Search
 - ✅ **Reliable**: Pre-tested URLs
 - ✅ **Fast**: ~5 seconds for 3 pages
 - ✅ **Multiple Pages**: Can aggregate information
@@ -255,10 +255,10 @@ The `HTMLTextExtractor` class:
 
 ---
 
-## Tier 2B: LangSearch Fallback (Okay)
+## Tier 2B: Ollama Search Fallback (Okay)
 
 ### Overview
-When no pre-configured URLs exist, uses LangSearch to dynamically discover relevant pages on the source, then fetches them.
+When no pre-configured URLs exist, uses Ollama Search to dynamically discover relevant pages on the source, then fetches them.
 
 ### When Used
 No native tool exists AND no URLs in `DIRECT_SOURCE_URLS`.
@@ -267,7 +267,7 @@ No native tool exists AND no URLs in `DIRECT_SOURCE_URLS`.
 
 ```mermaid
 graph LR
-    A[No Direct URLs] --> B[Call LangSearch]
+    A[No Direct URLs] --> B[Call Ollama Search]
     B --> C[Search: 'source query']
     C --> D[Extract URLs from Results]
     D --> E{URLs Found?}
@@ -278,7 +278,7 @@ graph LR
 ```
 
 1. **Search Construction**: Builds query: `"[source] [user_query]"`
-2. **LangSearch Call**: Sends to LangSearch API
+2. **Ollama Search Call**: Sends to Ollama Search API
 3. **URL Extraction**: Parses organic results for URLs
 4. **URL Filtering**: Keeps only URLs matching the source domain
 5. **Fetch**: Downloads top 3 URLs
@@ -296,9 +296,9 @@ graph LR
 ```
 1. TIER 1: No reddit_search tool found ✗
 2. TIER 2: No direct URLs for reddit.com ✗
-3. TIER 2B: LangSearch fallback
+3. TIER 2B: Ollama Search fallback
 4. Search: "reddit.com what do people think about Python 3.13"
-5. LangSearch returns 10 results
+5. Ollama Search returns 10 results
 6. Extract URLs matching "reddit.com":
    → https://www.reddit.com/r/Python/comments/.../python_313_released
    → https://www.reddit.com/r/programming/comments/.../thoughts_on_py313
@@ -311,7 +311,7 @@ graph LR
 **Output:**
 ```
 ⚠️ TIER 2: No direct URLs configured
-✅ TIER 2B: LangSearch fallback succeeded
+✅ TIER 2B: Ollama Search fallback succeeded
 Search query: "reddit.com Python 3.13"
 URLs found: 8
 URLs fetched: 3
@@ -330,31 +330,33 @@ notes that "the new JIT compiler is impressive"...
 
 ### Disadvantages
 - ⚠️ **Slower**: ~8 seconds (search + fetches)
-- ⚠️ **Search Dependency**: Requires LangSearch API
+- ⚠️ **Search Dependency**: Requires Ollama API key (`OLLAMA_TOKEN`)
 - ⚠️ **Quality Variance**: Depends on search result relevance
 - ⚠️ **May Miss Content**: Search might not find best pages
 
-### LangSearch Integration
+### Ollama Search Integration
 
 ```python
 # Search query construction
 search_query = f"{source} {query}"
 
 # Example: "reddit.com Python 3.13"
-search_result = await langsearch.search(search_query)
+search_result = await search_client.search(search_query)
 
 # Expected response format
 {
     "success": True,
     "results": {
-        "organic": [
-            {
-                "url": "https://www.reddit.com/r/Python/...",
-                "title": "Python 3.13 Released!",
-                "snippet": "The community is excited..."
-            },
-            # ... more results
-        ]
+        "webPages": {
+            "value": [
+                {
+                    "url": "https://www.reddit.com/r/Python/...",
+                    "name": "Python 3.13 Released!",
+                    "summary": "The community is excited..."
+                },
+                # ... more results
+            ]
+        }
     }
 }
 ```
@@ -370,7 +372,7 @@ When all content retrieval methods fail, falls back to the LLM's training knowle
 All previous tiers have failed:
 - No native tool exists
 - No direct URLs configured
-- LangSearch found no results OR
+- Ollama Search found no results OR
 - All fetched URLs failed
 
 ### How It Works
@@ -535,7 +537,7 @@ LLM Synthesis: "According to [SOURCE 1], quantum computing is..."
 
 ---
 
-### Example 3: LangSearch Fallback (Tier 2B)
+### Example 3: Ollama Search Fallback (Tier 2B)
 
 **Query:** `"using reddit.com as a source, best Python IDE?"`
 
@@ -551,7 +553,7 @@ TIER 2: Check Direct URLs
     ↓
 ✗ No URLs configured for reddit
     ↓
-TIER 2B: LangSearch
+TIER 2B: Ollama Search
     ↓
 Search: "reddit.com best Python IDE"
     ↓
@@ -566,7 +568,7 @@ LLM Synthesis: "Based on Reddit discussions, the community prefers..."
 ✅ SUCCESS (8.2s)
 ```
 
-**Why Tier 2B?** No tool, no URLs, but LangSearch found content.
+**Why Tier 2B?** No tool, no URLs, but Ollama Search found content.
 
 ---
 
@@ -586,7 +588,7 @@ TIER 2: Check Direct URLs
     ↓
 ✗ No URLs configured
     ↓
-TIER 2B: LangSearch
+TIER 2B: Ollama Search
     ↓
 ✗ No results found
     ↓
@@ -645,18 +647,18 @@ DIRECT_SOURCE_URLS = {
 "using nature.com as a source, latest AI research?"
 ```
 
-### Configuring LangSearch (Tier 2B)
+### Configuring Ollama Search (Tier 2B)
 
-1. **Set `LANGSEARCH_TOKEN` in `.env`**:
+1. **Set `OLLAMA_TOKEN` in `.env`**:
 ```bash
-LANGSEARCH_TOKEN=your_token_here
+OLLAMA_TOKEN=your_token_here
 ```
 
 2. **Verify availability**:
 ```python
-from langsearch_client import get_langsearch_client
-langsearch = get_langsearch_client()
-print(langsearch.is_available())  # Should be True
+from search_client import get_search_client
+search_client = get_search_client()
+print(search_client.is_available())  # Should be True
 ```
 
 ---
@@ -667,7 +669,7 @@ print(langsearch.is_available())  # Should be True
 |------|----------|--------------|---------|----------|
 | 1: Tools | 2s | 99% | ⭐⭐⭐⭐⭐ | Internal sources, APIs |
 | 2: Direct | 5s | 95% | ⭐⭐⭐⭐ | Known public sources |
-| 2B: LangSearch | 8s | 80% | ⭐⭐⭐ | Dynamic discovery |
+| 2B: Ollama Search | 8s | 80% | ⭐⭐⭐ | Dynamic discovery |
 | 3: LLM | 3s | 100% | ⭐⭐ | Fallback only |
 
 ---
@@ -704,20 +706,20 @@ print(langsearch.is_available())  # Should be True
 
 ### "No direct URLs" (Tier 2 Skip)
 
-**Symptom:** System falls to Tier 2B (LangSearch)
+**Symptom:** System falls to Tier 2B (Ollama Search)
 
 **Solution:**
 - Add URLs to `DIRECT_SOURCE_URLS`
 - Ensure source name matches (case-insensitive)
 
-### "LangSearch not available" (Tier 2B Fail)
+### "Ollama Search not available" (Tier 2B Fail)
 
 **Symptom:** System falls directly to Tier 3
 
 **Solution:**
-- Check `LANGSEARCH_TOKEN` in `.env`
-- Verify LangSearch service is running
-- Test: `langsearch.is_available()`
+- Check `OLLAMA_TOKEN` in `.env`
+- Verify your Ollama API key is valid
+- Test: `search_client.is_available()`
 
 ### "Network error" (All Tiers Fail to Tier 3)
 
@@ -776,9 +778,9 @@ async def search_and_fetch_source(source: str, query: str) -> dict:
     #     "success": True,
     #     "content": str,  # Combined content from all pages
     #     "urls_fetched": int,
-    #     "method": str  # "direct" or "langsearch"
+    #     "method": str  # "direct" or "ollama_search"
     # }
-    # 
+    #
     # Returns on failure:
     # {
     #     "success": False,

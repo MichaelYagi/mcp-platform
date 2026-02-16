@@ -32,8 +32,8 @@ def get_env_display() -> Dict[str, Any]:
             "A2A_ENDPOINTS": os.getenv("A2A_ENDPOINTS") or "(not set)",
             "A2A_EXPOSED_TOOLS": os.getenv("A2A_EXPOSED_TOOLS") or "(not set)"
         },
-        "langsearch": {
-            "LANGSEARCH_TOKEN": mask_token(os.getenv("LANGSEARCH_TOKEN"))
+        "ollama": {
+            "OLLAMA_TOKEN": mask_token(os.getenv("OLLAMA_TOKEN"))
         },
         "agent": {
             "MAX_MESSAGE_HISTORY": os.getenv("MAX_MESSAGE_HISTORY") or "20"
@@ -75,9 +75,9 @@ def format_env_display() -> str:
     output.append(f"   A2A_ENDPOINTS: {env_vars['a2a']['A2A_ENDPOINTS']}")
     output.append(f"   A2A_EXPOSED_TOOLS: {env_vars['a2a']['A2A_EXPOSED_TOOLS']}")
 
-    # LangSearch
-    output.append("\n🔍 LangSearch Web Search:")
-    output.append(f"   LANGSEARCH_TOKEN: {env_vars['langsearch']['LANGSEARCH_TOKEN']}")
+    # Search CLIENT
+    output.append("\n🔍 Search Client Web Search:")
+    output.append(f"   OLLAMA_TOKEN: {env_vars['ollama']['OLLAMA_TOKEN']}")
 
     # Agent Config
     output.append("\n🤖 Agent Configuration:")

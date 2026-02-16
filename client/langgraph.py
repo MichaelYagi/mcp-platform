@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from tools.rag.rag_vector_db import should_refresh_source
 from .stop_signal import is_stop_requested, clear_stop
-from .langsearch_client import get_langsearch_client
+from .search_client import get_search_client
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
@@ -149,46 +149,46 @@ INTENT_PATTERNS = {
             r'|\bscan.*project\b'
             r'|\bshow.*structure\b'
             r'|\blist.*dependencies\b'
-            
-            # Node.js/Package queries - UPDATED TO CATCH MORE
+
+            # Node.js/Package queries
             r'|\bnode\.?js\s+(packages?|dependencies|modules)\b'
             r'|\bnpm\s+(packages?|dependencies|modules)\b'
             r'|\bpackage\.json\b'
             r'|\bnode\s+(packages?|dependencies|modules)\b'
-            r'|\b(about|more|explain).*node\.?js\s+(packages?|dependencies)\b'  # ← ADD THIS
-            r'|\btell.*about.*(node|packages?|dependencies)\b'  # ← ADD THIS
-            r'|\bmore.*about.*(node|packages?|dependencies)\b'  # ← ADD THIS
-            
+            r'|\b(about|more|explain).*node\.?js\s+(packages?|dependencies)\b'
+            r'|\btell.*about.*(node|packages?|dependencies)\b'
+            r'|\bmore.*about.*(node|packages?|dependencies)\b'
+
             # "go into depth" style questions
             r'|\bgo\s+into\s+(depth|detail)\b'
             r'|\bmore\s+detail.*about.*(packages?|dependencies|modules)\b'
             r'|\bin[\s-]?depth.*about.*(packages?|dependencies|modules)\b'
             r'|\belaborate.*on.*(packages?|dependencies|modules)\b'
             r'|\bexpand.*on.*(packages?|dependencies|modules)\b'
-            
+
             # Generic package questions
             r'|\bwhat.*(do|are).*(packages?|dependencies|modules)\b'
             r'|\bexplain.*(packages?|dependencies|modules)\b'
             r'|\bwhat.*do\s+they\s+do\b'
             r'|\bwhat.*are\s+(they|those)\s+(for|used\s+for)\b'
-            r'|\bwhat.*they.*used\s+for\b'  # ← ADD THIS
-            
+            r'|\bwhat.*they.*used\s+for\b'
+
             # Code analysis
             r'|\banalyze.*code\b'
             r'|\bcheck.*code\b'
             r'|\breview.*code\b'
             r'|\blint\b'
-            
+
             # File extensions
             r'|\banalyze.*\.(py|js|jsx|ts|tsx|rs|go|java|kt)\b'
             r'|\bcheck.*\.(py|js|jsx|ts|tsx|rs|go|java|kt)\b'
-            
+
             # Bug fixing
             r'|\bfix.*bug\b'
             r'|\bfix.*error\b'
             r'|\bfix.*issue\b'
             r'|\bfix.*code\b'
-            
+
             # Code generation
             r'|\bgenerate.*code\b'
             r'|\bcreate.*(function|class|module|component)\b'
@@ -289,7 +289,7 @@ INTENT_PATTERNS = {
             r'|\brag\s+(status|contents?|info|summary|overview|report|stats)\b'
             r'|\bwhat(\'s| is)\s+in\s+(the\s+)?rag\b'
             r'|\bgive\s+me\s+rag\s+(stats|status|info|details)\b'
-    
+
             # Search queries
             r'|\bsearch\s+(the\s+)?rag\b'
             r'|\bfind\s+in\s+rag\b'
@@ -298,7 +298,7 @@ INTENT_PATTERNS = {
             r'|\bquery\s+(the\s+)?rag\b'
             r'|\bdo\s+you\s+have\s+.*\s+in\s+rag\b'
             r'|\bwhat\s+do\s+you\s+have\s+(about|on)\b'
-    
+
             # Browse/list queries
             r'|\bbrowse\s+(the\s+)?rag\b'
             r'|\bshow\s+rag\s+(content|documents|entries|sources)\b'
@@ -306,7 +306,7 @@ INTENT_PATTERNS = {
             r'|\bwhat\s+sources\s+.*(in\s+)?rag\b'
             r'|\brag_list_sources\b'
             r'|\brag_browse\b'
-    
+
             # General RAG references
             r'|\brag\s+(database|storage|data)\b'
         ),
@@ -532,12 +532,13 @@ def extract_research_sources(content: str) -> list:
     unique_sources = []
     seen = set()
     for s in sources:
-        s = s.strip()  # Extra safety
+        s = s.strip()
         if s and s not in seen:
             unique_sources.append(s)
             seen.add(s)
 
     return unique_sources if unique_sources else None
+
 
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
@@ -586,31 +587,20 @@ class HTMLTextExtractor(HTMLParser):
 
 def fetch_url_content_sync(url: str, timeout: int = 30) -> dict:
     try:
-        # ✅ Comprehensive URL encoding for special characters
         from urllib.parse import urlparse, quote, urlunparse
 
-        # Parse the URL into components
         parsed = urlparse(url)
-
-        # Encode the path component (handles all special chars)
-        # safe='/' keeps slashes as path separators
-        # Everything else gets encoded: parentheses, spaces, quotes, etc.
         encoded_path = quote(parsed.path, safe='/')
-
-        # Encode query string if present
         encoded_query = quote(parsed.query, safe='&=') if parsed.query else ''
-
-        # Encode fragment if present
         encoded_fragment = quote(parsed.fragment, safe='') if parsed.fragment else ''
 
-        # Reconstruct the full URL with encoded parts
         encoded_url = urlunparse((
-            parsed.scheme,  # http/https - no encoding needed
-            parsed.netloc,  # domain - no encoding needed
-            encoded_path,  # path - encoded
-            parsed.params,  # params - usually empty
-            encoded_query,  # query string - encoded
-            encoded_fragment  # fragment - encoded
+            parsed.scheme,
+            parsed.netloc,
+            encoded_path,
+            parsed.params,
+            encoded_query,
+            encoded_fragment
         ))
 
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
@@ -653,7 +643,7 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
        a. If homepage → Auto-search site for relevant pages
        b. If specific page → Fetch that page
     2. If source is a domain → Try direct URLs
-    3. If no direct URLs → Try LangSearch
+    3. If no direct URLs → Try Ollama Search
     4. Store all fetched content in RAG
     5. Always return something
     """
@@ -673,9 +663,6 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
                 logger.warning("⚠️ Skipping RAG storage: empty content")
                 return False
 
-            # ═══════════════════════════════════════════════════════════
-            # CHECK IF URL ALREADY EXISTS IN RAG
-            # ═══════════════════════════════════════════════════════════
             source_url = metadata.get("url", "")
             if source_url:
                 if not should_refresh_source(source_url, max_age_days=30):
@@ -720,7 +707,7 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
         # ═══════════════════════════════════════════════════════════
         is_homepage = (
                 path in ['/', '', '/en/', '/en', '/index.html', '/index.php'] or
-                path.count('/') <= 1  # Only domain + maybe one level
+                path.count('/') <= 1
         )
 
         if is_homepage:
@@ -742,8 +729,8 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
             logger.info(f"🔍 Site search: {search_query}")
 
             try:
-                langsearch = get_langsearch_client()
-                search_result = await langsearch.search(search_query)
+                search = get_search_client()
+                search_result = await search.search(search_query)
 
                 if search_result.get("success"):
                     data = search_result.get("results", {})
@@ -786,18 +773,16 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
                                             "title": item['title'],
                                             "domain": domain,
                                             "query": cleaned_query,
-                                            "fetch_method": "langsearch_summary",
+                                            "fetch_method": "ollama_search_summary",
                                             "timestamp": time.time()
                                         }
                                     )
                                     storage_tasks.append(task)
 
-                                # Store all in parallel
                                 results = await asyncio.gather(*storage_tasks, return_exceptions=True)
                                 stored_count = sum(1 for r in results if r is True)
                                 logger.info(f"✅ Stored {stored_count}/{len(top_summaries)} summaries in RAG")
 
-                            # Build combined content from summaries
                             combined_content = []
                             for i, item in enumerate(top_summaries, 1):
                                 logger.info(f"   {i}. {item['title']}")
@@ -817,7 +802,7 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
                                 "success": True,
                                 "content": "\n".join(combined_content) + note,
                                 "urls_fetched": len(top_summaries),
-                                "method": "langsearch_summaries",
+                                "method": "ollama_search_summaries",
                                 "stored_in_rag": True,
                                 "rag_entries": stored_count
                             }
@@ -839,7 +824,6 @@ async def search_and_fetch_source(source: str, query: str, rag_add_tool=None) ->
                 content = result.get("content", "")
                 title = result.get("title", "Untitled")
 
-                # Store homepage in RAG
                 await store_in_rag(
                     content=content,
                     metadata={
@@ -900,7 +884,6 @@ URL: {source}
                 content = result.get("content", "")
                 title = result.get("title", "Untitled")
 
-                # Store specific page in RAG
                 await store_in_rag(
                     content=content,
                     metadata={
@@ -945,7 +928,7 @@ URL: {source}
                 return {"success": False, "error": f"Invalid URL: {source}"}
 
     # ═══════════════════════════════════════════════════════════════
-    # REST OF EXISTING CODE (Direct access, LangSearch fallback)
+    # REST OF EXISTING CODE (Direct access, Ollama Search fallback)
     # ═══════════════════════════════════════════════════════════════
 
     # Try direct access (pre-configured URLs)
@@ -955,24 +938,24 @@ URL: {source}
         urls = direct_result.get("urls", [])
         logger.info(f"✅ Got {len(urls)} URLs via direct access")
     else:
-        # Fall back to LangSearch
-        logger.info(f"⚠️ No direct URLs, trying LangSearch")
-        langsearch = get_langsearch_client()
+        # Fall back to Ollama Search
+        logger.info(f"⚠️ No direct URLs, trying Ollama Search")
+        search = get_search_client()
 
-        if not langsearch.is_available():
-            return {"success": False, "error": "No direct URLs and LangSearch unavailable"}
+        if not search.is_available():
+            return {"success": False, "error": "No direct URLs and Ollama Search unavailable"}
 
         search_query = f"{source} {query}"
-        logger.info(f"🔍 LangSearch query: {search_query[:100]}...")
+        logger.info(f"🔍 Ollama Search query: {search_query[:100]}...")
 
-        search_result = await langsearch.search(search_query)
+        search_result = await search.search(search_query)
 
         if not search_result.get("success"):
-            return {"success": False, "error": "LangSearch failed"}
+            return {"success": False, "error": "Ollama Search failed"}
 
         results_data = search_result.get("results")
 
-        # Try to extract URLs from the LangSearch response
+        # Try to extract URLs from the search response
         urls = []
 
         # Method 1: If results_data is a dict with structured data
@@ -1002,21 +985,18 @@ URL: {source}
 
         # Method 2: Extract URLs via regex from string representation
         if not urls:
-            # Convert to string and extract all URLs
             results_str = str(results_data)
-            # More robust regex that handles URLs in JSON
             url_pattern = r'(?:url["\']?\s*[:=]\s*["\']?)?(https?://[^\s\'">\)]+)'
             matches = re.findall(url_pattern, results_str, re.IGNORECASE)
 
-            # Filter out duplicates and clean
             seen = set()
             for match in matches:
-                url = match.strip('",}]')  # Clean trailing JSON chars
+                url = match.strip('",}]')
                 if url and url not in seen and url.startswith('http'):
                     urls.append(url)
                     seen.add(url)
 
-        logger.info(f"📋 LangSearch found {len(urls)} URLs")
+        logger.info(f"📋 Ollama Search found {len(urls)} URLs")
 
         if not urls:
             return {"success": False, "error": "No URLs found"}
@@ -1039,7 +1019,6 @@ URL: {source}
             title = result.get("title", "Untitled")
             content = result.get("content", "")
 
-            # Store each fetched page in RAG
             await store_in_rag(
                 content=content,
                 metadata={
@@ -1077,10 +1056,11 @@ URL: {url}
         "success": True,
         "content": "\n".join(combined_content),
         "urls_fetched": len(combined_content),
-        "method": "direct" if direct_result.get("success") else "langsearch",
+        "method": "direct" if direct_result.get("success") else "ollama_search",
         "stored_in_rag": stored_count > 0,
         "rag_entries": stored_count
     }
+
 
 def router(state):
     """
@@ -1201,13 +1181,9 @@ async def rag_node(state):
         return {"messages": [msg], "llm": state.get("llm")}
 
     try:
-        # Call RAG search
         result = await rag_search_tool.ainvoke({"query": user_message.content})
-
-        # Parse results (simplified - add your parsing logic here)
         context = "RAG search results here"
 
-        # Create augmented message with RAG context
         augmented_messages = [
             SystemMessage(content=f"Context from RAG:\n\n{context}"),
             user_message
@@ -1223,8 +1199,9 @@ async def rag_node(state):
         msg = AIMessage(content=f"Error searching knowledge base: {str(e)}")
         return {"messages": [msg], "llm": state.get("llm")}
 
+
 # 4-TIER RESEARCH FALLBACK SYSTEM
-# Tools → Direct Access → LangSearch → LLM Knowledge
+# Tools → Direct Access → Ollama Search → LLM Knowledge
 async def research_node(state):
     """Perform source-based research with multi-source support and RAG storage"""
     logger = logging.getLogger("mcp_client")
@@ -1238,7 +1215,6 @@ async def research_node(state):
             "current_model": state.get("current_model", "unknown")
         }
 
-    # Get user message
     user_message = None
     for msg in reversed(state["messages"]):
         if isinstance(msg, HumanMessage):
@@ -1254,23 +1230,18 @@ async def research_node(state):
 
     query = user_message.content
 
-    # Extract ALL sources (supports multiple)
     sources = extract_research_sources(query)
     if not sources:
         sources = ["web"]
 
     logger.info(f"📚 Research sources ({len(sources)}): {sources}")
 
-    # Clean query
     query_cleaned = RESEARCH_SOURCE_PATTERN.sub('', query).strip()
     query_cleaned = re.sub(r'\s+', ' ', query_cleaned)
     logger.info(f"🔬 Research query: '{query_cleaned}'")
 
     llm = state.get("llm")
 
-    # ═══════════════════════════════════════════════════════════════
-    # GET RAG TOOL FOR STORAGE
-    # ═══════════════════════════════════════════════════════════════
     tools_dict = state.get("tools", {})
     rag_add_tool = tools_dict.get("rag_add_tool")
 
@@ -1280,7 +1251,6 @@ async def research_node(state):
         logger.debug("ℹ️ RAG tool not available - skipping storage")
 
     try:
-        # Fetch from ALL sources
         all_content = []
         all_urls = []
         total_urls_fetched = 0
@@ -1291,9 +1261,6 @@ async def research_node(state):
             logger.info(f"🔍 [{i}/{len(sources)}] Fetching from: {source}")
 
             try:
-                # ═══════════════════════════════════════════════════
-                # PASS RAG TOOL TO search_and_fetch_source
-                # ═══════════════════════════════════════════════════
                 result = await search_and_fetch_source(source, query_cleaned, rag_add_tool)
 
                 if result.get("success"):
@@ -1301,7 +1268,6 @@ async def research_node(state):
                     total_urls_fetched += result.get("urls_fetched", 0)
                     all_urls.append(source)
 
-                    # Track RAG storage
                     if result.get("stored_in_rag"):
                         rag_count = result.get("rag_entries", 1)
                         total_rag_entries += rag_count
@@ -1317,7 +1283,6 @@ async def research_node(state):
                 logger.error(f"❌ [{i}/{len(sources)}] Error: {source} - {e}")
                 failed_sources.append(f"{source} (Exception: {str(e)[:50]})")
 
-        # Check if we got any content
         if not all_content:
             failed_list = "\n".join([f"  - {s}" for s in failed_sources])
             return {
@@ -1330,14 +1295,9 @@ async def research_node(state):
                 "current_model": state.get("current_model", "unknown")
             }
 
-        # Combine all fetched content
         combined_content = "\n\n".join(all_content)
-
         success_count = len(all_content)
 
-        # ═══════════════════════════════════════════════════════════
-        # LOG RAG STORAGE SUMMARY
-        # ═══════════════════════════════════════════════════════════
         if total_rag_entries > 0:
             logger.info(
                 f"✅ Combined content from {success_count}/{len(sources)} sources ({len(combined_content)} chars, {total_rag_entries} RAG entries)")
@@ -1348,7 +1308,6 @@ async def research_node(state):
         if failed_sources:
             logger.warning(f"⚠️ Failed sources: {failed_sources}")
 
-        # Build research prompt with all sources
         sources_list = "\n".join([f"  {i + 1}. {url}" for i, url in enumerate(all_urls)])
 
         research_prompt = f"""I have fetched content from {success_count} source(s):
@@ -1375,14 +1334,11 @@ Your answer:"""
         try:
             response = await asyncio.wait_for(
                 llm.ainvoke(augmented_messages),
-                timeout=600.0  # 10 minute timeout
+                timeout=600.0
             )
 
             logger.info("✅ Research synthesis completed")
 
-            # ═══════════════════════════════════════════════════════
-            # ADD RAG STORAGE NOTE TO RESPONSE
-            # ═══════════════════════════════════════════════════════
             notes = []
 
             if failed_sources:
@@ -1402,11 +1358,9 @@ Your answer:"""
                 "current_model": state.get("current_model", "unknown")
             }
 
-        # CATCH: Timeout
         except asyncio.TimeoutError:
             logger.warning(f"⏱️ Research timed out, will retry with summarized content")
 
-        # CATCH: Context overflow (ValueError)
         except ValueError as e:
             error_str = str(e).lower()
             if any(phrase in error_str for phrase in [
@@ -1416,7 +1370,6 @@ Your answer:"""
             else:
                 raise
 
-        # CATCH: Other context-related errors
         except Exception as e:
             error_str = str(e).lower()
             if not any(phrase in error_str for phrase in ["context", "token", "length", "exceed"]):
@@ -1534,15 +1487,13 @@ Your answer:"""
             "current_model": state.get("current_model", "unknown")
         }
 
+
 def create_langgraph_agent(llm_with_tools, tools):
     """Create and compile the LangGraph agent"""
     logger = logging.getLogger("mcp_client")
 
     base_llm = llm_with_tools.bound if hasattr(llm_with_tools, 'bound') else llm_with_tools
 
-    # ═══════════════════════════════════════════════════════════════════
-    # HELPER FUNCTION: Extract model name from LLM instance
-    # ═══════════════════════════════════════════════════════════════════
     def get_model_name(llm):
         """Extract model name from LLM instance"""
         if hasattr(llm, 'model'):
@@ -1579,8 +1530,6 @@ def create_langgraph_agent(llm_with_tools, tools):
             if sources:
                 logger.info(f"🔬 call_model: Research sources detected → delegating to research_node")
                 state["research_source"] = sources
-                # Return a sentinel AIMessage with no tool calls and no content
-                # so the router's "continue" path triggers research
                 return {
                     "messages": [AIMessage(content="__RESEARCH__")],
                     "tools": state.get("tools", {}),
@@ -1662,31 +1611,31 @@ def create_langgraph_agent(llm_with_tools, tools):
                 user_message = msg.content
                 break
 
-        # Force LangSearch if explicitly requested
+        # Force web search if explicitly requested
         if user_message:
             user_lower = user_message.lower()
 
-            langsearch_patterns = [
-                r'\buse\s+langsearch\b',
-                r'\busing\s+langsearch\b',
-                r'\bwith\s+langsearch\b',
-                r'\blangsearch\s+for\b',
-                r'\bvia\s+langsearch\b',
+            web_search_patterns = [
+                r'\buse\s+web\s+search\b',
+                r'\busing\s+web\s+search\b',
+                r'\bwith\s+web\s+search\b',
+                r'\bweb\s+search\s+for\b',
+                r'\bvia\s+web\s+search\b',
             ]
 
-            should_use_langsearch = any(
+            should_use_web_search = any(
                 re.search(pattern, user_lower)
-                for pattern in langsearch_patterns
+                for pattern in web_search_patterns
             )
 
-            if should_use_langsearch:
-                logger.info("[LangGraph] 🎯 FORCED LANGSEARCH: User explicitly requested langsearch")
+            if should_use_web_search:
+                logger.info("[LangGraph] 🎯 FORCED WEB SEARCH: User explicitly requested web search")
 
-                langsearch = get_langsearch_client()
+                search_client = get_search_client()
 
-                if langsearch.is_available():
+                if search_client.is_available():
                     query = user_message
-                    for pattern in langsearch_patterns:
+                    for pattern in web_search_patterns:
                         query = re.sub(pattern, '', query, flags=re.IGNORECASE)
                     query = query.strip()
 
@@ -1696,16 +1645,16 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if not query:
                         query = user_message
 
-                    logger.info(f"🔍 Searching with langsearch: '{query}'")
+                    logger.info(f"🔍 Performing web search: '{query}'")
 
                     try:
-                        search_result = await langsearch.search(query)
+                        search_result = await search_client.search(query)
 
                         if search_result["success"] and search_result["results"]:
-                            logger.info("[LangGraph] ✅ LangSearch successful - passing to LLM for processing")
+                            logger.info("[LangGraph] ✅ Web search successful - passing to LLM for processing")
                             search_context = search_result["results"]
 
-                            augmented_prompt = f"""I searched the web using LangSearch and found the following results:
+                            augmented_prompt = f"""I searched the web and found the following results:
 
     {search_context}
 
@@ -1725,15 +1674,15 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 "current_model": get_model_name(base_llm)
                             }
                         else:
-                            logger.warning("⚠️ LangSearch returned no results")
+                            logger.warning("⚠️ Web search returned no results")
 
                     except Exception as e:
-                        logger.error(f"❌ LangSearch failed: {e}")
+                        logger.error(f"❌ Web search failed: {e}")
 
                 else:
-                    logger.warning("⚠️ LangSearch not available")
+                    logger.warning("⚠️ Web search not available")
                     error_response = AIMessage(
-                        content="LangSearch is not available. Please check configuration."
+                        content="Web search is not available. Please check OLLAMA_TOKEN configuration."
                     )
                     return {
                         "messages": [error_response],
@@ -1822,7 +1771,6 @@ def create_langgraph_agent(llm_with_tools, tools):
         else:
             llm_to_use = llm_with_tools
 
-        # Extract current model name
         current_model = get_model_name(llm_to_use)
 
         logger.info(f"🧠 Calling LLM with {len(messages)} messages")
@@ -1862,7 +1810,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                 metrics["llm_times"].append((time.time(), duration))
 
         except Exception as e:
-            # CHECK FOR "DOES NOT SUPPORT TOOLS" ERROR
             error_msg_str = str(e).lower()
             if "does not support tools" in error_msg_str:
                 logger.error(f"❌ Model '{current_model}' does not support tool calling")
@@ -1901,7 +1848,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                     "current_model": current_model
                 }
 
-            # Handle other exceptions
             duration = time.time() - start_time
             if METRICS_AVAILABLE:
                 metrics["llm_errors"] += 1
@@ -1909,20 +1855,20 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.error(f"❌ Model call failed: {e}")
             raise
 
-        # Continue with normal flow - FALLBACK CHAIN
+        # FALLBACK CHAIN
         try:
             has_tool_calls = hasattr(response, 'tool_calls') and response.tool_calls
             has_content = hasattr(response, 'content') and response.content and response.content.strip()
 
             if not has_tool_calls and not has_content:
-                logger.warning("⚠️ LLM returned blank - trying LangSearch")
-                langsearch = get_langsearch_client()
+                logger.warning("⚠️ LLM returned blank - trying web search")
+                search_client = get_search_client()
 
-                if langsearch.is_available():
-                    search_result = await langsearch.search(user_message)
+                if search_client.is_available():
+                    search_result = await search_client.search(user_message)
 
                     if search_result["success"] and search_result["results"]:
-                        logger.info("[LangGraph] ✅ LangSearch successful")
+                        logger.info("[LangGraph] ✅ Web search successful")
                         search_context = search_result["results"]
                         augmented_prompt = f"""WEB SEARCH RESULTS:
     {search_context}
@@ -1932,13 +1878,13 @@ def create_langgraph_agent(llm_with_tools, tools):
                         retry_messages = messages + [HumanMessage(content=augmented_prompt)]
                         response = await base_llm.ainvoke(retry_messages)
                     else:
-                        logger.warning("⚠️ LangSearch failed - using base LLM")
+                        logger.warning("⚠️ Web search failed - using base LLM")
                         response = await asyncio.wait_for(
                             base_llm.ainvoke(messages),
                             timeout=300.0
                         )
                 else:
-                    logger.warning("⚠️ LangSearch unavailable - using base LLM")
+                    logger.warning("⚠️ Web search unavailable - using base LLM")
                     response = await asyncio.wait_for(
                         base_llm.ainvoke(messages),
                         timeout=300.0
@@ -1952,14 +1898,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                 ])
 
                 if needs_current_info:
-                    logger.info("[LangGraph] 🔍 Trying LangSearch fallback for current info")
-                    langsearch = get_langsearch_client()
+                    logger.info("[LangGraph] 🔍 Trying web search fallback for current info")
+                    search_client = get_search_client()
 
-                    if langsearch.is_available():
-                        search_result = await langsearch.search(user_message)
+                    if search_client.is_available():
+                        search_result = await search_client.search(user_message)
 
                         if search_result["success"] and search_result["results"]:
-                            logger.info("[LangGraph] ✅ LangSearch successful - augmenting")
+                            logger.info("[LangGraph] ✅ Web search successful - augmenting")
                             search_context = search_result["results"]
                             augmented_prompt = f"""Previous answer: {response.content}
 
@@ -2049,7 +1995,6 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.info("[LangGraph] 📥 Starting ingest operation...")
             result = await ingest_tool.ainvoke({"limit": 5})
 
-            # Parse the TextContent result into readable summary
             try:
                 import json
                 raw = result[0].text if isinstance(result, list) else result
@@ -2125,7 +2070,6 @@ def create_langgraph_agent(llm_with_tools, tools):
             logger.warning("⚠️ No tool calls found")
             return state
 
-        # Extract context from system messages for auto-fix
         context = {}
         for msg in reversed(state["messages"][-10:]):
             if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
@@ -2145,7 +2089,6 @@ def create_langgraph_agent(llm_with_tools, tools):
             tool_args = tool_call.get("args", {})
             tool_id = tool_call.get("id")
 
-            # AUTO-FIX tool arguments
             if context.get("project_path") and tool_name in ["get_project_dependencies", "analyze_code_file", "analyze_project", "scan_project_structure"]:
                 if "project_path" not in tool_args:
                     logger.warning(f"🔧 AUTO-FIX: Adding missing project_path → '{context['project_path']}'")
@@ -2186,7 +2129,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if hasattr(result[0], 'text'):
                         result = result[0].text
 
-                # plain JSON string if it was TextContent
                 if tool_name in ("plex_ingest_batch", "plex_ingest_items"):
                     try:
                         data = json.loads(result) if isinstance(result, str) else result
@@ -2248,14 +2190,14 @@ def create_langgraph_agent(llm_with_tools, tools):
             "stopped": is_stop_requested()
         }
 
-    # State machine for agent
     # Build graph:
     # Each node is a function,
     # Edges define control flows between nodes depending on what the model decides
     # router decides:
-    #   ├── "tools"  → tools → agent → router → …
-    #   ├── "rag"    → rag → END
-    #   ├── "ingest" → ingest → END
+    #   ├── "tools"    → tools → agent → router → …
+    #   ├── "rag"      → rag → END
+    #   ├── "ingest"   → ingest → END
+    #   ├── "research" → research → END
     #   └── "continue" → END
     workflow = StateGraph(AgentState)
     workflow.add_node("agent", call_model)
@@ -2303,9 +2245,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         if METRICS_AVAILABLE:
             metrics["agent_runs"] += 1
 
-        # ═══════════════════════════════════════════════════════════════
         # STEP 1: Save the original SystemMessage (if it exists)
-        # ═══════════════════════════════════════════════════════════════
         original_system_msg = None
         has_system_msg = (
                 conversation_state["messages"]
@@ -2313,40 +2253,30 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         )
 
         if has_system_msg:
-            # Preserve the existing SystemMessage (may have enhancements)
             original_system_msg = conversation_state["messages"][0]
             logger.info("[LangGraph] Preserving existing SystemMessage")
         else:
-            # No SystemMessage exists - create one from parameter
             original_system_msg = SystemMessage(content=system_prompt)
             conversation_state["messages"].insert(0, original_system_msg)
             logger.info("[LangGraph] Created new SystemMessage from parameter")
 
-        # ═══════════════════════════════════════════════════════════════
         # STEP 2: Add user message and truncate
-        # ═══════════════════════════════════════════════════════════════
         conversation_state["messages"].append(HumanMessage(content=user_message))
 
-        # Truncate but keep the system message separate
-        system_msg = conversation_state["messages"][0]  # Save it
-        other_messages = conversation_state["messages"][1:]  # Everything else
+        system_msg = conversation_state["messages"][0]
+        other_messages = conversation_state["messages"][1:]
 
-        # Truncate the other messages
-        if len(other_messages) > max_history - 1:  # -1 for system message
+        if len(other_messages) > max_history - 1:
             other_messages = other_messages[-(max_history - 1):]
             logger.info(f"[LangGraph] Truncated to last {max_history} messages")
 
-        # Reconstruct: system message + truncated messages
         conversation_state["messages"] = [system_msg] + other_messages
 
-        # ═══════════════════════════════════════════════════════════════
         # STEP 3: Run the agent
-        # ═══════════════════════════════════════════════════════════════
         logger.info(f"🧠 Starting agent with {len(conversation_state['messages'])} messages")
 
         tool_registry = {tool.name: tool for tool in tools}
 
-        # Agent runtime - feeds message into the model
         result = await agent.ainvoke({
             "messages": conversation_state["messages"],
             "tools": tool_registry,
@@ -2357,20 +2287,13 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "research_source": "web"
         })
 
-        # ═══════════════════════════════════════════════════════════════
         # STEP 4: Update conversation state
-        # result["messages"] is the correct final accumulated state.
-        # operator.add in AgentState already concatenated correctly.
-        # extend() caused duplicates to snowball over long sessions.
-        # ═══════════════════════════════════════════════════════════════
         input_count = len(conversation_state["messages"])
         truly_new = result["messages"][input_count:]
         logger.info(f"📨 Agent added {len(truly_new)} new messages")
         conversation_state["messages"] = result["messages"]
 
-        # ═══════════════════════════════════════════════════════════════
         # STEP 5: Return results
-        # ═══════════════════════════════════════════════════════════════
         if METRICS_AVAILABLE:
             duration = time.time() - start_time
             metrics["agent_times"].append((time.time(), duration))
@@ -2388,7 +2311,6 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         }
 
     except ValueError as e:
-        # Handle context window overflow gracefully
         error_str = str(e)
         if "exceed context window" in error_str or "Requested tokens" in error_str:
             import re
@@ -2458,7 +2380,6 @@ This model cannot handle your current workload.""")
 
         raise
 
-
     except Exception as e:
 
         if METRICS_AVAILABLE:
@@ -2483,7 +2404,7 @@ This model cannot handle your current workload.""")
     2. Try a smaller model: `:model llama3.2:3b`
     3. Close other applications to free memory
     4. Check Ollama logs for details
-    
+
     **Quick fix:** `:model llama3.2:3b` for a lighter model.""")
 
             conversation_state["messages"].append(error_msg)

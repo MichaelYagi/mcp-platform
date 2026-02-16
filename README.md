@@ -156,7 +156,7 @@ GGUF_BATCH_SIZE=512             # Batch size for processing
 PLEX_URL=http://localhost:32400  # Plex server URL
 PLEX_TOKEN=your_token_here       # Get from Plex account settings
 WEATHER_TOKEN=your_token_here    # OpenWeatherMap API key
-LANGSEARCH_TOKEN=your_token_here # LangSearch API key (https://langsearch.com)
+OLLAMA_TOKEN=your_token_here     # Ollama API key (https://ollama.com/settings/keys)
 
 # === A2A Protocol (optional distributed mode) ===
 A2A_ENDPOINTS=http://localhost:8010  # Comma-separated endpoints
@@ -226,10 +226,10 @@ These work in both CLI and web UI:
 2. Get API key from account settings
 3. Add to `.env`: `WEATHER_TOKEN=your_key`
 
-**LangSearch (web search):**
-1. Sign up at https://langsearch.com
-2. Get API key from dashboard
-3. Add to `.env`: `LANGSEARCH_TOKEN=your_key`
+**Ollama Search API (web search):**
+1. Sign up at https://ollama.com/
+2. Get API key from https://ollama.com/settings/keys
+3. Add to `.env`: `OLLAMA_TOKEN=your_key`
 
 **Plex Media Server:**
 1. Open Plex web interface
@@ -248,10 +248,7 @@ These work in both CLI and web UI:
 
 ### Step 1: Create Tool Server
 ```bash
-# Create server directory
 mkdir servers/my_tool
-
-# Create server file
 touch servers/my_tool/server.py
 ```
 
@@ -269,27 +266,20 @@ mcp = Server("my_tool-server")
 def my_function(arg1: str, arg2: int) -> str:
     """
     Short description of what this tool does.
-    
-    Detailed explanation of behavior, use cases, etc.
-    
+
     Args:
         arg1: Description of arg1
         arg2: Description of arg2
-    
+
     Returns:
         Description of return value
     """
-    result = f"Processed {arg1} with {arg2}"
-    return result
+    return f"Processed {arg1} with {arg2}"
 
 async def main():
     from mcp.server.stdio import stdio_server
     async with stdio_server() as (read_stream, write_stream):
-        await mcp.run(
-            read_stream,
-            write_stream,
-            mcp.create_initialization_options()
-        )
+        await mcp.run(read_stream, write_stream, mcp.create_initialization_options())
 
 if __name__ == "__main__":
     asyncio.run(main())
@@ -297,24 +287,8 @@ if __name__ == "__main__":
 
 ### Step 3: Create Skill Documentation (Optional)
 ```bash
-# Create skills directory
 mkdir -p servers/my_tool/skills
-
-# Create skill file
 touch servers/my_tool/skills/my_feature.md
-```
-```markdown
-# My Feature Skill
-
-This skill enables X functionality.
-
-## When to Use
-- Use case 1
-- Use case 2
-
-## Examples
-User: "Do something"
-Assistant: [calls my_function with appropriate args]
 ```
 
 ### Step 4: Update Intent Patterns (Optional)
@@ -357,32 +331,14 @@ The client auto-discovers this file on startup — no code changes needed.
             "transport": "http",
             "url": "https://mcp.neon.tech/mcp",
             "enabled": true,
-            "headers": {
-                "Authorization": "Bearer <$TOKEN>"
-            }
+            "headers": { "Authorization": "Bearer <$TOKEN>" }
         }
     }
 }
 ```
 
 **Header authentication** uses the `ES_{SERVER_NAME}_{PLACEHOLDER}` convention in `.env`:
-```json
-{
-    "external_servers": {
-        "mcpserver": {
-            "transport": "http",
-            "url": "https://mcp.somemcpserver.com/mcp",
-            "enabled": true,
-            "headers": {
-                "Authorization": "Bearer <$TOKEN>",
-                "X-Api-Key": "<$API_KEY>"
-            }
-        }
-    }
-}
-```
 ```bash
-# Placeholder name becomes the suffix after ES_{SERVER_NAME}_
 # Server "mcpserver" with <$TOKEN>   → ES_MCPSERVER_TOKEN
 # Server "mcpserver" with <$API_KEY> → ES_MCPSERVER_API_KEY
 ES_MCPSERVER_TOKEN=your_token_here
@@ -423,11 +379,7 @@ ES_MCPSERVER_API_KEY=your_api_key_here
 
 ### Step 6: Test & Deploy
 ```bash
-# Restart client (auto-discovers new server)
-python client.py
-
-# Test in CLI or web UI
-> test my new tool
+python client.py   # restart to auto-discover new server
 ```
 
 ---
@@ -438,60 +390,30 @@ Run tools on remote servers and expose them via HTTP.
 
 ### Setup A2A Server
 
-**Terminal 1 - Start A2A server:**
 ```bash
-python a2a_server.py
+# Terminal 1
+python a2a_server.py        # starts on http://localhost:8010
+
+# Terminal 2
+python client.py            # auto-connects to A2A endpoints in .env
 ```
-
-Server starts on `http://localhost:8010`
-
-**Terminal 2 - Start client:**
-```bash
-python client.py
-```
-
-Client auto-connects to A2A endpoints in `.env`
 
 ### Control Exposed Tools
 
-Use `A2A_EXPOSED_TOOLS` to control which categories are publicly accessible:
 ```bash
 # Expose specific categories (comma-separated)
 A2A_EXPOSED_TOOLS=plex,location,text_tools
 
 # Expose everything (default)
 A2A_EXPOSED_TOOLS=
-
-# Available categories:
-# plex, location, text_tools, system_tools, code_review,
-# rag, todo, knowledge_base
 ```
 
-**Security:**
-- Empty = all 8 servers exposed (56 tools)
-- Specified = only listed categories exposed
-- Exclude `todo`, `knowledge_base`, `rag` to protect personal data
+**Security:** Exclude `todo`, `knowledge_base`, `rag` to protect personal data.
 
 ### Multi-Endpoint Support
 
-Connect to multiple A2A servers:
 ```bash
-# In .env
 A2A_ENDPOINTS=http://localhost:8010,http://gpu-server:8020
-```
-
-Client aggregates tools from all successful connections.
-
-### Check Available Tools
-
-**Via HTTP:**
-```bash
-curl http://localhost:8010/tool-categories
-```
-
-**Via Client:**
-```
-> :a2a status
 ```
 
 ---
@@ -500,110 +422,36 @@ curl http://localhost:8010/tool-categories
 
 ### Running Tests
 
-The project includes a comprehensive test suite with 44+ tests covering unit, integration, and end-to-end scenarios.
-
-**Run all tests:**
 ```bash
-pytest
-```
-
-**Run specific test categories:**
-```bash
-pytest -m unit              # Fast unit tests only
-pytest -m integration       # Integration tests
-pytest -m e2e              # End-to-end tests
-```
-
-**Run with coverage:**
-```bash
-pytest -c tests/pytest.coverage.ini
-```
-
-**Run specific test file:**
-```bash
-pytest tests/unit/test_session_manager.py
-pytest tests/integration/test_websocket_flow.py
-```
-
-### Test Reports
-
-After running tests, reports are automatically generated in `tests/results/`:
-
-- **`junit.xml`** - Test results for CI/CD (Jenkins, GitHub Actions)
-- **`coverage.xml`** - Coverage data for Codecov/Coveralls  
-- **`test-report.html`** - Interactive HTML test report
-- **`coverage-report.html`** - Coverage overview with per-file metrics
-
-**View HTML reports:**
-```bash
-# Test results
-open tests/results/test-report.html
-
-# Coverage report
-open tests/results/coverage-report.html
+pytest                              # all tests
+pytest -m unit                      # fast unit tests only
+pytest -m integration               # integration tests
+pytest -m e2e                       # end-to-end tests
+pytest -c tests/pytest.coverage.ini # with coverage
 ```
 
 ### Test Structure
 
 ```
 tests/
-├── conftest.py              # Shared fixtures & config
-├── pytest.ini              # Test configuration
-├── unit/                   # Fast, isolated tests
+├── conftest.py
+├── pytest.ini
+├── unit/
 │   ├── test_session_manager.py
 │   ├── test_models.py
 │   ├── test_context_tracker.py
 │   ├── test_intent_patterns.py
 │   └── test_code_review_tools.py
-├── integration/            # Multiple component tests
+├── integration/
 │   ├── test_websocket_flow.py
 │   └── test_langgraph_agent.py
-├── e2e/                   # Full system tests
+├── e2e/
 │   └── test_full_conversation.py
-└── results/               # Generated reports
+└── results/
     ├── junit.xml
     ├── coverage.xml
     ├── test-report.html
-    ├── coverage-report.html
-    └── generate_html.py
-```
-
-### Writing Tests
-
-Tests use pytest with async support and comprehensive fixtures:
-
-```python
-import pytest
-from unittest.mock import MagicMock
-
-@pytest.mark.unit
-def test_create_session(session_manager):
-    """Test session creation"""
-    session_id = session_manager.create_session("Test Session")
-    
-    assert session_id is not None
-    assert session_id > 0
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_full_workflow(session_manager, mock_llm):
-    """Test complete conversation workflow"""
-    # Test implementation
-    pass
-```
-
-**Available fixtures:**
-- `session_manager` - Temporary database session manager
-- `mock_llm` - Mocked LLM for testing
-- `mock_websocket` - Mocked WebSocket connection
-- `temp_dir` - Temporary directory for test files
-- `sample_python_file` - Sample code for testing
-
-### Test Dependencies
-
-```bash
-# Install test dependencies
-pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist
+    └── coverage-report.html
 ```
 
 ### CI/CD Integration
@@ -612,55 +460,11 @@ pip install pytest pytest-asyncio pytest-cov pytest-timeout pytest-xdist
 ```yaml
 - name: Run tests
   run: pytest
-
 - name: Upload coverage
   uses: codecov/codecov-action@v3
   with:
     files: tests/results/coverage.xml
 ```
-
-**GitLab CI:**
-```yaml
-test:
-  script:
-    - pytest
-  artifacts:
-    reports:
-      junit: tests/results/junit.xml
-      coverage_report:
-        coverage_format: cobertura
-        path: tests/results/coverage.xml
-```
-
-### Coverage Goals
-
-- **Current coverage:** ~90% of core client code
-- **Well-tested modules:**
-  - `session_manager.py` (90%+)
-  - `context_tracker.py` (62%+)
-  - `models.py` (40%+)
-  - `query_patterns.py` (66%+)
-
-### Running Tests from PyCharm
-
-1. Right-click `tests/` folder → **Run 'pytest in tests'**
-2. Or use the green play button next to test functions
-3. Reports auto-generate in `tests/results/`
-
-### Troubleshooting Tests
-
-**Import errors:**
-- Ensure you're in the project root: `cd /path/to/mcp_a2a`
-- Activate virtual environment: `source .venv/bin/activate`
-- Install dependencies: `pip install -r requirements.txt`
-
-**Async test failures:**
-- Install pytest-asyncio: `pip install pytest-asyncio`
-- Tests are auto-marked with `@pytest.mark.asyncio`
-
-**Coverage not working:**
-- Install pytest-cov: `pip install pytest-cov`
-- Use coverage config: `pytest -c tests/pytest.coverage.ini`
 
 ---
 
@@ -668,7 +472,6 @@ test:
 
 ### Multi-Server Design
 
-8 specialized MCP servers communicate via stdio:
 ```
 servers/
 ├── code_review/       5 tools  - Code analysis
@@ -686,22 +489,18 @@ Total: 56 local tools
 ### Directory Structure
 ```
 mcp_a2a/
-├── servers/           # MCP servers (stdio)
-│   ├── plex/
-│   │   ├── server.py
-│   │   ├── ml_recommender.py
-│   │   └── skills/
-│   └── ...
-├── a2a_server.py     # A2A HTTP server
-├── client.py         # AI agent client
+├── servers/
+├── a2a_server.py
+├── client.py
 ├── client/
 │   ├── ui/
-│   │   ├── index.html      # Web UI
-│   │   └── dashboard.html  # Dashboard UI
-│   ├── langgraph.py  # Agent execution
-│   ├── websocket.py  # WebSocket server
+│   │   ├── index.html
+│   │   └── dashboard.html
+│   ├── langgraph.py
+│   ├── search_client.py   ← Ollama web search & fetch
+│   ├── websocket.py
 │   └── ...
-└── tools/            # Tool implementations
+└── tools/
 ```
 
 ---
@@ -734,9 +533,9 @@ mcp_a2a/
 > List my todos
 ```
 
-**Web Search (via LangSearch):**
+**Web Search (via Ollama Search):**
 ```
-> Who won the <current_year> NBA championship?
+> Who won the 2025 NBA championship?
 > Latest AI developments
 ```
 
@@ -758,7 +557,6 @@ mcp_a2a/
 ```
 > Use the rag_search_tool to search for "quantum entanglement"
 > What do you have in the RAG about algorithm complexity?
-> Search the RAG for information about superposition
 ```
 
 *Checking RAG status:*
@@ -772,17 +570,9 @@ mcp_a2a/
 > Analyze architecture at https://github.com/user/repo
 ```
 
-*More Examples:*
-```
-> Create a document using https://some_link_to_chicken_nachos as a source
-> Search RAG for nachos
-> Ingest 3 items from Plex
-> Use rag_list_sources_tool to see what sources were used
-```
-
 **How RAG works:**
-- When you research topics using URLs, content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
-- URLs are deduplicated - the same page won't be stored twice
+- Content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
+- URLs are deduplicated — the same page won't be stored twice
 - Semantic search finds the most relevant content even if exact keywords don't match
 - Search returns top 5 results with similarity scores and source URLs
 
@@ -790,86 +580,51 @@ mcp_a2a/
 
 **Ollama models not appearing:**
 ```bash
-# Make sure Ollama is running
 ollama serve
-
-# Check models are downloaded
 ollama list
-
-# Restart client
 python client.py
 ```
 
 **GGUF model won't load:**
 - Check model size vs VRAM (use models <7GB for 12GB VRAM)
 - Reduce GPU layers: `export GGUF_GPU_LAYERS=20`
-- Increase timeout: `export GGUF_LOAD_TIMEOUT=300`
-- Use CPU only: `export GGUF_GPU_LAYERS=0`
+- CPU only: `export GGUF_GPU_LAYERS=0`
 
 **Web UI won't load:**
 ```bash
-# Check ports are available: 8765, 8766, 9000
-netstat -an | grep LISTEN
-
-# Try localhost directly
-http://localhost:9000
+netstat -an | grep LISTEN   # check ports 8765, 8766, 9000
 ```
 
 **A2A server not connecting:**
 ```bash
-# Verify server is running
 curl http://localhost:8010/.well-known/agent-card.json
-
-# Check A2A_ENDPOINTS in .env
 ```
 
-**LangSearch not working:**
-- Verify `LANGSEARCH_TOKEN` in `.env`
-- Check API key at https://langsearch.com
-- System falls back to LLM if unavailable
+**Ollama Search not working:**
+- Verify `OLLAMA_TOKEN` in `.env`
+- Get API key at https://ollama.com/settings/keys
+- System falls back to LLM knowledge if unavailable
 
 **RAG search returns wrong results:**
-- RAG uses semantic similarity - it returns the closest matches even if they're not exact
-- If searching for content that doesn't exist, it returns the most similar available content
+- RAG uses semantic similarity — returns closest matches even if not exact
 - Check what's in the database: `> show rag stats`
 - Content is only stored after researching URLs or manually adding via `rag_add_tool`
 
 **RAG ingestion is slow:**
-- Current performance: ~2.5 seconds for 16 chunks (10,000 characters)
-- Embeddings: ~0.5-2s (concurrent processing with 5 workers)
-- Database insert: ~0.02s (binary embeddings with batch inserts)
+- Normal: ~2.5s for 16 chunks (10,000 characters)
 - If slower, check Ollama is running: `ollama list`
 
-**Conversation history not working ("what was my last prompt" fails):**
-- **Cause**: Smaller models (7B parameters) often refuse to answer questions about conversation history, even when the data is present in their context
-- **Solution 1 (Recommended)**: Switch to a larger model with better instruction following:
-```bash
-  ollama pull qwen2.5:14b-instruct-q4_K_M
-  :model qwen2.5:14b-instruct-q4_K_M
-```
-- **Solution 2**: Use models known for good instruction following:
-  - `qwen2.5:14b-instruct-q4_K_M` (excellent, 80-95% success rate)
-  - `llama3.1:8b-instruct-q4_K_` (good, ~70% success rate)
-  - `mistral-nemo` (good, ~70% success rate)
-  - Avoid: `qwen2.5:3b`, `qwen2.5:7b` (~10-30% success rate)
-- **Why this happens**: Smaller models prioritize their safety training ("don't claim knowledge you don't have") over system instructions, causing them to deny access to conversation history even when it's available in their context window
-- **Expected behavior with larger models**: 
-```
-  You: "what's the weather?"
-  Bot: "It's sunny, 22°C"
-  You: "what was my last prompt?"
-  Bot: "Your last prompt was: what's the weather?"
-```
+**Conversation history not working:**
+- Smaller models (≤7B) often refuse to answer questions about conversation history
+- Switch to a larger model: `:model qwen2.5:14b-instruct-q4_K_M`
+- Models with good instruction following: `qwen2.5:14b` (80-95%), `llama3.1:8b` (~70%), `mistral-nemo` (~70%)
+- Avoid for this use case: `qwen2.5:3b`, `qwen2.5:7b` (~10-30%)
 
 **Tools not appearing:**
 ```bash
-# Check tool is enabled
-:tools --all
-
-# Check DISABLED_TOOLS in .env
-
-# Restart client
-python client.py
+:tools --all        # check if disabled
+# check DISABLED_TOOLS in .env
+python client.py    # restart
 ```
 
 ---
