@@ -5,326 +5,236 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MCP Dashboard - Performance Metrics</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* ============================================================
+           THEME DEFINITIONS  (matches index.html exactly)
+           ============================================================ */
+        :root,
+        [data-theme="default"] {
+            --header-bg:      #2c3e50;
+            --header-border:  #1a252f;
+            --page-bg:        #f5f7fa;
+            --btn-back:       #3498db;
+            --btn-back-hover: #2980b9;
+            --card-bg:        #ffffff;
+            --card-border:    #d0d7de;
+            --card-shadow:    rgba(0,0,0,0.08);
+            --card-shadow-hover: rgba(0,0,0,0.12);
+            --title-color:    #2c3e50;
+            --metric-color:   #2c3e50;
+            --subtitle-color: #999;
+            --label-color:    #666;
+            --chart-blue:     #3498db;
+            --chart-purple:   #9b59b6;
+            --tool-border:    #3498db;
+            --tool-bg:        #f8f9fa;
+            --status-bg:      #ffffff;
+            --scrollbar-track:#f5f7fa;
+            --scrollbar-thumb:#cbd5e1;
+            --scrollbar-hover:#94a3b8;
         }
+
+        [data-theme="midnight"] {
+            --header-bg:      #0d1117;
+            --header-border:  #010409;
+            --page-bg:        #090c10;
+            --btn-back:       #00b4d8;
+            --btn-back-hover: #0096b7;
+            --card-bg:        #0d1117;
+            --card-border:    #30363d;
+            --card-shadow:    rgba(0,0,0,0.3);
+            --card-shadow-hover: rgba(0,0,0,0.5);
+            --title-color:    #c9d1d9;
+            --metric-color:   #e6edf3;
+            --subtitle-color: #8b949e;
+            --label-color:    #8b949e;
+            --chart-blue:     #00b4d8;
+            --chart-purple:   #7b2d8b;
+            --tool-border:    #00b4d8;
+            --tool-bg:        #161b22;
+            --status-bg:      #0d1117;
+            --scrollbar-track:#090c10;
+            --scrollbar-thumb:#30363d;
+            --scrollbar-hover:#484f58;
+        }
+
+        [data-theme="forest"] {
+            --header-bg:      #1a2e1a;
+            --header-border:  #0f1f0f;
+            --page-bg:        #f0f4f0;
+            --btn-back:       #52b788;
+            --btn-back-hover: #40916c;
+            --card-bg:        #fafcfa;
+            --card-border:    #c8d8c8;
+            --card-shadow:    rgba(0,0,0,0.06);
+            --card-shadow-hover: rgba(0,0,0,0.12);
+            --title-color:    #1a2e1a;
+            --metric-color:   #1a2e1a;
+            --subtitle-color: #4a6a4a;
+            --label-color:    #4a6a4a;
+            --chart-blue:     #52b788;
+            --chart-purple:   #d4a017;
+            --tool-border:    #52b788;
+            --tool-bg:        #edf3ed;
+            --status-bg:      #fafcfa;
+            --scrollbar-track:#f0f4f0;
+            --scrollbar-thumb:#c8d8c8;
+            --scrollbar-hover:#a8c8a8;
+        }
+
+        [data-theme="crimson"] {
+            --header-bg:      #1c1c1e;
+            --header-border:  #0a0a0b;
+            --page-bg:        #f7f0f0;
+            --btn-back:       #e63946;
+            --btn-back-hover: #c1121f;
+            --card-bg:        #ffffff;
+            --card-border:    #e0c8c8;
+            --card-shadow:    rgba(0,0,0,0.06);
+            --card-shadow-hover: rgba(0,0,0,0.12);
+            --title-color:    #2a1a1a;
+            --metric-color:   #2a1a1a;
+            --subtitle-color: #6a3a3a;
+            --label-color:    #6a3a3a;
+            --chart-blue:     #e63946;
+            --chart-purple:   #6a0572;
+            --tool-border:    #e63946;
+            --tool-bg:        #fdf0f0;
+            --status-bg:      #ffffff;
+            --scrollbar-track:#f7f0f0;
+            --scrollbar-thumb:#e0c8c8;
+            --scrollbar-hover:#c8a8a8;
+        }
+
+        /* ============================================================
+           BASE STYLES
+           ============================================================ */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
             height: 100vh;
-            background: #f5f7fa;
+            background: var(--page-bg);
             overflow: hidden;
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
+            transition: background 0.3s ease;
         }
 
         #header {
-            background: #2c3e50;
+            background: var(--header-bg);
             color: white;
             padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: background 0.3s ease;
         }
 
-        #header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
+        #header h1 { font-size: 1.5rem; font-weight: 600; }
 
-        #topBar {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
+        #topBar { display: flex; align-items: center; gap: 1rem; }
 
         #backBtn {
             padding: 0.5rem 1rem;
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
+            background: var(--btn-back);
+            color: white; border: none; border-radius: 6px;
+            cursor: pointer; font-size: 0.9rem;
             transition: background 0.2s;
             text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            height: 38px;
-            line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center;
+            height: 38px; line-height: 1;
         }
-
-        #backBtn:hover {
-            background: #2980b9;
-        }
+        #backBtn:hover { background: var(--btn-back-hover); }
 
         #mainContainer {
-            flex: 1;
-            overflow-y: auto;
-            padding: 2rem;
+            flex: 1; overflow-y: auto; padding: 2rem;
             padding-bottom: max(3rem, calc(3rem + env(safe-area-inset-bottom)));
         }
 
         .status-bar {
-            background: white;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+            background: var(--status-bg);
+            border-radius: 8px; padding: 1rem; margin-bottom: 2rem;
+            box-shadow: 0 1px 3px var(--card-shadow);
+            display: flex; align-items: center; gap: 1rem;
+            border: 1px solid var(--card-border);
         }
 
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #f44336;
-        }
+        .status-indicator { width: 12px; height: 12px; border-radius: 50%; background: #f44336; }
+        .status-indicator.connected { background: #4caf50; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
 
-        .status-indicator.connected {
-            background: #4caf50;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .status-text {
-            font-size: 0.9rem;
-            color: #666;
-        }
+        .status-text { font-size: 0.9rem; color: var(--label-color); }
 
         .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem; margin-bottom: 2rem;
         }
 
         .metric-card {
-            background: white;
-            border-radius: 8px;
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            transition: transform 0.2s, box-shadow 0.2s;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px; padding: 1.5rem;
+            box-shadow: 0 1px 3px var(--card-shadow);
+            transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease;
         }
+        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--card-shadow-hover); }
 
-        .metric-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-        }
-
-        .metric-header {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .metric-icon {
-            font-size: 1.5rem;
-        }
-
-        .metric-title {
-            font-size: 0.9rem;
-            color: #666;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .metric-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-        }
-
-        .metric-subtitle {
-            font-size: 0.85rem;
-            color: #999;
-        }
-
-        .metric-error {
-            color: #f44336;
-            font-weight: 600;
-        }
+        .metric-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+        .metric-icon   { font-size: 1.5rem; }
+        .metric-title  { font-size: 0.9rem; color: var(--label-color); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .metric-value  { font-size: 2.5rem; font-weight: 700; color: var(--metric-color); margin-bottom: 0.5rem; }
+        .metric-subtitle { font-size: 0.85rem; color: var(--subtitle-color); }
+        .metric-error  { color: #f44336; font-weight: 600; }
 
         .chart-container {
-            background: white;
-            border-radius: 8px;
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px; padding: 1.5rem;
+            box-shadow: 0 1px 3px var(--card-shadow);
             margin-bottom: 2rem;
+            transition: background 0.3s ease;
         }
+        .chart-header  { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .chart-title   { font-size: 1.1rem; font-weight: 600; color: var(--title-color); }
+        .chart-wrapper { position: relative; height: 300px; width: 100%; }
 
-        .chart-header {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .chart-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .chart-wrapper {
-            position: relative;
-            height: 300px;
-            width: 100%;
-        }
-
-        .tools-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-        }
+        .tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
 
         .tool-card {
-            background: #f8f9fa;
-            border-radius: 6px;
-            padding: 1rem;
-            border-left: 4px solid #3498db;
+            background: var(--tool-bg);
+            border-radius: 6px; padding: 1rem;
+            border-left: 4px solid var(--tool-border);
         }
+        .tool-name  { font-weight: 600; color: var(--title-color); margin-bottom: 0.5rem; }
+        .tool-stats { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--label-color); }
+        .tool-stat  { display: flex; flex-direction: column; gap: 0.25rem; }
+        .tool-stat-label { font-size: 0.75rem; color: var(--subtitle-color); text-transform: uppercase; }
+        .tool-stat-value { font-weight: 600; color: var(--title-color); }
+        .error-badge { background: #ffebee; color: #c62828; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
 
-        .tool-name {
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 0.5rem;
-        }
+        .no-data { text-align: center; padding: 3rem; color: var(--subtitle-color); font-style: italic; }
 
-        .tool-stats {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.85rem;
-            color: #666;
-        }
-
-        .tool-stat {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .tool-stat-label {
-            font-size: 0.75rem;
-            color: #999;
-            text-transform: uppercase;
-        }
-
-        .tool-stat-value {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .error-badge {
-            background: #ffebee;
-            color: #c62828;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 3rem;
-            color: #999;
-            font-style: italic;
-        }
-
-        ::-webkit-scrollbar {
-            width: 10px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: #f5f7fa;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 5px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
+        ::-webkit-scrollbar         { width: 10px; }
+        ::-webkit-scrollbar-track   { background: var(--scrollbar-track); }
+        ::-webkit-scrollbar-thumb   { background: var(--scrollbar-thumb); border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
         @media (max-width: 768px) {
-            #header {
-                padding: 0.75rem 1rem;
-            }
-
-            #header h1 {
-                font-size: 1.1rem;
-            }
-
-            #backBtn {
-                padding: 0.5rem 0.8rem;
-                font-size: 0.85rem;
-                height: 38px;
-                min-height: 38px;
-            }
-
-            #mainContainer {
-                padding: 1rem;
-                padding-bottom: max(4rem, calc(4rem + env(safe-area-inset-bottom) + 30px));
-            }
-
-            .metrics-grid {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-
-            .metric-card {
-                padding: 1rem;
-            }
-
-            .metric-value {
-                font-size: 2rem;
-            }
-
-            .chart-container {
-                padding: 1rem;
-            }
-
-            .chart-wrapper {
-                height: 200px;
-            }
-
-            .tools-grid {
-                grid-template-columns: 1fr;
-            }
+            #header { padding: 0.75rem 1rem; }
+            #header h1 { font-size: 1.1rem; }
+            #backBtn { padding: 0.5rem 0.8rem; font-size: 0.85rem; height: 38px; min-height: 38px; }
+            #mainContainer { padding: 1rem; padding-bottom: max(4rem, calc(4rem + env(safe-area-inset-bottom) + 30px)); }
+            .metrics-grid { grid-template-columns: 1fr; gap: 1rem; }
+            .metric-card  { padding: 1rem; }
+            .metric-value { font-size: 2rem; }
+            .chart-container { padding: 1rem; }
+            .chart-wrapper   { height: 200px; }
+            .tools-grid      { grid-template-columns: 1fr; }
         }
-
         @media (max-width: 480px) {
-            #header h1 {
-                font-size: 1rem;
-            }
-
-            #backBtn {
-                padding: 0.4rem 0.7rem;
-                font-size: 0.8rem;
-                height: 36px;
-                min-height: 36px;
-            }
-
-            .metric-value {
-                font-size: 1.75rem;
-            }
+            #header h1   { font-size: 1rem; }
+            #backBtn     { padding: 0.4rem 0.7rem; font-size: 0.8rem; height: 36px; min-height: 36px; }
+            .metric-value{ font-size: 1.75rem; }
         }
     </style>
 </head>
@@ -344,338 +254,178 @@
 
         <div class="metrics-grid">
             <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-icon">🤖</div>
-                    <div class="metric-title">LLM Calls</div>
-                </div>
+                <div class="metric-header"><div class="metric-icon">🤖</div><div class="metric-title">LLM Calls</div></div>
                 <div class="metric-value" id="llmCallsValue">0</div>
                 <div class="metric-subtitle">Total requests</div>
             </div>
-
             <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-icon">🔧</div>
-                    <div class="metric-title">Tool Usage</div>
-                </div>
+                <div class="metric-header"><div class="metric-icon">🔧</div><div class="metric-title">Tool Usage</div></div>
                 <div class="metric-value" id="toolCallsValue">0</div>
                 <div class="metric-subtitle">Total executions</div>
             </div>
-
             <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-icon">⚡</div>
-                    <div class="metric-title">Agent Execution</div>
-                </div>
+                <div class="metric-header"><div class="metric-icon">⚡</div><div class="metric-title">Agent Execution</div></div>
                 <div class="metric-value" id="agentRunsValue">0</div>
                 <div class="metric-subtitle">Total executions</div>
             </div>
-
             <div class="metric-card">
-                <div class="metric-header">
-                    <div class="metric-icon">⚠️</div>
-                    <div class="metric-title">Error Rate</div>
-                </div>
+                <div class="metric-header"><div class="metric-icon">⚠️</div><div class="metric-title">Error Rate</div></div>
                 <div class="metric-value metric-error" id="errorRateValue">0%</div>
                 <div class="metric-subtitle"><span id="totalErrorsValue">0</span> overall errors</div>
             </div>
         </div>
 
         <div class="chart-container">
-            <div class="chart-header">
-                <div class="chart-icon">📈</div>
-                <div class="chart-title">Agent Performance Over Time</div>
-            </div>
-            <div class="chart-wrapper">
-                <canvas id="agentChart"></canvas>
-            </div>
+            <div class="chart-header"><div class="chart-icon">📈</div><div class="chart-title">Agent Performance Over Time</div></div>
+            <div class="chart-wrapper"><canvas id="agentChart"></canvas></div>
         </div>
-
         <div class="chart-container">
-            <div class="chart-header">
-                <div class="chart-icon">🧠</div>
-                <div class="chart-title">LLM Response Times</div>
-            </div>
-            <div class="chart-wrapper">
-                <canvas id="llmChart"></canvas>
-            </div>
+            <div class="chart-header"><div class="chart-icon">🧠</div><div class="chart-title">LLM Response Times</div></div>
+            <div class="chart-wrapper"><canvas id="llmChart"></canvas></div>
         </div>
-
         <div class="chart-container">
-            <div class="chart-header">
-                <div class="chart-icon">🛠️</div>
-                <div class="chart-title">Tool Performance</div>
-            </div>
-            <div id="toolsContainer" class="tools-grid">
-                <div class="no-data">No tool data available yet</div>
-            </div>
+            <div class="chart-header"><div class="chart-icon">🛠️</div><div class="chart-title">Tool Performance</div></div>
+            <div id="toolsContainer" class="tools-grid"><div class="no-data">No tool data available yet</div></div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        let ws = null;
-        let metricsData = null;
-        let updateInterval = null;
+        // ── Apply saved theme immediately ──
+        const THEME_KEY = 'mcp_theme';
+        (function() {
+            const saved = localStorage.getItem(THEME_KEY) || 'default';
+            document.documentElement.setAttribute('data-theme', saved);
+        })();
 
-        let agentChart = null;
-        let llmChart = null;
+        // ── Chart colours derived from theme ──
+        function getThemeColors() {
+            const style = getComputedStyle(document.documentElement);
+            return {
+                blue:   style.getPropertyValue('--chart-blue').trim()   || '#3498db',
+                purple: style.getPropertyValue('--chart-purple').trim() || '#9b59b6',
+            };
+        }
+
+        let ws = null, metricsData = null, updateInterval = null;
+        let agentChart = null, llmChart = null;
 
         function formatTimestamp(timestamp) {
             const date = new Date(timestamp * 1000);
-            return date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
+            return date.toLocaleTimeString('en-US',{ hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+        }
+
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+            return `rgba(${r},${g},${b},${alpha})`;
         }
 
         function initCharts() {
-            const chartConfig = {
-                type: 'line',
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            callbacks: {
-                                title: function(context) {
-                                    return context[0].label;
-                                },
-                                label: function(context) {
-                                    return context.parsed.y.toFixed(2) + 's';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toFixed(2) + 's';
-                                }
-                            }
-                        },
-                        x: {
-                            display: true,
-                            ticks: {
-                                maxRotation: 45,
-                                minRotation: 45,
-                                autoSkip: true,
-                                maxTicksLimit: 8,
-                                font: {
-                                    size: 10
-                                }
-                            }
-                        }
-                    }
+            const colors = getThemeColors();
+            const baseOptions = {
+                responsive: true, maintainAspectRatio: false, animation: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (ctx) => ctx.parsed.y.toFixed(2)+'s' } }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: (v) => v.toFixed(2)+'s' } },
+                    x: { display: true, ticks: { maxRotation:45, minRotation:45, autoSkip:true, maxTicksLimit:8, font:{size:10} } }
                 }
             };
 
-            const agentCtx = document.getElementById('agentChart').getContext('2d');
-            agentChart = new Chart(agentCtx, {
-                ...chartConfig,
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Agent Response Time (s)',
-                        data: [],
-                        borderColor: '#3498db',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                }
+            agentChart = new Chart(document.getElementById('agentChart').getContext('2d'), {
+                type: 'line', options: baseOptions,
+                data: { labels:[], datasets:[{ label:'Agent Response Time (s)', data:[],
+                    borderColor: colors.blue,
+                    backgroundColor: hexToRgba(colors.blue.padEnd(7,'0'), 0.1),
+                    tension:0.4, fill:true }] }
             });
 
-            const llmCtx = document.getElementById('llmChart').getContext('2d');
-            llmChart = new Chart(llmCtx, {
-                ...chartConfig,
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'LLM Response Time (s)',
-                        data: [],
-                        borderColor: '#9b59b6',
-                        backgroundColor: 'rgba(155, 89, 182, 0.1)',
-                        tension: 0.4,
-                        fill: true
-                    }]
-                }
+            llmChart = new Chart(document.getElementById('llmChart').getContext('2d'), {
+                type: 'line', options: baseOptions,
+                data: { labels:[], datasets:[{ label:'LLM Response Time (s)', data:[],
+                    borderColor: colors.purple,
+                    backgroundColor: hexToRgba(colors.purple.padEnd(7,'0'), 0.1),
+                    tension:0.4, fill:true }] }
             });
-
-            console.log('✅ Charts initialized');
         }
 
         function updateMetrics(data) {
-            console.log('📊 Updating metrics:', data);
             metricsData = data;
-
             document.getElementById('toolCallsValue').textContent = data.tools.total_calls.toLocaleString();
-            document.getElementById('llmCallsValue').textContent = data.llm.calls.toLocaleString();
+            document.getElementById('llmCallsValue').textContent  = data.llm.calls.toLocaleString();
             document.getElementById('agentRunsValue').textContent = data.agent.runs.toLocaleString();
-            document.getElementById('errorRateValue').textContent = data.agent.error_rate.toFixed(2) + '%';
+            document.getElementById('errorRateValue').textContent = data.agent.error_rate.toFixed(2)+'%';
             document.getElementById('totalErrorsValue').textContent = data.overall_errors.toLocaleString();
-
             updateAgentChart(data.agent.times);
             updateLLMChart(data.llm.times);
             updateToolsDisplay(data.tools.per_tool);
         }
 
         function updateAgentChart(timesData) {
-            if (!agentChart || !timesData) return;
-
-            // timesData = {timestamps: [...], durations: [...]}
-            const timestamps = timesData.timestamps || [];
-            const durations = timesData.durations || [];
-
-            if (timestamps.length === 0) return;
-
-            const labels = timestamps.map(ts => formatTimestamp(ts));
-            agentChart.data.labels = labels;
+            if (!agentChart||!timesData) return;
+            const timestamps=timesData.timestamps||[], durations=timesData.durations||[];
+            if (!timestamps.length) return;
+            agentChart.data.labels = timestamps.map(formatTimestamp);
             agentChart.data.datasets[0].data = durations;
             agentChart.update('none');
         }
 
         function updateLLMChart(timesData) {
-            if (!llmChart || !timesData) return;
-
-            // timesData = {timestamps: [...], durations: [...]}
-            const timestamps = timesData.timestamps || [];
-            const durations = timesData.durations || [];
-
-            if (timestamps.length === 0) return;
-
-            const labels = timestamps.map(ts => formatTimestamp(ts));
-            llmChart.data.labels = labels;
+            if (!llmChart||!timesData) return;
+            const timestamps=timesData.timestamps||[], durations=timesData.durations||[];
+            if (!timestamps.length) return;
+            llmChart.data.labels = timestamps.map(formatTimestamp);
             llmChart.data.datasets[0].data = durations;
             llmChart.update('none');
         }
 
         function updateToolsDisplay(toolsData) {
             const container = document.getElementById('toolsContainer');
-
-            if (!toolsData || Object.keys(toolsData).length === 0) {
-                container.innerHTML = '<div class="no-data">No tool data available yet</div>';
-                return;
-            }
-
+            if (!toolsData||!Object.keys(toolsData).length) { container.innerHTML='<div class="no-data">No tool data available yet</div>'; return; }
             container.innerHTML = '';
-
-            const sortedTools = Object.entries(toolsData).sort((a, b) => b[1].calls - a[1].calls);
-
-            sortedTools.forEach(([toolName, stats]) => {
-                const card = document.createElement('div');
-                card.className = 'tool-card';
-
-                const errorBadge = stats.errors > 0
-                    ? `<span class="error-badge">${stats.errors} errors</span>`
-                    : '';
-
+            Object.entries(toolsData).sort((a,b)=>b[1].calls-a[1].calls).forEach(([toolName,stats]) => {
+                const card = document.createElement('div'); card.className='tool-card';
+                const errorBadge = stats.errors>0 ? `<span class="error-badge">${stats.errors} errors</span>` : '';
                 card.innerHTML = `
                     <div class="tool-name">${toolName} ${errorBadge}</div>
                     <div class="tool-stats">
-                        <div class="tool-stat">
-                            <div class="tool-stat-label">Calls</div>
-                            <div class="tool-stat-value">${stats.calls.toLocaleString()}</div>
-                        </div>
-                        <div class="tool-stat">
-                            <div class="tool-stat-label">Avg Time</div>
-                            <div class="tool-stat-value">${stats.avg_time.toFixed(2)}s</div>
-                        </div>
-                        <div class="tool-stat">
-                            <div class="tool-stat-label">Errors</div>
-                            <div class="tool-stat-value ${stats.errors > 0 ? 'metric-error' : ''}">${stats.errors}</div>
-                        </div>
-                    </div>
-                `;
-
+                        <div class="tool-stat"><div class="tool-stat-label">Calls</div><div class="tool-stat-value">${stats.calls.toLocaleString()}</div></div>
+                        <div class="tool-stat"><div class="tool-stat-label">Avg Time</div><div class="tool-stat-value">${stats.avg_time.toFixed(2)}s</div></div>
+                        <div class="tool-stat"><div class="tool-stat-label">Errors</div><div class="tool-stat-value ${stats.errors>0?'metric-error':''}">${stats.errors}</div></div>
+                    </div>`;
                 container.appendChild(card);
             });
         }
 
         function updateStatus(connected) {
             const indicator = document.getElementById('statusIndicator');
-            const text = document.getElementById('statusText');
-
-            if (connected) {
-                indicator.classList.add('connected');
-                text.textContent = 'Live metrics stream active';
-            } else {
-                indicator.classList.remove('connected');
-                text.textContent = 'Disconnected - Attempting to reconnect...';
-            }
+            const text      = document.getElementById('statusText');
+            if (connected) { indicator.classList.add('connected'); text.textContent='Live metrics stream active'; }
+            else           { indicator.classList.remove('connected'); text.textContent='Disconnected - Attempting to reconnect...'; }
         }
 
         function requestMetrics() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                console.log('📨 Requesting metrics...');
-                ws.send(JSON.stringify({ type: 'metrics_request' }));
-            }
+            if (ws&&ws.readyState===WebSocket.OPEN) ws.send(JSON.stringify({type:'metrics_request'}));
         }
 
         function connectWebSocket() {
-            const hostname = window.location.hostname || 'localhost';
-            const wsUrl = `ws://${hostname}:8765`;
-
-            console.log('🔌 Connecting to metrics WebSocket:', wsUrl);
-
-            try {
-                ws = new WebSocket(wsUrl);
-            } catch (error) {
-                console.error('❌ Failed to create WebSocket:', error);
-                updateStatus(false);
-                setTimeout(connectWebSocket, 3000);
-                return;
-            }
-
+            const wsUrl = `ws://${window.location.hostname||'localhost'}:8765`;
+            try { ws = new WebSocket(wsUrl); } catch(e) { updateStatus(false); setTimeout(connectWebSocket,3000); return; }
             ws.onopen = () => {
-                console.log('✅ Connected to metrics WebSocket');
-                updateStatus(true);
-
-                requestMetrics();
-
-                if (updateInterval) {
-                    clearInterval(updateInterval);
-                }
-
+                updateStatus(true); requestMetrics();
+                if (updateInterval) clearInterval(updateInterval);
                 updateInterval = setInterval(requestMetrics, 2000);
             };
-
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                console.log('📥 Received message:', data.type);
-
-                if (data.type === 'metrics_response') {
-                    console.log('📊 Got metrics response');
-                    updateMetrics(data.metrics);
-                }
+                if (data.type==='metrics_response') updateMetrics(data.metrics);
             };
-
-            ws.onerror = (error) => {
-                console.error('❌ WebSocket error:', error);
-                updateStatus(false);
-            };
-
-            ws.onclose = () => {
-                console.log('🔌 WebSocket closed. Reconnecting in 3 seconds...');
-                updateStatus(false);
-
-                if (updateInterval) {
-                    clearInterval(updateInterval);
-                    updateInterval = null;
-                }
-
-                setTimeout(connectWebSocket, 3000);
-            };
+            ws.onerror = () => updateStatus(false);
+            ws.onclose = () => { updateStatus(false); if (updateInterval){clearInterval(updateInterval);updateInterval=null;} setTimeout(connectWebSocket,3000); };
         }
 
-        console.log('🚀 Dashboard starting...');
         initCharts();
         connectWebSocket();
     </script>
