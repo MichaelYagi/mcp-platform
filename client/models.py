@@ -14,25 +14,33 @@ from pathlib import Path
 MODEL_STATE_FILE = str(Path(__file__).parent / "last_model.txt")
 
 def get_ollama_models():
-    """Get list of Ollama models"""
+    """Get list of Ollama chat models, filtering out embedding-only models
+    by checking the model family reported by the Ollama API."""
     try:
-        import subprocess
-        # Suppress stderr to hide "ollama server not responding" message
-        out = subprocess.check_output(
-            ["ollama", "list"],
-            text=True,
-            stderr=subprocess.DEVNULL  # Suppress error messages
-        )
-        lines = out.strip().split("\n")
+        import httpx
+        response = httpx.get("http://127.0.0.1:11434/api/tags", timeout=3.0)
+        if response.status_code != 200:
+            return []
+
+        # Families that indicate embedding-only models (no chat support).
+        # Sourced from Ollama's own model metadata, not hardcoded names.
+        NON_CHAT_FAMILIES = {"bert", "nomic-bert", "clip"}
+
         models = []
-        for line in lines[1:]:
-            parts = line.split()
-            if parts:
-                models.append(parts[0])
+        for m in response.json().get("models", []):
+            families = set(m.get("details", {}).get("families") or [])
+            if not families.intersection(NON_CHAT_FAMILIES):
+                models.append(m["name"])
         return models
-    except:
-        # Silent failure - caller will handle
-        return []
+    except Exception:
+        # Fall back to subprocess if httpx unavailable or Ollama unreachable
+        try:
+            out = subprocess.check_output(
+                ["ollama", "list"], text=True, stderr=subprocess.DEVNULL
+            )
+            return [line.split()[0] for line in out.strip().split("\n")[1:] if line.split()]
+        except Exception:
+            return []
 
 
 def get_available_models():

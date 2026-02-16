@@ -1813,6 +1813,19 @@ def create_langgraph_agent(llm_with_tools, tools):
 
         except Exception as e:
             error_msg_str = str(e).lower()
+            if "does not support chat" in error_msg_str:
+                logger.error(f"❌ Model '{current_model}' does not support chat (embedding model?)")
+                error_response = AIMessage(
+                    content=f"❌ **'{current_model}'** does not support chat — it may be an embedding model.\n\nSwitch to a chat model: `:model qwen2.5:14b`")
+                return {
+                    "messages": [error_response],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": current_model
+                }
+
             if "does not support tools" in error_msg_str:
                 logger.error(f"❌ Model '{current_model}' does not support tool calling")
 
