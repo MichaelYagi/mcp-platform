@@ -113,7 +113,7 @@
             --swatch3: #0f7a4e;
         }
 
-        /* Forest – dark greens with amber accents */
+        /* Forest – dark greens with emerald accents */
         [data-theme="forest"] {
             --header-bg:        #1a2e1a;
             --header-border:    #0f1f0f;
@@ -162,6 +162,57 @@
             --swatch1: #1a2e1a;
             --swatch2: #52b788;
             --swatch3: #00693E;
+        }
+
+        /* Optimus Prime – cobalt blue, red, silver, yellow */
+        [data-theme="optimus"] {
+            --header-bg:        #0047AB;
+            --header-border:    #003080;
+
+            --sidebar-bg:       #1a2e5a;
+            --sidebar-header:   #0047AB;
+            --sidebar-item:     #0047AB;
+            --sidebar-hover:    #1a5299;
+            --sidebar-active:   #D92121;
+            --sidebar-border:   #4682BF;
+            --sidebar-search:   #0047AB;
+
+            --page-bg:          #111111;
+            --chat-bg:          #1a1a1a;
+            --chat-border:      #4682BF;
+            --chat-assistant:   #1e2a3a;
+            --chat-asst-border: #4682BF;
+            --chat-asst-color:  #D3D3D3;
+            --input-bg:         #1a1a1a;
+            --input-border:     #4682BF;
+            --status-color:     #D3D3D3;
+
+            --user-bubble:      linear-gradient(135deg, #D92121, #a01515);
+            --send-btn:         #D92121;
+            --send-btn-hover:   #a01515;
+            --send-btn-focus:   rgba(217,33,33,0.35);
+
+            --btn-logs:         #4682BF;
+            --btn-logs-hover:   #0047AB;
+            --btn-monitor:      #D92121;
+            --btn-monitor-hover:#a01515;
+            --btn-dashboard:    #ffcc00;
+            --btn-dashboard-hover:#e6b800;
+            --btn-newsession:   #ffcc00;
+            --btn-newsession-hover:#e6b800;
+
+            --log-bg:           #0a0a0a;
+            --log-header:       #111111;
+            --log-border:       #0047AB;
+            --log-filter-bg:    #0d0d0d;
+            --log-filter-btn:   #1a2e5a;
+
+            --monitor-gradient: linear-gradient(135deg, #D92121 0%, #0047AB 100%);
+            --monitor-header:   rgba(0,0,0,0.4);
+
+            --swatch1: #0047AB;
+            --swatch2: #D92121;
+            --swatch3: #ffcc00;
         }
 
         /* Crimson – dark charcoal with red/rose accents */
@@ -420,6 +471,7 @@
             color: white;
             font-size: 0.85rem;
             transition: background 0.15s;
+            white-space: nowrap;
         }
         .theme-option:hover { background: rgba(255,255,255,0.1); }
         .theme-option.active { background: rgba(255,255,255,0.15); font-weight: 600; }
@@ -984,7 +1036,7 @@
                             <div class="theme-option-swatches">
                                 <div class="theme-opt-swatch" style="background:#1a2e1a"></div>
                                 <div class="theme-opt-swatch" style="background:#52b788"></div>
-                                <div class="theme-opt-swatch" style="background:#d4a017"></div>
+                                <div class="theme-opt-swatch" style="background:#00693E"></div>
                             </div>
                             Forest
                             <span class="check">✓</span>
@@ -996,6 +1048,15 @@
                                 <div class="theme-opt-swatch" style="background:#6a0572"></div>
                             </div>
                             Crimson
+                            <span class="check">✓</span>
+                        </div>
+                        <div class="theme-option" data-theme="optimus" onclick="applyTheme('optimus')">
+                            <div class="theme-option-swatches">
+                                <div class="theme-opt-swatch" style="background:#0047AB"></div>
+                                <div class="theme-opt-swatch" style="background:#D92121"></div>
+                                <div class="theme-opt-swatch" style="background:#ffcc00"></div>
+                            </div>
+                            Optimus Prime
                             <span class="check">✓</span>
                         </div>
                     </div>
