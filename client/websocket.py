@@ -1,8 +1,7 @@
 """
 WebSocket Module with Concurrent Processing
 Uses asyncio.create_task to handle operations in background
-
-INCLUDES: History question workaround for weaker models (7B)
+History question workaround for weaker models (7B)
 """
 
 import asyncio
@@ -50,84 +49,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             conversation_state["session_id"] = session_id
 
         # ═══════════════════════════════════════════════════════════════
-        # Build enhanced system prompt with history awareness
-        # ═══════════════════════════════════════════════════════════════
-        history_instruction = """
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-## CONVERSATION HISTORY ACCESS - CRITICAL INSTRUCTIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-YOU HAVE FULL ACCESS TO THIS SESSION'S CONVERSATION HISTORY.
-
-The message list contains ALL messages from THIS session in chronological order.
-Messages are: [SystemMessage, HumanMessage, AIMessage, HumanMessage, AIMessage, ...]
-
-**WHEN USER ASKS: "what was my last prompt" or "what did I just ask"**
-→ Look at the most recent HumanMessage BEFORE the current one
-→ Respond: "Your last prompt was: [exact text from that HumanMessage]"
-
-**WHEN USER ASKS: "what did you say" or "what was your response"**
-→ Look at the most recent AIMessage
-→ Respond: "I said: [exact text from that AIMessage]"
-
-**WHEN USER ASKS: "what did we discuss" or "summarize our conversation"**
-→ Review recent HumanMessage and AIMessage exchanges
-→ Provide a brief summary
-
-**EXAMPLE:**
-```
-User: "what's the weather?"
-You: [calls weather tool] "The weather is sunny, 22°C"
-User: "what was my last prompt?"
-You: "Your last prompt was: what's the weather?"  ← CORRECT
-```
-
-DO NOT say "I don't have access to history" - YOU DO.
-DO NOT say "I cannot retrieve that" - YOU CAN.
-"""
-
-        enhanced_system_prompt = system_prompt + history_instruction
-
-        # ═══════════════════════════════════════════════════════════════
-        # Update SystemMessage in conversation_state
-        # This is the SINGLE SOURCE OF TRUTH that langgraph will preserve
-        # ═══════════════════════════════════════════════════════════════
-        from langchain_core.messages import SystemMessage
-
-        if conversation_state["messages"] and isinstance(conversation_state["messages"][0], SystemMessage):
-            # Update existing SystemMessage
-            conversation_state["messages"][0] = SystemMessage(content=enhanced_system_prompt)
-            logger.info("✅ Updated SystemMessage with history awareness")
-        else:
-            # Insert new SystemMessage
-            conversation_state["messages"].insert(0, SystemMessage(content=enhanced_system_prompt))
-            logger.info("✅ Added SystemMessage with history awareness")
-
-        # Add cross-session context if available
-        if session_manager:
-            try:
-                total_sessions = session_manager.get_user_session_count()
-                recent_topics = session_manager.get_recent_session_topics(limit=5)
-
-                if total_sessions == 1:
-                    session_context = "\n\nThis is your FIRST conversation with this user."
-                else:
-                    session_context = f"\n\nYou've had {total_sessions} sessions. Recent topics:\n"
-                    for topic in recent_topics:
-                        if topic['session_id'] != session_id:  # Skip current
-                            session_context += f"  - {topic['name']}\n"
-
-                # Update the SystemMessage with cross-session context
-                current_content = conversation_state["messages"][0].content
-                conversation_state["messages"][0] = SystemMessage(content=current_content + session_context)
-                logger.info(f"✅ Added cross-session context ({total_sessions} total sessions)")
-
-            except Exception as e:
-                logger.error(f"Cross-session context failed: {e}")
-
-        # ═══════════════════════════════════════════════════════════════
-        # WORKAROUND: Intercept history questions for weaker models (7B)
+        # Intercept history questions for weaker models (7B)
         # Some models refuse to follow instructions even when correct
         # ═══════════════════════════════════════════════════════════════
         agent = agent_ref[0]
@@ -176,7 +98,6 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
                     break
 
             if previous_ai_message:
-                # Truncate if too long
                 if len(previous_ai_message) > 500:
                     response_text = f'I said: "{previous_ai_message[:500]}..." (truncated for brevity)\n\nWould you like me to repeat the full response?'
                 else:
@@ -193,12 +114,11 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
             logger.info("🎯 Conversation summary question detected - answering directly")
             history_question_detected = True
 
-            # Get last 10 exchanges (20 messages: 10 user + 10 assistant)
             recent_exchanges = []
             for msg in reversed(conversation_state["messages"]):
                 if isinstance(msg, (HumanMessage, AIMessage)) and not isinstance(msg, SystemMessage):
                     recent_exchanges.insert(0, msg)
-                    if len(recent_exchanges) >= 20:  # Last 10 exchanges
+                    if len(recent_exchanges) >= 20:
                         break
 
             if recent_exchanges:
@@ -208,7 +128,6 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
                         summary_lines.append(f"You asked: \"{msg.content[:100]}{'...' if len(msg.content) > 100 else ''}\"")
                     elif isinstance(msg, AIMessage):
                         summary_lines.append(f"I responded: \"{msg.content[:100]}{'...' if len(msg.content) > 100 else ''}\"")
-
                 response_text = "\n".join(summary_lines)
             else:
                 response_text = "We haven't had any conversation yet in this session."
@@ -221,7 +140,6 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
             logger.info("🎯 List of user prompts question detected - answering directly")
             history_question_detected = True
 
-            # Get all HumanMessages
             user_prompts = []
             for msg in conversation_state["messages"]:
                 if isinstance(msg, HumanMessage):
@@ -229,7 +147,7 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
 
             if user_prompts:
                 response_text = "Here are your recent prompts:\n\n"
-                for i, prompt_text in enumerate(user_prompts[-10:], 1):  # Last 10
+                for i, prompt_text in enumerate(user_prompts[-10:], 1):
                     response_text += f"{i}. \"{prompt_text}\"\n"
             else:
                 response_text = "You haven't asked any questions yet in this session."
@@ -239,7 +157,6 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
             logger.info("🎯 Topic-specific search question detected - answering directly")
             history_question_detected = True
 
-            # Extract the topic
             topic = None
             if "what did you say about" in prompt.lower():
                 topic = prompt.lower().split("what did you say about")[-1].strip().strip("?")
@@ -247,7 +164,6 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
                 topic = prompt.lower().split("what did i ask about")[-1].strip().strip("?")
 
             if topic:
-                # Search for relevant messages
                 relevant_messages = []
                 for msg in conversation_state["messages"]:
                     if isinstance(msg, AIMessage) and topic in msg.content.lower():
@@ -257,7 +173,7 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
 
                 if relevant_messages:
                     response_text = f"Here's what we discussed about '{topic}':\n\n"
-                    for role, content in relevant_messages[-5:]:  # Last 5 relevant
+                    for role, content in relevant_messages[-5:]:
                         preview = content[:200] + "..." if len(content) > 200 else content
                         if role == "user":
                             response_text += f"You: \"{preview}\"\n\n"
@@ -300,7 +216,7 @@ DO NOT say "I cannot retrieve that" - YOU CAN.
             prompt,
             logger,
             tools,
-            enhanced_system_prompt  # Passed as fallback if no SystemMessage exists
+            system_prompt
         )
 
         # ═══════════════════════════════════════════════════════════════
@@ -399,7 +315,6 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 messages = session_manager.get_session_messages(session_id)
                 current_session_id = session_id
 
-                # Load messages into conversation_state for context tracking
                 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
                 # Preserve system prompt if it exists
@@ -411,7 +326,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 conversation_state["messages"] = []
                 if system_msg:
-                    conversation_state["messages"].append(system_msg)  # ← Keep system prompt!
+                    conversation_state["messages"].append(system_msg)
 
                 conversation_state["session_id"] = session_id
 
@@ -419,17 +334,11 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 for msg in messages[-MAX_MESSAGE_HISTORY:]:
                     if msg["role"] == "system":
-                        conversation_state["messages"].append(
-                            SystemMessage(content=msg["text"])
-                        )
+                        conversation_state["messages"].append(SystemMessage(content=msg["text"]))
                     elif msg["role"] == "user":
-                        conversation_state["messages"].append(
-                            HumanMessage(content=msg["text"])
-                        )
+                        conversation_state["messages"].append(HumanMessage(content=msg["text"]))
                     elif msg["role"] == "assistant":
-                        conversation_state["messages"].append(
-                            AIMessage(content=msg["text"])
-                        )
+                        conversation_state["messages"].append(AIMessage(content=msg["text"]))
 
                 logger.info(f"📥 Loaded {len(conversation_state['messages'])} messages from session {session_id}")
 
@@ -442,9 +351,9 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
             if data.get("type") == "new_session":
                 current_session_id = None
-                conversation_state["messages"] = []  # Clear history
+                conversation_state["messages"] = []
                 if "session_id" in conversation_state:
-                    del conversation_state["session_id"]  # Remove old session_id
+                    del conversation_state["session_id"]
                 logger.info("🆕 New session started - conversation history cleared")
                 continue
 
@@ -477,29 +386,19 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 import sys
 
                 logger.warning("🛑 STOP SIGNAL ACTIVATED - Operations will halt at next checkpoint")
-
-                # Set stop flag immediately
                 request_stop()
 
-                # Print to CLI
                 print("\n🛑 Stop requested - operation will halt at next checkpoint")
                 print("   This may take a few seconds for the current step to complete.")
                 print("   Watch for '🛑 Stopped' messages below.\n")
                 sys.stdout.flush()
 
-                # Send IMMEDIATE response to web UI
                 await websocket.send(json.dumps({
                     "type": "assistant_message",
                     "text": "🛑 Stop requested - operation will halt at next checkpoint.\n\nThis may take a few seconds for the current step to complete."
                 }))
-
-                # Send completion immediately so UI resets
-                await websocket.send(json.dumps({
-                    "type": "complete",
-                    "stopped": True
-                }))
-
-                continue  # Don't process further
+                await websocket.send(json.dumps({"type": "complete", "stopped": True}))
+                continue
 
             # ═══════════════════════════════════════════════════════════
             # Fast operations - process synchronously
@@ -507,35 +406,22 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
             if data.get("type") == "subscribe_system_stats":
                 SYSTEM_MONITOR_CLIENTS.add(websocket)
-                await websocket.send(json.dumps({
-                    "type": "subscribed",
-                    "subscription": "system_stats"
-                }))
+                await websocket.send(json.dumps({"type": "subscribed", "subscription": "system_stats"}))
                 continue
 
             if data.get("type") == "unsubscribe_system_stats":
                 SYSTEM_MONITOR_CLIENTS.discard(websocket)
-                await websocket.send(json.dumps({
-                    "type": "unsubscribed",
-                    "subscription": "system_stats"
-                }))
+                await websocket.send(json.dumps({"type": "unsubscribed", "subscription": "system_stats"}))
                 continue
 
-            # ═══════════════════════════════════════════════════════════
-            # UPDATED: List models - Now shows both Ollama and GGUF
-            # ═══════════════════════════════════════════════════════════
             if data.get("type") == "list_models":
-                # Get unified model list (both Ollama and GGUF)
                 all_models = models_module.get_all_models()
-
-                # Extract just the model names for the dropdown
                 model_names = [m["name"] for m in all_models]
-
                 last = models_module.load_last_model()
                 await websocket.send(json.dumps({
                     "type": "models_list",
                     "models": model_names,
-                    "all_models": all_models,  # Include full info for future enhancement
+                    "all_models": all_models,
                     "last_used": last
                 }))
                 continue
@@ -546,10 +432,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     else {"role": "assistant", "text": m.content}
                     for m in conversation_state["messages"]
                 ]
-                await websocket.send(json.dumps({
-                    "type": "history_sync",
-                    "history": history_payload
-                }))
+                await websocket.send(json.dumps({"type": "history_sync", "history": history_payload}))
                 continue
 
             if data.get("type") == "metrics_request":
@@ -567,90 +450,58 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "tools": {"total_calls": 0, "total_errors": 0, "per_tool": {}},
                             "overall_errors": 0
                         }
-                await websocket.send(json.dumps({
-                    "type": "metrics_response",
-                    "metrics": metrics_data
-                }))
+                await websocket.send(json.dumps({"type": "metrics_response", "metrics": metrics_data}))
                 continue
 
-            # ═══════════════════════════════════════════════════════════
-            # UPDATED: Switch model - Now auto-detects backend
-            # ═══════════════════════════════════════════════════════════
             if data.get("type") == "switch_model":
                 model_name = data.get("model")
-
-                # Use unified switch_model that auto-detects backend
                 new_agent = await models_module.switch_model(
-                    model_name,
-                    tools,
-                    logger,
+                    model_name, tools, logger,
                     create_agent_fn=create_langgraph_agent,
                     a2a_state=a2a_state
                 )
-
                 if new_agent is None:
                     await websocket.send(json.dumps({
                         "type": "model_error",
                         "message": f"Model '{model_name}' not loaded"
                     }))
                     continue
-
-                # Clear conversation history when switching models
-                # conversation_state["messages"] = []
-                # logger.info("✅ Chat history cleared after model switch")
-
                 agent_ref[0] = new_agent
-                await websocket.send(json.dumps({
-                    "type": "model_switched",
-                    "model": model_name
-                }))
+                await websocket.send(json.dumps({"type": "model_switched", "model": model_name}))
                 continue
 
             # ═══════════════════════════════════════════════════════════
             # User messages - Create background task for long operations
             # ═══════════════════════════════════════════════════════════
             if data.get("type") == "user" or "text" in data:
-                original_prompt = data.get("text")  # Keep original for display
-                prompt = original_prompt  # Will be sanitized below
+                original_prompt = data.get("text")
+                prompt = original_prompt
 
-                # Get session_id from message if provided
                 if data.get("session_id"):
                     current_session_id = data.get("session_id")
 
-                # Sanitize user input to prevent parsing issues
                 from client.input_sanitizer import sanitize_user_input, sanitize_command
 
                 if prompt.startswith(":"):
-                    # Minimal sanitization for commands
                     prompt = sanitize_command(prompt)
                 else:
-                    # Full sanitization for regular queries
                     prompt = sanitize_user_input(prompt, preserve_markdown=True)
 
-                # Handle :a2a commands (fast - process inline)
                 if prompt.startswith(":a2a"):
                     result = await handle_a2a_commands(prompt, orchestrator)
                     if result:
                         await broadcast_message("assistant_message", {"text": result})
-                        await websocket.send(json.dumps({
-                            "type": "complete",
-                            "stopped": False
-                        }))
+                        await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                         continue
 
-                # Handle :multi commands (fast - process inline)
                 if prompt.startswith(":multi"):
                     from client.commands import handle_multi_agent_commands
                     result = await handle_multi_agent_commands(prompt, orchestrator, multi_agent_state)
                     if result:
                         await broadcast_message("assistant_message", {"text": result})
-                        await websocket.send(json.dumps({
-                            "type": "complete",
-                            "stopped": False
-                        }))
+                        await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                         continue
 
-                # Handle other commands (fast - process inline)
                 if prompt.startswith(":"):
                     handled, response, new_agent, new_model = await handle_command(
                         prompt, tools, model_name, conversation_state, models_module,
@@ -669,38 +520,27 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             agent_ref[0] = new_agent
                         if new_model:
                             model_name = new_model
-                        await websocket.send(json.dumps({
-                            "type": "complete",
-                            "stopped": False
-                        }))
+                        await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                         continue
 
-                # Save user message to session
                 if session_manager and not prompt.startswith(":"):
                     if not current_session_id:
-                        # Create new session on first message
                         current_session_id = session_manager.create_session()
                         await websocket.send(json.dumps({
                             "type": "session_created",
                             "session_id": current_session_id
                         }))
 
-                    # Save user message (user messages don't have model, pass None)
                     MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                     session_manager.add_message(current_session_id, "user", prompt, MAX_MESSAGE_HISTORY, model=None)
 
-                    # Generate session name immediately after first user message
                     messages = session_manager.get_session_messages(current_session_id)
-                    if len(messages) == 1:  # First message only
+                    if len(messages) == 1:
                         try:
-                            # Generate a simple name from first message (truncated)
                             text = prompt
-                            # Take first sentence or 50 chars
                             name = text.split('.')[0] if '.' in text else text
                             name = name[:50] + '...' if len(name) > 50 else name
                             session_manager.update_session_name(current_session_id, name)
-
-                            # Notify client of name update
                             await websocket.send(json.dumps({
                                 "type": "session_name_updated",
                                 "session_id": current_session_id,
@@ -709,30 +549,18 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         except Exception as e:
                             logger.error(f"Failed to generate session name: {e}")
 
-                # ═══════════════════════════════════════════════════════════
-                # Normal query - Run as BACKGROUND TASK
-                # This allows WebSocket to continue processing messages (like :stop)
-                # ═══════════════════════════════════════════════════════════
-
-                # Cancel previous task if still running (optional)
                 if current_task and not current_task.done():
                     logger.warning("⚠️ Cancelling previous task")
                     current_task.cancel()
 
-                # Create background task for query processing
                 current_task = asyncio.create_task(
                     process_query(websocket, prompt, original_prompt, agent_ref, conversation_state,
-                                run_agent_fn, logger, tools, session_manager, current_session_id, system_prompt)
+                                  run_agent_fn, logger, tools, session_manager, current_session_id, system_prompt)
                 )
 
-                # Don't await - let it run in background!
-                # The WebSocket loop continues immediately and can process :stop
-
     finally:
-        # Cancel any running task when connection closes
         if current_task and not current_task.done():
             current_task.cancel()
-
         CONNECTED_WEBSOCKETS.discard(websocket)
         SYSTEM_MONITOR_CLIENTS.discard(websocket)
 
