@@ -765,12 +765,12 @@
             opacity: 1;
         }
 
-        /* ── NEW: USER filter button color ── */
+        /* User filter button color ── */
         .filter-btn.USER.active {
             background: #e67e22;
         }
 
-        /* ── NEW: ASSISTANT filter button color ── */
+        /* Assistant filter button color ── */
         .filter-btn.ASSISTANT.active {
             background: #2ecc71;
             color: #1e1e1e;
@@ -814,13 +814,13 @@
             background: #2d2d2d;
         }
 
-        /* ── NEW: USER log entry ── */
+        /* User log entry ── */
         .log-entry.USER {
             border-left-color: #e67e22;
             background: rgba(230, 126, 34, 0.07);
         }
 
-        /* ── NEW: ASSISTANT log entry ── */
+        /* Assistant log entry ── */
         .log-entry.ASSISTANT {
             border-left-color: #2ecc71;
             background: rgba(46, 204, 113, 0.05);
@@ -858,7 +858,7 @@
             font-size: 0.75rem;
         }
 
-        /* ── NEW: USER / ASSISTANT label colors ── */
+        /* USER / ASSISTANT label colors ── */
         .log-level.USER {
             color: #e67e22;
         }
@@ -1302,7 +1302,7 @@
             </div>
 
             <div id="logFilters">
-                <!-- ── NEW: USER and ASSISTANT filter buttons ── -->
+                <!-- USER and ASSISTANT filter buttons -->
                 <button class="filter-btn USER active" data-level="USER" onclick="toggleLogFilter('USER')">USER</button>
                 <button class="filter-btn ASSISTANT active" data-level="ASSISTANT" onclick="toggleLogFilter('ASSISTANT')">ASSISTANT</button>
                 <button class="filter-btn DEBUG active" data-level="DEBUG" onclick="toggleLogFilter('DEBUG')">DEBUG</button>
@@ -1399,7 +1399,7 @@
 
         let logPanelOpen = false;
         let logAutoscroll = true;
-        // ── UPDATED: USER and ASSISTANT included in default active filters ──
+        // USER and ASSISTANT included in default active filters
         let logFilters = new Set(['USER', 'ASSISTANT', 'DEBUG', 'INFO', 'WARNING', 'ERROR']);
         let logWs = null;
 
@@ -2086,7 +2086,10 @@
                 if (modelName) {
                     const modelBadge = document.createElement("div");
                     modelBadge.className = "model-badge";
-                    modelBadge.textContent = modelName;
+                    const FALLBACK_LABELS = new Set(["unknown", "direct-answer", "mcp error"]);
+                    modelBadge.textContent = FALLBACK_LABELS.has(modelName.toLowerCase())
+                        ? "MCP"
+                        : modelName;
                     div.appendChild(modelBadge);
                 }
             }
