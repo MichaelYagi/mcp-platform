@@ -3,6 +3,46 @@
 // ============================================================
 const THEME_KEY = 'mcp_theme';
 
+const THEMES = [
+    { id: 'default',  label: 'Default' },
+    { id: 'midnight', label: 'Midnight' },
+    { id: 'forest',   label: 'Forest' },
+    { id: 'crimson',  label: 'Crimson' },
+    { id: 'optimus',  label: 'Optimus Prime' },
+    { id: 'neon',     label: 'Neon' },
+    { id: 'monokai',  label: 'Monokai' },
+    { id: 'nord',     label: 'Nord' },
+    { id: 'dracula',  label: 'Dracula' },
+];
+
+function getThemeSwatches(themeId) {
+    const prev = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', themeId);
+    const style = getComputedStyle(document.documentElement);
+    const s1 = style.getPropertyValue('--swatch1').trim();
+    const s2 = style.getPropertyValue('--swatch2').trim();
+    const s3 = style.getPropertyValue('--swatch3').trim();
+    document.documentElement.setAttribute('data-theme', prev || 'default');
+    return [s1, s2, s3];
+}
+
+function buildThemeDropdown() {
+    const dropdown = document.getElementById('themeDropdown');
+    dropdown.innerHTML = THEMES.map(({ id, label }) => {
+        const [s1, s2, s3] = getThemeSwatches(id);
+        return `
+            <div class="theme-option" data-theme="${id}" onclick="applyTheme('${id}')">
+                <div class="theme-option-swatches">
+                    <div class="theme-opt-swatch" style="background:${s1}"></div>
+                    <div class="theme-opt-swatch" style="background:${s2}"></div>
+                    <div class="theme-opt-swatch" style="background:${s3}"></div>
+                </div>
+                ${label}
+                <span class="check">✓</span>
+            </div>`;
+    }).join('');
+}
+
 function applyTheme(themeName) {
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem(THEME_KEY, themeName);
@@ -31,8 +71,9 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Load saved theme immediately
+// Build dropdown then load saved theme
 (function() {
+    buildThemeDropdown();
     const saved = localStorage.getItem(THEME_KEY) || 'default';
     applyTheme(saved);
 })();
