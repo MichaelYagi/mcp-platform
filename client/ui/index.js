@@ -565,15 +565,26 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper';
         wrapper.appendChild(div);
+
+        const meta = document.createElement('div');
+        meta.className = 'msg-meta';
+
         const ts = document.createElement('div');
         ts.className = 'msg-timestamp';
         const d = timestamp ? new Date(timestamp.includes('T') || timestamp.endsWith('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z') : new Date();
         const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
-        const timeStr = d.toLocaleString(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone });
-        const FALLBACK = new Set(["unknown","direct-answer","mcp error"]);
-        const modelLabel = modelName && !FALLBACK.has(modelName.toLowerCase()) ? modelName : "MCP";
-        ts.textContent = modelName ? `${timeStr} · ${modelLabel}` : timeStr;
-        wrapper.appendChild(ts);
+        ts.textContent = d.toLocaleString(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone });
+        meta.appendChild(ts);
+
+        if (modelName) {
+            const model = document.createElement('div');
+            model.className = 'msg-model';
+            const FALLBACK = new Set(["unknown","direct-answer","mcp error"]);
+            model.textContent = FALLBACK.has(modelName.toLowerCase()) ? "MCP" : modelName;
+            meta.appendChild(model);
+        }
+
+        wrapper.appendChild(meta);
         chat.appendChild(wrapper);
     } else {
         chat.appendChild(div);

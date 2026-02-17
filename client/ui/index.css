@@ -653,6 +653,34 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     padding-left: 0.25rem;
 }
 
+
+.msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+    max-width: 70%;
+}
+
+.msg-meta {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    font-size: 0.7rem;
+    gap: 0.5rem;
+}
+
+.msg-timestamp {
+    color: var(--status-color);
+    opacity: 0.5;
+}
+
+.msg-model {
+    color: var(--status-color);
+    opacity: 0.8;
+    font-weight: 500;
+}
+
 #modelSelectLabel { display: block; }
 
 /* ── Mobile ── */
