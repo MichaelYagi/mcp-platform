@@ -4,6 +4,97 @@
    index.html (chat interface) and dashboard.html
    ============================================================ */
 
+/* ============================================================
+   BASE RESET
+============================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ============================================================
+   BODY
+============================================================ */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--page-bg);
+    overflow: hidden;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    transition: background 0.3s ease;
+}
+
+/* ============================================================
+   HEADER
+============================================================ */
+
+#header {
+    background: var(--header-bg);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background 0.3s ease;
+}
+
+#header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* ============================================================
+   SCROLLBARS
+============================================================ */
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* ============================================================
+   RESPONSIVE BREAKPOINTS
+============================================================ */
+
+@media (max-width: 768px) {
+    #header {
+        padding: 0.75rem 1rem;
+    }
+    #header h1 {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #header h1 {
+        font-size: 1rem;
+    }
+}
+
+/* ============================================================
+   INDEX & DASHBOARD THEMES
+============================================================ */
+
+/* DATA THEMES */
 /* Default – steel blue (existing look) */
 :root,
 [data-theme="default"] {
@@ -653,6 +744,91 @@
     --swatch3:          #6a0572;
 }
 
+/* Tokyo Night – deep navy with electric blue & soft purple */
+[data-theme="tokyo"] {
+    /* Header */
+    --header-bg:        #1a1b26;
+    --header-border:    #16161e;
+
+    /* Sidebar */
+    --sidebar-bg:       #1f2335;
+    --sidebar-header:   #1a1b26;
+    --sidebar-item:     #1a1b26;
+    --sidebar-hover:    #2a2f45;
+    --sidebar-active:   #7aa2f7;
+    --sidebar-border:   #3b4261;
+    --sidebar-search:   #1a1b26;
+
+    /* Page & Chat */
+    --page-bg:          #1a1b26;
+    --chat-bg:          #1f2335;
+    --chat-border:      #3b4261;
+    --chat-assistant:   #24283b;
+    --chat-asst-border: #3b4261;
+    --chat-asst-color:  #c0caf5;
+    --input-bg:         #1f2335;
+    --input-border:     #3b4261;
+    --status-color:     #7aa2f7;
+
+    /* User bubbles & send button */
+    --user-bubble:      linear-gradient(135deg, #7aa2f7, #5680c2);
+    --send-btn:         #7aa2f7;
+    --send-btn-hover:   #5680c2;
+    --send-btn-focus:   rgba(122,162,247,0.3);
+
+    /* Buttons */
+    --btn-logs:             #7aa2f7;  /* electric blue */
+    --btn-logs-hover:       #5680c2;
+
+    --btn-monitor:          #bb9af7;  /* soft purple */
+    --btn-monitor-hover:    #9f7ce0;
+
+    --btn-dashboard:        #2ac3de;  /* muted teal */
+    --btn-dashboard-hover:  #1e9eb8;
+
+    --btn-newsession:       #2ac3de;
+    --btn-newsession-hover: #1e9eb8;
+
+    /* Log panel */
+    --log-bg:           #16161e;
+    --log-header:       #1a1b26;
+    --log-border:       #24283b;
+    --log-filter-bg:    #1a1b26;
+    --log-filter-btn:   #24283b;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%);
+    --monitor-header:   rgba(0,0,0,0.35);
+
+    /* Dashboard */
+    --btn-back:         #7aa2f7;
+    --btn-back-hover:   #5680c2;
+    --card-bg:          #1f2335;
+    --card-border:      #3b4261;
+    --card-shadow:      rgba(0,0,0,0.35);
+    --card-shadow-hover:rgba(0,0,0,0.55);
+    --title-color:      #c0caf5;
+    --metric-color:     #7aa2f7;
+    --subtitle-color:   #9aa5ce;
+    --label-color:      #9aa5ce;
+    --chart-blue:       #7aa2f7;
+    --chart-purple:     #bb9af7;
+    --tool-border:      #7aa2f7;
+    --tool-bg:          #24283b;
+    --status-bg:        #1f2335;
+
+    /* Scrollbars */
+    --scrollbar-track:  #1a1b26;
+    --scrollbar-thumb:  #3b4261;
+    --scrollbar-hover:  #4c5a7a;
+
+    /* Swatches (header, logs, monitor) */
+    --swatch1:          #1a1b26;
+    --swatch2:          #7aa2f7;
+    --swatch3:          #bb9af7;
+}
+
+/* SWATCHES */
 /* Dropdown swatches use same colors as button swatches */
 .theme-option[data-theme="default"] .theme-opt-swatch:nth-child(1) { background: #2c3e50; }
 .theme-option[data-theme="default"] .theme-opt-swatch:nth-child(2) { background: #3498db; }
@@ -690,88 +866,18 @@
 .theme-option[data-theme="dracula"] .theme-opt-swatch:nth-child(2) { background: #bd93f9; }
 .theme-option[data-theme="dracula"] .theme-opt-swatch:nth-child(3) { background: #50fa7b; }
 
-/* ============================================================
-   BASE RESET
-   ============================================================ */
+.theme-option[data-theme="tokyo"] .theme-opt-swatch:nth-child(1) { background: #1a1b26; }
+.theme-option[data-theme="tokyo"] .theme-opt-swatch:nth-child(2) { background: #7aa2f7; }
+.theme-option[data-theme="tokyo"] .theme-opt-swatch:nth-child(3) { background: #bb9af7; }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* ============================================================
-   BODY
-   ============================================================ */
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background: var(--page-bg);
-    overflow: hidden;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    transition: background 0.3s ease;
-}
-
-/* ============================================================
-   HEADER
-   ============================================================ */
-
-#header {
-    background: var(--header-bg);
-    color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: background 0.3s ease;
-}
-
-#header h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-/* ============================================================
-   SCROLLBARS
-   ============================================================ */
-
-::-webkit-scrollbar {
-    width: 10px;
-}
-
-::-webkit-scrollbar-track {
-    background: var(--scrollbar-track);
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--scrollbar-thumb);
-    border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--scrollbar-hover);
-}
-
-/* ============================================================
-   RESPONSIVE BREAKPOINTS
-   ============================================================ */
-
-@media (max-width: 768px) {
-    #header {
-        padding: 0.75rem 1rem;
-    }
-    #header h1 {
-        font-size: 1.1rem;
-    }
-}
-
-@media (max-width: 480px) {
-    #header h1 {
-        font-size: 1rem;
-    }
+/* Theme registry — readable by JS without file I/O */
+/* Add the data-theme
+[data-theme="tokyo"]
+Swatches    .theme-option[data-theme="tokyo"] .theme-opt-swatch:nth-child(1) { background: #1a1b26; }
+            .theme-option[data-theme="tokyo"] .theme-opt-swatch:nth-child(2) { background: #7aa2f7; }
+            .theme-option[data-theme="tokyo"] .theme-opt-swatch:nth-child(3) { background: #bb9af7; }
+And update the theme-list below
+ */
+:root {
+    --theme-list: "default,midnight,forest,crimson,optimus,neon,monokai,nord,dracula,tokyo";
 }

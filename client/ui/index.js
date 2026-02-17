@@ -3,17 +3,19 @@
 // ============================================================
 const THEME_KEY = 'mcp_theme';
 
-const THEMES = [
-    { id: 'default',  label: 'Default' },
-    { id: 'midnight', label: 'Midnight' },
-    { id: 'forest',   label: 'Forest' },
-    { id: 'crimson',  label: 'Crimson' },
-    { id: 'optimus',  label: 'Optimus Prime' },
-    { id: 'neon',     label: 'Neon' },
-    { id: 'monokai',  label: 'Monokai' },
-    { id: 'nord',     label: 'Nord' },
-    { id: 'dracula',  label: 'Dracula' },
-];
+// Discover themes directly from CSS - no hardcoded list needed.
+// Reads all [data-theme="x"] selectors from loaded stylesheets,
+// then uses --swatch1/2/3 variables for the picker swatches.
+// Falls back to fetching shared.css as text if CSSOM is blocked (e.g. file://).
+// Discover themes by reading --theme-list from :root in shared.css.
+// This works everywhere including file:// with no I/O or CORS issues.
+function discoverThemes() {
+    const list = getComputedStyle(document.documentElement)
+        .getPropertyValue('--theme-list')
+        .trim()
+        .replace(/"/g, '');
+    return list ? list.split(',').map(s => s.trim()).filter(Boolean) : ['default'];
+}
 
 function getThemeSwatches(themeId) {
     const prev = document.documentElement.getAttribute('data-theme');
@@ -26,9 +28,15 @@ function getThemeSwatches(themeId) {
     return [s1, s2, s3];
 }
 
+function themeIdToLabel(id) {
+    const overrides = { optimus: 'Optimus Prime', tokyo: 'Tokyo Night' };
+    return overrides[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+}
+
 function buildThemeDropdown() {
+    const themes = discoverThemes();
     const dropdown = document.getElementById('themeDropdown');
-    dropdown.innerHTML = THEMES.map(({ id, label }) => {
+    dropdown.innerHTML = themes.map(id => {
         const [s1, s2, s3] = getThemeSwatches(id);
         return `
             <div class="theme-option" data-theme="${id}" onclick="applyTheme('${id}')">
@@ -37,7 +45,7 @@ function buildThemeDropdown() {
                     <div class="theme-opt-swatch" style="background:${s2}"></div>
                     <div class="theme-opt-swatch" style="background:${s3}"></div>
                 </div>
-                ${label}
+                ${themeIdToLabel(id)}
                 <span class="check">✓</span>
             </div>`;
     }).join('');
@@ -46,12 +54,9 @@ function buildThemeDropdown() {
 function applyTheme(themeName) {
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem(THEME_KEY, themeName);
-
-    // update active state in dropdown
     document.querySelectorAll('.theme-option').forEach(el => {
         el.classList.toggle('active', el.dataset.theme === themeName);
     });
-
     closeThemeDropdown();
 }
 
@@ -64,21 +69,18 @@ function closeThemeDropdown() {
     document.getElementById('themeDropdown').classList.remove('open');
 }
 
-// Close dropdown on outside click
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('#themeWrapper')) {
-        closeThemeDropdown();
-    }
+    if (!e.target.closest('#themeWrapper')) closeThemeDropdown();
 });
 
-// Build dropdown then load saved theme
+// Build dropdown then restore saved theme
 (function() {
-    buildThemeDropdown();
     const saved = localStorage.getItem(THEME_KEY) || 'default';
+    document.documentElement.setAttribute('data-theme', saved);
+    buildThemeDropdown();
     applyTheme(saved);
 })();
 
-// ============================================================
 // CORE APP STATE
 // ============================================================
 const status = document.getElementById("status");
