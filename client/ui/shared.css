@@ -1,24 +1,660 @@
 /* ============================================================
-   SHARED THEME VARIABLES (only variables that appear in BOTH)
+   UNIFIED THEME VARIABLES
+   All themes defined with complete variable sets for both
+   index.html (chat interface) and dashboard.html
    ============================================================ */
 
+/* Default – steel blue (existing look) */
 :root,
-[data-theme="default"],
-[data-theme="neon"],
-[data-theme="monokai"],
-[data-theme="nord"],
-[data-theme="dracula"],
-[data-theme="midnight"],
-[data-theme="forest"],
-[data-theme="optimus"],
+[data-theme="default"] {
+    /* Header */
+    --header-bg:        #2c3e50;
+    --header-border:    #1a252f;
+
+    /* Sidebar (chat interface) */
+    --sidebar-bg:       #34495e;
+    --sidebar-header:   #2c3e50;
+    --sidebar-item:     #2c3e50;
+    --sidebar-hover:    #3d5a80;
+    --sidebar-active:   #153d58;
+    --sidebar-border:   #4a5f7f;
+    --sidebar-search:   #2c3e50;
+
+    /* Page & Chat */
+    --page-bg:          #f5f7fa;
+    --chat-bg:          #ffffff;
+    --chat-border:      #d0d7de;
+    --chat-assistant:   #f0f2f5;
+    --chat-asst-border: #d9d9d9;
+    --chat-asst-color:  #333;
+    --input-bg:         #ffffff;
+    --input-border:     #cbd5e1;
+    --status-color:     #555;
+
+    /* User bubbles & buttons */
+    --user-bubble:      linear-gradient(135deg, #4da3ff, #1c7dff);
+    --send-btn:         #1c7dff;
+    --send-btn-hover:   #0066e6;
+    --send-btn-focus:   rgba(77,163,255,0.3);
+
+    --btn-logs:         #3498db;
+    --btn-logs-hover:   #2980b9;
+    --btn-monitor:      #9b59b6;
+    --btn-monitor-hover:#8e44ad;
+    --btn-dashboard:    #27ae60;
+    --btn-dashboard-hover:#229954;
+    --btn-newsession:   #27ae60;
+    --btn-newsession-hover:#229954;
+
+    /* Log panel */
+    --log-bg:           #1e1e1e;
+    --log-header:       #2d2d2d;
+    --log-border:       #3e3e3e;
+    --log-filter-bg:    #252525;
+    --log-filter-btn:   #424242;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --monitor-header:   rgba(0,0,0,0.2);
+
+    /* Dashboard specific */
+    --btn-back:         #3498db;
+    --btn-back-hover:   #2980b9;
+    --card-bg:          #ffffff;
+    --card-border:      #d0d7de;
+    --card-shadow:      rgba(0,0,0,0.08);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #2c3e50;
+    --metric-color:     #2c3e50;
+    --subtitle-color:   #999;
+    --label-color:      #666;
+    --chart-blue:       #3498db;
+    --chart-purple:     #9b59b6;
+    --tool-border:      #3498db;
+    --tool-bg:          #f8f9fa;
+    --status-bg:        #ffffff;
+
+    /* Scrollbars */
+    --scrollbar-track:  #f5f7fa;
+    --scrollbar-thumb:  #cbd5e1;
+    --scrollbar-hover:  #94a3b8;
+
+    /* Swatch colors */
+    --swatch1:          #2c3e50;
+    --swatch2:          #3498db;
+    --swatch3:          #27ae60;
+}
+
+/* Neon – cyberpunk dark with cyan/magenta */
+[data-theme="neon"] {
+    --header-bg:        #1a1a2e;
+    --header-border:    #0f0f1e;
+
+    --sidebar-bg:       #16213e;
+    --sidebar-header:   #1a1a2e;
+    --sidebar-item:     #1a1a2e;
+    --sidebar-hover:    #2a2a4e;
+    --sidebar-active:   #0f1f3e;
+    --sidebar-border:   #3a4f6f;
+    --sidebar-search:   #1a1a2e;
+
+    --page-bg:          #0f0f1e;
+    --chat-bg:          #16213e;
+    --chat-border:      #3a4f6f;
+    --chat-assistant:   #1a2332;
+    --chat-asst-border: #3a4f6f;
+    --chat-asst-color:  #8ecae6;
+    --input-bg:         #16213e;
+    --input-border:     #3a4f6f;
+    --status-color:     #8ecae6;
+
+    --user-bubble:      linear-gradient(135deg, #ff006e, #d90058);
+    --send-btn:         #ff006e;
+    --send-btn-hover:   #d90058;
+    --send-btn-focus:   rgba(255,0,110,0.3);
+
+    --btn-logs:         #00f5ff;
+    --btn-logs-hover:   #00d4e6;
+    --btn-monitor:      #ff006e;
+    --btn-monitor-hover:#d90058;
+    --btn-dashboard:    #00f5ff;
+    --btn-dashboard-hover:#00d4e6;
+    --btn-newsession:   #00f5ff;
+    --btn-newsession-hover:#00d4e6;
+
+    --log-bg:           #0a0a1e;
+    --log-header:       #0f0f1e;
+    --log-border:       #1a1a2e;
+    --log-filter-bg:    #0f0f1e;
+    --log-filter-btn:   #16213e;
+
+    --monitor-gradient: linear-gradient(135deg, #00f5ff 0%, #ff006e 100%);
+    --monitor-header:   rgba(0,0,0,0.4);
+
+    --btn-back:         #00f5ff;
+    --btn-back-hover:   #00d4e6;
+    --card-bg:          #16213e;
+    --card-border:      #3a4f6f;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #8ecae6;
+    --metric-color:     #00f5ff;
+    --subtitle-color:   #8ecae6;
+    --label-color:      #8ecae6;
+    --chart-blue:       #00f5ff;
+    --chart-purple:     #ff006e;
+    --tool-border:      #ff006e;
+    --tool-bg:          #1a2332;
+    --status-bg:        #16213e;
+
+    --scrollbar-track:  #0f0f1e;
+    --scrollbar-thumb:  #3a4f6f;
+    --scrollbar-hover:  #4a6f8f;
+
+    --swatch1:          #1a1a2e;
+    --swatch2:          #00f5ff;
+    --swatch3:          #ff006e;
+}
+
+/* Monokai – classic code editor theme */
+[data-theme="monokai"] {
+    --header-bg:        #272822;
+    --header-border:    #1e1f1c;
+
+    --sidebar-bg:       #2e2f2a;
+    --sidebar-header:   #272822;
+    --sidebar-item:     #272822;
+    --sidebar-hover:    #3e3f3a;
+    --sidebar-active:   #1a1b16;
+    --sidebar-border:   #49483e;
+    --sidebar-search:   #272822;
+
+    --page-bg:          #1e1f1c;
+    --chat-bg:          #272822;
+    --chat-border:      #49483e;
+    --chat-assistant:   #2e2f2a;
+    --chat-asst-border: #49483e;
+    --chat-asst-color:  #f8f8f2;
+    --input-bg:         #272822;
+    --input-border:     #49483e;
+    --status-color:     #a6a6a1;
+
+    --user-bubble:      linear-gradient(135deg, #f92672, #d91a5b);
+    --send-btn:         #f92672;
+    --send-btn-hover:   #d91a5b;
+    --send-btn-focus:   rgba(249,38,114,0.3);
+
+    --btn-logs:         #66d9ef;
+    --btn-logs-hover:   #4ac9df;
+    --btn-monitor:      #ae81ff;
+    --btn-monitor-hover:#9871ef;
+    --btn-dashboard:    #a6e22e;
+    --btn-dashboard-hover:#90cc1e;
+    --btn-newsession:   #a6e22e;
+    --btn-newsession-hover:#90cc1e;
+
+    --log-bg:           #1a1b16;
+    --log-header:       #1e1f1c;
+    --log-border:       #2e2f2a;
+    --log-filter-bg:    #1e1f1c;
+    --log-filter-btn:   #2e2f2a;
+
+    --monitor-gradient: linear-gradient(135deg, #66d9ef 0%, #ae81ff 100%);
+    --monitor-header:   rgba(0,0,0,0.4);
+
+    --btn-back:         #66d9ef;
+    --btn-back-hover:   #4ac9df;
+    --card-bg:          #272822;
+    --card-border:      #49483e;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #f8f8f2;
+    --metric-color:     #a6e22e;
+    --subtitle-color:   #75715e;
+    --label-color:      #a6a6a1;
+    --chart-blue:       #66d9ef;
+    --chart-purple:     #ae81ff;
+    --tool-border:      #f92672;
+    --tool-bg:          #2e2f2a;
+    --status-bg:        #272822;
+
+    --scrollbar-track:  #1e1f1c;
+    --scrollbar-thumb:  #49483e;
+    --scrollbar-hover:  #75715e;
+
+    --swatch1:          #272822;
+    --swatch2:          #66d9ef;
+    --swatch3:          #a6e22e;
+}
+
+/* Nord – arctic blue-gray */
+[data-theme="nord"] {
+    --header-bg:        #2e3440;
+    --header-border:    #3b4252;
+
+    --sidebar-bg:       #3b4252;
+    --sidebar-header:   #2e3440;
+    --sidebar-item:     #2e3440;
+    --sidebar-hover:    #434c5e;
+    --sidebar-active:   #5e81ac;
+    --sidebar-border:   #4c566a;
+    --sidebar-search:   #2e3440;
+
+    --page-bg:          #eceff4;
+    --chat-bg:          #ffffff;
+    --chat-border:      #d8dee9;
+    --chat-assistant:   #e5e9f0;
+    --chat-asst-border: #d8dee9;
+    --chat-asst-color:  #2e3440;
+    --input-bg:         #ffffff;
+    --input-border:     #d8dee9;
+    --status-color:     #4c566a;
+
+    --user-bubble:      linear-gradient(135deg, #5e81ac, #4c6a94);
+    --send-btn:         #5e81ac;
+    --send-btn-hover:   #4c6a94;
+    --send-btn-focus:   rgba(94,129,172,0.3);
+
+    --btn-logs:         #5e81ac;
+    --btn-logs-hover:   #4c6a94;
+    --btn-monitor:      #b48ead;
+    --btn-monitor-hover:#a07e9d;
+    --btn-dashboard:    #88c0d0;
+    --btn-dashboard-hover:#72a0b0;
+    --btn-newsession:   #88c0d0;
+    --btn-newsession-hover:#72a0b0;
+
+    --log-bg:           #2e3440;
+    --log-header:       #3b4252;
+    --log-border:       #434c5e;
+    --log-filter-bg:    #2e3440;
+    --log-filter-btn:   #3b4252;
+
+    --monitor-gradient: linear-gradient(135deg, #5e81ac 0%, #b48ead 100%);
+    --monitor-header:   rgba(0,0,0,0.25);
+
+    --btn-back:         #5e81ac;
+    --btn-back-hover:   #4c6a94;
+    --card-bg:          #ffffff;
+    --card-border:      #d8dee9;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #2e3440;
+    --metric-color:     #2e3440;
+    --subtitle-color:   #4c566a;
+    --label-color:      #4c566a;
+    --chart-blue:       #5e81ac;
+    --chart-purple:     #b48ead;
+    --tool-border:      #5e81ac;
+    --tool-bg:          #e5e9f0;
+    --status-bg:        #ffffff;
+
+    --scrollbar-track:  #eceff4;
+    --scrollbar-thumb:  #d8dee9;
+    --scrollbar-hover:  #c4cbd8;
+
+    --swatch1:          #2e3440;
+    --swatch2:          #5e81ac;
+    --swatch3:          #88c0d0;
+}
+
+/* Dracula – purple and pink on charcoal */
+[data-theme="dracula"] {
+    --header-bg:        #282a36;
+    --header-border:    #21222c;
+
+    --sidebar-bg:       #33353f;
+    --sidebar-header:   #282a36;
+    --sidebar-item:     #282a36;
+    --sidebar-hover:    #44475a;
+    --sidebar-active:   #6272a4;
+    --sidebar-border:   #44475a;
+    --sidebar-search:   #282a36;
+
+    --page-bg:          #1e1f28;
+    --chat-bg:          #282a36;
+    --chat-border:      #44475a;
+    --chat-assistant:   #33353f;
+    --chat-asst-border: #44475a;
+    --chat-asst-color:  #f8f8f2;
+    --input-bg:         #282a36;
+    --input-border:     #44475a;
+    --status-color:     #a0a0a0;
+
+    --user-bubble:      linear-gradient(135deg, #bd93f9, #9d73d9);
+    --send-btn:         #bd93f9;
+    --send-btn-hover:   #9d73d9;
+    --send-btn-focus:   rgba(189,147,249,0.3);
+
+    --btn-logs:         #8be9fd;
+    --btn-logs-hover:   #6bd9ed;
+    --btn-monitor:      #ff79c6;
+    --btn-monitor-hover:#df59a6;
+    --btn-dashboard:    #50fa7b;
+    --btn-dashboard-hover:#30da5b;
+    --btn-newsession:   #50fa7b;
+    --btn-newsession-hover:#30da5b;
+
+    --log-bg:           #1e1f28;
+    --log-header:       #21222c;
+    --log-border:       #282a36;
+    --log-filter-bg:    #21222c;
+    --log-filter-btn:   #282a36;
+
+    --monitor-gradient: linear-gradient(135deg, #8be9fd 0%, #ff79c6 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    --btn-back:         #bd93f9;
+    --btn-back-hover:   #9d73d9;
+    --card-bg:          #282a36;
+    --card-border:      #44475a;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #f8f8f2;
+    --metric-color:     #50fa7b;
+    --subtitle-color:   #6272a4;
+    --label-color:      #a0a0a0;
+    --chart-blue:       #8be9fd;
+    --chart-purple:     #ff79c6;
+    --tool-border:      #bd93f9;
+    --tool-bg:          #33353f;
+    --status-bg:        #282a36;
+
+    --scrollbar-track:  #1e1f28;
+    --scrollbar-thumb:  #44475a;
+    --scrollbar-hover:  #6272a4;
+
+    --swatch1:          #282a36;
+    --swatch2:          #bd93f9;
+    --swatch3:          #50fa7b;
+}
+
+/* Midnight – deep dark blue-black */
+[data-theme="midnight"] {
+    --header-bg:        #0d1117;
+    --header-border:    #010409;
+
+    --sidebar-bg:       #161b22;
+    --sidebar-header:   #0d1117;
+    --sidebar-item:     #0d1117;
+    --sidebar-hover:    #21262d;
+    --sidebar-active:   #00b4d8;
+    --sidebar-border:   #30363d;
+    --sidebar-search:   #0d1117;
+
+    --page-bg:          #090c10;
+    --chat-bg:          #0d1117;
+    --chat-border:      #30363d;
+    --chat-assistant:   #161b22;
+    --chat-asst-border: #30363d;
+    --chat-asst-color:  #c9d1d9;
+    --input-bg:         #0d1117;
+    --input-border:     #30363d;
+    --status-color:     #8b949e;
+
+    --user-bubble:      linear-gradient(135deg, #00b4d8, #0096b7);
+    --send-btn:         #00b4d8;
+    --send-btn-hover:   #0096b7;
+    --send-btn-focus:   rgba(0,180,216,0.3);
+
+    --btn-logs:         #00b4d8;
+    --btn-logs-hover:   #0096b7;
+    --btn-monitor:      #7b2d8b;
+    --btn-monitor-hover:#6b1d7b;
+    --btn-dashboard:    #00b4d8;
+    --btn-dashboard-hover:#0096b7;
+    --btn-newsession:   #00b4d8;
+    --btn-newsession-hover:#0096b7;
+
+    --log-bg:           #010409;
+    --log-header:       #0d1117;
+    --log-border:       #161b22;
+    --log-filter-bg:    #0d1117;
+    --log-filter-btn:   #161b22;
+
+    --monitor-gradient: linear-gradient(135deg, #00b4d8 0%, #7b2d8b 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    --btn-back:         #00b4d8;
+    --btn-back-hover:   #0096b7;
+    --card-bg:          #0d1117;
+    --card-border:      #30363d;
+    --card-shadow:      rgba(0,0,0,0.3);
+    --card-shadow-hover:rgba(0,0,0,0.5);
+    --title-color:      #c9d1d9;
+    --metric-color:     #e6edf3;
+    --subtitle-color:   #8b949e;
+    --label-color:      #8b949e;
+    --chart-blue:       #00b4d8;
+    --chart-purple:     #7b2d8b;
+    --tool-border:      #00b4d8;
+    --tool-bg:          #161b22;
+    --status-bg:        #0d1117;
+
+    --scrollbar-track:  #090c10;
+    --scrollbar-thumb:  #30363d;
+    --scrollbar-hover:  #484f58;
+
+    --swatch1:          #0d1117;
+    --swatch2:          #00b4d8;
+    --swatch3:          #7b2d8b;
+}
+
+/* Forest – green nature tones */
+[data-theme="forest"] {
+    --header-bg:        #1a2e1a;
+    --header-border:    #0f1f0f;
+
+    --sidebar-bg:       #2a4a2a;
+    --sidebar-header:   #1a2e1a;
+    --sidebar-item:     #1a2e1a;
+    --sidebar-hover:    #3a5a3a;
+    --sidebar-active:   #52b788;
+    --sidebar-border:   #4a6a4a;
+    --sidebar-search:   #1a2e1a;
+
+    --page-bg:          #f0f4f0;
+    --chat-bg:          #fafcfa;
+    --chat-border:      #c8d8c8;
+    --chat-assistant:   #edf3ed;
+    --chat-asst-border: #c8d8c8;
+    --chat-asst-color:  #1a2e1a;
+    --input-bg:         #fafcfa;
+    --input-border:     #c8d8c8;
+    --status-color:     #4a6a4a;
+
+    --user-bubble:      linear-gradient(135deg, #52b788, #40916c);
+    --send-btn:         #52b788;
+    --send-btn-hover:   #40916c;
+    --send-btn-focus:   rgba(82,183,136,0.3);
+
+    --btn-logs:         #52b788;
+    --btn-logs-hover:   #40916c;
+    --btn-monitor:      #00693E;
+    --btn-monitor-hover:#00592E;
+    --btn-dashboard:    #52b788;
+    --btn-dashboard-hover:#40916c;
+    --btn-newsession:   #52b788;
+    --btn-newsession-hover:#40916c;
+
+    --log-bg:           #1a2e1a;
+    --log-header:       #2a4a2a;
+    --log-border:       #3a5a3a;
+    --log-filter-bg:    #1a2e1a;
+    --log-filter-btn:   #2a4a2a;
+
+    --monitor-gradient: linear-gradient(135deg, #52b788 0%, #00693E 100%);
+    --monitor-header:   rgba(0,0,0,0.2);
+
+    --btn-back:         #52b788;
+    --btn-back-hover:   #40916c;
+    --card-bg:          #fafcfa;
+    --card-border:      #c8d8c8;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #1a2e1a;
+    --metric-color:     #1a2e1a;
+    --subtitle-color:   #4a6a4a;
+    --label-color:      #4a6a4a;
+    --chart-blue:       #52b788;
+    --chart-purple:     #00693E;
+    --tool-border:      #52b788;
+    --tool-bg:          #edf3ed;
+    --status-bg:        #fafcfa;
+
+    --scrollbar-track:  #f0f4f0;
+    --scrollbar-thumb:  #c8d8c8;
+    --scrollbar-hover:  #a8c8a8;
+
+    --swatch1:          #1a2e1a;
+    --swatch2:          #52b788;
+    --swatch3:          #00693E;
+}
+
+/* Optimus Prime – blue and red heroic */
+[data-theme="optimus"] {
+    --header-bg:        #0047AB;
+    --header-border:    #003080;
+
+    --sidebar-bg:       #1a3a6a;
+    --sidebar-header:   #0047AB;
+    --sidebar-item:     #0047AB;
+    --sidebar-hover:    #2a5a8a;
+    --sidebar-active:   #D92121;
+    --sidebar-border:   #4682BF;
+    --sidebar-search:   #0047AB;
+
+    --page-bg:          #111111;
+    --chat-bg:          #1a1a1a;
+    --chat-border:      #4682BF;
+    --chat-assistant:   #1e2a3a;
+    --chat-asst-border: #4682BF;
+    --chat-asst-color:  #D3D3D3;
+    --input-bg:         #1a1a1a;
+    --input-border:     #4682BF;
+    --status-color:     #D3D3D3;
+
+    --user-bubble:      linear-gradient(135deg, #D92121, #a01515);
+    --send-btn:         #D92121;
+    --send-btn-hover:   #a01515;
+    --send-btn-focus:   rgba(217,33,33,0.3);
+
+    --btn-logs:         #4682BF;
+    --btn-logs-hover:   #3672AF;
+    --btn-monitor:      #ffcc00;
+    --btn-monitor-hover:#e6b800;
+    --btn-dashboard:    #D92121;
+    --btn-dashboard-hover:#a01515;
+    --btn-newsession:   #4682BF;
+    --btn-newsession-hover:#3672AF;
+
+    --log-bg:           #0a0a0a;
+    --log-header:       #111111;
+    --log-border:       #1a1a1a;
+    --log-filter-bg:    #111111;
+    --log-filter-btn:   #1a1a1a;
+
+    --monitor-gradient: linear-gradient(135deg, #4682BF 0%, #D92121 100%);
+    --monitor-header:   rgba(0,0,0,0.4);
+
+    --btn-back:         #D92121;
+    --btn-back-hover:   #a01515;
+    --card-bg:          #1a1a1a;
+    --card-border:      #4682BF;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #D3D3D3;
+    --metric-color:     #ffcc00;
+    --subtitle-color:   #D3D3D3;
+    --label-color:      #D3D3D3;
+    --chart-blue:       #4682BF;
+    --chart-purple:     #D92121;
+    --tool-border:      #D92121;
+    --tool-bg:          #1e2a3a;
+    --status-bg:        #1a1a1a;
+
+    --scrollbar-track:  #111111;
+    --scrollbar-thumb:  #0047AB;
+    --scrollbar-hover:  #4682BF;
+
+    --swatch1:          #0047AB;
+    --swatch2:          #D92121;
+    --swatch3:          #ffcc00;
+}
+
+/* Crimson – deep red accents */
 [data-theme="crimson"] {
-    --header-bg: inherit;
-    --header-border: inherit;
-    --page-bg: inherit;
+    --header-bg:        #1c1c1e;
+    --header-border:    #0a0a0b;
+
+    --sidebar-bg:       #2a1a1a;
+    --sidebar-header:   #1c1c1e;
+    --sidebar-item:     #1c1c1e;
+    --sidebar-hover:    #3a2a2a;
+    --sidebar-active:   #e63946;
+    --sidebar-border:   #4a3a3a;
+    --sidebar-search:   #1c1c1e;
+
+    --page-bg:          #f7f0f0;
+    --chat-bg:          #ffffff;
+    --chat-border:      #e0c8c8;
+    --chat-assistant:   #fdf0f0;
+    --chat-asst-border: #e0c8c8;
+    --chat-asst-color:  #2a1a1a;
+    --input-bg:         #ffffff;
+    --input-border:     #e0c8c8;
+    --status-color:     #6a3a3a;
+
+    --user-bubble:      linear-gradient(135deg, #e63946, #c1121f);
+    --send-btn:         #e63946;
+    --send-btn-hover:   #c1121f;
+    --send-btn-focus:   rgba(230,57,70,0.3);
+
+    --btn-logs:         #e63946;
+    --btn-logs-hover:   #c1121f;
+    --btn-monitor:      #6a0572;
+    --btn-monitor-hover:#5a0562;
+    --btn-dashboard:    #e63946;
+    --btn-dashboard-hover:#c1121f;
+    --btn-newsession:   #e63946;
+    --btn-newsession-hover:#c1121f;
+
+    --log-bg:           #1a1a1a;
+    --log-header:       #1c1c1e;
+    --log-border:       #2a1a1a;
+    --log-filter-bg:    #1c1c1e;
+    --log-filter-btn:   #2a1a1a;
+
+    --monitor-gradient: linear-gradient(135deg, #e63946 0%, #6a0572 100%);
+    --monitor-header:   rgba(0,0,0,0.2);
+
+    --btn-back:         #e63946;
+    --btn-back-hover:   #c1121f;
+    --card-bg:          #ffffff;
+    --card-border:      #e0c8c8;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #2a1a1a;
+    --metric-color:     #2a1a1a;
+    --subtitle-color:   #6a3a3a;
+    --label-color:      #6a3a3a;
+    --chart-blue:       #e63946;
+    --chart-purple:     #6a0572;
+    --tool-border:      #e63946;
+    --tool-bg:          #fdf0f0;
+    --status-bg:        #ffffff;
+
+    --scrollbar-track:  #f7f0f0;
+    --scrollbar-thumb:  #e0c8c8;
+    --scrollbar-hover:  #c8a8a8;
+
+    --swatch1:          #1c1c1e;
+    --swatch2:          #e63946;
+    --swatch3:          #6a0572;
 }
 
 /* ============================================================
-   BASE RESET (shared)
+   BASE RESET
    ============================================================ */
 
 * {
@@ -28,7 +664,7 @@
 }
 
 /* ============================================================
-   BODY (shared structure)
+   BODY
    ============================================================ */
 
 body {
@@ -44,7 +680,7 @@ body {
 }
 
 /* ============================================================
-   HEADER (shared structure)
+   HEADER
    ============================================================ */
 
 #header {
@@ -64,7 +700,7 @@ body {
 }
 
 /* ============================================================
-   SCROLLBARS (shared)
+   SCROLLBARS
    ============================================================ */
 
 ::-webkit-scrollbar {
@@ -85,7 +721,7 @@ body {
 }
 
 /* ============================================================
-   RESPONSIVE BREAKPOINTS (shared patterns)
+   RESPONSIVE BREAKPOINTS
    ============================================================ */
 
 @media (max-width: 768px) {
