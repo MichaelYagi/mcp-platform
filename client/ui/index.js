@@ -3,12 +3,8 @@
 // ============================================================
 const THEME_KEY = 'mcp_theme';
 
-// Discover themes directly from CSS - no hardcoded list needed.
-// Reads all [data-theme="x"] selectors from loaded stylesheets,
-// then uses --swatch1/2/3 variables for the picker swatches.
-// Falls back to fetching shared.css as text if CSSOM is blocked (e.g. file://).
-// Discover themes by reading --theme-list from :root in shared.css.
-// This works everywhere including file:// with no I/O or CORS issues.
+// Reads --theme-list CSS variable from :root in shared.css.
+// Works everywhere including file:// with no I/O or CORS issues.
 function discoverThemes() {
     const list = getComputedStyle(document.documentElement)
         .getPropertyValue('--theme-list')
@@ -46,7 +42,7 @@ function buildThemeDropdown() {
                     <div class="theme-opt-swatch" style="background:${s3}"></div>
                 </div>
                 ${themeIdToLabel(id)}
-                <span class="check">✓</span>
+                <span class="check">&#x2713;</span>
             </div>`;
     }).join('');
 }
@@ -440,7 +436,7 @@ ws.onmessage = (event) => {
         chat.innerHTML = "";
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
-        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model));
+        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp));
         renderSessions(allSessions); return;
     }
     if (data.type==='session_created')      { currentSessionId = data.session_id; localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId); return; }
@@ -462,7 +458,7 @@ ws.onmessage = (event) => {
             hideThinking(); addMessage(data.text,"assistant",false,false,data.model); isProcessing=false; resetControlButtons(); return;
         }
         hideThinking(); lastResponseWasMultiAgent = data.multi_agent===true;
-        addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model);
+        addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString());
         const modelLabel = data.model ? `[${data.model}] ` : '';
         addLocalLogEntry('ASSISTANT', modelLabel+data.text);
         isProcessing=false; sendBtn.style.display='flex'; sendBtn.disabled=false; sendBtn.style.opacity='1'; sendBtn.style.cursor="pointer";
@@ -553,7 +549,7 @@ document.addEventListener('click', function(e) {
 // ============================================================
 // ADD MESSAGE
 // ============================================================
-function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null) {
+function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null) {
     if (text.startsWith("[TextContent(")) return;
     if (text.trim()==="") return;
     const div = document.createElement("div");
@@ -563,14 +559,26 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
         div.textContent = text;
     } else {
         div.innerHTML = formatMessage(text);
-        if (modelName) {
-            const badge = document.createElement("div"); badge.className = "model-badge";
-            const FALLBACK = new Set(["unknown","direct-answer","mcp error"]);
-            badge.textContent = FALLBACK.has(modelName.toLowerCase()) ? "MCP" : modelName;
-            div.appendChild(badge);
-        }
+
     }
-    chat.appendChild(div); chat.scrollTop = chat.scrollHeight;
+    if (role === 'assistant') {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper';
+        wrapper.appendChild(div);
+        const ts = document.createElement('div');
+        ts.className = 'msg-timestamp';
+        const d = timestamp ? new Date(timestamp.includes('T') || timestamp.endsWith('Z') ? timestamp : timestamp.replace(' ', 'T') + 'Z') : new Date();
+        const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
+        const timeStr = d.toLocaleString(locale, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZone });
+        const FALLBACK = new Set(["unknown","direct-answer","mcp error"]);
+        const modelLabel = modelName && !FALLBACK.has(modelName.toLowerCase()) ? modelName : "MCP";
+        ts.textContent = modelName ? `${timeStr} · ${modelLabel}` : timeStr;
+        wrapper.appendChild(ts);
+        chat.appendChild(wrapper);
+    } else {
+        chat.appendChild(div);
+    }
+    chat.scrollTop = chat.scrollHeight;
     if (saveToDb) saveMessageToSession(role, text);
 }
 
