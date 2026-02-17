@@ -466,40 +466,6 @@
 /* ============================================================
    BASE STYLES (use CSS vars throughout)
    ============================================================ */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background: var(--page-bg);
-    overflow: hidden;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-    transition: background 0.3s ease;
-}
-
-#header {
-    background: var(--header-bg);
-    color: white;
-    padding: 1rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: background 0.3s ease;
-}
-
-#header h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
 #headerLeft {
     display: flex;
     align-items: center;
@@ -1130,10 +1096,6 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 .progress-fill.critical { background: linear-gradient(90deg, #f44336, #d32f2f); }
 
 /* ── Scrollbars ── */
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-track { background: var(--log-bg); }
-::-webkit-scrollbar-thumb { background: #424242; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: #4e4e4e; }
 #chat::-webkit-scrollbar-track { background: var(--page-bg); }
 #chat::-webkit-scrollbar-thumb { background: #cbd5e1; }
 .sessions-list::-webkit-scrollbar { width: 8px; }
@@ -1158,11 +1120,10 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     #chatContainer { padding: 0.5rem 0.5rem 0 0.5rem; }
 
     #header {
-        padding: 0.75rem 1rem;
         flex-direction: column; gap: 0.75rem; align-items: stretch;
     }
     #headerLeft { justify-content: center; }
-    #header h1  { font-size: 1.1rem; text-align: center; }
+    #header h1  { font-size: 1.1rem; }
 
     #topBar { flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
     #topBar button { font-size: 0.85rem; padding: 0.5rem 0.75rem; }

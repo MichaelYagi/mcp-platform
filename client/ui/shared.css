@@ -1,0 +1,104 @@
+/* ============================================================
+   SHARED THEME VARIABLES (only variables that appear in BOTH)
+   ============================================================ */
+
+:root,
+[data-theme="default"],
+[data-theme="neon"],
+[data-theme="monokai"],
+[data-theme="nord"],
+[data-theme="dracula"],
+[data-theme="midnight"],
+[data-theme="forest"],
+[data-theme="optimus"],
+[data-theme="crimson"] {
+    --header-bg: inherit;
+    --header-border: inherit;
+    --page-bg: inherit;
+}
+
+/* ============================================================
+   BASE RESET (shared)
+   ============================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ============================================================
+   BODY (shared structure)
+   ============================================================ */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--page-bg);
+    overflow: hidden;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    transition: background 0.3s ease;
+}
+
+/* ============================================================
+   HEADER (shared structure)
+   ============================================================ */
+
+#header {
+    background: var(--header-bg);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background 0.3s ease;
+}
+
+#header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* ============================================================
+   SCROLLBARS (shared)
+   ============================================================ */
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* ============================================================
+   RESPONSIVE BREAKPOINTS (shared patterns)
+   ============================================================ */
+
+@media (max-width: 768px) {
+    #header {
+        padding: 0.75rem 1rem;
+    }
+    #header h1 {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #header h1 {
+        font-size: 1rem;
+    }
+}
