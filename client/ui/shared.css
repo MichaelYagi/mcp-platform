@@ -683,11 +683,95 @@ body {
     --swatch3:          #bb9af7;
 }
 
+/* Garbagefire – intentionally hideous, chaotic, and painful */
+[data-theme="garbagefire"] {
+    /* Header */
+    --header-bg:        #ffea00;   /* blinding yellow */
+    --header-border:    #7f00ff;   /* neon purple clash */
+
+    /* Sidebar */
+    --sidebar-bg:       #8b4513;   /* muddy brown */
+    --sidebar-header:   #ff69b4;   /* hot pink */
+    --sidebar-item:     #39ff14;   /* toxic green */
+    --sidebar-hover:    #ff0000;   /* pure red */
+    --sidebar-active:   #00ffff;   /* cyan */
+    --sidebar-border:   #ff7f00;   /* orange */
+    --sidebar-search:   #d2691e;   /* burnt orange */
+
+    /* Page & Chat */
+    --page-bg:          #ffe4e1;   /* sickly pastel pink */
+    --chat-bg:          #fafad2;   /* pale yellow */
+    --chat-border:      #ff00ff;   /* magenta */
+    --chat-assistant:   #adff2f;   /* vomit green */
+    --chat-asst-border: #0000ff;   /* blue */
+    --chat-asst-color:  #ff1493;   /* deep pink */
+    --input-bg:         #ffdead;   /* weird beige */
+    --input-border:     #ff4500;   /* orange-red */
+    --status-color:     #9400d3;   /* violent purple */
+
+    /* User bubble & send button */
+    --user-bubble:      linear-gradient(135deg, #ff0000, #00ff00); /* red→green nightmare */
+    --send-btn:         #00ff00;   /* neon green */
+    --send-btn-hover:   #ff0000;   /* red */
+    --send-btn-focus:   rgba(255,0,0,0.4);
+
+    /* Buttons */
+    --btn-logs:             #ff00ff; /* magenta */
+    --btn-logs-hover:       #ff69b4; /* hot pink */
+
+    --btn-monitor:          #00ff00; /* neon green */
+    --btn-monitor-hover:    #008000; /* muddy green */
+
+    --btn-dashboard:        #ff7f00; /* orange */
+    --btn-dashboard-hover:  #ff4500; /* red-orange */
+
+    --btn-newsession:       #0000ff; /* blue */
+    --btn-newsession-hover: #00008b; /* dark blue */
+
+    /* Log panel */
+    --log-bg:           #7f7f7f;   /* depressing gray */
+    --log-header:       #ff00ff;   /* magenta */
+    --log-border:       #00ffff;   /* cyan */
+    --log-filter-bg:    #ff69b4;   /* hot pink */
+    --log-filter-btn:   #8b4513;   /* brown */
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #ff0000 0%, #00ffff 100%);
+    --monitor-header:   rgba(255,255,0,0.4);
+
+    /* Dashboard */
+    --btn-back:         #ff0000;
+    --btn-back-hover:   #00ff00;
+    --card-bg:          #ffefd5;   /* pale peach */
+    --card-border:      #ff00ff;
+    --card-shadow:      rgba(0,255,0,0.4);
+    --card-shadow-hover:rgba(255,0,0,0.6);
+    --title-color:      #0000ff;
+    --metric-color:     #ff7f00;
+    --subtitle-color:   #ff1493;
+    --label-color:      #8b4513;
+    --chart-blue:       #0000ff;
+    --chart-purple:     #ff00ff;
+    --tool-border:      #ff0000;
+    --tool-bg:          #ffff00;
+    --status-bg:        #ffe4e1;
+
+    /* Scrollbars */
+    --scrollbar-track:  #ffdead;
+    --scrollbar-thumb:  #ff00ff;
+    --scrollbar-hover:  #00ff00;
+
+    /* Swatches (header, logs, monitor) */
+    --swatch1:          #ffea00;
+    --swatch2:          #ff00ff;
+    --swatch3:          #00ff00;
+}
+
 /* Theme registry — readable by JS without file I/O */
 /*
 * Add the data-theme eg. [data-theme="tokyo"]
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,optimus,neon,dracula,tokyo";
+    --theme-list: "default,midnight,forest,crimson,optimus,neon,dracula,tokyo,garbagefire";
 }
