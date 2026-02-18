@@ -140,7 +140,7 @@ input:checked + .toggle-slider:before {
     width: 7px; height: 7px;
     border-radius: 2px;
     display: block; flex-shrink: 0;
-    border: 1px solid rgba(0,0,0,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
 }
 .theme-swatch:nth-child(1) { background: var(--swatch1); }
 .theme-swatch:nth-child(2) { background: var(--swatch2); }
