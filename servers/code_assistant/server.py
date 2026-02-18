@@ -1,6 +1,7 @@
 """
 Code Assistant MCP Server
 Automated code analysis, bug detection, and fixing
+WITH FEEDBACK SUPPORT FOR CODE GENERATION
 """
 
 import sys
@@ -306,9 +307,10 @@ def generate_code(
     output_file: str = ""
 ) -> str:
     """
-    Generate code from a natural language description.
+    Generate code from a natural language description WITH QUALITY FEEDBACK.
 
     Creates production-ready code following best practices for the target language.
+    Now includes automatic quality checks and improvement suggestions.
 
     Args:
         description (str): What the code should do (be specific and detailed)
@@ -334,6 +336,8 @@ def generate_code(
         - includes_docs: Whether documentation was included
         - saved_to: File path if saved
         - prompt_used: The prompt sent to generate code
+        - status: "success", "needs_improvement", or "low_quality"
+        - feedback: Optional improvement suggestions
 
     Examples:
         generate_code("Calculate factorial recursively", "python", "function")
@@ -353,7 +357,112 @@ def generate_code(
     Bad:  "email validator"
     """
     logger.info(f"✨ [TOOL] generate_code called: {description[:50]}...")
-    return generate_code_impl(description, language, style, include_tests, include_docstrings, framework, output_file)
+
+    # Call the original implementation
+    result_json = generate_code_impl(description, language, style, include_tests, include_docstrings, framework, output_file)
+
+    # Parse the result
+    try:
+        result = json.loads(result_json)
+    except json.JSONDecodeError:
+        # If parsing fails, return as-is
+        return result_json
+
+    # ═══════════════════════════════════════════════════════════════
+    # NEW: Quality checks and feedback
+    # ═══════════════════════════════════════════════════════════════
+    generated_code = result.get("generated_code", "")
+
+    # Check 1: Code length (too short might mean incomplete)
+    if generated_code and len(generated_code.strip()) < 50:
+        result["status"] = "needs_improvement"
+        result["feedback"] = {
+            "reason": "Generated code is very short (< 50 chars). Description may be too vague.",
+            "suggestions": [
+                "Provide more detail about what the code should do",
+                "Specify input/output types",
+                "Mention edge cases to handle",
+                "Add context about the use case"
+            ],
+            "auto_retry": False
+        }
+        logger.warning(f"⚠️ Generated code too short: {len(generated_code)} chars")
+        return json.dumps(result, indent=2)
+
+    # Check 2: Missing requested features
+    issues = []
+
+    if include_tests and "def test_" not in generated_code and "it(" not in generated_code:
+        issues.append("Tests were requested but none were generated")
+
+    if include_docstrings and language == "python":
+        # Check for docstrings in Python
+        if '"""' not in generated_code and "'''" not in generated_code:
+            issues.append("Docstrings were requested but appear to be missing")
+
+    if framework and framework.lower() not in generated_code.lower():
+        issues.append(f"Framework '{framework}' was specified but doesn't appear in the code")
+
+    # Check 3: Description vagueness (single-word descriptions are usually bad)
+    desc_words = description.strip().split()
+    if len(desc_words) <= 2:
+        result["status"] = "needs_improvement"
+        result["feedback"] = {
+            "reason": f"Description is very brief ({len(desc_words)} words). More detail needed for quality code generation.",
+            "suggestions": [
+                "Describe what inputs the code should accept",
+                "Specify what output it should produce",
+                "Mention any constraints or requirements",
+                "Provide an example of expected behavior"
+            ],
+            "example": f'Instead of: "{description}"\nTry: "Create a {style} that {description}, accepting X as input, returning Y, and handling Z edge case"',
+            "auto_retry": False
+        }
+        logger.warning(f"⚠️ Vague description: {description}")
+        return json.dumps(result, indent=2)
+
+    # Check 4: Basic syntax check for Python
+    if language == "python" and generated_code:
+        try:
+            import ast
+            ast.parse(generated_code)
+            # Syntax is valid
+        except SyntaxError as e:
+            result["status"] = "needs_improvement"
+            result["feedback"] = {
+                "reason": f"Generated Python code has syntax errors: {str(e)}",
+                "suggestions": [
+                    "Try rephrasing the description",
+                    "Specify the language constructs to use",
+                    "Provide more context about the implementation"
+                ],
+                "syntax_error": str(e),
+                "auto_retry": True  # Auto-retry syntax errors
+            }
+            logger.error(f"❌ Syntax error in generated code: {e}")
+            return json.dumps(result, indent=2)
+
+    # If we found issues but no syntax errors
+    if issues:
+        result["status"] = "low_quality"
+        result["feedback"] = {
+            "reason": "Code was generated but some requested features may be missing",
+            "issues": issues,
+            "suggestions": [
+                "Verify the generated code includes all requested features",
+                "Consider regenerating with more specific requirements",
+                "Explicitly mention each feature in the description"
+            ],
+            "auto_retry": False
+        }
+        logger.info(f"ℹ️ Generated code has quality issues: {', '.join(issues)}")
+        return json.dumps(result, indent=2)
+
+    # All checks passed
+    result["status"] = "success"
+    logger.info(f"✅ Generated code passed quality checks")
+
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()

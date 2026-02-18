@@ -9,6 +9,7 @@ import json
 import os
 import socket
 import websockets
+from langchain_core.messages import ToolMessage
 
 from client.commands import handle_command, handle_a2a_commands
 from client.langgraph import create_langgraph_agent
@@ -272,6 +273,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
     KEY: Long operations run as background tasks, allowing :stop to be processed immediately
     """
+    global json
     CONNECTED_WEBSOCKETS.add(websocket)
 
     # Track current background task (if any)
@@ -492,6 +494,64 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 if data.get("session_id"):
                     current_session_id = data.get("session_id")
+
+                    # Detect user follow-up requests (improve, fix, refine previous response)
+                    follow_up_triggers = [
+                        "improve", "fix", "refine", "change", "update", "redo",
+                        "better", "enhance", "modify", "adjust", "correct",
+                        "search again", "try again", "search more", "find more"
+                    ]
+
+                    # Check if prompt starts with a follow-up keyword
+                    prompt_lower = original_prompt.lower()
+                    prompt_words = prompt_lower.split()[:5]  # Check first 5 words
+
+                    is_follow_up = any(trigger in prompt_words for trigger in follow_up_triggers)
+
+                    # Also detect phrases like "those results" or "that search"
+                    is_reference = any(ref in prompt_lower for ref in ["those", "that", "the previous", "last"])
+
+                    if (is_follow_up or is_reference) and len(conversation_state["messages"]) > 2:
+                        # Find the last assistant message and related tool calls
+                        last_assistant_msg = None
+                        last_tool_result = None
+                        last_tool_name = None
+
+                        for msg in reversed(conversation_state["messages"]):
+                            if isinstance(msg, AIMessage) and not last_assistant_msg:
+                                last_assistant_msg = msg
+                            if isinstance(msg, ToolMessage) and not last_tool_result:
+                                last_tool_result = msg
+                                last_tool_name = getattr(msg, 'name', None)
+
+                            # Stop after finding both
+                            if last_assistant_msg and last_tool_result:
+                                break
+
+                        # Inject context into the prompt
+                        if last_tool_result and last_tool_name:
+                            # User is referring to a tool result
+                            context_info = f"\n\n[Context: User is referring to the previous {last_tool_name} result. "
+
+                            # Try to extract the original query from tool result
+                            try:
+                                import json
+                                tool_data = json.loads(last_tool_result.content)
+                                original_query = tool_data.get("query")
+                                if original_query:
+                                    context_info += f"Original query was: '{original_query}'. "
+                            except:
+                                pass
+
+                            context_info += "They want to refine/improve those results.]"
+                            prompt = original_prompt + context_info
+
+                            logger.info(f"🔄 Follow-up detected for {last_tool_name}")
+                        elif last_assistant_msg:
+                            # Generic follow-up to last response
+                            context_info = "\n\n[Context: User is referring to the previous response and wants improvement/changes.]"
+                            prompt = original_prompt + context_info
+                            logger.info("🔄 Follow-up detected for previous response")
 
                 from client.input_sanitizer import sanitize_user_input, sanitize_command
 

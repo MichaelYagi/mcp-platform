@@ -1,6 +1,11 @@
 """
-RAG MCP Server
+RAG MCP Server - WITH FEEDBACK/IMPROVEMENT SUPPORT
 Runs over stdio transport
+
+CHANGES:
+- rag_search_tool now returns feedback when results are poor quality
+- Agent can automatically retry with refined queries
+- Users can say "improve that" or "search more specifically"
 """
 import sys
 from pathlib import Path
@@ -95,14 +100,16 @@ def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: 
     """
     Search the RAG database using semantic similarity with STOP SIGNAL support.
 
+    NOW WITH FEEDBACK: Returns improvement suggestions when results are poor quality.
+
     Args:
         query (str): Search query text (primary parameter)
         text (str): Alternative parameter for search query (fallback)
         top_k (int): Number of results to return (default: 5)
-        min_score (float): Minimum similarity score (default: 0.0)
+        min_score (float): Minimum similarity score (default: 0.3)
 
     Returns:
-        JSON string with search results
+        JSON string with search results and optional feedback for improvement
     """
     # Accept either parameter
     search_query = query or text
@@ -128,6 +135,68 @@ def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: 
         }, indent=2)
 
     result = rag_search(search_query, top_k, min_score)
+
+    # ═══════════════════════════════════════════════════════════════
+    # NEW: Quality check and feedback logic
+    # ═══════════════════════════════════════════════════════════════
+    results = result.get("results", [])
+
+    # Check if results are poor quality
+    if not results:
+        # No results at all - suggest broader search
+        result["status"] = "needs_improvement"
+        result["feedback"] = {
+            "reason": "No results found. The query may be too specific or use terminology not in the database.",
+            "suggestions": [
+                "Try more general terms (e.g., 'time travel' instead of 'temporal displacement paradox')",
+                "Use simpler language",
+                "Try related concepts or synonyms",
+                "Search for broader topics first"
+            ],
+            "auto_retry": False  # Don't auto-retry, let user decide
+        }
+        logger.warning(f"⚠️ No results for query: {search_query}")
+
+    elif len(results) < 3 and top_k >= 5:
+        # Very few results - might be too specific
+        max_score = max((r.get("score", 0) for r in results), default=0)
+        if max_score < 0.5:
+            result["status"] = "needs_improvement"
+            result["feedback"] = {
+                "reason": f"Only {len(results)} weak results found (max score: {max_score:.2f}). Query may be too narrow.",
+                "suggestions": [
+                    "Broaden your search terms",
+                    "Remove very specific details",
+                    "Try searching for the main topic only"
+                ],
+                "auto_retry": False
+            }
+            logger.warning(f"⚠️ Weak results for query: {search_query} (max score: {max_score:.2f})")
+
+    elif results:
+        # Check average score quality
+        avg_score = sum(r.get("score", 0) for r in results) / len(results)
+        max_score = max((r.get("score", 0) for r in results), default=0)
+
+        if avg_score < 0.4:
+            # Results exist but quality is poor
+            result["status"] = "low_quality"
+            result["feedback"] = {
+                "reason": f"Results found but average relevance is low ({avg_score:.2f}). Consider refining.",
+                "suggestions": [
+                    "Try different phrasing",
+                    "Add more context to your query",
+                    "Use more specific terms if you want precise results",
+                    "Use broader terms if you want more results"
+                ],
+                "auto_retry": False
+            }
+            logger.info(f"ℹ️ Low quality results for query: {search_query} (avg: {avg_score:.2f})")
+        else:
+            # Good results!
+            result["status"] = "success"
+            logger.info(f"✅ Good results for query: {search_query} (avg: {avg_score:.2f}, max: {max_score:.2f})")
+
     return json.dumps(result, indent=2)
 
 @mcp.tool()
@@ -358,7 +427,7 @@ skill_registry = None
 @check_tool_enabled(category="rag")
 def list_skills() -> str:
     """List all available skills for this server."""
-    logger.info(f"🛠  list_skills called")
+    logger.info(f"🛠 list_skills called")
     if skill_registry is None:
         return json.dumps({
             "server": "rag-server",
@@ -376,7 +445,7 @@ def list_skills() -> str:
 @check_tool_enabled(category="rag")
 def read_skill(skill_name: str) -> str:
     """Read the full content of a skill."""
-    logger.info(f"🛠  read_skill called")
+    logger.info(f"🛠 read_skill called")
 
     if skill_registry is None:
         return json.dumps({"error": "Skills not loaded"}, indent=2)
@@ -412,6 +481,6 @@ if __name__ == "__main__":
     loader = SkillLoader(server_tools)
     skill_registry = loader.load_all(skills_dir)
 
-    logger.info(f"🛠  {len(server_tools)} tools: {', '.join(server_tools)}")
-    logger.info(f"🛠  {len(skill_registry.skills)} skills loaded")
+    logger.info(f"🛠 {len(server_tools)} tools: {', '.join(server_tools)}")
+    logger.info(f"🛠 {len(skill_registry.skills)} skills loaded")
     mcp.run(transport="stdio")

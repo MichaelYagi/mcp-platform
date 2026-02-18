@@ -1489,6 +1489,25 @@ Your answer:"""
             "current_model": state.get("current_model", "unknown")
         }
 
+def should_continue_after_tools(state: AgentState) -> str:
+    """
+    Check if tools requested continuation/improvement.
+
+    Returns:
+        "agent" - Go back to LLM for refinement
+        "end" - Normal termination
+    """
+    logger = logging.getLogger("mcp_client")
+    messages = state.get("messages", [])
+
+    # Check last few messages for feedback marker
+    for msg in reversed(messages[-5:]):
+        if isinstance(msg, HumanMessage) and "[Tool Feedback" in msg.content:
+            logger.info("🔄 Tool feedback detected - continuing to agent")
+            return "agent"
+
+    # No feedback - normal end
+    return "end"
 
 def create_langgraph_agent(llm_with_tools, tools):
     """Create and compile the LangGraph agent"""
@@ -2197,12 +2216,49 @@ def create_langgraph_agent(llm_with_tools, tools):
                 )
                 tool_messages.append(error_msg)
 
+        needs_improvement = False
+        feedback_message = None
+
+        for tool_msg in tool_messages:
+            try:
+                # Try to parse tool result as JSON
+                result_data = json.loads(tool_msg.content)
+
+                # Check for improvement feedback
+                if isinstance(result_data, dict):
+                    status = result_data.get("status")
+                    feedback = result_data.get("feedback", {})
+
+                    if status in ("needs_improvement", "low_quality"):
+                        needs_improvement = True
+                        reason = feedback.get("reason", "Tool suggested improvement")
+                        suggestions = feedback.get("suggestions", [])
+
+                        # Build feedback message
+                        feedback_text = f"[Tool Feedback: {tool_msg.name}] {reason}"
+                        if suggestions:
+                            feedback_text += "\n\nSuggestions:\n" + "\n".join(f"  • {s}" for s in suggestions[:3])
+
+                        feedback_message = feedback_text
+                        logger.info(f"🔄 Tool {tool_msg.name} requested improvement: {reason}")
+                        break
+            except (json.JSONDecodeError, AttributeError):
+                # Not JSON or doesn't have content - skip
+                pass
+
+        # If tool requested improvement, inject feedback as HumanMessage to continue loop
+        if needs_improvement and feedback_message:
+            tool_messages.append(
+                HumanMessage(content=feedback_message)
+            )
+
         return {
             "messages": tool_messages,
             "tools": state.get("tools", {}),
             "llm": state.get("llm"),
             "ingest_completed": state.get("ingest_completed", False),
-            "stopped": is_stop_requested()
+            "stopped": state.get("stopped", False),
+            "current_model": state.get("current_model")
         }
 
     # Build graph:
@@ -2233,7 +2289,14 @@ def create_langgraph_agent(llm_with_tools, tools):
             "continue": END
         }
     )
-    workflow.add_edge("tools", "agent")
+    workflow.add_conditional_edges(
+        "tools",
+        should_continue_after_tools,
+        {
+            "agent": "agent",
+            "end": "agent"  # Both go back to agent for now
+        }
+    )
     workflow.add_edge("ingest", END)
     workflow.add_edge("rag", END)
     workflow.add_edge("research", END)
