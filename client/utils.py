@@ -48,10 +48,21 @@ def get_venv_python(project_root: Path) -> str:
 
 def start_http_server(port=9000):
     """Serve index.html over HTTP on the network"""
-    Handler = SimpleHTTPRequestHandler
+
+    class QuietHTTPRequestHandler(SimpleHTTPRequestHandler):
+        def log_message(self, format_log, *args):
+            # Suppress noisy access logs - only errors will print
+            pass
+
+        def handle_one_request(self):
+            try:
+                super().handle_one_request()
+            except (BrokenPipeError, ConnectionResetError):
+                # Client disconnected mid-response - ignore silently
+                pass
 
     def serve():
-        with TCPServer(("0.0.0.0", port), Handler) as httpd:
+        with TCPServer(("0.0.0.0", port), QuietHTTPRequestHandler) as httpd:
             try:
                 # Get actual network IP (not 127.0.1.1)
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
