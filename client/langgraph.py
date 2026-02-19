@@ -305,6 +305,9 @@ INTENT_PATTERNS = {
 
             # General RAG references
             r'|\brag\s+(database|storage|data)\b'
+            r'|\btell\s+me\s+(about|more\s+about)\b'
+            r'|\bwhat\s+do\s+you\s+know\s+about\b'
+            r'|\bwhat\s+is\s+.+\s+in\s+my\s+(rag|knowledge|database)\b'
         ),
         "tools": [
             "rag_search_tool",
