@@ -304,6 +304,7 @@ INTENT_PATTERNS = {
             r'|\brag_browse\b'
 
             # General RAG references
+            r'|\btell\s+me\s+(about|more\s+about)\b'
             r'|\brag\s+(database|storage|data)\b'
             r'|\btell\s+me\s+(about|more\s+about)\b'
             r'|\bwhat\s+do\s+you\s+know\s+about\b'
