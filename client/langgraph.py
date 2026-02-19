@@ -2305,7 +2305,14 @@ def create_langgraph_agent(llm_with_tools, tools):
     logger.info("[LangGraph] ✅ LangGraph agent compiled successfully")
     return app
 
-
+# The agent is a LangGraph compiled graph, created by langgraph.create_langgraph_agent(llm_with_tools, tools).
+#   It creates nodes (unit of work), edges (connects nodes and defines what happens next)
+#   In LangGraph terms it's a StateGraph — a directed graph where each node is a function and edges define the flow.
+# Typically it looks something like:
+# [START] → call_llm → should_use_tools?
+#                          ├── yes → execute_tool → call_llm (loop)
+#                          └── no  → [END]
+# agent.ainvoke runs the entire LangGraph graph to completion and returns the final state
 async def run_agent(agent, conversation_state, user_message, logger, tools, system_prompt, llm=None, max_history=20):
     """
     Execute the agent with the given user message and track metrics
@@ -2355,6 +2362,11 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
         tool_registry = {tool.name: tool for tool in tools}
 
+        # Hits the LLM
+        # Message contains
+        #   SystemMessage — system prompt / tool usage guide
+        #   Previous conversation history (truncated to max_history, default 20)
+        #   The new HumanMessage with the user's input (appended just before in Step 2)
         result = await agent.ainvoke({
             "messages": conversation_state["messages"],
             "tools": tool_registry,
