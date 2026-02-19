@@ -1,6 +1,10 @@
 """
 Shared Query Patterns for MCP Client
 Used by both LangGraph routing and Skills injection
+
+Understands whether to inject skills or not.
+This happens before LangGraph as a system prompt modification.
+Returns a boolean.
 """
 
 import re

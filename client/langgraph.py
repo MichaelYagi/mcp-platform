@@ -1,6 +1,9 @@
 """
 LangGraph Module with Centralized Pattern Configuration
 Handles LangGraph agent creation, routing, and execution
+
+Understands which tool the LLM should use.
+Returns a filtered tool list
 """
 import asyncio
 import json
@@ -57,16 +60,6 @@ except ImportError:
 # ═══════════════════════════════════════════════════════════════════
 
 INTENT_PATTERNS = {
-    "general_knowledge": {
-        "pattern": (
-            r'\bwhat\s+is\s+(a|an|the)\s+\w+\??$'  # "what is a div?"
-            r'|\bdefine\s+'
-            r'|\bexplain\s+\w+\s*$'  # "explain recursion"
-            r'|\bhow\s+does\s+\w+\s+work\??$'
-        ),
-        "tools": [],  # NO TOOLS - just answer from knowledge
-        "priority": 4  # Lower priority than specific intents
-    },
     "ingest": {
         "pattern": (
             r'\bingest\b'
@@ -233,7 +226,7 @@ INTENT_PATTERNS = {
     },
     "time": {
         "pattern": (
-            r'|\bwhat\s+time\b'
+            r'\bwhat\s+time\b'
             r'|\bwhat\s+date\b'
             r'|\bcurrent\s+time\b'
             r'|\bcurrent\s+date\b'
@@ -299,6 +292,7 @@ INTENT_PATTERNS = {
             r'|\brag\s+search\b'
             r'|\bquery\s+(the\s+)?rag\b'
             r'|\bdo\s+you\s+have\s+.*\s+in\s+rag\b'
+            r'|\btell\s+me\s+about\b'
             r'|\bwhat\s+do\s+you\s+have\s+(about|on)\b'
 
             # Browse/list queries
