@@ -77,6 +77,107 @@ document.addEventListener('click', (e) => {
     applyTheme(saved);
 })();
 
+// ============================================================
+// MODAL SYSTEM
+// ============================================================
+(function() {
+    // Inject modal HTML into body on first use
+    function ensureModalDOM() {
+        if (document.getElementById('mcpModal')) return;
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div id="mcpModalBackdrop" class="mcp-modal-backdrop"></div>
+            <div id="mcpModal" class="mcp-modal" role="dialog" aria-modal="true" aria-labelledby="mcpModalTitle">
+                <div class="mcp-modal-dialog">
+                    <div class="mcp-modal-header">
+                        <h5 class="mcp-modal-title" id="mcpModalTitle"></h5>
+                    </div>
+                    <div class="mcp-modal-body" id="mcpModalBody"></div>
+                    <div class="mcp-modal-footer" id="mcpModalFooter"></div>
+                </div>
+            </div>`;
+        document.body.appendChild(el.children[0]); // backdrop
+        document.body.appendChild(el.children[0]); // modal
+    }
+
+    function openModal() {
+        ensureModalDOM();
+        document.getElementById('mcpModalBackdrop').classList.add('show');
+        document.getElementById('mcpModal').classList.add('show');
+        document.addEventListener('keydown', onModalKeydown);
+    }
+
+    function closeModal() {
+        const backdrop = document.getElementById('mcpModalBackdrop');
+        const modal    = document.getElementById('mcpModal');
+        if (backdrop) backdrop.classList.remove('show');
+        if (modal)    modal.classList.remove('show');
+        document.removeEventListener('keydown', onModalKeydown);
+    }
+
+    function onModalKeydown(e) {
+        if (e.key === 'Escape') closeModal();
+    }
+
+    /**
+     * showConfirm({ title, message, confirmText, cancelText, danger }) → Promise<boolean>
+     */
+    window.showConfirm = function({ title = 'Confirm', message = '', confirmText = 'OK', cancelText = 'Cancel', danger = false } = {}) {
+        return new Promise(resolve => {
+            ensureModalDOM();
+            document.getElementById('mcpModalTitle').textContent = title;
+            document.getElementById('mcpModalBody').textContent  = message;
+
+            const footer = document.getElementById('mcpModalFooter');
+            footer.innerHTML = '';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = cancelText;
+            cancelBtn.className   = 'mcp-modal-btn mcp-modal-btn-secondary';
+            cancelBtn.onclick = () => { closeModal(); resolve(false); };
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.textContent = confirmText;
+            confirmBtn.className   = 'mcp-modal-btn' + (danger ? ' mcp-modal-btn-danger' : ' mcp-modal-btn-primary');
+            confirmBtn.onclick = () => { closeModal(); resolve(true); };
+
+            footer.appendChild(cancelBtn);
+            footer.appendChild(confirmBtn);
+
+            // Backdrop click cancels
+            document.getElementById('mcpModalBackdrop').onclick = () => { closeModal(); resolve(false); };
+
+            openModal();
+            confirmBtn.focus();
+        });
+    };
+
+    /**
+     * showAlert({ title, message, buttonText }) → Promise<void>
+     */
+    window.showAlert = function({ title = 'Notice', message = '', buttonText = 'OK' } = {}) {
+        return new Promise(resolve => {
+            ensureModalDOM();
+            document.getElementById('mcpModalTitle').textContent = title;
+            document.getElementById('mcpModalBody').textContent  = message;
+
+            const footer = document.getElementById('mcpModalFooter');
+            footer.innerHTML = '';
+
+            const okBtn = document.createElement('button');
+            okBtn.textContent = buttonText;
+            okBtn.className   = 'mcp-modal-btn mcp-modal-btn-primary';
+            okBtn.onclick = () => { closeModal(); resolve(); };
+
+            footer.appendChild(okBtn);
+            document.getElementById('mcpModalBackdrop').onclick = () => { closeModal(); resolve(); };
+
+            openModal();
+            okBtn.focus();
+        });
+    };
+})();
+
 // CORE APP STATE
 // ============================================================
 const status = document.getElementById("status");
@@ -141,7 +242,6 @@ function startNewSession() {
     currentSessionId = null;
     localStorage.setItem(CURRENT_SESSION_KEY, '');
     chat.innerHTML = "";
-    toggleSessionsSidebar();
     ws.send(JSON.stringify({ type: "new_session" }));
 }
 
@@ -233,20 +333,30 @@ function startSessionEdit(sessionId)  { openMenuSessionId = null; editingSession
 function cancelSessionEdit()           { editingSessionId = null; renderSessions(allSessions); }
 
 function saveSessionRename(sessionId, newName) {
-    if (!newName || !newName.trim()) { alert('Session name cannot be empty'); return; }
+    if (!newName || !newName.trim()) { showAlert({ title: 'Validation Error', message: 'Session name cannot be empty.' }); return; }
     ws.send(JSON.stringify({ type:'rename_session', session_id:sessionId, name:newName.trim() }));
     editingSessionId = null;
 }
 
 function deleteSession(sessionId) {
-    if (!confirm('Are you sure you want to delete this conversation? This cannot be undone.')) return;
-    ws.send(JSON.stringify({ type:'delete_session', session_id:sessionId }));
-    openMenuSessionId = null;
-    if (sessionId === currentSessionId) {
-        currentSessionId = null;
-        localStorage.setItem(CURRENT_SESSION_KEY, '');
-        chat.innerHTML = '';
-    }
+    showConfirm({
+        title:       'Delete Conversation',
+        message:     'Are you sure you want to delete this conversation? This cannot be undone.',
+        confirmText: 'Delete',
+        cancelText:  'Cancel',
+        danger:      true
+    }).then(confirmed => {
+        if (!confirmed) return;
+        const wasCurrent = (sessionId === currentSessionId);
+        ws.send(JSON.stringify({ type:'delete_session', session_id:sessionId }));
+        openMenuSessionId = null;
+        if (wasCurrent) {
+            currentSessionId = null;
+            localStorage.setItem(CURRENT_SESSION_KEY, '');
+            chat.innerHTML = '';
+            ws.send(JSON.stringify({ type: "new_session" }));
+        }
+    });
 }
 
 function selectSession(sessionId) {
@@ -439,7 +549,15 @@ ws.onmessage = (event) => {
         data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp));
         renderSessions(allSessions); return;
     }
-    if (data.type==='session_created')      { currentSessionId = data.session_id; localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId); return; }
+    if (data.type==='session_created') {
+        currentSessionId = data.session_id;
+        localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
+        // Add the new session to the local list so it appears immediately
+        const newSession = { id: data.session_id, name: data.name || 'Untitled Session', created_at: new Date().toISOString() };
+        allSessions.unshift(newSession);
+        if (sessionsSidebarOpen) renderSessions(allSessions);
+        return;
+    }
     if (data.type==='session_name_updated') { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;if(sessionsSidebarOpen)renderSessions(allSessions);} return; }
     if (data.type==='session_renamed')      { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;renderSessions(allSessions);} return; }
     if (data.type==='session_deleted')      { allSessions=allSessions.filter(s=>s.id!==data.session_id); renderSessions(allSessions); return; }

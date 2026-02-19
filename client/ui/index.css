@@ -689,3 +689,109 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     .mobile-close { display: flex !important; }
     .msg { max-width: 100%; }
 }
+/* ============================================================
+   MODAL SYSTEM
+   ============================================================ */
+.mcp-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 1040;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.mcp-modal-backdrop.show {
+    display: block;
+    opacity: 1;
+}
+
+.mcp-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1050;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.mcp-modal.show {
+    display: flex;
+    opacity: 1;
+    transform: scale(1);
+}
+
+.mcp-modal-dialog {
+    background: var(--bg-secondary, #1e2130);
+    border: 1px solid var(--border-color, rgba(255,255,255,0.12));
+    border-radius: 10px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+    color: var(--text-primary, #e2e8f0);
+}
+
+.mcp-modal-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.25rem 0.75rem;
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.mcp-modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #e2e8f0);
+}
+
+.mcp-modal-body {
+    padding: 1rem 1.25rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--text-secondary, #94a3b8);
+}
+
+.mcp-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem 1rem;
+    border-top: 1px solid var(--border-color, rgba(255,255,255,0.1));
+}
+
+.mcp-modal-btn {
+    padding: 0.45rem 1.1rem;
+    border-radius: 6px;
+    border: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s ease, background 0.15s ease;
+    outline-offset: 2px;
+}
+.mcp-modal-btn:focus-visible {
+    outline: 2px solid var(--accent, #7c6af7);
+}
+.mcp-modal-btn:hover  { opacity: 0.88; }
+.mcp-modal-btn:active { opacity: 0.75; }
+
+.mcp-modal-btn-primary {
+    background: var(--accent, #7c6af7);
+    color: #fff;
+}
+
+.mcp-modal-btn-secondary {
+    background: var(--bg-tertiary, rgba(255,255,255,0.08));
+    color: var(--text-primary, #e2e8f0);
+    border: 1px solid var(--border-color, rgba(255,255,255,0.12));
+}
+
+.mcp-modal-btn-danger {
+    background: #e53e3e;
+    color: #fff;
+}
