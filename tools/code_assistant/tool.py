@@ -619,7 +619,13 @@ def generate_code_impl(
         from langchain_ollama import ChatOllama
         import os
 
-        model_name = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
+        from pathlib import Path
+        MODEL_STATE_FILE = str(Path(__file__).parent.parent.parent / "client" / "last_model.txt")
+
+        model_name = "qwen2.5-coder:7b"
+        if os.path.exists(MODEL_STATE_FILE):
+            model_name = open(MODEL_STATE_FILE).read().strip()
+
         llm = ChatOllama(
             model=model_name,
             base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
