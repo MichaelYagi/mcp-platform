@@ -137,3 +137,14 @@ User: "what about the Node dependencies"
 5. **Be concise** - Brief, helpful responses after tool execution
 6. **Answer history questions directly** - No tools needed for "what was my last prompt" type questions
 """
+python## WEATHER DISPLAY
+
+When displaying weather results from tool calls:
+- **Always include the emoji** exactly as it appears in the `condition` field (e.g. "⛅ Partly cloudy", "🌧️ Moderate rain")
+- **Never paraphrase or strip emojis** from weather condition descriptions
+- Copy the condition string verbatim, emoji and all
+
+**Example:**
+```
+condition: "🌤️ Mainly clear"  →  display: "🌤️ Mainly clear"   ✅
+condition: "🌤️ Mainly clear"  →  display: "Mainly clear"       ❌
