@@ -1539,6 +1539,99 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "current_model": get_model_name(base_llm)
             }
 
+        # Ollama search override
+        messages = state["messages"]
+        user_message = None
+        for msg in reversed(messages):
+            if isinstance(msg, HumanMessage):
+                user_message = msg.content
+                break
+
+        # Regex pattern for Ollama Search triggers
+        OLLAMA_SEARCH_PATTERN = re.compile(
+            r'\bollama\s+search\b'
+            r'|\bollama\s+search\s+(for|about|on)\b'
+            r'|\bweb\s+search\s+using\s+ollama\b',
+            re.IGNORECASE
+        )
+
+        if user_message and OLLAMA_SEARCH_PATTERN.search(user_message):
+            logger.info("🔍 EXPLICIT OLLAMA SEARCH REQUESTED - bypassing all tools")
+
+            search_client = get_search_client()
+
+            if not search_client.is_available():
+                error_response = AIMessage(
+                    content="❌ Ollama Search is not available. Check OLLAMA_TOKEN in .env"
+                )
+                return {
+                    "messages": [error_response],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": get_model_name(base_llm)
+                }
+
+            # Strip Ollama Search phrases from query
+            query = OLLAMA_SEARCH_PATTERN.sub('', user_message)
+            query = query.strip().lstrip(':,.')
+
+            if not query:
+                query = user_message
+
+            logger.info(f"🔍 Searching: '{query}'")
+
+            try:
+                search_result = await search_client.search(query)
+
+                if search_result["success"] and search_result["results"]:
+                    search_context = search_result["results"]
+
+                    augmented_prompt = f"""Web search results for: "{query}"
+
+    {search_context}
+
+    Based on these search results, provide a clear answer."""
+
+                    augmented_messages = messages + [HumanMessage(content=augmented_prompt)]
+                    response = await base_llm.ainvoke(augmented_messages)
+
+                    return {
+                        "messages": [response],
+                        "tools": state.get("tools", {}),
+                        "llm": state.get("llm"),
+                        "ingest_completed": state.get("ingest_completed", False),
+                        "stopped": state.get("stopped", False),
+                        "current_model": get_model_name(base_llm)
+                    }
+                else:
+                    error_response = AIMessage(
+                        content=f"🔍 Ollama Search returned no results for: '{query}'"
+                    )
+                    return {
+                        "messages": [error_response],
+                        "tools": state.get("tools", {}),
+                        "llm": state.get("llm"),
+                        "ingest_completed": state.get("ingest_completed", False),
+                        "stopped": state.get("stopped", False),
+                        "current_model": get_model_name(base_llm)
+                    }
+
+            except Exception as e:
+                logger.error(f"❌ Ollama Search failed: {e}")
+                error_response = AIMessage(
+                    content=f"❌ Ollama Search error: {str(e)}"
+                )
+                return {
+                    "messages": [error_response],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": get_model_name(base_llm)
+                }
+
         # detect research intent before calling LLM
         user_message = None
         for msg in reversed(state["messages"]):
