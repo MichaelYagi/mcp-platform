@@ -646,49 +646,6 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 
 #modelSelectLabel { display: block; }
 
-/* ── Mobile ── */
-@media (max-width: 768px) {
-    #modelSelectLabel { display: none; }
-    #chat { padding: 0.5rem; }
-    #chatContainer { padding: 0.5rem 0.5rem 0 0.5rem; }
-
-    #header {
-        flex-direction: column; gap: 0.75rem; align-items: stretch;
-    }
-    #headerLeft { justify-content: center; }
-    #header h1  { font-size: 1.1rem; }
-
-    #topBar { flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
-    #topBar button { font-size: 0.85rem; padding: 0.5rem 0.75rem; }
-    #hamburgerBtn  { width: 44px; height: 44px; }
-
-    #modelSelect { font-size: 16px; max-width: 100%; }
-    .mode-toggle-container { order: -1; width: 100%; justify-content: center; }
-
-    #sessionsSidebar.open {
-        width: 100%; position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        height: 100%; z-index: 1000; border-right: none;
-    }
-    #statusRow { margin-bottom: 3.5rem; }
-    .sessions-header { padding: 0.75rem 1rem; }
-    .sessions-header h2 { font-size: 0.95rem; }
-    .session-close-btn { display: block; padding: 0.3rem 0.6rem; font-size: 0.75rem; min-height: 44px; }
-    .sessions-search-container { padding: 0.75rem 1rem; }
-    .new-session-btn { min-width: 44px; height: 44px; font-size: 1.4rem; }
-    #sessionSearch { font-size: 16px; height: 44px; }
-    .sessions-list { padding: 0.75rem 1rem; }
-    .session-item { padding: 0.6rem 0.8rem; font-size: 0.85rem; min-height: 44px; display: flex; align-items: center; }
-    .session-menu-btn { opacity: 1; width: 36px; height: 36px; font-size: 1.4rem; }
-
-    #logPanel.open, #systemMonitor.open {
-        width: 100%; position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        height: 100%; z-index: 1000; border-left: none;
-    }
-    .mobile-close { display: flex !important; }
-    .msg { max-width: 100%; }
-}
 /* ============================================================
    MODAL SYSTEM
    ============================================================ */
@@ -794,4 +751,49 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 .mcp-modal-btn-danger {
     background: #e53e3e;
     color: #fff;
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+    #modelSelectLabel { display: none; }
+    #chat { padding: 0.5rem; }
+    #chatContainer { padding: 0.5rem 0.5rem 0 0.5rem; }
+
+    #header {
+        flex-direction: column; gap: 0.75rem; align-items: stretch;
+    }
+    #headerLeft { justify-content: center; }
+    #header h1  { font-size: 1.1rem; }
+
+    #topBar { flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+    #topBar button { font-size: 0.85rem; padding: 0.5rem 0.75rem; }
+    #hamburgerBtn  { width: 44px; height: 44px; }
+
+    #modelSelect { font-size: 16px; max-width: 100%; }
+    .mode-toggle-container { order: -1; width: 100%; justify-content: center; }
+
+    #sessionsSidebar.open {
+        width: 100%; position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        height: 100%; z-index: 1000; border-right: none;
+    }
+    #statusRow { margin-bottom: 3.5rem; }
+    .sessions-header { padding: 0.75rem 1rem; }
+    .sessions-header h2 { font-size: 0.95rem; }
+    .session-close-btn { display: block; padding: 0.3rem 0.6rem; font-size: 0.75rem; min-height: 44px; }
+    .sessions-search-container { padding: 0.75rem 1rem; }
+    .new-session-btn { min-width: 44px; height: 44px; font-size: 1.4rem; }
+    #sessionSearch { font-size: 16px; height: 44px; }
+    .sessions-list { padding: 0.75rem 1rem; }
+    .session-item { padding: 0.6rem 0.8rem; font-size: 0.85rem; min-height: 44px; display: flex; align-items: center; }
+    .session-menu-btn { opacity: 1; width: 36px; height: 36px; font-size: 1.4rem; }
+
+    #logPanel.open, #systemMonitor.open {
+        width: 100%; position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        height: 100%; z-index: 1000; border-left: none;
+    }
+    .mobile-close { display: flex !important; }
+    .msg { max-width: 100%; }
+    .msg-wrapper { max-width: 100%; }
 }
