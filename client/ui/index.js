@@ -656,15 +656,69 @@ function formatMessage(text) {
     return text;
 }
 
-document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.copy-btn'); if (!btn) return;
-    const code = document.getElementById(btn.dataset.target); if (!code) return;
-    navigator.clipboard.writeText(code.innerText).then(() => {
-        btn.style.transition='opacity 0.2s ease'; btn.style.opacity='0';
-        setTimeout(()=>{ btn.innerHTML='<span style="color:#22c55e;font-size:12px;font-weight:600;">✓ Copied</span>'; btn.style.opacity='1'; }, 200);
-        setTimeout(()=>{ btn.style.opacity='0'; setTimeout(()=>{ btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'; btn.style.opacity='1'; }, 200); }, 2200);
-    });
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.copy-btn');
+    if (!btn) return;
+
+    const code = document.getElementById(btn.dataset.target);
+    if (!code) return;
+
+    const text = code.innerText;
+
+    function showCopied() {
+        btn.style.transition = 'opacity 0.2s ease';
+        btn.style.opacity = '0';
+
+        setTimeout(() => {
+            btn.innerHTML = '<span style="color:#22c55e;font-size:12px;font-weight:600;">✓ Copied</span>';
+            btn.style.opacity = '1';
+        }, 200);
+
+        setTimeout(() => {
+            btn.style.opacity = '0';
+            setTimeout(() => {
+                btn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>`;
+                btn.style.opacity = '1';
+            }, 200);
+        }, 2200);
+    }
+
+    // --- Primary method: modern clipboard API ---
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(showCopied)
+            .catch(() => fallbackCopy(text, showCopied));
+    } else {
+        // --- Fallback immediately ---
+        fallbackCopy(text, showCopied);
+    }
 });
+
+function fallbackCopy(text, onSuccess) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+
+    // Prevent scrolling to bottom on iOS
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-9999px';
+
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    try {
+        const ok = document.execCommand('copy');
+        if (ok) onSuccess();
+    } catch (err) {
+        console.warn('Copy fallback failed:', err);
+    }
+
+    document.body.removeChild(textarea);
+}
 
 // ============================================================
 // ADD MESSAGE
