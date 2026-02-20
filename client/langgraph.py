@@ -292,7 +292,7 @@ INTENT_PATTERNS = {
             r'|\brag\s+search\b'
             r'|\bquery\s+(the\s+)?rag\b'
             r'|\bdo\s+you\s+have\s+.*\s+in\s+rag\b'
-            r'|\btell\s+me\s+about\b'
+            r'|\btell\s+me\s+(about|more\s+about)\b'
             r'|\bwhat\s+do\s+you\s+have\s+(about|on)\b'
 
             # Browse/list queries
@@ -404,6 +404,7 @@ INTENT_PATTERNS = {
         "exclude_pattern": r'\bcode\b',
         "tools": [
             "summarize_text_tool",
+            "concept_contextualizer_tool",
             "summarize_direct_tool",
             "explain_simplified_tool",
             "concept_contextualizer_tool"
