@@ -1588,14 +1588,86 @@ def create_langgraph_agent(llm_with_tools, tools):
                 if search_result["success"] and search_result["results"]:
                     search_context = search_result["results"]
 
+                    # ═══════════════════════════════════════════════════════════
+                    # INGEST SEARCH RESULTS INTO RAG
+                    # ═══════════════════════════════════════════════════════════
+                    tools_dict = state.get("tools", {})
+                    rag_add_tool = tools_dict.get("rag_add_tool")
+
+                    if rag_add_tool:
+                        logger.info("💾 Ingesting Ollama Search results into RAG...")
+
+                        # Parse search results and extract URLs/content
+                        try:
+                            # Try to parse as JSON if it's structured
+                            if isinstance(search_context, str):
+                                import json
+                                try:
+                                    data = json.loads(search_context)
+                                except json.JSONDecodeError:
+                                    data = {"text": search_context}
+                            else:
+                                data = search_context
+
+                            # Extract web pages from Bing-style response
+                            pages = []
+                            if isinstance(data, dict):
+                                web_pages = data.get("webPages", {})
+                                if isinstance(web_pages, dict):
+                                    pages = web_pages.get("value", [])
+
+                            # Ingest each search result
+                            ingested_count = 0
+                            for page in pages[:5]:  # Limit to top 5 results
+                                if isinstance(page, dict):
+                                    url = page.get("url", "")
+                                    title = page.get("name", "Untitled")
+                                    snippet = page.get("snippet", "")
+
+                                    if snippet:
+                                        rag_entry = {
+                                            "text": snippet,
+                                            "source": url,
+                                            "metadata": {
+                                                "source_type": "web_search",
+                                                "url": url,
+                                                "title": title,
+                                                "query": query,
+                                                "fetch_method": "ollama_search",
+                                                "timestamp": time.time()
+                                            }
+                                        }
+
+                                        try:
+                                            await rag_add_tool.ainvoke(rag_entry)
+                                            ingested_count += 1
+                                        except Exception as e:
+                                            logger.warning(f"⚠️ Failed to ingest {title}: {e}")
+
+                            if ingested_count > 0:
+                                logger.info(f"✅ Ingested {ingested_count} search results into RAG")
+                            else:
+                                logger.warning("⚠️ No results ingested into RAG")
+
+                        except Exception as e:
+                            logger.error(f"❌ Failed to ingest search results: {e}")
+                    else:
+                        logger.warning("⚠️ RAG tool not available - skipping ingestion")
+                    # ═══════════════════════════════════════════════════════════
+
                     augmented_prompt = f"""Web search results for: "{query}"
 
-    {search_context}
+        {search_context}
 
-    Based on these search results, provide a clear answer."""
+        Based on these search results, provide a clear answer."""
 
                     augmented_messages = messages + [HumanMessage(content=augmented_prompt)]
                     response = await base_llm.ainvoke(augmented_messages)
+
+                    # Add note about RAG ingestion
+                    if rag_add_tool and ingested_count > 0:
+                        if hasattr(response, 'content'):
+                            response.content += f"\n\n💾 *{ingested_count} search results stored in RAG for future reference.*"
 
                     return {
                         "messages": [response],
