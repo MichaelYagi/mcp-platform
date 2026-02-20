@@ -1575,6 +1575,10 @@ def create_langgraph_agent(llm_with_tools, tools):
 
             # Strip Ollama Search phrases from query
             query = OLLAMA_SEARCH_PATTERN.sub('', user_message)
+
+            # Remove common command prefixes
+            query = re.sub(r'^\s*(use|using|with|via|please|can you)\s+', '', query, flags=re.IGNORECASE)
+            query = re.sub(r'\s+(for me|to)\s+', ' ', query, flags=re.IGNORECASE)
             query = query.strip().lstrip(':,.')
 
             if not query:
@@ -1597,34 +1601,58 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if rag_add_tool:
                         logger.info("💾 Ingesting Ollama Search results into RAG...")
 
-                        # Parse search results and extract URLs/content
+                        ingested_count = 0
+
                         try:
-                            # Try to parse as JSON if it's structured
-                            if isinstance(search_context, str):
-                                import json
+                            # The search_context is already the raw response
+                            # Try to extract pages from different possible formats
+                            pages = []
+
+                            if isinstance(search_context, dict):
+                                # Format 1: Direct webPages structure
+                                if "webPages" in search_context:
+                                    web_pages = search_context.get("webPages", {})
+                                    if isinstance(web_pages, dict):
+                                        pages = web_pages.get("value", [])
+                                # Format 2: Direct list of results
+                                elif "results" in search_context:
+                                    pages = search_context.get("results", [])
+                                # Format 3: Top-level value array
+                                elif "value" in search_context:
+                                    pages = search_context.get("value", [])
+
+                            elif isinstance(search_context, list):
+                                # Direct list of results
+                                pages = search_context
+
+                            elif isinstance(search_context, str):
+                                # Try to parse JSON string
                                 try:
                                     data = json.loads(search_context)
+                                    if isinstance(data, dict):
+                                        if "webPages" in data:
+                                            pages = data.get("webPages", {}).get("value", [])
+                                        elif "results" in data:
+                                            pages = data.get("results", [])
+                                        elif "value" in data:
+                                            pages = data.get("value", [])
+                                    elif isinstance(data, list):
+                                        pages = data
                                 except json.JSONDecodeError:
-                                    data = {"text": search_context}
-                            else:
-                                data = search_context
+                                    logger.warning("⚠️ Could not parse search context as JSON")
 
-                            # Extract web pages from Bing-style response
-                            pages = []
-                            if isinstance(data, dict):
-                                web_pages = data.get("webPages", {})
-                                if isinstance(web_pages, dict):
-                                    pages = web_pages.get("value", [])
+                            logger.info(f"📋 Found {len(pages)} pages to ingest")
 
                             # Ingest each search result
-                            ingested_count = 0
-                            for page in pages[:5]:  # Limit to top 5 results
+                            for i, page in enumerate(pages[:5], 1):  # Limit to top 5 results
                                 if isinstance(page, dict):
-                                    url = page.get("url", "")
-                                    title = page.get("name", "Untitled")
-                                    snippet = page.get("snippet", "")
+                                    # Try different field names
+                                    url = page.get("url") or page.get("link") or page.get("href") or ""
+                                    title = page.get("name") or page.get("title") or "Untitled"
+                                    snippet = page.get("snippet") or page.get("description") or page.get(
+                                        "summary") or ""
 
-                                    if snippet:
+                                    if snippet and url:
                                         rag_entry = {
                                             "text": snippet,
                                             "source": url,
@@ -1641,19 +1669,28 @@ def create_langgraph_agent(llm_with_tools, tools):
                                         try:
                                             await rag_add_tool.ainvoke(rag_entry)
                                             ingested_count += 1
+                                            logger.info(f"   ✅ [{i}/5] Ingested: {title[:50]}")
                                         except Exception as e:
-                                            logger.warning(f"⚠️ Failed to ingest {title}: {e}")
+                                            logger.warning(f"   ⚠️ [{i}/5] Failed to ingest {title[:50]}: {e}")
+                                    else:
+                                        logger.warning(f"   ⚠️ [{i}/5] Skipping - missing snippet or URL")
 
                             if ingested_count > 0:
-                                logger.info(f"✅ Ingested {ingested_count} search results into RAG")
+                                logger.info(f"✅ Ingested {ingested_count}/5 search results into RAG")
                             else:
-                                logger.warning("⚠️ No results ingested into RAG")
+                                logger.warning("⚠️ No results ingested into RAG - check response format")
+                                # Debug: log the actual structure
+                                logger.debug(f"Search context type: {type(search_context)}")
+                                if isinstance(search_context, dict):
+                                    logger.debug(f"Keys: {list(search_context.keys())}")
 
                         except Exception as e:
                             logger.error(f"❌ Failed to ingest search results: {e}")
+                            import traceback
+                            traceback.print_exc()
                     else:
+                        ingested_count = 0
                         logger.warning("⚠️ RAG tool not available - skipping ingestion")
-                    # ═══════════════════════════════════════════════════════════
 
                     augmented_prompt = f"""Web search results for: "{query}"
 
