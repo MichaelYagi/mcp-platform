@@ -1,87 +1,259 @@
 import json
-import os
 import requests
 from typing import Optional
 from tools.location.resolve_location import resolve_location
-from dotenv import load_dotenv
 
-def get_weather(city: Optional[str] = None, state: Optional[str] = None, country: Optional[str] = None) -> str:
+# WMO Weather interpretation codes -> human readable description + chance label
+WMO_CODES = {
+    0:  ("☀️ Clear sky", 0),
+    1:  ("🌤️ Mainly clear", 5),
+    2:  ("⛅ Partly cloudy", 20),
+    3:  ("☁️ Overcast", 0),
+    45: ("🌫️ Fog", 0),
+    48: ("🌫️ Depositing rime fog", 0),
+    51: ("🌦️ Light drizzle", 40),
+    53: ("🌦️ Moderate drizzle", 60),
+    55: ("🌧️ Dense drizzle", 80),
+    56: ("🌨️ Light freezing drizzle", 40),
+    57: ("🌨️ Dense freezing drizzle", 80),
+    61: ("🌧️ Slight rain", 50),
+    63: ("🌧️ Moderate rain", 70),
+    65: ("🌧️ Heavy rain", 90),
+    66: ("🌨️ Light freezing rain", 50),
+    67: ("🌨️ Heavy freezing rain", 85),
+    71: ("🌨️ Slight snowfall", 50),
+    73: ("❄️ Moderate snowfall", 70),
+    75: ("❄️ Heavy snowfall", 90),
+    77: ("🌨️ Snow grains", 60),
+    80: ("🌦️ Slight rain showers", 50),
+    81: ("🌧️ Moderate rain showers", 65),
+    82: ("⛈️ Violent rain showers", 90),
+    85: ("🌨️ Slight snow showers", 50),
+    86: ("❄️ Heavy snow showers", 80),
+    95: ("⛈️ Thunderstorm", 75),
+    96: ("⛈️ Thunderstorm with slight hail", 80),
+    99: ("⛈️ Thunderstorm with heavy hail", 90),
+}
+
+def _wmo_description(code: int) -> str:
+    return WMO_CODES.get(code, ("Unknown", 0))[0]
+
+def _celsius_to_fahrenheit(c: float) -> float:
+    return round(c * 9 / 5 + 32, 1)
+
+def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = None):
     """
-    Fetches real weather data using WeatherAPI.com.
-    Falls back to a clear error message if the API key is missing or the request fails.
+    Use Open-Meteo's geocoding API to resolve a city name to lat/lon.
+    Returns dict with lat, lon, resolved_city, resolved_state, resolved_country
+    or None on failure.
+    """
+    query = city
+    url = f"https://geocoding-api.open-meteo.com/v1/search?name={requests.utils.quote(query)}&count=10&language=en&format=json"
+    resp = requests.get(url, timeout=5)
+    data = resp.json()
+
+    results = data.get("results", [])
+    if not results:
+        return None
+
+    # Try to match state/country if provided
+    best = None
+    for r in results:
+        r_country = r.get("country", "").lower()
+        r_state = r.get("admin1", "").lower()
+        r_cc = r.get("country_code", "").lower()
+
+        country_match = (
+            not country or
+            country.lower() in r_country or
+            r_country in country.lower() or
+            country.lower() == r_cc
+        )
+        state_match = (
+            not state or
+            state.lower() in r_state or
+            r_state in state.lower() or
+            state.lower() == r.get("admin1_code", "").lower()
+        )
+
+        if country_match and state_match:
+            best = r
+            break
+
+    if not best:
+        best = results[0]  # Fall back to top result
+
+    return {
+        "lat": best["latitude"],
+        "lon": best["longitude"],
+        "city": best.get("name", city),
+        "state": best.get("admin1", state or ""),
+        "country": best.get("country", country or ""),
+        "timezone": best.get("timezone", "auto"),
+    }
+
+
+def get_weather(
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    country: Optional[str] = None,
+    forecast_days: int = 7
+) -> str:
+    """
+    Fetches current weather and a multi-day forecast using the free Open-Meteo API.
+    No API key required.
+
+    Location resolution priority:
+      1. Use provided city/state/country arguments
+      2. If none provided, defaults to Vancouver, BC, Canada
+
     When parsing locations:
-    • City = city name (e.g., Surrey)
-    • State = province or prefecture or state (e.g., BC, Ontario, Kanagawa, California)
+    • City  = city name (e.g., Surrey)
+    • State = province, prefecture, or state (e.g., BC, Ontario, Kanagawa, California)
     • Country = full country name (e.g., Canada, Japan, United States)
 
     Never put a province or state into the country field.
+
+    Args:
+        city (str, optional): City name
+        state (str, optional): State / province / prefecture
+        country (str, optional): Full country name
+        forecast_days (int): Number of forecast days to return (1-16, default 7)
     """
+    # --- Resolve location ---
+    # If nothing is provided, default to Vancouver BC
+    if not city and not state and not country:
+        city = "Vancouver"
+        state = "BC"
+        country = "Canada"
+
+    # Use existing resolve_location for any normalization it provides,
+    # then geocode to get lat/lon
     loc = resolve_location(city, state, country)
 
-    load_dotenv()
-    api_key = os.getenv("WEATHER_TOKEN")
-    if not api_key:
+    geo = _geocode(loc.get("city") or city, loc.get("state") or state, loc.get("country") or country)
+    if not geo:
         return json.dumps({
-            "error": "missing_api_key",
-            "message": "Set WEATHER_TOKENin your environment to enable real weather data.",
-            "city": loc["city"],
-            "state": loc["state"],
-            "country": loc["country"]
+            "error": "geocode_failed",
+            "message": f"Could not resolve location: city={city}, state={state}, country={country}",
+            "city": city,
+            "state": state,
+            "country": country,
         }, indent=2)
 
-    # WeatherAPI expects "City,State,Country"
-    query_parts = [loc['city'], loc['state'], loc['country']]
-    query = ",".join([p for p in query_parts if p])
-    url = f"https://api.weatherapi.com/v1/forecast.json?key={api_key}&q={query}&aqi=no&days=1"
+    lat = geo["lat"]
+    lon = geo["lon"]
+    timezone = geo.get("timezone") or "auto"
+    forecast_days = max(1, min(16, forecast_days))
+
+    # --- Fetch weather from Open-Meteo ---
+    current_vars = [
+        "temperature_2m",
+        "apparent_temperature",
+        "relative_humidity_2m",
+        "weather_code",
+        "precipitation_probability",
+        "wind_speed_10m",
+        "is_day",
+    ]
+    daily_vars = [
+        "weather_code",
+        "temperature_2m_max",
+        "temperature_2m_min",
+        "precipitation_probability_max",
+        "wind_speed_10m_max",
+        "sunrise",
+        "sunset",
+    ]
+
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        f"&current={','.join(current_vars)}"
+        f"&daily={','.join(daily_vars)}"
+        f"&forecast_days={forecast_days}"
+        f"&timezone={requests.utils.quote(timezone)}"
+        f"&wind_speed_unit=kmh"
+    )
 
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, timeout=10)
         data = response.json()
-
-        # WeatherAPI error format
-        if "error" in data:
-            return json.dumps({
-                "error": data["error"].get("code"),
-                "message": data["error"].get("message"),
-                "city": loc["city"],
-                "state": loc["state"],
-                "country": loc["country"]
-            }, indent=2)
-
-        location = data["location"]
-        current = data["current"]
-        forecast = data["forecast"]
-
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"🌤️  get_weather called with: city={city}, state={state}, country={country}")
-        logger.info(f"🌤️  {url}")
-
-        result = {
-            "city": location["name"],
-            "state": location["region"],
-            "country": location["country"],
-            "weather": {
-                "condition": current["condition"]["text"],
-                "temperature_f": current["temp_f"],
-                "temperature_c": current["temp_c"],
-                "feelslike_f": current["feelslike_f"],
-                "feelslike_c": current["feelslike_c"],
-                "humidity": current["humidity"],
-                "maxtemp_f": forecast["forecastday"][0]["day"]["maxtemp_f"],
-                "maxtemp_c": forecast["forecastday"][0]["day"]["maxtemp_c"],
-                "mintemp_f": forecast["forecastday"][0]["day"]["mintemp_f"],
-                "mintemp_c": forecast["forecastday"][0]["day"]["mintemp_c"]
-            }
-        }
-
-        return json.dumps(result, indent=2)
-
     except Exception as e:
         return json.dumps({
             "error": "request_failed",
             "message": str(e),
-            "city": loc["city"],
-            "state": loc["state"],
-            "country": loc["country"]
+            "city": geo["city"],
+            "state": geo["state"],
+            "country": geo["country"],
         }, indent=2)
+
+    if "error" in data:
+        return json.dumps({
+            "error": "api_error",
+            "message": data.get("reason", "Unknown error from Open-Meteo"),
+            "city": geo["city"],
+            "state": geo["state"],
+            "country": geo["country"],
+        }, indent=2)
+
+    current = data.get("current", {})
+    daily = data.get("daily", {})
+
+    # --- Build current weather ---
+    cur_temp_c = current.get("temperature_2m")
+    cur_feels_c = current.get("apparent_temperature")
+    cur_code = current.get("weather_code", 0)
+
+    current_weather = {
+        "condition": _wmo_description(cur_code),
+        "precipitation_chance": f"{current.get('precipitation_probability', 0)}%",
+        "temperature_c": cur_temp_c,
+        "temperature_f": _celsius_to_fahrenheit(cur_temp_c) if cur_temp_c is not None else None,
+        "feelslike_c": cur_feels_c,
+        "feelslike_f": _celsius_to_fahrenheit(cur_feels_c) if cur_feels_c is not None else None,
+        "humidity": f"{current.get('relative_humidity_2m', 0)}%",
+        "wind_speed_kph": current.get("wind_speed_10m"),
+        "is_day": bool(current.get("is_day", 1)),
+    }
+
+    # --- Build daily forecast ---
+    dates = daily.get("time", [])
+    codes = daily.get("weather_code", [])
+    max_temps = daily.get("temperature_2m_max", [])
+    min_temps = daily.get("temperature_2m_min", [])
+    precip_probs = daily.get("precipitation_probability_max", [])
+    wind_maxes = daily.get("wind_speed_10m_max", [])
+    sunrises = daily.get("sunrise", [])
+    sunsets = daily.get("sunset", [])
+
+    forecast = []
+    for i, date in enumerate(dates):
+        code = codes[i] if i < len(codes) else 0
+        max_c = max_temps[i] if i < len(max_temps) else None
+        min_c = min_temps[i] if i < len(min_temps) else None
+        forecast.append({
+            "date": date,
+            "condition": _wmo_description(code),
+            "precipitation_chance": f"{precip_probs[i]}%" if i < len(precip_probs) and precip_probs[i] is not None else "N/A",
+            "max_temp_c": max_c,
+            "max_temp_f": _celsius_to_fahrenheit(max_c) if max_c is not None else None,
+            "min_temp_c": min_c,
+            "min_temp_f": _celsius_to_fahrenheit(min_c) if min_c is not None else None,
+            "max_wind_kph": wind_maxes[i] if i < len(wind_maxes) else None,
+            "sunrise": sunrises[i] if i < len(sunrises) else None,
+            "sunset": sunsets[i] if i < len(sunsets) else None,
+        })
+
+    result = {
+        "city": geo["city"],
+        "state": geo["state"],
+        "country": geo["country"],
+        "latitude": lat,
+        "longitude": lon,
+        "timezone": timezone,
+        "current": current_weather,
+        "forecast": forecast,
+    }
+
+    return json.dumps(result, indent=2)

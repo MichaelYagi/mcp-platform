@@ -138,36 +138,39 @@ def get_time_tool(city: str | None = None, state: str | None = None, country: st
 
 @mcp.tool()
 @check_tool_enabled(category="location")
-def get_weather_tool(city: str | None = None, state: str | None = None, country: str | None = None) -> str:
+def get_weather_tool(city: str | None = None, state: str | None = None, country: str | None = None, forecast_days: int = 7) -> str:
     """
-    Get current weather conditions for any location.
+    Get current weather conditions and multi-day forecast for any location.
 
     Args:
         city (str, optional): City name (e.g., "Surrey", "Paris")
         state (str, optional): State/province/prefecture (e.g., "BC", "California", "Kanagawa")
         country (str, optional): FULL country name (e.g., "Canada", "Japan", "United States")
+        forecast_days (int, optional): Number of forecast days to return (1-16, default 7)
 
-    All arguments are optional. If none provided, uses client's IP to determine location.
+    All location arguments are optional. If none provided, uses client's IP to determine
+    location. Falls back to Vancouver, BC, Canada if IP geolocation is unavailable.
 
     IMPORTANT: Never put a province/state into the country field.
 
     Returns:
         JSON string with:
-        - location: {city, state, country}
+        - city, state, country, latitude, longitude, timezone
         - current: {
-            temperature_c: Current temperature in Celsius
-            temperature_f: Current temperature in Fahrenheit
-            condition: Weather description
-            humidity: Humidity percentage
+            condition: Weather description (e.g. "Partly cloudy")
+            precipitation_chance: Chance of precipitation as percentage
+            temperature_c / temperature_f: Current temperature
+            feelslike_c / feelslike_f: Feels like temperature
+            humidity: Relative humidity percentage
             wind_speed_kph: Wind speed
-            feels_like_c: Feels like temperature
+            is_day: Whether it is currently daytime
           }
-        - forecast: Array of upcoming days with high/low temps
+        - forecast: Array of daily entries with condition, precipitation_chance,
+            max/min temps in C and F, max wind speed, sunrise, and sunset
 
-    Use when user asks about weather, temperature, or forecast.
+    Use when user asks about weather, temperature, forecast, or "will it rain".
     """
-    logger.info(f"🛠 [server] get_weather_tool called with city: {city}, state: {state}, country: {country}")
-    logger.info(f"🌤️  get_weather_tool called with: city={city}, state={state}, country={country}")
+    logger.info(f"🛠 [server] get_weather_tool called with city: {city}, state: {state}, country: {country}, forecast_days: {forecast_days}")
     logger.info(f"🌤️  CLIENT_IP = {CLIENT_IP}")
 
     if not city and CLIENT_IP:
@@ -180,8 +183,7 @@ def get_weather_tool(city: str | None = None, state: str | None = None, country:
             country = loc.get("country")
             logger.info(f"🌤️  Resolved to: city={city}, state={state}, country={country}")
 
-    result = get_weather_fn(city, state, country)
-    logger.info(f"🌤️  Result: {result}")
+    result = get_weather_fn(city, state, country, forecast_days=forecast_days)
     logger.info(f"🌤️  Returning weather result")
     return result
 

@@ -155,7 +155,6 @@ GGUF_BATCH_SIZE=512             # Batch size for processing
 # === API Keys (optional services) ===
 PLEX_URL=http://localhost:32400  # Plex server URL
 PLEX_TOKEN=your_token_here       # Get from Plex account settings
-WEATHER_TOKEN=your_token_here    # OpenWeatherMap API key
 OLLAMA_TOKEN=your_token_here     # Ollama API key (https://ollama.com/settings/keys)
 
 # === A2A Protocol (optional distributed mode) ===
@@ -219,11 +218,6 @@ These work in both CLI and web UI:
 ```
 
 ### API Setup
-
-**Weather (OpenWeatherMap):**
-1. Sign up at https://openweathermap.org/api
-2. Get API key from account settings
-3. Add to `.env`: `WEATHER_TOKEN=your_key`
 
 **Ollama Search API (web search):**
 1. Sign up at https://ollama.com/
