@@ -53,6 +53,8 @@ function applyTheme(themeName) {
     document.querySelectorAll('.theme-option').forEach(el => {
         el.classList.toggle('active', el.dataset.theme === themeName);
     });
+    const btn = document.getElementById('themeBtn');
+    if (btn) btn.title = themeIdToLabel(themeName);
     closeThemeDropdown();
 }
 
