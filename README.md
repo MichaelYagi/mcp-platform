@@ -1,6 +1,8 @@
-# MCP Multi-Server Architecture
+# MCP Platform
 
-A Model Context Protocol (MCP) implementation with distributed multi-server architecture, Agent-to-Agent (A2A) protocol support, and ML-powered recommendations.
+Local MCP runtime with multi-agent orchestration, distributed tool servers, and ML-powered media recommendations.
+
+⚠️ **Experimental** — intended for personal and experimental use only, not for production deployment.
 
 ---
 
