@@ -57,6 +57,8 @@ ollama pull bge-large
 ollama pull qwen2.5:14b-instruct-q4_K_M
 ```
 
+> ⚠️ **RAG requires Ollama + bge-large:** If Ollama is not running or `bge-large` has not been pulled, RAG ingestion and semantic search will not work. Run `ollama pull bge-large` before attempting to use any RAG features.
+
 **Option B: GGUF (local model files)**
 ```bash
 # Download a GGUF model (example)
@@ -65,6 +67,8 @@ wget https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/
 # Register the model
 # (After starting client, use :gguf add command)
 ```
+
+> ⚠️ **RAG with GGUF backend:** RAG still requires Ollama running separately for embeddings (`bge-large`), even if you use a GGUF model for chat. Ollama is not optional for RAG regardless of your LLM backend choice.
 
 ### Start the Client
 ```bash
@@ -131,8 +135,8 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 **Available servers:**
 - `code_review` - Code analysis (5 tools)
 - `location` - Weather, time, location (3 tools)
-- `plex` - Media library + ML recommendations (17 tools)
-- `rag` - Vector search (4 tools)
+- `plex` - Media library + ML recommendations (17 tools) ⚠️ *Requires Plex env vars*
+- `rag` - Vector search (4 tools) ⚠️ *Requires Ollama + bge-large*
 - `system_tools` - System info (4 tools)
 - `text_tools` - Text processing (7 tools)
 - `todo` - Task management (6 tools)
@@ -194,6 +198,22 @@ DISABLED_TOOLS=knowledge_base:*,todo:*  # Disable specific tools/categories
 - Example: `DISABLED_TOOLS=todo:delete_all_todo_items,system:*`
 - Hidden from `:tools` list, return error if called
 
+### Feature Requirements
+
+Some features require additional setup before they will function. The table below summarizes what's needed:
+
+| Feature | Required env vars | Additional setup |
+|---------|-------------------|------------------|
+| RAG ingestion & search | — | Ollama running + `bge-large` pulled |
+| Plex media library | `PLEX_URL`, `PLEX_TOKEN` | Plex Media Server running |
+| Plex ingestion & recommendations | `PLEX_URL`, `PLEX_TOKEN` | Ollama running + `bge-large` pulled |
+| Ollama web search | `OLLAMA_TOKEN` | Ollama account + API key |
+| A2A distributed mode | `A2A_ENDPOINTS` | Remote A2A server running |
+
+> ⚠️ **RAG will silently fail** if Ollama is not running or `bge-large` is not available — embeddings cannot be generated without it. Run `ollama list` to confirm the model is present.
+
+> ⚠️ **Plex tools will return errors** if `PLEX_URL` and `PLEX_TOKEN` are not set in `.env`. The Plex server must also be reachable at the configured URL. See the API Setup section below for how to obtain your token.
+
 ### Available Commands
 
 These work in both CLI and web UI:
@@ -237,6 +257,8 @@ These work in both CLI and web UI:
    PLEX_URL=http://your_server_ip:32400
    PLEX_TOKEN=your_token
 ```
+
+> ⚠️ **Without `PLEX_URL` and `PLEX_TOKEN`**, all Plex tools (library browsing, ingestion, ML recommendations) will be unavailable. The server will load but calls will return a configuration error.
 
 ---
 
@@ -473,8 +495,8 @@ servers/
 ├── code_review/       5 tools  - Code analysis
 ├── knowledge_base/   10 tools  - Notes management
 ├── location/          3 tools  - Weather, time, location
-├── plex/             17 tools  - Media + ML recommendations
-├── rag/               4 tools  - Vector search
+├── plex/             17 tools  - Media + ML recommendations  [requires PLEX_URL + PLEX_TOKEN]
+├── rag/               4 tools  - Vector search               [requires Ollama + bge-large]
 ├── system_tools/      4 tools  - System info
 ├── text_tools/        7 tools  - Text processing
 └── todo/              6 tools  - Task management
@@ -537,6 +559,8 @@ mcp_a2a/
 
 **RAG (Retrieval-Augmented Generation):**
 
+> ⚠️ **RAG requires Ollama + bge-large.** If either is missing, ingestion and search will fail. See [Choose LLM Backend](#choose-llm-backend) for setup steps.
+
 *Automatic ingestion from web research:*
 ```
 > Write a report about quantum computing using 
@@ -589,6 +613,17 @@ ollama list
 python client.py
 ```
 
+**RAG not working / embedding errors:**
+- Ensure Ollama is running: `ollama serve`
+- Confirm `bge-large` is available: `ollama list`
+- If missing, pull it: `ollama pull bge-large`
+- RAG requires Ollama for embeddings regardless of which LLM backend (Ollama or GGUF) you use for chat
+
+**Plex tools returning errors:**
+- Confirm `PLEX_URL` and `PLEX_TOKEN` are set in `.env`
+- Verify the Plex server is reachable: `curl $PLEX_URL/identity?X-Plex-Token=$PLEX_TOKEN`
+- See [API Setup](#api-setup) for how to locate your token
+
 **GGUF model won't load:**
 - Check model size vs VRAM (use models <7GB for 12GB VRAM)
 - Reduce GPU layers: `export GGUF_GPU_LAYERS=20`
@@ -637,5 +672,3 @@ python client.py    # restart
 
 
 MIT License
-
-
