@@ -683,45 +683,48 @@ body {
     --swatch3:          #bb9af7;
 }
 
-/* Nimbus – modern, clean, airy neutrals with soft blue accents */
+/* Nimbus – ultra-soft, airy, readable */
 [data-theme="nimbus"] {
-    /* Header */
-    --header-bg:        #e6e9ef;
+    /* Backgrounds */
+    --page-bg:          #e4ebf5;
+    --header-bg:        #e4ebf5;
     --header-border:    #cfd4dd;
 
-    /* Sidebar */
-    --sidebar-bg:       #f2f4f7;
-    --sidebar-header:   #e6e9ef;
-    --sidebar-item:     #e6e9ef;
-    --sidebar-hover:    #dce1ea;
-    --sidebar-active:   #4a90e2;
-    --sidebar-border:   #d0d5dd;
-    --sidebar-search:   #e6e9ef;
+    --sidebar-bg:       #e4ebf5;
+    --sidebar-header:   #d2ddee;
+    --sidebar-item:     #e4ebf5;
+    --sidebar-hover:    #d9e1ee;
+    --sidebar-active:   #c7d3e8;
+    --sidebar-border:   #c7cfdb;
+    --sidebar-search:   #d2ddee;
 
-    /* Page & Chat */
-    --page-bg:          #f7f9fc;
+    /* TEXT — very soft slate (barely darker than background) */
+    --text-strong:      #7c8290;   /* primary */
+    --text-medium:      #868c99;   /* secondary */
+    --text-light:       #959ba6;   /* meta */
+
+    --chat-asst-color:  var(--text-strong);
+    --status-color:     var(--text-light);
+    --title-color:      var(--text-strong);
+    --subtitle-color:   var(--text-medium);
+    --label-color:      var(--text-medium);
+    --metric-color:     var(--text-strong);
+
+    /* Chat + Input */
     --chat-bg:          #ffffff;
-    --chat-border:      #d0d5dd;
+    --chat-border:      #cfd4dd;
     --chat-assistant:   #f2f4f7;
     --chat-asst-border: #d0d5dd;
-
-    /* Readable text */
-    --chat-asst-color:  #2a2f38;   /* was #3a3f47 */
-    --status-color:     #4a4f58;   /* was #6b7280 */
-    --title-color:      #2a2f38;   /* was #3a3f47 */
-    --subtitle-color:   #5a616c;   /* was #6b7280 */
-    --label-color:      #4a4f58;   /* was #6b7280 */
 
     --input-bg:         #ffffff;
     --input-border:     #cfd4dd;
 
-    /* User bubble & send button */
+    /* Buttons */
     --user-bubble:      linear-gradient(135deg, #4a90e2, #357acb);
     --send-btn:         #4a90e2;
     --send-btn-hover:   #357acb;
     --send-btn-focus:   rgba(74,144,226,0.25);
 
-    /* Buttons */
     --btn-logs:             #4a90e2;
     --btn-logs-hover:       #357acb;
     --btn-monitor:          #7b61ff;
@@ -750,9 +753,6 @@ body {
     --card-shadow:      rgba(0,0,0,0.06);
     --card-shadow-hover:rgba(0,0,0,0.12);
 
-    /* Dashboard text */
-    --metric-color:     #2a2f38;   /* was #4a90e2 (kept accent but darkened) */
-
     --chart-blue:       #4a90e2;
     --chart-purple:     #7b61ff;
     --tool-border:      #4a90e2;
@@ -760,14 +760,134 @@ body {
     --status-bg:        #ffffff;
 
     /* Scrollbars */
-    --scrollbar-track:  #f2f4f7;
+    --scrollbar-track:  #e4ebf5;
     --scrollbar-thumb:  #cfd4dd;
     --scrollbar-hover:  #b7bcc7;
 
     /* Swatches */
-    --swatch1:          #e6e9ef;
+    --swatch1:          #d2ddee;
     --swatch2:          #4a90e2;
     --swatch3:          #7b61ff;
+}
+
+/* Nimbus UI text overrides */
+[data-theme="nimbus"] #header,
+[data-theme="nimbus"] #headerLeft,
+[data-theme="nimbus"] .sessions-header,
+[data-theme="nimbus"] #topBar,
+[data-theme="nimbus"] #themeWrapper,
+[data-theme="nimbus"] #modelSelectLabel,
+[data-theme="nimbus"] #topBar button,
+[data-theme="nimbus"] #topBar select {
+    color: var(--text-strong) !important;
+    background: #e4ebf5 !important;
+}
+
+/* Fix "Chats" label */
+[data-theme="nimbus"] .sessions-header h2 {
+    color: var(--text-strong) !important;
+}
+
+/* Session list text */
+[data-theme="nimbus"] .session-item-text {
+    color: var(--text-medium) !important;
+}
+
+[data-theme="nimbus"] .session-item:hover .session-item-text {
+    color: var(--text-strong) !important;
+}
+
+[data-theme="nimbus"] .session-item.active .session-item-text {
+    color: white !important;
+}
+
+/* Hamburger icon — soft slate */
+[data-theme="nimbus"] #hamburgerBtn .bar {
+    background: var(--text-medium) !important;
+}
+
+/* Nimbus – theme dropdown text + background fix */
+[data-theme="nimbus"] #themeDropdown,
+[data-theme="nimbus"] .theme-option {
+    background: #e4ebf5 !important;
+    color: var(--text-strong) !important;
+}
+
+[data-theme="nimbus"] .theme-option:hover {
+    background: #d9e1ee !important;
+    color: var(--text-strong) !important;
+}
+
+[data-theme="nimbus"] .theme-option.active {
+    background: #c7d3e8 !important;
+    color: var(--text-strong) !important;
+}
+
+/* Swatches inside dropdown stay visible */
+[data-theme="nimbus"] .theme-opt-swatch {
+    border-color: rgba(0,0,0,0.15) !important;
+}
+
+/* Checkmark color */
+[data-theme="nimbus"] .theme-option .check {
+    color: var(--text-strong) !important;
+}
+
+/* Nimbus – soften search input + wrapper */
+[data-theme="nimbus"] #sessionSearch {
+    background: #eef2f8 !important;   /* very light cloud */
+    border: 1px solid #d4d9e2 !important;
+    color: #7c8290 !important;        /* soft slate */
+}
+
+[data-theme="nimbus"] .sessions-search-container {
+    background: #e4ebf5 !important;
+    border-bottom: 1px solid #d4d9e2 !important;
+}
+
+/* Placeholder text */
+[data-theme="nimbus"] #sessionSearch::placeholder {
+    color: #9aa1ac !important;        /* softest readable slate */
+}
+
+/* Nimbus – New Chat button (remove green) */
+[data-theme="nimbus"] .new-session-btn {
+    background: #e4ebf5 !important;   /* soft pastel teal */
+    color: #5a5f68 !important;        /* soft slate text */
+}
+
+[data-theme="nimbus"] .new-session-btn:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+}
+
+[data-theme="nimbus"] #dashboardBtn {
+    background: #e4ebf5 !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #dashboardBtn:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #logToggle:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #monitorToggle:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #backBtn {
+    background: #e4ebf5 !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #backBtn:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
 }
 
 /* Garbagefire – intentionally hideous, chaotic, and painful */
