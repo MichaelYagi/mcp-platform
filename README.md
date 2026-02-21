@@ -25,6 +25,8 @@ Get the client running in 3 steps:
 Clone repo and do the following
 
 ```bash
+cd mcp-platform
+
 # Create virtual environment
 python -m venv .venv
 
@@ -635,3 +637,4 @@ python client.py    # restart
 
 
 MIT License
+
