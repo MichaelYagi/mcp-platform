@@ -36,7 +36,7 @@ source .venv/bin/activate
 # Activate (Windows PowerShell)
 .venv\Scripts\activate
 
-# Install requirements
+# Install requirements - this will take a while
 pip install -r requirements.txt
 ```
 
@@ -637,4 +637,5 @@ python client.py    # restart
 
 
 MIT License
+
 
