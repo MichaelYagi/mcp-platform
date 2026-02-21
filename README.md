@@ -23,8 +23,8 @@ Get the client running in 3 steps:
 ### Install Dependencies
 ```bash
 # Clone repository
-git clone <repo-url>
-cd mcp_a2a
+git clone https://github.com/MichaelYagi/mcp-platform.git
+cd mcp-platform
 
 # Create virtual environment
 python -m venv .venv
