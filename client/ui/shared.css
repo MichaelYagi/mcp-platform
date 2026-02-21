@@ -825,7 +825,7 @@ body {
 
 /* Swatches inside dropdown stay visible */
 [data-theme="nimbus"] .theme-opt-swatch {
-    border-color: rgba(0,0,0,0.15) !important;
+    border: none !important;
 }
 
 /* Checkmark color */
