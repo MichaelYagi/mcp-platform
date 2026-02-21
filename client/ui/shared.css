@@ -742,8 +742,8 @@ body {
     --log-filter-btn:   #dce1ea;
 
     /* System monitor */
-    --monitor-gradient: linear-gradient(135deg, #4a90e2 0%, #7b61ff 100%);
-    --monitor-header:   rgba(0,0,0,0.15);
+    --monitor-gradient: var(--sidebar-bg);
+    --monitor-header:   var(--sidebar-header);
 
     /* Dashboard */
     --btn-back:         #4a90e2;
@@ -887,6 +887,71 @@ body {
 
 [data-theme="nimbus"] #backBtn:hover {
     background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+/* Nimbus – System Monitor overrides */
+[data-theme="nimbus"] #systemMonitor {
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--sidebar-border);
+}
+
+[data-theme="nimbus"] .monitor-header {
+    background: var(--sidebar-header);
+    border-bottom: 2px solid var(--sidebar-border);
+}
+[data-theme="nimbus"] .monitor-header h2 { color: var(--text-strong); }
+
+[data-theme="nimbus"] .monitor-btn {
+    background: var(--sidebar-hover);
+    color: var(--text-strong);
+}
+[data-theme="nimbus"] .monitor-btn:hover { background: var(--sidebar-active); }
+
+[data-theme="nimbus"] .stat-group {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 3px var(--card-shadow);
+}
+[data-theme="nimbus"] .stat-label    { color: var(--text-light); }
+[data-theme="nimbus"] .stat-value    { color: var(--text-strong); }
+[data-theme="nimbus"] .stat-secondary { color: var(--text-medium); }
+
+[data-theme="nimbus"] .progress-bar  { background: var(--sidebar-hover); }
+[data-theme="nimbus"] .progress-fill { background: linear-gradient(90deg, #4a90e2, #7b61ff); }
+
+/* Nimbus – Log Panel overrides */
+[data-theme="nimbus"] #logPanel {
+    background: var(--log-bg);
+    border-left: 1px solid var(--sidebar-border);
+}
+
+[data-theme="nimbus"] #logHeader {
+    background: var(--sidebar-header);
+    border-bottom: 2px solid var(--sidebar-border);
+}
+[data-theme="nimbus"] #logHeader h2 { color: var(--text-strong); }
+
+[data-theme="nimbus"] #logFilters {
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--sidebar-border);
+}
+
+[data-theme="nimbus"] #logContainer {
+    background: var(--log-bg);
+}
+
+[data-theme="nimbus"] .log-message   { color: var(--text-medium); }
+[data-theme="nimbus"] .log-timestamp { color: var(--text-light); }
+[data-theme="nimbus"] .log-entry:hover { background: var(--sidebar-hover); }
+
+[data-theme="nimbus"] .log-btn  {
+    background: #d2ddee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] .log-btn:hover {
+    background: #c8d4e6 !important;   /* slightly darker pastel */
     color: var(--text-strong)
 }
 
