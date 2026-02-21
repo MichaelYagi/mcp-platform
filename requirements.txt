@@ -6,7 +6,6 @@ gputil>=1.4.0
 httpx>=0.28.1
 joblib>=1.5.3
 langchain-community>=0.4.1
-langchain-core>=2.6.3
 langchain-ollama>=1.0.1
 lancedb>=0.26.1
 llama-cpp-python>=0.3.16
@@ -29,3 +28,4 @@ typing-extensions>=4.15.0
 tzdata>=2025.3
 uvicorn>=0.40.0
 websockets>=16.0
+
