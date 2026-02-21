@@ -952,7 +952,28 @@ body {
 
 [data-theme="nimbus"] .log-btn:hover {
     background: #c8d4e6 !important;   /* slightly darker pastel */
-    color: var(--text-strong)
+    color: var(--text-strong);
+}
+
+[data-theme="nimbus"] .mobile-close {
+    background: #d2ddee !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+    display: none;
+}
+
+[data-theme="nimbus"] .mobile-close:hover {
+    background: #c8d4e6 !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+}
+
+[data-theme="nimbus"] .session-close-btn {
+    background: #e4ebf5 !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+}
+
+[data-theme="nimbus"] .session-close-btn:hover {
+    background: #d2ddee !important;   /* slightly darker pastel */
+    color: var(--text-strong);
 }
 
 /* Garbagefire – intentionally hideous, chaotic, and painful */
