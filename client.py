@@ -695,7 +695,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         skills_manager = None  # Disable if no skills found
 
     # ═════════════════════════════════════════════════════════════════
-    # MULTI-A2A REGISTRATION (UPDATED)
+    # MULTI-A2A REGISTRATION
     # ═════════════════════════════════════════════════════════════════
 
     a2a_result = await register_all_a2a_endpoints(mcp_agent, logger)

@@ -704,10 +704,16 @@ body {
     --chat-border:      #d0d5dd;
     --chat-assistant:   #f2f4f7;
     --chat-asst-border: #d0d5dd;
-    --chat-asst-color:  #3a3f47;
+
+    /* Readable text */
+    --chat-asst-color:  #2a2f38;   /* was #3a3f47 */
+    --status-color:     #4a4f58;   /* was #6b7280 */
+    --title-color:      #2a2f38;   /* was #3a3f47 */
+    --subtitle-color:   #5a616c;   /* was #6b7280 */
+    --label-color:      #4a4f58;   /* was #6b7280 */
+
     --input-bg:         #ffffff;
     --input-border:     #cfd4dd;
-    --status-color:     #6b7280;
 
     /* User bubble & send button */
     --user-bubble:      linear-gradient(135deg, #4a90e2, #357acb);
@@ -743,10 +749,10 @@ body {
     --card-border:      #d0d5dd;
     --card-shadow:      rgba(0,0,0,0.06);
     --card-shadow-hover:rgba(0,0,0,0.12);
-    --title-color:      #3a3f47;
-    --metric-color:     #4a90e2;
-    --subtitle-color:   #6b7280;
-    --label-color:      #6b7280;
+
+    /* Dashboard text */
+    --metric-color:     #2a2f38;   /* was #4a90e2 (kept accent but darkened) */
+
     --chart-blue:       #4a90e2;
     --chart-purple:     #7b61ff;
     --tool-border:      #4a90e2;

@@ -1,5 +1,5 @@
 """
-Code Review MCP Server - UPDATED with comprehensive code review
+Code Review MCP Server with comprehensive code review
 Runs over stdio transport
 """
 import sys

@@ -137,7 +137,7 @@ def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: 
     result = rag_search(search_query, top_k, min_score)
 
     # ═══════════════════════════════════════════════════════════════
-    # NEW: Quality check and feedback logic
+    # Quality check and feedback logic
     # ═══════════════════════════════════════════════════════════════
     results = result.get("results", [])
 
