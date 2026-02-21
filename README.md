@@ -21,11 +21,10 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 Get the client running in 3 steps:
 
 ### Install Dependencies
-```bash
-# Clone repository
-git clone https://github.com/MichaelYagi/mcp-platform.git
-cd mcp-platform
 
+Clone repo and do the following
+
+```bash
 # Create virtual environment
 python -m venv .venv
 
@@ -633,5 +632,6 @@ python client.py    # restart
 ---
 
 ## License
+
 
 MIT License
