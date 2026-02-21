@@ -835,7 +835,7 @@ body {
 
 /* Nimbus – soften search input + wrapper */
 [data-theme="nimbus"] #sessionSearch {
-    background: #eef2f8 !important;   /* very light cloud */
+    background: #ffffff !important;   /* very light cloud */
     border: 1px solid #d4d9e2 !important;
     color: #7c8290 !important;        /* soft slate */
 }
