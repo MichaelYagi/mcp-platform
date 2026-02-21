@@ -801,6 +801,10 @@ body {
     color: white !important;
 }
 
+[data-theme="nimbus"] .filter-btn:not(.active) {
+    color: var(--text-strong) !important;
+}
+
 /* Hamburger icon — soft slate */
 [data-theme="nimbus"] #hamburgerBtn .bar {
     background: var(--text-medium) !important;
