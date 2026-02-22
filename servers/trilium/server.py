@@ -40,7 +40,7 @@ root_logger.handlers.clear()
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 # Create file handler
-file_handler = logging.FileHandler(LOG_DIR / "mcp-server.log", encoding="utf-8")
+file_handler = logging.FileHandler(LOG_DIR / "trilium-server.log", encoding="utf-8")
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 
@@ -163,7 +163,7 @@ def make_request(method: str, endpoint: str, data: dict = None, params: dict = N
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-def search_notes(query: str, limit: int = 50) -> str:
+def search_notes(query: str, limit: int = 50, include_content: bool = True) -> str:
     """
     Search Trilium notes using full-text search.
 
@@ -177,14 +177,15 @@ def search_notes(query: str, limit: int = 50) -> str:
     Args:
         query: Search query (e.g., "meeting notes", "#project", "todo AND urgent")
         limit: Maximum number of results (default: 50)
+        include_content: Whether to fetch content preview (slower but more detailed, default: True)
 
     Returns:
-        JSON with matching notes including noteId, title, type, content preview
+        JSON with matching notes including noteId, title, type, content preview (if enabled)
     """
     if not TRILIUM_AVAILABLE:
         return json.dumps(trilium_unavailable_error(), indent=2)
 
-    logger.info(f"🔍 [server] search_notes called with query: '{query}' (limit: {limit})")
+    logger.info(f"🔍 [server] search_notes called with query: '{query}' (limit: {limit}, content: {include_content})")
 
     result = make_request(
         method="GET",
@@ -203,28 +204,40 @@ def search_notes(query: str, limit: int = 50) -> str:
     for note_summary in result.get("results", [])[:limit]:
         note_id = note_summary.get("noteId")
 
-        # Get full note details
+        # Get note metadata
         note_detail = make_request("GET", f"/notes/{note_id}")
 
         if "error" not in note_detail:
-            # Get content preview
-            content = note_detail.get("content", "")
-            preview = content[:200] + "..." if len(content) > 200 else content
-
-            notes.append({
+            note_data = {
                 "noteId": note_id,
                 "title": note_detail.get("title", "Untitled"),
                 "type": note_detail.get("type", "text"),
                 "dateCreated": note_detail.get("dateCreated"),
-                "dateModified": note_detail.get("dateModified"),
-                "contentPreview": preview,
-                "contentLength": len(content)
-            })
+                "dateModified": note_detail.get("dateModified")
+            }
+
+            # Optionally fetch content (slower)
+            if include_content:
+                # Get note content separately (returns raw text)
+                content = make_request("GET", f"/notes/{note_id}/content", expect_json=False)
+
+                # Handle content
+                if isinstance(content, str):
+                    preview = content[:200] + "..." if len(content) > 200 else content
+                else:
+                    content = ""
+                    preview = ""
+
+                note_data["contentPreview"] = preview
+                note_data["contentLength"] = len(content)
+
+            notes.append(note_data)
 
     response = {
         "query": query,
         "total_results": len(notes),
-        "results": notes
+        "results": notes,
+        "content_included": include_content
     }
 
     logger.info(f"✅ [server] Found {len(notes)} notes")
@@ -344,9 +357,10 @@ def create_note(
 
     logger.info(f"📝 [server] create_note called: '{title}' under {parent_note_id}")
 
+    # Create note with POST /notes
     result = make_request(
         method="POST",
-        endpoint="/create-note",
+        endpoint="/notes",
         data={
             "parentNoteId": parent_note_id,
             "title": title,
@@ -358,7 +372,8 @@ def create_note(
     if "error" in result:
         return json.dumps(result, indent=2)
 
-    logger.info(f"✅ [server] Created note: {result.get('note', {}).get('noteId')}")
+    note_id = result.get("note", {}).get("noteId") if "note" in result else result.get("noteId")
+    logger.info(f"✅ [server] Created note: {note_id}")
     return json.dumps(result, indent=2)
 
 
