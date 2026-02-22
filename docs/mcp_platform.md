@@ -2,7 +2,7 @@
 
 ## High-Level Overview
 
-Your MCP platform is a **multi-agent orchestration system** that connects multiple MCP servers (RAG, Plex, Trilium, Code Assistant, etc.) through a centralized client with both CLI and web interfaces.
+The MCP platform is a **multi-agent orchestration system** that connects multiple MCP servers (RAG, Plex, Trilium, Code Assistant, etc.) through a centralized client with both CLI and web interfaces.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
