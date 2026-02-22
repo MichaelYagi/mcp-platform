@@ -466,6 +466,49 @@ INTENT_PATTERNS = {
         ),
         "tools": ["send_a2a*", "discover_a2a"],
         "priority": 3
+    },
+    "trilium": {
+        "pattern": (
+            # Direct Trilium references
+            r'\btrilium\b'
+            r'|\bnotes?\s+(in\s+)?trilium\b'
+            r'|\bmy\s+notes?\b'
+            
+            # Search in notes
+            r'|\bsearch\s+(my\s+)?notes?\b'
+            r'|\bfind\s+(in\s+)?(my\s+)?notes?\b'
+            r'|\blook\s+up\s+(in\s+)?notes?\b'
+            
+            # Note management
+            r'|\bcreate\s+(a\s+)?note\b'
+            r'|\badd\s+(a\s+)?note\b'
+            r'|\bupdate\s+(my\s+)?note\b'
+            r'|\bdelete\s+(my\s+)?note\b'
+            
+            # Labels/tags
+            r'|\bnotes?\s+tagged\b'
+            r'|\bnotes?\s+with\s+label\b'
+            r'|\badd\s+(label|tag)\s+to\s+note\b'
+            
+            # Recent/navigation
+            r'|\brecent\s+notes?\b'
+            r'|\blatest\s+notes?\b'
+            r'|\bchild\s+notes?\b'
+        ),
+        "tools": [
+            "search_notes",
+            "search_by_label",
+            "get_note_by_id",
+            "create_note",
+            "update_note_content",
+            "update_note_title",
+            "delete_note",
+            "add_label_to_note",
+            "get_note_labels",
+            "get_note_children",
+            "get_recent_notes"
+        ],
+        "priority": 2
     }
 }
 
