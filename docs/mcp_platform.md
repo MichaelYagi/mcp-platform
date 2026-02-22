@@ -66,10 +66,12 @@ The client is the orchestration layer that manages all MCP servers and routes re
 │  │  ┌───────────────────────────────────────────────────────────┐     │ │
 │  │  │           Client.py (Main Entry Point)                    │     │ │
 │  │  │                                                           │     │ │
-│  │  │  - run_agent_wrapper()                                    │     │ │
-│  │  │  - Multi-agent detection                                  │     │ │
+│  │  │  - run_agent_wrapper() - Agent runner with multi-agent    │     │ │
+│  │  │    support                                                │     │ │
+│  │  │  - Multi-agent detection - Determines if multi-agent is   │     │ │
+│  │  │    needed (eg. needs researcher agent)                    │     │ │
 │  │  │  - Skills injection                                       │     │ │
-│  │  │  - Conversation management                                │     │ │
+│  │  │  - Conversation management - For the chat UI              │     │ │
 │  │  └────────────────────┬──────────────────────────────────────┘     │ │
 │  │                       │                                            │ │
 │  │  ┌────────────────────▼────────────────────────────────────────┐   │ │
@@ -77,7 +79,8 @@ The client is the orchestration layer that manages all MCP servers and routes re
 │  │  │                                                             │   │ │
 │  │  │  - Skill discovery across servers                           │   │ │
 │  │  │  - Forced skill patterns (GitHub review)                    │   │ │
-│  │  │  - Keyword matching (find_relevant_skills)                  │   │ │
+│  │  │  - Keyword matching (find_relevant_skills) - needed for     │   │ │
+│  │  │    weak models                                              │   │ │
 │  │  │  - inject_relevant_skills_into_messages()                   │   │ │
 │  │  └────────────────────┬────────────────────────────────────────┘   │ │
 │  │                       │                                            │ │
