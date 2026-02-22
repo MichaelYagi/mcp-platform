@@ -12,7 +12,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from dotenv import load_dotenv
-
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
 from servers.skills.skill_loader import SkillLoader
@@ -83,7 +82,6 @@ else:
     TRILIUM_AVAILABLE = True
     logger.info("✅ Trilium configuration found")
 
-
 # ═══════════════════════════════════════════════════════════════════
 # HELPER FUNCTIONS
 # ═══════════════════════════════════════════════════════════════════
@@ -100,7 +98,7 @@ def trilium_unavailable_error():
     }
 
 
-def make_request(method: str, endpoint: str, data: dict = None, params: dict = None) -> dict:
+def make_request(method: str, endpoint: str, data: dict = None, params: dict = None, expect_json: bool = True) -> dict | str:
     """
     Make authenticated request to Trilium ETAPI
 
@@ -109,9 +107,10 @@ def make_request(method: str, endpoint: str, data: dict = None, params: dict = N
         endpoint: API endpoint (e.g., '/notes/search')
         data: JSON body for POST/PUT/PATCH
         params: Query parameters for GET
+        expect_json: Whether to parse response as JSON (default: True)
 
     Returns:
-        Response JSON or error dict
+        Response JSON dict, raw text string, or error dict
     """
     if not TRILIUM_AVAILABLE:
         return trilium_unavailable_error()
@@ -146,6 +145,11 @@ def make_request(method: str, endpoint: str, data: dict = None, params: dict = N
         if response.status_code == 204:
             return {"success": True, "status": 204}
 
+        # Return raw text if not expecting JSON (for content endpoints)
+        if not expect_json:
+            return response.text
+
+        # Try to parse as JSON
         return response.json()
 
     except requests.exceptions.RequestException as e:
@@ -278,24 +282,29 @@ def get_note_by_id(note_id: str) -> str:
         - noteId, title, type (text, code, image, etc.)
         - content (full note content)
         - dateCreated, dateModified
-        - attributes (labels and relations)
-        - parentNoteIds
+        - parentNoteIds, childNoteIds
+        - attributes array (labels and relations)
     """
     if not TRILIUM_AVAILABLE:
         return json.dumps(trilium_unavailable_error(), indent=2)
 
     logger.info(f"📄 [server] get_note_by_id called with noteId: {note_id}")
 
+    # Get note metadata
     note = make_request("GET", f"/notes/{note_id}")
 
     if "error" in note:
         return json.dumps(note, indent=2)
 
-    # Get attributes (labels and relations)
-    attributes = make_request("GET", f"/notes/{note_id}/attributes")
+    # Get note content (returns raw HTML/text, not JSON)
+    content = make_request("GET", f"/notes/{note_id}/content", expect_json=False)
 
-    if "error" not in attributes:
-        note["attributes"] = attributes
+    # Add content to note dict
+    if isinstance(content, str):
+        note["content"] = content
+    elif isinstance(content, dict) and "error" in content:
+        note["content_error"] = content.get("error")
+        note["content"] = ""
 
     logger.info(f"✅ [server] Retrieved note: {note.get('title', 'Untitled')}")
     return json.dumps(note, indent=2)
@@ -308,10 +317,10 @@ def get_note_by_id(note_id: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="trilium")
 def create_note(
-        parent_note_id: str,
-        title: str,
-        content: str = "",
-        note_type: str = "text"
+    parent_note_id: str,
+    title: str,
+    content: str = "",
+    note_type: str = "text"
 ) -> str:
     """
     Create a new note in Trilium.
@@ -371,17 +380,37 @@ def update_note_content(note_id: str, content: str) -> str:
 
     logger.info(f"✏️  [server] update_note_content called for noteId: {note_id}")
 
-    result = make_request(
-        method="PUT",
-        endpoint=f"/notes/{note_id}/content",
-        data={"content": content}
-    )
+    # Trilium content endpoint expects raw content in body, not JSON
+    url = f"{TRILIUM_URL}/etapi/notes/{note_id}/content"
+    headers = {
+        "Authorization": TRILIUM_TOKEN,
+        "Content-Type": "text/html"  # or text/plain depending on note type
+    }
 
-    if "error" in result:
-        return json.dumps(result, indent=2)
+    try:
+        response = requests.put(
+            url=url,
+            headers=headers,
+            data=content.encode('utf-8'),
+            timeout=30
+        )
 
-    logger.info(f"✅ [server] Updated note content")
-    return json.dumps({"success": True, "noteId": note_id, "message": "Content updated"}, indent=2)
+        if response.status_code >= 400:
+            return json.dumps({
+                "error": f"HTTP {response.status_code}",
+                "message": response.text
+            }, indent=2)
+
+        logger.info(f"✅ [server] Updated note content")
+        return json.dumps({
+            "success": True,
+            "noteId": note_id,
+            "message": "Content updated"
+        }, indent=2)
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Failed to update content: {e}")
+        return json.dumps({"error": str(e)}, indent=2)
 
 
 @mcp.tool()
@@ -501,6 +530,9 @@ def get_note_labels(note_id: str) -> str:
     """
     Get all labels (attributes) for a note.
 
+    Note: This extracts labels from the note's attributes array.
+    Trilium ETAPI includes attributes in the note response.
+
     Args:
         note_id: ID of note
 
@@ -512,12 +544,15 @@ def get_note_labels(note_id: str) -> str:
 
     logger.info(f"🏷️  [server] get_note_labels called for noteId: {note_id}")
 
-    result = make_request("GET", f"/notes/{note_id}/attributes")
+    # Get note details which includes attributes
+    note = make_request("GET", f"/notes/{note_id}")
 
-    if "error" in result:
-        return json.dumps(result, indent=2)
+    if "error" in note:
+        return json.dumps(note, indent=2)
 
-    labels = [attr for attr in result if attr.get("type") == "label"]
+    # Extract labels from attributes array
+    attributes = note.get("attributes", [])
+    labels = [attr for attr in attributes if attr.get("type") == "label"]
 
     logger.info(f"✅ [server] Found {len(labels)} labels")
     return json.dumps({
@@ -633,7 +668,6 @@ def get_recent_notes(limit: int = 20) -> str:
 # ═══════════════════════════════════════════════════════════════════
 
 skill_registry = None
-
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
