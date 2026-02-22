@@ -53,7 +53,7 @@ The client is the orchestration layer that manages all MCP servers and routes re
 │  │  │  - :model   │              │  - Streaming responses   │         │ │
 │  │  │  - :stop    │              │  - Web UI integration    │         │ │
 │  │  │  - :stats   │              │  - Chat interface        │         │ │
-│  │  └──────┬──────┘              └──────────┬───────────────┘         │ │
+│  │  └──────┬──────┘              └───────────┬──────────────┘         │ │
 │  │         │                                 │                        │ │
 │  │         └─────────────┬───────────────────┘                        │ │
 │  │                       │                                            │ │
