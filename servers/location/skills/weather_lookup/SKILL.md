@@ -1,22 +1,30 @@
 ---
 name: weather_lookup
-description: >
-  Retrieve current weather conditions and forecast for any location. Use this
-  skill when the user asks about temperature, weather, or forecast.
+description: Get weather forecasts. For tomorrow use forecast_days=2 minimum.
 tags:
   - weather
-  - forecast
-  - climate
-  - location
 tools:
   - get_weather_tool
 ---
 
-# Weather Lookup Skill
+# Weather Lookup
 
-Use this skill when the user asks for:
+## Key Rule
 
-- "What's the weather in Paris"
-- "Show me the forecast"
-- "How hot is it in Tokyo"
-- "What's the temperature here"
+forecast[0] = today
+forecast[1] = tomorrow
+
+## Usage
+
+**Today:** `get_weather_tool(forecast_days=1)` → use forecast[0]
+
+**Tomorrow:** `get_weather_tool(forecast_days=2)` → use forecast[1]
+
+**This week:** `get_weather_tool(forecast_days=7)` → use all
+
+## Verify
+
+Each forecast has `relative_day` field:
+- "today" = today
+- "tomorrow" = tomorrow  
+- "day_after_tomorrow" = 2 days out

@@ -1,14 +1,15 @@
 import json
 import requests
 from typing import Optional
+from datetime import datetime, date
 from tools.location.resolve_location import resolve_location
 
 # WMO Weather interpretation codes -> human readable description + chance label
 WMO_CODES = {
-    0:  ("☀️ Clear sky", 0),
-    1:  ("🌤️ Mainly clear", 5),
-    2:  ("⛅ Partly cloudy", 20),
-    3:  ("☁️ Overcast", 0),
+    0: ("☀️ Clear sky", 0),
+    1: ("🌤️ Mainly clear", 5),
+    2: ("⛅ Partly cloudy", 20),
+    3: ("☁️ Overcast", 0),
     45: ("🌫️ Fog", 0),
     48: ("🌫️ Depositing rime fog", 0),
     51: ("🌦️ Light drizzle", 40),
@@ -35,11 +36,44 @@ WMO_CODES = {
     99: ("⛈️ Thunderstorm with heavy hail", 90),
 }
 
+
 def _wmo_description(code: int) -> str:
     return WMO_CODES.get(code, ("Unknown", 0))[0]
 
+
 def _celsius_to_fahrenheit(c: float) -> float:
     return round(c * 9 / 5 + 32, 1)
+
+
+def _get_date_label(date_str: str) -> str:
+    """
+    Convert date string to friendly label like 'Today', 'Tomorrow', or day name
+
+    Args:
+        date_str: Date in format "2026-02-23"
+
+    Returns:
+        Label like "Today", "Tomorrow", "Wednesday", etc.
+    """
+    try:
+        forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        today = date.today()
+
+        days_diff = (forecast_date - today).days
+
+        if days_diff == 0:
+            return "Today"
+        elif days_diff == 1:
+            return "Tomorrow"
+        elif days_diff == -1:
+            return "Yesterday"
+        elif 2 <= days_diff <= 6:
+            return forecast_date.strftime("%A")  # "Monday", "Tuesday", etc.
+        else:
+            return forecast_date.strftime("%A, %B %d")  # "Monday, February 23"
+    except:
+        return date_str
+
 
 def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = None):
     """
@@ -64,16 +98,16 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
         r_cc = r.get("country_code", "").lower()
 
         country_match = (
-            not country or
-            country.lower() in r_country or
-            r_country in country.lower() or
-            country.lower() == r_cc
+                not country or
+                country.lower() in r_country or
+                r_country in country.lower() or
+                country.lower() == r_cc
         )
         state_match = (
-            not state or
-            state.lower() in r_state or
-            r_state in state.lower() or
-            state.lower() == r.get("admin1_code", "").lower()
+                not state or
+                state.lower() in r_state or
+                r_state in state.lower() or
+                state.lower() == r.get("admin1_code", "").lower()
         )
 
         if country_match and state_match:
@@ -94,10 +128,10 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
 
 
 def get_weather(
-    city: Optional[str] = None,
-    state: Optional[str] = None,
-    country: Optional[str] = None,
-    forecast_days: int = 7
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        country: Optional[str] = None,
+        forecast_days: int = 7
 ) -> str:
     """
     Fetches current weather and a multi-day forecast using the free Open-Meteo API.
@@ -228,14 +262,36 @@ def get_weather(
     sunsets = daily.get("sunset", [])
 
     forecast = []
-    for i, date in enumerate(dates):
+    today = date.today()
+
+    for i, date_str in enumerate(dates):
         code = codes[i] if i < len(codes) else 0
         max_c = max_temps[i] if i < len(max_temps) else None
         min_c = min_temps[i] if i < len(min_temps) else None
+
+        # Calculate relative day
+        try:
+            forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            days_from_today = (forecast_date - today).days
+
+            if days_from_today == 0:
+                relative_day = "today"
+            elif days_from_today == 1:
+                relative_day = "tomorrow"
+            elif days_from_today == 2:
+                relative_day = "day_after_tomorrow"
+            else:
+                relative_day = f"{days_from_today}_days_from_now"
+        except:
+            relative_day = "unknown"
+
         forecast.append({
-            "date": date,
+            "date": date_str,
+            "day_label": _get_date_label(date_str),
+            "relative_day": relative_day,
             "condition": _wmo_description(code),
-            "precipitation_chance": f"{precip_probs[i]}%" if i < len(precip_probs) and precip_probs[i] is not None else "N/A",
+            "precipitation_chance": f"{precip_probs[i]}%" if i < len(precip_probs) and precip_probs[
+                i] is not None else "N/A",
             "max_temp_c": max_c,
             "max_temp_f": _celsius_to_fahrenheit(max_c) if max_c is not None else None,
             "min_temp_c": min_c,

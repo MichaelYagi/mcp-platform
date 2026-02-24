@@ -138,39 +138,43 @@ def get_time_tool(city: str | None = None, state: str | None = None, country: st
 
 @mcp.tool()
 @check_tool_enabled(category="location")
-def get_weather_tool(city: str | None = None, state: str | None = None, country: str | None = None, forecast_days: int = 7) -> str:
+def get_weather_tool(
+        city: str | None = None,
+        state: str | None = None,
+        country: str | None = None,
+        forecast_days: int = 7
+) -> str:
     """
-    Get current weather conditions and multi-day forecast for any location.
+    Get weather forecast. Returns current conditions plus daily forecasts.
+
+    CRITICAL: forecast_days means "total days starting from today"
+    - forecast_days=1 returns 1 day (today only)
+    - forecast_days=2 returns 2 days (today + tomorrow)
+    - forecast_days=7 returns 7 days (today through 6 days out)
+
+    The forecast array ALWAYS starts with today at index 0:
+    - forecast[0] = today (relative_day: "today")
+    - forecast[1] = tomorrow (relative_day: "tomorrow")
+    - forecast[2] = day after tomorrow (relative_day: "day_after_tomorrow")
+
+    FOR TOMORROW'S WEATHER: You MUST use forecast_days=2 (minimum)
+    Then read forecast[1] or find entry where relative_day=="tomorrow"
 
     Args:
-        city (str, optional): City name (e.g., "Surrey", "Paris")
-        state (str, optional): State/province/prefecture (e.g., "BC", "California", "Kanagawa")
-        country (str, optional): FULL country name (e.g., "Canada", "Japan", "United States")
-        forecast_days (int, optional): Number of forecast days to return (1-16, default 7)
-
-    All location arguments are optional. If none provided, uses client's IP to determine
-    location. Falls back to Vancouver, BC, Canada if IP geolocation is unavailable.
-
-    IMPORTANT: Never put a province/state into the country field.
+        city: City name (optional, defaults to IP location)
+        state: State/province (optional)
+        country: Country (optional)
+        forecast_days: How many days total (1-16, default 7)
 
     Returns:
-        JSON string with:
-        - city, state, country, latitude, longitude, timezone
-        - current: {
-            condition: Weather description (e.g. "Partly cloudy")
-            precipitation_chance: Chance of precipitation as percentage
-            temperature_c / temperature_f: Current temperature
-            feelslike_c / feelslike_f: Feels like temperature
-            humidity: Relative humidity percentage
-            wind_speed_kph: Wind speed
-            is_day: Whether it is currently daytime
-          }
-        - forecast: Array of daily entries with condition, precipitation_chance,
-            max/min temps in C and F, max wind speed, sunrise, and sunset
-
-    Use when user asks about weather, temperature, forecast, or "will it rain".
+        JSON with current weather and forecast array. Each forecast has:
+        - date: "2026-02-24"
+        - day_label: "Tomorrow" (human readable)
+        - relative_day: "tomorrow" (machine readable - use this!)
+        - condition, temperatures, precipitation, etc.
     """
-    logger.info(f"🛠 [server] get_weather_tool called with city: {city}, state: {state}, country: {country}, forecast_days: {forecast_days}")
+    logger.info(
+        f"🛠 [server] get_weather_tool called with city: {city}, state: {state}, country: {country}, forecast_days: {forecast_days}")
     logger.info(f"🌤️  CLIENT_IP = {CLIENT_IP}")
 
     if not city and CLIENT_IP:
