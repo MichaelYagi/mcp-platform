@@ -15,6 +15,13 @@ from client.commands import handle_command, handle_a2a_commands
 from client.langgraph import create_langgraph_agent
 from client.stop_signal import request_stop
 
+try:
+    from tools.rag.conversation_rag import store_turn_async as _rag_store_turn
+    _CONV_RAG_AVAILABLE = True
+except ImportError:
+    _CONV_RAG_AVAILABLE = False
+    def _rag_store_turn(*args, **kwargs): pass  # no-op fallback
+
 # Import system monitor conditionally
 try:
     from tools.system_monitor import system_monitor_loop
@@ -194,6 +201,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                 model_name = "direct-answer"
                 session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
+                # Store direct-answer turn in session-scoped RAG
+                _rag_store_turn(session_id, "assistant", response_text)
 
             await broadcast_message("assistant_message", {
                 "text": response_text,
@@ -234,6 +243,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
             model_name = result.get("current_model", "unknown")
             session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
+            # Store assistant turn in session-scoped RAG for semantic context retrieval
+            _rag_store_turn(session_id, "assistant", assistant_text)
 
         # Broadcast to WebSocket clients
         await broadcast_message("assistant_message", {
@@ -378,6 +389,13 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 session_id = data.get("session_id")
                 if session_id:
                     session_manager.delete_session(session_id)
+                    # Also purge conversation RAG entries for this session
+                    if _CONV_RAG_AVAILABLE:
+                        try:
+                            from tools.rag.conversation_rag import purge_session
+                            purge_session(session_id)
+                        except Exception as _e:
+                            pass  # Non-fatal
                     await websocket.send(json.dumps({
                         "type": "session_deleted",
                         "session_id": session_id
@@ -606,6 +624,8 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                     MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                     session_manager.add_message(current_session_id, "user", prompt, MAX_MESSAGE_HISTORY, model=None)
+                    # Store user turn in session-scoped RAG for semantic context retrieval
+                    _rag_store_turn(current_session_id, "user", prompt)
 
                     messages = session_manager.get_session_messages(current_session_id)
                     if len(messages) == 1:

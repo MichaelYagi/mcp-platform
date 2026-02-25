@@ -40,17 +40,17 @@ def get_connection() -> sqlite3.Connection:
         _db_connection.execute("PRAGMA cache_size=-64000")  # 64MB cache
         _db_connection.execute("PRAGMA temp_store=MEMORY")  # In-memory temp tables
 
-        # Create tables if they don't exist
+        # Create / migrate tables
         _initialize_database(_db_connection)
 
     return _db_connection
 
 
 def _initialize_database(conn: sqlite3.Connection):
-    """Create tables and indexes if they don't exist"""
+    """Create tables and indexes if they don't exist, migrate schema if needed."""
     cursor = conn.cursor()
 
-    # Main documents table
+    # Main documents table (original schema)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS documents (
             id TEXT PRIMARY KEY,
@@ -63,16 +63,34 @@ def _initialize_database(conn: sqlite3.Connection):
         )
     """)
 
-    # Index on source for faster filtering
+    # ── Schema migration: add session_id column if it doesn't exist ──────────
+    cursor.execute("PRAGMA table_info(documents)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+
+    if "session_id" not in existing_columns:
+        logger.info("🔄 Migrating RAG schema: adding session_id column")
+        cursor.execute("ALTER TABLE documents ADD COLUMN session_id TEXT")
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_documents_session_id
+            ON documents(session_id)
+        """)
+        logger.info("✅ session_id column added to documents table")
+
+    # ── Standard indexes ──────────────────────────────────────────────────────
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_source 
         ON documents(source)
     """)
 
-    # Index on created_at for time-based queries
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_created 
         ON documents(created_at)
+    """)
+
+    # Composite index: session queries filter on session_id then order by created_at
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_documents_session_created
+        ON documents(session_id, created_at)
     """)
 
     conn.commit()
@@ -81,29 +99,28 @@ def _initialize_database(conn: sqlite3.Connection):
 
 def load_rag_db() -> List[Dict[str, Any]]:
     """
-    Load all documents from the RAG database.
+    Load all NON-conversation documents from the RAG database.
+    Conversation turns (session_id IS NOT NULL) are excluded — they are
+    accessed via conversation_rag.retrieve_context() instead.
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-                       SELECT id, text, embedding, source, length, word_count
-                       FROM documents
-                       ORDER BY created_at
-                       """)
+            SELECT id, text, embedding, source, length, word_count
+            FROM documents
+            WHERE session_id IS NULL
+            ORDER BY created_at
+        """)
 
         documents = []
         for row in cursor.fetchall():
-            # Handle both binary and JSON embeddings
             embedding_data = row['embedding']
 
             if isinstance(embedding_data, bytes):
-                # Binary format (new) - convert from bytes to list
-                import numpy as np
                 embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
             else:
-                # JSON format (old) - deserialize
                 embedding = json.loads(embedding_data)
 
             doc = {
@@ -129,29 +146,22 @@ def load_rag_db() -> List[Dict[str, Any]]:
 def save_rag_db(db: List[Dict[str, Any]]):
     """
     Save documents to the RAG database in a single transaction.
-
-    This uses UPSERT for efficiency - updates existing, inserts new.
-
-    Args:
-        db: List of document dictionaries with embeddings
+    Only saves non-conversation documents (session_id stays NULL).
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Begin transaction for batch insert
         cursor.execute("BEGIN TRANSACTION")
 
         for doc in db:
-            # Serialize embedding to JSON blob
             embedding_blob = json.dumps(doc['embedding'])
-
             metadata = doc.get('metadata', {})
 
             cursor.execute("""
                 INSERT OR REPLACE INTO documents 
-                (id, text, embedding, source, length, word_count)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (id, text, embedding, source, session_id, length, word_count)
+                VALUES (?, ?, ?, ?, NULL, ?, ?)
             """, (
                 doc['id'],
                 doc['text'],
@@ -161,14 +171,11 @@ def save_rag_db(db: List[Dict[str, Any]]):
                 metadata.get('word_count')
             ))
 
-        # Commit transaction
         cursor.execute("COMMIT")
-
         logger.debug(f"💾 Saved {len(db)} documents to database")
 
     except Exception as e:
         logger.error(f"❌ Error saving RAG database: {e}")
-        # Rollback on error
         try:
             cursor.execute("ROLLBACK")
         except:
@@ -177,18 +184,11 @@ def save_rag_db(db: List[Dict[str, Any]]):
 
 
 def save_rag_db_batch(documents: List[Dict[str, Any]]):
-    """
-    Efficiently save a batch of documents using bulk insert.
-    Much faster than save_rag_db for large batches.
-
-    Args:
-        documents: List of document dictionaries with embeddings
-    """
+    """Efficiently save a batch of documents using bulk insert."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Prepare data for bulk insert
         data = []
         for doc in documents:
             embedding_blob = json.dumps(doc['embedding'])
@@ -199,16 +199,16 @@ def save_rag_db_batch(documents: List[Dict[str, Any]]):
                 doc['text'],
                 embedding_blob,
                 metadata.get('source'),
+                None,  # session_id — external docs never have one
                 metadata.get('length'),
                 metadata.get('word_count')
             ))
 
-        # Bulk insert with single transaction
         cursor.execute("BEGIN TRANSACTION")
         cursor.executemany("""
             INSERT OR REPLACE INTO documents 
-            (id, text, embedding, source, length, word_count)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (id, text, embedding, source, session_id, length, word_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, data)
         cursor.execute("COMMIT")
 
@@ -224,11 +224,11 @@ def save_rag_db_batch(documents: List[Dict[str, Any]]):
 
 
 def get_document_count() -> int:
-    """Get total number of documents in database"""
+    """Get total number of non-conversation documents in database"""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM documents")
+        cursor.execute("SELECT COUNT(*) FROM documents WHERE session_id IS NULL")
         return cursor.fetchone()[0]
     except Exception as e:
         logger.error(f"❌ Error getting document count: {e}")
@@ -242,19 +242,17 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
         cursor = conn.cursor()
 
         cursor.execute("""
-                       SELECT id, text, embedding, source, length, word_count
-                       FROM documents
-                       WHERE source = ?
-                       ORDER BY created_at
-                       """, (source,))
+            SELECT id, text, embedding, source, length, word_count
+            FROM documents
+            WHERE source = ? AND session_id IS NULL
+            ORDER BY created_at
+        """, (source,))
 
         documents = []
         for row in cursor.fetchall():
             embedding_data = row['embedding']
 
-            # Handle both binary and JSON formats
             if isinstance(embedding_data, bytes):
-                import numpy as np
                 embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
             else:
                 embedding = json.loads(embedding_data)
@@ -277,17 +275,9 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
         logger.error(f"❌ Error getting documents by source: {e}")
         return []
 
+
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
-    """
-    Calculate cosine similarity between two vectors.
-
-    Args:
-        vec1: First embedding vector
-        vec2: Second embedding vector
-
-    Returns:
-        Similarity score between 0 and 1
-    """
+    """Calculate cosine similarity between two vectors."""
     try:
         vec1_np = np.array(vec1)
         vec2_np = np.array(vec2)
@@ -299,10 +289,7 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
         if norm1 == 0 or norm2 == 0:
             return 0.0
 
-        similarity = dot_product / (norm1 * norm2)
-
-        # Clip to [0, 1] range
-        return float(max(0.0, min(1.0, similarity)))
+        return float(max(0.0, min(1.0, dot_product / (norm1 * norm2))))
 
     except Exception as e:
         logger.error(f"❌ Error calculating cosine similarity: {e}")
@@ -310,28 +297,20 @@ def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
 
 
 def clear_rag_db():
-    """Clear the entire RAG database"""
+    """Clear only external/document RAG entries (preserves conversation turns)"""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
-        cursor.execute("DELETE FROM documents")
+        cursor.execute("DELETE FROM documents WHERE session_id IS NULL")
         conn.commit()
-
-        # Vacuum to reclaim space
         cursor.execute("VACUUM")
-
-        logger.info("🗑️  Cleared RAG database")
-
+        logger.info("🗑️  Cleared document RAG database (conversation turns preserved)")
     except Exception as e:
         logger.error(f"❌ Error clearing database: {e}")
 
 
 def migrate_from_json():
-    """
-    Migrate from old JSON database to SQLite.
-    Run this once to convert your existing database.
-    """
+    """Migrate from old JSON database to SQLite."""
     old_json_file = PROJECT_ROOT / "data" / "rag_database.json"
 
     if not old_json_file.exists():
@@ -341,18 +320,13 @@ def migrate_from_json():
     logger.info("🔄 Starting migration from JSON to SQLite...")
 
     try:
-        # Load old JSON database
         with open(old_json_file, 'r', encoding='utf-8') as f:
             old_db = json.load(f)
 
         logger.info(f"📂 Loaded {len(old_db)} documents from JSON")
-
-        # Save to SQLite using batch insert
         save_rag_db_batch(old_db)
-
         logger.info(f"✅ Migration complete: {len(old_db)} documents")
 
-        # Backup old JSON file
         backup_file = old_json_file.with_suffix('.json.backup')
         old_json_file.rename(backup_file)
         logger.info(f"📦 Old JSON backed up to: {backup_file}")
@@ -368,24 +342,28 @@ def get_database_stats() -> Dict[str, Any]:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Total documents
-        cursor.execute("SELECT COUNT(*) FROM documents")
+        cursor.execute("SELECT COUNT(*) FROM documents WHERE session_id IS NULL")
         total_docs = cursor.fetchone()[0]
 
-        # Total words
-        cursor.execute("SELECT SUM(word_count) FROM documents")
+        cursor.execute("SELECT COUNT(*) FROM documents WHERE session_id IS NOT NULL")
+        conversation_turns = cursor.fetchone()[0]
+
+        cursor.execute("SELECT SUM(word_count) FROM documents WHERE session_id IS NULL")
         total_words = cursor.fetchone()[0] or 0
 
-        # Unique sources
-        cursor.execute("SELECT COUNT(DISTINCT source) FROM documents")
+        cursor.execute("SELECT COUNT(DISTINCT source) FROM documents WHERE session_id IS NULL")
         unique_sources = cursor.fetchone()[0]
 
-        # Database file size
+        cursor.execute("SELECT COUNT(DISTINCT session_id) FROM documents WHERE session_id IS NOT NULL")
+        unique_sessions = cursor.fetchone()[0]
+
         db_size_bytes = RAG_DB_FILE.stat().st_size if RAG_DB_FILE.exists() else 0
         db_size_mb = db_size_bytes / (1024 * 1024)
 
         return {
             "total_documents": total_docs,
+            "conversation_turns_indexed": conversation_turns,
+            "unique_sessions_indexed": unique_sessions,
             "total_words": total_words,
             "unique_sources": unique_sources,
             "database_size_mb": round(db_size_mb, 2),
