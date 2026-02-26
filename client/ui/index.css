@@ -373,7 +373,7 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 
 .assistant.multi-agent {
     border-left: 4px solid #8b5cf6;
-    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+    /*background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);*/
 }
 
 .thinking {
