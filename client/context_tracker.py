@@ -163,7 +163,7 @@ def integrate_context_tracking(
     session_id: int,
     prompt: str,
     conversation_state: dict,
-    logger_
+    logger
 ) -> bool:
     """
     Retrieve and inject relevant session context before running the agent.
@@ -191,14 +191,14 @@ def integrate_context_tracking(
             context_msg = tracker.build_rag_context_message(rag_results)
             if context_msg:
                 conversation_state["messages"].append(context_msg)
-                logger_.info(
+                logger.info(
                     f"✅ RAG context injected: {len(rag_results)} relevant turns "
                     f"(top score: {rag_results[0]['score']:.2f})"
                 )
                 injected = True
 
     except Exception as e:
-        logger_.warning(f"⚠️ RAG context step failed, trying fallback: {e}")
+        logger.warning(f"⚠️ RAG context step failed, trying fallback: {e}")
 
     # ── 2. Structured entity fallback ────────────────────────────────────────
     # Always run — project paths are cheap to extract and highly reliable
@@ -208,10 +208,10 @@ def integrate_context_tracking(
             struct_msg = tracker.build_structured_context_message(structured)
             if struct_msg:
                 conversation_state["messages"].append(struct_msg)
-                logger_.info(f"📁 Structured context injected: {list(structured.keys())}")
+                logger.info(f"📁 Structured context injected: {list(structured.keys())}")
                 injected = True
 
     except Exception as e:
-        logger_.warning(f"⚠️ Structured context extraction failed: {e}")
+        logger.warning(f"⚠️ Structured context extraction failed: {e}")
 
     return injected
