@@ -29,7 +29,9 @@ from client.query_patterns import (
     ROUTER_INGEST_COMMAND, ROUTER_STATUS_QUERY, ROUTER_MULTI_STEP,
     ROUTER_ONE_TIME_INGEST, ROUTER_EXPLICIT_RAG, ROUTER_KNOWLEDGE_QUERY,
     ROUTER_EXCLUDE_MEDIA,
-    classify, QueryIntent
+    classify, QueryIntent, INTENT_CATALOG,
+    RESEARCH_SOURCE_PATTERN, extract_research_sources,
+    OLLAMA_SEARCH_PATTERN, WEB_SEARCH_EXPLICIT_PATTERN
 )
 
 # Try to import metrics
@@ -55,463 +57,7 @@ except ImportError:
             "tool_times": defaultdict(list),
         }
 
-# ═══════════════════════════════════════════════════════════════════
-# CENTRALIZED PATTERN CONFIGURATION
-# Add new intents here - no code changes needed!
-# ═══════════════════════════════════════════════════════════════════
 
-INTENT_PATTERNS = {
-    "ingest": {
-        "pattern": (
-            r'\bingest\b'
-            r'|\bprocess\b'
-            r'|\badd\s+to\s+rag\b'
-            r'|\bindex\b'
-            r'|\bvectorize\b'
-            r'|\bembed\s+(this|it)\b'
-            r'|\bupdate\s+rag\b'
-            r'|\brefresh\s+rag\b'
-            r'|\bscan\s+plex\b'
-            r'|\bprocess\s+next\b'
-            r'|\bingest\s+next\b'
-            r'|\badd\s+movie\b'
-            r'|\badd\s+media\b'
-        ),
-        "exclude_pattern": (
-            r'\bhow\s+many\b'
-            r'|\bwhat\s+(has|was)\b'
-            r'|\bcount\b'
-            r'|\btotal\b'
-            r'|\bstatus\b'
-            r'|\bwhat(\'s| is)\s+in\s+rag\b'
-        ),
-        "tools": [
-            "plex_ingest_*",
-            "plex_find_unprocessed",
-            "plex_ingest_single",
-            "plex_ingest_batch",
-            "rag_add_tool"
-        ],
-        "priority": 2
-    },
-    "github_review": {
-        "pattern": (
-            # GitHub URLs
-            r'\\bgithub\\.com/[^\\s]+'
-            r'|\\breview.*github'
-            r'|\\bclone.*github'
-            r'|\\bcheck.*github\\.com'
-
-            # Repository review
-            r'|\\breview.*(repo|repository)'
-            r'|\\banalyze.*(repo|repository)'
-            r'|\\bcheck.*(repo|repository)'
-
-            # Code from URL
-            r'|\\breview.*https?://'
-            r'|\\banalyze.*https?://'
-
-            # Explicit GitHub references
-            r'|\\bgithub\\s+(repo|repository|project)'
-            r'|\\bfrom\\s+github'
-        ),
-        "tools": [
-            "github_clone_repo",
-            "github_list_files",
-            "github_get_file_content",
-            "github_cleanup_repo",
-            "analyze_project",
-            "analyze_code_file",
-            "review_code",
-            "scan_project_structure"
-        ],
-        "priority": 2
-    },
-    "code_assistant": {
-        "pattern": (
-            # Tech stack queries
-            r'\btech\s+stack\b'
-            r'|\btechnology\s+stack\b'
-            r'|\bwhat.*tech\b'
-            r'|\bwhat.*stack\b'
-            r'|\bwhat.*technologies\b'
-            r'|\bwhat.*languages\b'
-            r'|\bwhat.*frameworks?\b'
-            r'|\bwhat.*dependencies\b'
-            r'|\bproject\s+structure\b'
-            r'|\banalyze.*project\b'
-            r'|\bscan.*project\b'
-            r'|\bshow.*structure\b'
-            r'|\blist.*dependencies\b'
-
-            # Node.js/Package queries
-            r'|\bnode\.?js\s+(packages?|dependencies|modules)\b'
-            r'|\bnpm\s+(packages?|dependencies|modules)\b'
-            r'|\bpackage\.json\b'
-            r'|\bnode\s+(packages?|dependencies|modules)\b'
-            r'|\b(about|more|explain).*node\.?js\s+(packages?|dependencies)\b'
-            r'|\btell.*about.*(node|packages?|dependencies)\b'
-            r'|\bmore.*about.*(node|packages?|dependencies)\b'
-
-            # "go into depth" style questions
-            r'|\bgo\s+into\s+(depth|detail)\b'
-            r'|\bmore\s+detail.*about.*(packages?|dependencies|modules)\b'
-            r'|\bin[\s-]?depth.*about.*(packages?|dependencies|modules)\b'
-            r'|\belaborate.*on.*(packages?|dependencies|modules)\b'
-            r'|\bexpand.*on.*(packages?|dependencies|modules)\b'
-
-            # Generic package questions
-            r'|\bwhat.*(do|are).*(packages?|dependencies|modules)\b'
-            r'|\bexplain.*(packages?|dependencies|modules)\b'
-            r'|\bwhat.*do\s+they\s+do\b'
-            r'|\bwhat.*are\s+(they|those)\s+(for|used\s+for)\b'
-            r'|\bwhat.*they.*used\s+for\b'
-
-            # Code analysis
-            r'|\banalyze.*code\b'
-            r'|\bcheck.*code\b'
-            r'|\breview.*code\b'
-            r'|\blint\b'
-
-            # File extensions
-            r'|\banalyze.*\.(py|js|jsx|ts|tsx|rs|go|java|kt)\b'
-            r'|\bcheck.*\.(py|js|jsx|ts|tsx|rs|go|java|kt)\b'
-
-            # Bug fixing
-            r'|\bfix.*bug\b'
-            r'|\bfix.*error\b'
-            r'|\bfix.*issue\b'
-            r'|\bfix.*code\b'
-
-            # Code generation
-            r'|\bgenerate.*code\b'
-            r'|\bcreate.*(function|class|module|component)\b'
-            r'|\bwrite.*(function|class)\b'
-        ),
-        "tools": [
-            "analyze_project",
-            "get_project_dependencies",
-            "scan_project_structure",
-            "analyze_code_file",
-            "fix_code_file",
-            "suggest_improvements",
-            "explain_code",
-            "generate_tests",
-            "refactor_code",
-            "generate_code"
-        ],
-        "priority": 2
-    },
-    "location": {
-        "pattern": (
-            r'\b(my|what\'?s?\s+my)\s+location\b'
-            r'|\bwhere\s+am\s+i\b'
-            r'|\bcurrent\s+location\b'
-            r'|\bwhere\s+do\s+i\s+live\b'
-        ),
-        "tools": ["get_location_tool"],
-        "priority": 3
-    },
-    "weather": {
-        "pattern": (
-            r'\bweather\b'
-            r'|\btemperature\b'
-            r'|\bforecast\b'
-            r'|\brain\b'
-            r'|\bsnow\b'
-            r'|\bwind\b'
-            r'|\bconditions\b'
-        ),
-        "tools": ["get_location_tool", "get_weather_tool"],
-        "priority": 3
-    },
-    "time": {
-        "pattern": (
-            r'\bwhat\s+time\b'
-            r'|\bwhat\s+date\b'
-            r'|\bcurrent\s+time\b'
-            r'|\bcurrent\s+date\b'
-            r'|\btime\s+now\b'
-            r'|\btime\s+is\s+it\b'
-        ),
-        "tools": ["get_time_tool"],
-        "priority": 3
-    },
-    # ═══════════════════════════════════════════════════════════════
-    # CRITICAL FIX: plex_search BEFORE ml_recommendation (priority 2 vs 3)
-    # ═══════════════════════════════════════════════════════════════
-    "plex_search": {
-        "pattern": (
-            # Direct search phrases
-            r'\b(find|search|look\s+for|show\s+me)\s+.*\b(movie|film|show|media|series)\b'
-
-            # Plot-based searches (CRITICAL for "where hero wins")
-            r'|\bmovies?\s+(about|where|with|featuring|in\s+which)\b'
-            r'|\bfilms?\s+(about|where|with|featuring|in\s+which)\b'
-
-            # "where X happens" pattern
-            r'|\bwhere\s+.*\s+(wins?|loses?|dies|survives|happens|occurs|escapes)\b'
-
-            # Library references
-            r'|\bsearch\s+(plex|library|my\s+library|my\s+movies)\b'
-            r'|\bfind\s+.*\s+in\s+(plex|library|my\s+library)\b'
-
-            # Scene searches
-            r'|\bscene\s+(where|with|from)\b'
-            r'|\bfind\s+scene\b'
-            r'|\blocate\s+scene\b'
-
-            # Browse/explore (not recommendations)
-            r'|\bbrowse\s+my\b'
-            r'|\blist\s+.*\s+(movies|films|shows)\b'
-        ),
-        "tools": [
-            "rag_search_tool",
-            "semantic_media_search_text",
-            "scene_locator_tool",
-            "find_scene_by_title"
-        ],
-        "priority": 2  # HIGHER priority than ml_recommendation!
-    },
-    "rag": {
-        "pattern": (
-            # Status queries
-            r'\bhow\s+many\s+.*(ingested|in\s+rag)\b'
-            r'|\bwhat\s+(has|was)\s+been\s+ingested\b'
-            r'|\bitems?\s+(have\s+been|were)\s+ingested\b'
-            r'|\bcount\s+.*(items?|in\s+rag)\b'
-            r'|\btotal\s+.*(items?|in\s+rag)\b'
-            r'|\b(show|list|display)\s+rag\b'
-            r'|\brag\s+(status|contents?|info|summary|overview|report|stats)\b'
-            r'|\bwhat(\'s| is)\s+in\s+(the\s+)?rag\b'
-            r'|\bgive\s+me\s+rag\s+(stats|status|info|details)\b'
-
-            # Search queries
-            r'|\bsearch\s+(the\s+)?rag\b'
-            r'|\bfind\s+in\s+rag\b'
-            r'|\blook\s+up\s+in\s+rag\b'
-            r'|\brag\s+search\b'
-            r'|\bquery\s+(the\s+)?rag\b'
-            r'|\bdo\s+you\s+have\s+.*\s+in\s+rag\b'
-            r'|\btell\s+me\s+(about|more\s+about)\b'
-            r'|\bwhat\s+do\s+you\s+have\s+(about|on)\b'
-
-            # Browse/list queries
-            r'|\bbrowse\s+(the\s+)?rag\b'
-            r'|\bshow\s+rag\s+(content|documents|entries|sources)\b'
-            r'|\blist\s+rag\s+(sources|documents|content)\b'
-            r'|\bwhat\s+sources\s+.*(in\s+)?rag\b'
-            r'|\brag_list_sources\b'
-            r'|\brag_browse\b'
-
-            # General RAG references
-            r'|\btell\s+me\s+(about|more\s+about)\b'
-            r'|\brag\s+(database|storage|data)\b'
-            r'|\btell\s+me\s+(about|more\s+about)\b'
-            r'|\bwhat\s+do\s+you\s+know\s+about\b'
-            r'|\bwhat\s+is\s+.+\s+in\s+my\s+(rag|knowledge|database)\b'
-        ),
-        "tools": [
-            "rag_search_tool",
-            "rag_status_tool",
-            "rag_list_sources_tool",
-            "rag_browse_tool",
-            "rag_diagnose_tool",
-            "rag_add_tool"
-        ],
-        "priority": 2
-    },
-    "ml_recommendation": {
-        "pattern": (
-            # Explicit recommendation requests
-            r'\brecommend(ation)?s?\b'
-            r'|\bsuggest(ion)?s?\b'
-
-            # ML/training specific
-            r'|\bml\s+(model|train|recommendation)\b'
-            r'|\btrain\s+(model|recommender|recommendation)\b'
-            r'|\bauto.?train\b'
-
-            # History management
-            r'|\bimport\s+.*\s*history\b'
-            r'|\bviewing\s+history\b'
-            r'|\bwatch\s+history\b'
-            r'|\brecord\s+(viewing|that\s+i\s+watched)\b'
-
-            # Personalized suggestions
-            r'|\bwhat\s+should\s+i\s+watch\b'
-            r'|\brank\s+(these|movies|shows)\b'
-            r'|\bmy\s+best\s+unwatched\b'
-            r'|\bunwatched\s+(recommendations|suggestions)\b'
-
-            # Stats/model info
-            r'|\brecommender\s+stats\b'
-        ),
-        "tools": [
-            "record_viewing",
-            "train_recommender",
-            "recommend_content",
-            "get_recommender_stats",
-            "import_plex_history",
-            "auto_train_from_plex",
-            "reset_recommender",
-            "auto_recommend_from_plex"
-        ],
-        "priority": 3  # LOWER priority - only matches if plex_search doesn't
-    },
-    "system": {
-        "pattern": (
-            r'\bsystem\s+info\b'
-            r'|\bhardware\b'
-            r'|\b(cpu|gpu|ram)\b'
-            r'|\bspecs?\b'
-            r'|\bprocesses?\b'
-            r'|\bperformance\b'
-            r'|\butilization\b'
-            r'|\bmemory\s+usage\b'
-        ),
-        "tools": [
-            "get_hardware_specs_tool",
-            "get_system_info",
-            "list_system_processes",
-            "terminate_process"
-        ],
-        "priority": 3
-    },
-    "code": {
-        "pattern": (
-            r'\bcode\b'
-            r'|\bscan\s+code\b'
-            r'|\bdebug\b'
-            r'|\breview\s+code\b'
-            r'|\bsummarize\s+code\b'
-            r'|\bfix\s+this\s+code\b'
-            r'|\bexplain\s+this\s+code\b'
-        ),
-        "tools": [
-            "review_code",
-            "summarize_code_file",
-            "search_code_in_directory",
-            "scan_code_directory",
-            "summarize_code",
-            "debug_fix"
-        ],
-        "priority": 3
-    },
-    "text": {
-        "pattern": (
-            r'\b(summarize|summary|explain|simplify|break\s+down)\b'
-        ),
-        "exclude_pattern": r'\bcode\b',
-        "tools": [
-            "summarize_text_tool",
-            "concept_contextualizer_tool",
-            "summarize_direct_tool",
-            "explain_simplified_tool",
-            "concept_contextualizer_tool"
-        ],
-        "priority": 3
-    },
-    "todo": {
-        "pattern": (
-            r'\btodo\b'
-            r'|\btask\b'
-            r'|\bremind\s+me\b'
-            r'|\bmy\s+todos?\b'
-            r'|\bmy\s+tasks?\b'
-            r'|\badd\s+to\s+my\s+list\b'
-            r'|\btask\s+list\b'
-        ),
-        "tools": [
-            "add_todo_item",
-            "list_todo_items",
-            "search_todo_items",
-            "update_todo_item",
-            "delete_todo_item",
-            "delete_all_todo_items"
-        ],
-        "priority": 3
-    },
-    "knowledge": {
-        "pattern": (
-            r'\bremember\b'
-            r'|\bsave\s+this\b'
-            r'|\bmake\s+a\s+note\b'
-            r'|\bknowledge\s+base\b'
-            r'|\bsearch\s+my\s+notes?\b'
-            r'|\badd\s+entry\b'
-            r'|\bnote\s+this\b'
-            r'|\bstore\s+this\b'
-        ),
-        "tools": [
-            "add_entry",
-            "list_entries",
-            "get_entry",
-            "search_entries",
-            "search_by_tag",
-            "search_semantic",
-            "update_entry",
-            "delete_entry"
-        ],
-        "priority": 3
-    },
-    "a2a": {
-        "pattern": (
-            r'\ba2a\b'
-            r'|\bremote\s+(agent|tools?)\b'
-            r'|\bdiscover\s+(agent|tools?)\b'
-            r'|\bsend\s+to\s+remote\b'
-            r'|\bcall\s+remote\s+tool\b'
-            r'|\buse\s+remote\s+agent\b'
-            r'|\bconnect\s+to\s+agent\b'
-        ),
-        "tools": ["send_a2a*", "discover_a2a"],
-        "priority": 3
-    },
-    "trilium": {
-        "pattern": (
-            # Direct Trilium references
-            r'\btrilium\b'
-            r'|\bnotes?\s+(in\s+)?trilium\b'
-            r'|\bmy\s+notes?\b'
-            
-            # Search in notes
-            r'|\bsearch\s+(my\s+)?notes?\b'
-            r'|\bfind\s+(in\s+)?(my\s+)?notes?\b'
-            r'|\blook\s+up\s+(in\s+)?notes?\b'
-            
-            # Note management
-            r'|\bcreate\s+(a\s+)?note\b'
-            r'|\badd\s+(a\s+)?note\b'
-            r'|\bupdate\s+(my\s+)?note\b'
-            r'|\bdelete\s+(my\s+)?note\b'
-            
-            # Labels/tags
-            r'|\bnotes?\s+tagged\b'
-            r'|\bnotes?\s+with\s+label\b'
-            r'|\badd\s+(label|tag)\s+to\s+note\b'
-            
-            # Recent/navigation
-            r'|\brecent\s+notes?\b'
-            r'|\blatest\s+notes?\b'
-            r'|\bchild\s+notes?\b'
-        ),
-        "tools": [
-            "search_notes",
-            "search_by_label",
-            "get_note_by_id",
-            "create_note",
-            "update_note_content",
-            "update_note_title",
-            "delete_note",
-            "add_label_to_note",
-            "get_note_labels",
-            "get_note_children",
-            "get_recent_notes"
-        ],
-        "priority": 2
-    }
-}
 
 
 class AgentState(TypedDict):
@@ -524,74 +70,12 @@ class AgentState(TypedDict):
     current_model: str
     research_source: str
 
-
-# Research source detection
-RESEARCH_SOURCE_PATTERN = re.compile(
-    r'\busing\s+(?P<source>(?:https?://)?[\w\s\.\-/:]+?)\s+as\s+(a\s+)?source\b'
-    r'|\bbased\s+on\s+(?P<source2>(?:https?://)?[\w\s\.\-/:]+?)(?:\s|,|$)'
-    r'|\bfrom\s+(?P<source3>(?:https?://)?[\w\s\.\-/:]+?)\s+(?:find|search|get|tell)\b',
-    re.IGNORECASE
-)
-
-
-def extract_research_sources(content: str) -> list:
-    """
-    Extract ALL sources from query (handles multiple sources).
-    Returns list of sources, e.g., ['url1', 'url2', 'domain.com']
-    """
-    sources = []
-
-    # Pattern 1: "using X and Y as sources" or "using X as a source"
-    pattern1 = re.compile(
-        r'\busing\s+(.+?)\s+as\s+(a\s+)?(source|sources)\b',
-        re.IGNORECASE
-    )
-    match1 = pattern1.search(content)
-    if match1:
-        source_text = match1.group(1)
-        parts = re.split(r'\s+and\s+|,\s*', source_text)
-        sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
-
-    # Pattern 2: "based on X and Y"
-    pattern2 = re.compile(
-        r'\bbased\s+on\s+(.+?)(?:\s+write|\s+create|\s+explain|,|$)',
-        re.IGNORECASE
-    )
-    match2 = pattern2.search(content)
-    if match2:
-        source_text = match2.group(1)
-        parts = re.split(r'\s+and\s+|,\s*', source_text)
-        sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
-
-    # Pattern 3: Find all URLs explicitly (backup)
-    url_pattern = re.compile(r'https?://[^\s]+')
-    urls = url_pattern.findall(content)
-
-    # Clean URLs - remove trailing punctuation
-    for url in urls:
-        cleaned_url = url.rstrip(',.;:!?')
-        if cleaned_url:
-            sources.append(cleaned_url)
-
-    # Deduplicate while preserving order
-    unique_sources = []
-    seen = set()
-    for s in sources:
-        s = s.strip()
-        if s and s not in seen:
-            unique_sources.append(s)
-            seen.add(s)
-
-    return unique_sources if unique_sources else None
-
-
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
     "wikipedia.org": {
         "fallback_urls": []
     }
 }
-
 
 # HTML text extractor
 class HTMLTextExtractor(HTMLParser):
@@ -1597,12 +1081,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 break
 
         # Regex pattern for Ollama Search triggers
-        OLLAMA_SEARCH_PATTERN = re.compile(
-            r'\bollama\s+search\b'
-            r'|\bollama\s+search\s+(for|about|on)\b'
-            r'|\bweb\s+search\s+using\s+ollama\b',
-            re.IGNORECASE
-        )
+        # OLLAMA_SEARCH_PATTERN imported from query_patterns
 
         if user_message and OLLAMA_SEARCH_PATTERN.search(user_message):
             logger.info("🔍 EXPLICIT OLLAMA SEARCH REQUESTED - bypassing all tools")
@@ -1886,18 +1365,7 @@ def create_langgraph_agent(llm_with_tools, tools):
         if user_message:
             user_lower = user_message.lower()
 
-            web_search_patterns = [
-                r'\buse\s+web\s+search\b',
-                r'\busing\s+web\s+search\b',
-                r'\bwith\s+web\s+search\b',
-                r'\bweb\s+search\s+for\b',
-                r'\bvia\s+web\s+search\b',
-            ]
-
-            should_use_web_search = any(
-                re.search(pattern, user_lower)
-                for pattern in web_search_patterns
-            )
+            should_use_web_search = bool(WEB_SEARCH_EXPLICIT_PATTERN.search(user_lower))
 
             if should_use_web_search:
                 logger.info("[LangGraph] 🎯 FORCED WEB SEARCH: User explicitly requested web search")
@@ -1906,8 +1374,7 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                 if search_client.is_available():
                     query = user_message
-                    for pattern in web_search_patterns:
-                        query = re.sub(pattern, '', query, flags=re.IGNORECASE)
+                    query = WEB_SEARCH_EXPLICIT_PATTERN.sub('', query).strip()
                     query = query.strip()
 
                     query = re.sub(r'^,?\s*(who|what|where|when|why|how)\s+', r'\1 ', query, flags=re.IGNORECASE)
@@ -2001,7 +1468,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
                 if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
                     logger.info("[LangGraph] 🎯 Found project context → forcing code_assistant tools")
-                    config = INTENT_PATTERNS.get("code_assistant", {})
+                    config = next((e for e in INTENT_CATALOG if e["name"] == "code_assistant"), {})
                     filtered = _filter_tools(all_tools, config.get("tools", []))
                     if filtered:
                         logger.info(f"   → {len(filtered)} code tools (context-based routing)")

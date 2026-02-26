@@ -530,3 +530,73 @@ ROUTER_EXCLUDE_MEDIA = re.compile(
     r'\bmovie\b|\bplex\b|\bsearch\b|\bfind\b|\bshow\b|\bmedia\b',
     re.IGNORECASE
 )
+
+# ═══════════════════════════════════════════════════════════════════
+# RESEARCH SOURCE EXTRACTION
+# Moved from langgraph.py — used to parse "using X as source" queries
+# ═══════════════════════════════════════════════════════════════════
+
+RESEARCH_SOURCE_PATTERN = re.compile(
+    r'\busing\s+(?P<source>(?:https?://)?[\w\s\.\-/:]+?)\s+as\s+(a\s+)?source\b'
+    r'|\bbased\s+on\s+(?P<source2>(?:https?://)?[\w\s\.\-/:]+?)(?:\s|,|$)'
+    r'|\bfrom\s+(?P<source3>(?:https?://)?[\w\s\.\-/:]+?)\s+(?:find|search|get|tell)\b',
+    re.IGNORECASE
+)
+
+
+def extract_research_sources(content: str) -> list:
+    """
+    Extract all sources from a query (handles multiple sources).
+    Returns list of sources e.g. ['url1', 'url2', 'domain.com']
+    """
+    sources = []
+
+    pattern1 = re.compile(
+        r'\busing\s+(.+?)\s+as\s+(a\s+)?(source|sources)\b',
+        re.IGNORECASE
+    )
+    match1 = pattern1.search(content)
+    if match1:
+        source_text = match1.group(1)
+        parts = re.split(r'\s+and\s+|,\s*', source_text)
+        sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
+
+    pattern2 = re.compile(
+        r'\bbased\s+on\s+(.+?)(?:\s+write|\s+create|\s+explain|,|$)',
+        re.IGNORECASE
+    )
+    match2 = pattern2.search(content)
+    if match2:
+        source_text = match2.group(1)
+        parts = re.split(r'\s+and\s+|,\s*', source_text)
+        sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
+
+    url_pattern = re.compile(r'https?://[^\s]+')
+    for url in url_pattern.findall(content):
+        cleaned = url.rstrip(',.;:!?')
+        if cleaned:
+            sources.append(cleaned)
+
+    return sources
+
+
+# ═══════════════════════════════════════════════════════════════════
+# EXPLICIT SEARCH OVERRIDE PATTERNS
+# Moved from langgraph.py — triggers that bypass normal routing
+# ═══════════════════════════════════════════════════════════════════
+
+OLLAMA_SEARCH_PATTERN = re.compile(
+    r'\bollama\s+search\b'
+    r'|\bollama\s+search\s+(for|about|on)\b'
+    r'|\bweb\s+search\s+using\s+ollama\b',
+    re.IGNORECASE
+)
+
+WEB_SEARCH_EXPLICIT_PATTERN = re.compile(
+    r'\buse\s+web\s+search\b'
+    r'|\busing\s+web\s+search\b'
+    r'|\bwith\s+web\s+search\b'
+    r'|\bweb\s+search\s+for\b'
+    r'|\bvia\s+web\s+search\b',
+    re.IGNORECASE
+)
