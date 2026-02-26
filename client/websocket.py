@@ -16,12 +16,13 @@ from client.langgraph import create_langgraph_agent
 from client.stop_signal import request_stop
 
 try:
-    from tools.rag.conversation_rag import store_turn_async as _rag_store_turn, purge_session as _rag_purge_session
+    from tools.rag.conversation_rag import store_turn_async as _rag_store_turn, purge_session as _rag_purge_session, retrieve_context as _rag_search_turns
     _CONV_RAG_AVAILABLE = True
 except ImportError:
     _CONV_RAG_AVAILABLE = False
     def _rag_store_turn(*args, **kwargs): pass
     def _rag_purge_session(*args, **kwargs): pass
+    def _rag_search_turns(*args, **kwargs): return []
 
 # Import system monitor conditionally
 try:

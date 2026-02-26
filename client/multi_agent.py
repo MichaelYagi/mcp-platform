@@ -667,7 +667,7 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
 
         return status
 
-    async def execute(self, user_request: str, skill_context: str = None) -> dict:
+    async def execute(self, user_request: str, skill_context: str = None, session_id: int = None, rag_search_fn=None) -> dict:
         """
         Main entry point for multi-agent execution
         NOW WITH STOP SIGNAL HANDLING
@@ -726,8 +726,7 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
                 }
 
             # Step 3: Aggregate results
-            final_response = await self._aggregate_results(user_request, results)
-
+            final_response = await self._aggregate_results(user_request, results, session_id=session_id, rag_search_fn=rag_search_fn)
             duration = time.time() - start_time
             self.logger.info(f"✅ Multi-agent execution completed in {duration:.2f}s")
 
@@ -1023,7 +1022,7 @@ Complete this task using your available tools."""
             traceback.print_exc()
             raise
 
-    async def _aggregate_results(self, user_request: str, results: Dict[str, Any]) -> str:
+    async def _aggregate_results(self, user_request: str, results: Dict[str, Any], session_id: int = None, rag_search_fn=None) -> str:
         """Aggregate results from all agents"""
 
         self.logger.info("📊 Aggregating results...")
@@ -1047,13 +1046,25 @@ Complete this task using your available tools."""
             if task:
                 results_summary += f"\n\n### {task.role.value.title()} ({task_id}):\n{result}"
 
+        rag_context = ""
+        if session_id and rag_search_fn:
+            try:
+                relevant = rag_search_fn(session_id, user_request, top_k=3, min_score=0.4)
+                if relevant:
+                    rag_context = "\n\nRELEVANT CONVERSATION HISTORY:\n"
+                    for turn in relevant:
+                        rag_context += f"{turn.get('text', '')[:600]}\n\n"
+            except Exception as e:
+                self.logger.warning(f"⚠️ RAG lookup failed in aggregator: {e}")
+
         aggregation_prompt = f"""User's original request: "{user_request}"
+        {rag_context}
+        Results from specialized agents:
+        {results_summary}
 
-Results from specialized agents:
-{results_summary}
-
-Synthesize these results into a coherent, final response that directly answers the user's request.
-Focus on clarity and completeness."""
+        Synthesize these results into a coherent, final response that directly answers the user's request.
+        If conversation history is provided above, use it to answer questions about prior exchanges.
+        Focus on clarity and completeness."""
 
         response = await self.base_llm.ainvoke([
             SystemMessage(content="You are synthesizing results from multiple agents. Create a clear, unified response."),

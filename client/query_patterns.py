@@ -254,18 +254,25 @@ def needs_tools(query: str) -> bool:
     """
     query_lower = query.lower()
 
-    # Current events should use web search, not MCP tools
-    if PATTERN_CURRENT_EVENTS.search(query_lower):
-        return False
-
-    # Check if it matches any tool pattern
+    # Check explicit tool patterns first — these take priority over
+    # the current-events short-circuit below (e.g. "what's the weather today?")
     for pattern in TOOL_PATTERNS:
         if pattern.search(query_lower):
             return True
 
-    # Check for explicit "my" references (personal data)
-    if re.search(r'\bmy\b', query_lower):
+    # Check for "my" references to personal/system data — but only
+    # when paired with action verbs or specific data nouns.
+    # A bare \bmy\b would catch "my favourite colour" which needs no tools.
+    if re.search(
+        r'\bmy\s+(location|todos?|tasks?|notes?|history|library|plex|files?|system|stats?|calendar|reminders?)\b'
+        r'|\b(show|get|list|find|check|search|update|add|delete)\s+my\b',
+        query_lower
+    ):
         return True
+
+    # Current events should use web search, not MCP tools
+    if PATTERN_CURRENT_EVENTS.search(query_lower):
+        return False
 
     return False
 

@@ -192,8 +192,21 @@ class DistributedSkillsManager:
         Returns:
             List of skill metadata dicts with 'name', 'server', 'description'
         """
+        # Common words that appear in every description — filter these out
+        # before scoring so they don't inflate match counts
+        STOPWORDS = {
+            "a", "an", "the", "and", "or", "but", "in", "on", "at", "to",
+            "for", "of", "with", "by", "from", "is", "are", "was", "were",
+            "be", "been", "being", "have", "has", "had", "do", "does", "did",
+            "will", "would", "could", "should", "may", "might", "shall",
+            "this", "that", "these", "those", "it", "its", "my", "your",
+            "their", "our", "i", "you", "he", "she", "we", "they", "what",
+            "which", "who", "how", "when", "where", "why", "all", "any",
+            "use", "used", "using", "based", "new", "as", "so", "if",
+        }
+
         query_lower = user_query.lower()
-        query_words = set(query_lower.split())
+        query_words = set(query_lower.split()) - STOPWORDS
 
         forced = set()
         results = []
@@ -216,7 +229,7 @@ class DistributedSkillsManager:
                 continue  # Already included
 
             desc_lower = skill_info['description'].lower()
-            desc_words = set(desc_lower.split())
+            desc_words = set(desc_lower.split()) - STOPWORDS
 
             matches = len(query_words & desc_words)
 

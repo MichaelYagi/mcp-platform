@@ -28,7 +28,7 @@ from langgraph.prebuilt import ToolNode
 from client.query_patterns import (
     ROUTER_INGEST_COMMAND, ROUTER_STATUS_QUERY, ROUTER_MULTI_STEP,
     ROUTER_ONE_TIME_INGEST, ROUTER_EXPLICIT_RAG, ROUTER_KNOWLEDGE_QUERY,
-    ROUTER_EXCLUDE_MEDIA
+    ROUTER_EXCLUDE_MEDIA, needs_tools, is_general_knowledge
 )
 
 # Try to import metrics
@@ -1551,6 +1551,45 @@ def should_continue_after_tools(state: AgentState) -> str:
     # No feedback - normal end
     return "end"
 
+def _needs_web_search(message: str) -> bool:
+    """
+    Determine if a message genuinely needs current external information.
+    Filters out statements, instructions, personal facts, and creative requests.
+    Exclusions are checked first — if any match, returns False immediately.
+    """
+    msg = message.strip()
+
+    # Explicit exclusions — never search these
+    STATEMENT_PATTERNS = [
+        r"^(my |i |i'm |i am )",
+        r"^(acknowledge|confirm|remember|note that|please note)",
+        r"^(create|write|generate|make|draft|compose|give me a|tell me a story|tell me a poem)",
+        r"^(yes|no|ok|okay|sure|thanks|thank you|hello|hi\b)",
+        r"\b(favourite|favorite|i like|i love|i hate|i prefer)\b",
+        # Questions directed at the assistant about the conversation
+        r"\b(you just|i just|i told you|i said|i mentioned|i gave you|we discussed|you listed|you said)\b",
+        r"^(what did i|what were the|what was the|do you remember|can you recall)\b",
+    ]
+
+    for pattern in STATEMENT_PATTERNS:
+        if re.search(pattern, msg, re.IGNORECASE):
+            return False
+
+    # Must match a genuine question or current-info request
+    SEARCH_PATTERNS = [
+        r"\?",                                                           # question mark
+        r"\b(what is|what are|what was|what were)\b",
+        r"\b(who is|who are|who was|who were)\b",
+        r"\b(when is|when was|when did)\b",
+        r"\b(where is|where are|where was)\b",
+        r"\b(how (much|many|long|old|far|do|does|did|is|are))\b",
+        r"\b(current|latest|recent|today|right now|as of)\b",
+        r"\b(news|price|score|weather|stock|update)\b",
+    ]
+
+    return any(re.search(p, msg, re.IGNORECASE) for p in SEARCH_PATTERNS)
+
+
 def create_langgraph_agent(llm_with_tools, tools):
     """Create and compile the LangGraph agent"""
     logger = logging.getLogger("mcp_client")
@@ -1964,6 +2003,12 @@ def create_langgraph_agent(llm_with_tools, tools):
         def match_intent(user_message: str, all_tools: list, base_llm, logger, conversation_state):
             """Match user intent using centralized pattern configuration"""
 
+            # If the query doesn't need tools at all, bind none — this prevents
+            # Tool schemas flooding the context for conversational/recall queries
+            if is_general_knowledge(user_message) or not needs_tools(user_message):
+                logger.info("🎯 No-tool query → binding 0 tools")
+                return base_llm.bind_tools([]), "no_tools"
+
             for tool in all_tools:
                 if hasattr(tool, 'name') and tool.name.lower() in user_message.lower():
                     logger.info(f"🎯 Explicit tool name detected → binding only: {tool.name}")
@@ -2171,9 +2216,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 current_model = get_model_name(base_llm)
 
             elif not has_tool_calls and has_content:
-                needs_current_info = any(word in user_message.lower() for word in [
-                    "current", "who is", "latest", "recent", "today", "now"
-                ])
+                needs_current_info = _needs_web_search(user_message)
 
                 if needs_current_info:
                     logger.info("[LangGraph] 🔍 Trying web search fallback for current info")

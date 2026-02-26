@@ -43,6 +43,13 @@ except ImportError:
     SYSTEM_MONITOR_AVAILABLE = False
     print("⚠️  System monitor not available. Install with: pip install psutil gputil nvidia-ml-py3")
 
+try:
+    from tools.rag.conversation_rag import retrieve_context as _rag_search_turns
+    _CONV_RAG_AVAILABLE = True
+except ImportError:
+    _CONV_RAG_AVAILABLE = False
+    def _rag_search_turns(*args, **kwargs): return []
+
 # Load environment variables
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env", override=True)
@@ -1101,7 +1108,12 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
             try:
                 # Pass skill_context so orchestrator follows the skill workflow
-                result = await orchestrator.execute(user_message, skill_context=skill_context)
+                result = await orchestrator.execute(
+                    user_message,
+                    skill_context=skill_context,
+                    session_id=conversation_state.get("session_id"),
+                    rag_search_fn=_rag_search_turns if _CONV_RAG_AVAILABLE else None
+                )
 
                 if isinstance(result, dict):
                     result_text = result.get("response", str(result))
