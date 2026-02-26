@@ -463,6 +463,12 @@ async def handle_command(
         conversation_state["messages"] = []
         sessionmanager = SessionManager()
         sessionmanager.delete_all_sessions()
+        try:
+            from tools.rag.rag_utils import clear_all_conversation_turns
+            clear_all_conversation_turns()
+        except Exception as e:
+            if logger:
+                logger.warning(f"⚠️ Could not clear RAG conversation turns: {e}")
         return (True, "✅ Chat history cleared", None, None)
 
     # List all sessions
@@ -487,6 +493,12 @@ async def handle_command(
         session = sessionmanager.get_session(session_id)
         if session is not None:
             sessionmanager.delete_session(session_id)
+            try:
+                from tools.rag.rag_utils import delete_conversation_session
+                delete_conversation_session(session_id)
+            except Exception as e:
+                if logger:
+                    logger.warning(f"⚠️ Could not clear RAG turns for session {session_id}: {e}")
             return (True, f"✅ Session {session_id} - {session.get('name', 'No session name')} deleted", None, None)
         return (True, "✅ Session not found", None, None)
 

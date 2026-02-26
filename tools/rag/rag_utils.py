@@ -308,6 +308,39 @@ def clear_rag_db():
     except Exception as e:
         logger.error(f"❌ Error clearing database: {e}")
 
+def delete_conversation_session(session_id: int):
+    """
+    Delete all RAG conversation turns for a specific session.
+    Called by :clear session <id> to keep rag_database.db in sync with sessions.db.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM documents WHERE session_id = ?",
+            (str(session_id),)
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+        logger.info(f"🗑️  Deleted {deleted} RAG turns for session {session_id}")
+    except Exception as e:
+        logger.error(f"❌ Error deleting RAG turns for session {session_id}: {e}")
+
+def clear_all_conversation_turns():
+    """
+    Delete ALL conversation turns from the RAG database.
+    Called by :clear sessions to keep rag_database.db in sync with sessions.db.
+    Ingested media documents (session_id IS NULL) are preserved.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM documents WHERE session_id IS NOT NULL")
+        deleted = cursor.rowcount
+        conn.commit()
+        logger.info(f"🗑️  Cleared {deleted} conversation turns from RAG database")
+    except Exception as e:
+        logger.error(f"❌ Error clearing conversation turns from RAG database: {e}")
 
 def migrate_from_json():
     """Migrate from old JSON database to SQLite."""
