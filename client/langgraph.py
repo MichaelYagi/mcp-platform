@@ -28,7 +28,8 @@ from langgraph.prebuilt import ToolNode
 from client.query_patterns import (
     ROUTER_INGEST_COMMAND, ROUTER_STATUS_QUERY, ROUTER_MULTI_STEP,
     ROUTER_ONE_TIME_INGEST, ROUTER_EXPLICIT_RAG, ROUTER_KNOWLEDGE_QUERY,
-    ROUTER_EXCLUDE_MEDIA
+    ROUTER_EXCLUDE_MEDIA,
+    classify, QueryIntent
 )
 
 # Try to import metrics
@@ -1552,41 +1553,8 @@ def should_continue_after_tools(state: AgentState) -> str:
     return "end"
 
 def _needs_web_search(message: str) -> bool:
-    """
-    Determine if a message genuinely needs current external information.
-    Filters out statements, instructions, personal facts, and creative requests.
-    Exclusions are checked first — if any match, returns False immediately.
-    """
-    msg = message.strip()
-
-    # Explicit exclusions — never search these
-    STATEMENT_PATTERNS = [
-        r"^(my |i |i'm |i am )",                                        # personal statements
-        r"^(acknowledge|confirm|remember|note that|please note)",        # memory instructions
-        r"^(create|write|generate|make|draft|compose|give me a|tell me a story|tell me a poem)",  # creative tasks
-        r"^(yes|no|ok|okay|sure|thanks|thank you|hello|hi\b)",          # conversational
-        r"\b(favourite|favorite|i like|i love|i hate|i prefer)\b",      # personal preferences
-        r"\b(weather|forecast|temperature|rain|snow|wind|humidity)\b",  # weather — handled by MCP tools
-        r"\b(my (location|todo|task|note|system|plex|library))\b",      # personal data — handled by MCP tools
-    ]
-
-    for pattern in STATEMENT_PATTERNS:
-        if re.search(pattern, msg, re.IGNORECASE):
-            return False
-
-    # Must match a genuine question or current-info request
-    SEARCH_PATTERNS = [
-        r"\?",                                                           # question mark
-        r"\b(what is|what are|what was|what were)\b",
-        r"\b(who is|who are|who was|who were)\b",
-        r"\b(when is|when was|when did)\b",
-        r"\b(where is|where are|where was)\b",
-        r"\b(how (much|many|long|old|far|do|does|did|is|are))\b",
-        r"\b(current|latest|recent|today|right now|as of)\b",
-        r"\b(news|price|score|stock|update)\b",            # weather removed — MCP tools handle it
-    ]
-
-    return any(re.search(p, msg, re.IGNORECASE) for p in SEARCH_PATTERNS)
+    """Delegate entirely to classify() — single source of truth in query_patterns.py."""
+    return classify(message).needs_web_search
 
 
 def create_langgraph_agent(llm_with_tools, tools):
@@ -1999,65 +1967,61 @@ def create_langgraph_agent(llm_with_tools, tools):
         # ═══════════════════════════════════════════════════════════
         # CENTRALIZED PATTERN MATCHING
         # ═══════════════════════════════════════════════════════════
-        def match_intent(user_message: str, all_tools: list, base_llm, logger, conversation_state):
-            """Match user intent using centralized pattern configuration"""
-
+        def _filter_tools(all_tools: list, tool_patterns: list) -> list:
+            """Filter tool list to those matching name patterns. Supports 'prefix*' wildcards."""
+            result = []
             for tool in all_tools:
-                if hasattr(tool, 'name') and tool.name.lower() in user_message.lower():
-                    logger.info(f"🎯 Explicit tool name detected → binding only: {tool.name}")
-                    return base_llm.bind_tools([tool]), "explicit_tool"
+                if not hasattr(tool, 'name'):
+                    continue
+                for pattern in tool_patterns:
+                    if "*" in pattern:
+                        if tool.name.startswith(pattern.replace("*", "")):
+                            result.append(tool)
+                            break
+                    elif tool.name == pattern:
+                        result.append(tool)
+                        break
+            return result
 
-            has_project_context = False
+        def match_intent(user_message: str, all_tools: list, base_llm, logger, conversation_state):
+            """
+            Route query to the right tool subset using classify() from query_patterns.py.
+            That module is the single source of truth — no pattern matching here.
+            """
+            available_tool_names = [t.name for t in all_tools if hasattr(t, 'name')]
+            intent = classify(user_message, available_tool_names=available_tool_names)
+
+            # Pure conversational / recall / creative — no tools, keeps context clean
+            if intent.is_conversational:
+                logger.info("🎯 No-tool query → binding 0 tools")
+                return base_llm.bind_tools([]), "no_tools"
+
+            # Project context override: CONVERSATION CONTEXT in recent system messages
+            # means a code review workflow is active — force code_assistant tools
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
                 if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
-                    has_project_context = True
-                    logger.info("[LangGraph] 🎯 Found project context in conversation - using code_assistant")
+                    logger.info("[LangGraph] 🎯 Found project context → forcing code_assistant tools")
+                    config = INTENT_PATTERNS.get("code_assistant", {})
+                    filtered = _filter_tools(all_tools, config.get("tools", []))
+                    if filtered:
+                        logger.info(f"   → {len(filtered)} code tools (context-based routing)")
+                        return base_llm.bind_tools(filtered), "code_assistant"
                     break
 
-            if has_project_context:
-                config = INTENT_PATTERNS["code_assistant"]
-                filtered_tools = []
-                for tool in all_tools:
-                    for tool_pattern in config["tools"]:
-                        if "*" in tool_pattern:
-                            prefix = tool_pattern.replace("*", "")
-                            if tool.name.startswith(prefix):
-                                filtered_tools.append(tool)
-                                break
-                        elif tool.name == tool_pattern:
-                            filtered_tools.append(tool)
-                            break
+            # Web-search-only intents: classified but no MCP tools needed
+            if intent.needs_web_search and not intent.tools:
+                logger.info(f"🎯 {intent.category} → web search only, binding 0 tools")
+                return base_llm.bind_tools([]), intent.category
 
-                if filtered_tools:
-                    logger.info(f"   → {len(filtered_tools)} code tools (context-based routing)")
-                    return base_llm.bind_tools(filtered_tools), "code_assistant"
+            # Matched intent with tools — filter down to just what's needed
+            if intent.tools:
+                filtered = _filter_tools(all_tools, intent.tools)
+                if filtered:
+                    logger.info(f"🎯 {intent.category} → filtering tools")
+                    logger.info(f"   → {len(filtered)} tools: {[t.name for t in filtered[:5]]}")
+                    return base_llm.bind_tools(filtered), intent.category
 
-            sorted_patterns = sorted(INTENT_PATTERNS.items(), key=lambda x: x[1]["priority"])
-
-            for intent_name, config in sorted_patterns:
-                if re.search(config["pattern"], user_message, re.IGNORECASE):
-                    if "exclude_pattern" in config:
-                        if re.search(config["exclude_pattern"], user_message, re.IGNORECASE):
-                            continue
-
-                    logger.info(f"🎯 {intent_name} → filtering tools")
-
-                    filtered_tools = []
-                    for tool in all_tools:
-                        for tool_pattern in config["tools"]:
-                            if "*" in tool_pattern:
-                                prefix = tool_pattern.replace("*", "")
-                                if tool.name.startswith(prefix):
-                                    filtered_tools.append(tool)
-                                    break
-                            elif tool.name == tool_pattern:
-                                filtered_tools.append(tool)
-                                break
-
-                    if filtered_tools:
-                        logger.info(f"   → {len(filtered_tools)} tools: {[t.name for t in filtered_tools[:5]]}")
-                        return base_llm.bind_tools(filtered_tools), intent_name
-
+            # General fallback — bind everything
             logger.info(f"🎯 General query → all {len(all_tools)} tools")
             return base_llm.bind_tools(all_tools), "general"
 

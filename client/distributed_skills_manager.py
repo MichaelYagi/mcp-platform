@@ -10,8 +10,8 @@ import logging
 from typing import Dict, List, Optional
 from mcp_use.client.client import MCPClient
 
-# Import shared patterns
-from client.query_patterns import needs_tools, is_general_knowledge
+# Single routing authority
+from client.query_patterns import classify
 
 
 class DistributedSkillsManager:
@@ -279,23 +279,18 @@ async def inject_relevant_skills_into_messages(
     """
 
     # ═══════════════════════════════════════════════════════════
-    # USE SHARED PATTERN MATCHING (same as LangGraph)
+    # USE classify() — single source of truth (query_patterns.py)
     # ═══════════════════════════════════════════════════════════
 
-    # Check if this is a general knowledge query (no tools needed)
-    if is_general_knowledge(user_query):
-        logger.info("📚 General knowledge query detected - skipping skill injection")
+    intent = classify(user_query)
+
+    # Conversational queries never need skills
+    if intent.is_conversational:
+        logger.info("📚 Query doesn't need tools - skipping skill injection")
         return messages
 
-    # Forced skill patterns always bypass the needs_tools check —
-    # a bare GitHub URL looks like "no tools needed" to the generic
-    # classifier but we know it requires the github_review workflow.
-    has_forced_match = any(
-        re.search(trigger["pattern"], user_query.lower())
-        for trigger in DistributedSkillsManager.FORCED_SKILL_PATTERNS
-    )
-
-    if not has_forced_match and not needs_tools(user_query):
+    # Only inject skills when the matched intent has skills enabled
+    if not intent.needs_skills:
         logger.info("📚 Query doesn't need tools - skipping skill injection")
         return messages
 
