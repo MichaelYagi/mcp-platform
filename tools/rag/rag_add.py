@@ -1,5 +1,5 @@
 """
-RAG Add Tool - OPTIMIZED
+RAG Add Tool
 Concurrent embeddings + batch inserts + proper error handling
 """
 
@@ -179,11 +179,8 @@ def rag_add(text: str, source: str = None, chunk_size: int = 400) -> Dict[str, A
         for success, result, index in results:
             if success:
                 successful_docs.append({
-                    'text': chunks[index],
                     'embedding': result,
                     'source': source,
-                    'length': len(chunks[index]),
-                    'word_count': len(chunks[index].split())
                 })
             else:
                 failed_count += 1

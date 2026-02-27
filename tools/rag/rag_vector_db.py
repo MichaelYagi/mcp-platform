@@ -61,12 +61,9 @@ def add_to_rag(text: str, source: str = None, save: bool = True) -> Dict[str, An
         doc_id = str(uuid.uuid4())
         doc = {
             "id": doc_id,
-            "text": text,
             "embedding": embedding,
             "metadata": {
                 "source": source,
-                "length": len(text),
-                "word_count": len(text.split())
             }
         }
 
@@ -108,12 +105,10 @@ def get_rag_stats() -> Dict[str, Any]:
                 "sources": []
             }
 
-        total_words = sum(doc["metadata"]["word_count"] for doc in db)
         sources = list(set(doc["metadata"]["source"] for doc in db if doc["metadata"].get("source")))
 
         return {
             "total_documents": len(db),
-            "total_words": total_words,
             "sources": sources,
             "unique_sources": len(sources)
         }
@@ -146,12 +141,9 @@ def add_to_rag_batch(text: str, source: str = None) -> Dict[str, Any]:
         doc_id = str(uuid.uuid4())
         doc = {
             "id": doc_id,
-            "text": text,
             "embedding": embedding,
             "metadata": {
                 "source": source,
-                "length": len(text),
-                "word_count": len(text.split())
             }
         }
 
@@ -284,25 +276,22 @@ def batch_insert_documents(documents: List[Dict[str, Any]]) -> int:
         for doc in documents:
             doc_id = str(uuid.uuid4())
 
-            # Convert embedding to numpy array then bytes
+            # Convert embedding to numpy array then bytes (binary is faster than JSON)
             embedding_array = np.array(doc['embedding'], dtype=np.float32)
             embedding_bytes = embedding_array.tobytes()
 
             batch_data.append((
                 doc_id,
-                doc['text'],
-                embedding_bytes,  # Binary, not JSON!
+                embedding_bytes,
                 doc.get('source'),
-                doc.get('length'),
-                doc.get('word_count')
             ))
 
         # Fast transaction
         cursor.execute("BEGIN IMMEDIATE")
         cursor.executemany("""
                            INSERT INTO documents
-                               (id, text, embedding, source, length, word_count)
-                           VALUES (?, ?, ?, ?, ?, ?)
+                               (id, embedding, source)
+                           VALUES (?, ?, ?)
                            """, batch_data)
         cursor.execute("COMMIT")
 
