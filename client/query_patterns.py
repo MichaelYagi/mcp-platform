@@ -387,7 +387,16 @@ _CONVERSATIONAL_PATTERNS = re.compile(
     r'|\b(favourite|favorite|i like|i love|i hate)\b'  # preferences (i prefer removed — conflicts with knowledge)
     r'|^(create|write|generate|make|draft|compose)\b'  # creative tasks
     r'|\b(you just|i just|i told you|i said|i mentioned|i gave you)\b'  # recall
-    r'|^(what did i|what were the|what was the|do you remember|can you recall)\b',
+    r'|^(what did i|what were the|what was the|do you remember|can you recall)\b'
+    # Pronoun follow-ups — context-dependent, never need tools
+    # Requires he/she/they/him/her/them/his/her/their to avoid catching
+    # broad questions like "what is the weather" or "what has the news been"
+    r'|^(what (are|were|is|was) (his|her|their|its)\b)'
+    r'|^(what (did|does|do|has|have|had) (he|she|they|it)\b)'
+    r'|^(tell me (more about|about) (him|her|them|it)\b)'
+    r'|^(how (did|does|do|has|have) (he|she|they|it)\b)'
+    r'|^(why (did|does|do|is|was|were|has|have) (he|she|they|it)\b)'
+    r'|^(when (did|does|do|has|have|had|is|was|were) (he|she|they|it)\b)',
     re.IGNORECASE
 )
 
