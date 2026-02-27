@@ -13,6 +13,12 @@ from mcp_use.client.client import MCPClient
 # Single routing authority
 from client.query_patterns import classify
 
+# Tool enable/disable control
+try:
+    from tools.tool_control import is_tool_enabled
+except ImportError:
+    def is_tool_enabled(name, category=None): return True  # fallback: all enabled
+
 
 class DistributedSkillsManager:
     """
@@ -216,6 +222,9 @@ class DistributedSkillsManager:
             if re.search(trigger["pattern"], query_lower):
                 skill_name = trigger["skill"]
                 if skill_name in self.all_skills and skill_name not in forced:
+                    if not is_tool_enabled(skill_name):
+                        self.logger.info(f"📚 Skipping disabled skill: {skill_name}")
+                        continue
                     self.logger.info(
                         f"📚 Forced skill match: {skill_name} ({trigger['reason']})"
                     )
@@ -243,6 +252,9 @@ class DistributedSkillsManager:
                     matches += 3
 
             if matches >= 2:
+                if not is_tool_enabled(skill_name):
+                    self.logger.debug(f"📚 Skipping disabled skill: {skill_name}")
+                    continue
                 scores.append((matches, skill_info))
 
         scores.sort(key=lambda x: x[0], reverse=True)

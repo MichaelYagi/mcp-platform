@@ -67,29 +67,26 @@ def store_turn(session_id: int, role: str, content: str) -> bool:
     prefix = ROLE_PREFIX.get(role, f"{role}: ")
     text_to_embed = prefix + content[:MAX_TURN_CHARS]
 
+    embedding = _embed_text(text_to_embed)
+    if embedding is None:
+        return False
+
+    import numpy as np
+    embedding_bytes = np.array(embedding, dtype=np.float32).tobytes()
+
+    doc_id = str(uuid.uuid4())
+    conn = get_connection()
     try:
-        embedding = _embed_text(text_to_embed)
-        if embedding is None:
-            return False
-
-        import numpy as np
-        embedding_bytes = np.array(embedding, dtype=np.float32).tobytes()
-
-        doc_id = str(uuid.uuid4())
-        conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-            INSERT INTO documents (id, text, embedding, source, session_id, length, word_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO documents (id, embedding, source, session_id)
+            VALUES (?, ?, ?, ?)
         """, (
             doc_id,
-            content,                    # Store original (no prefix) for display
             embedding_bytes,
-            "conversation",             # source identifies type
-            str(session_id),            # session_id scopes retrieval
-            len(content),
-            len(content.split())
+            "conversation",
+            str(session_id),
         ))
         conn.commit()
 
@@ -99,6 +96,8 @@ def store_turn(session_id: int, role: str, content: str) -> bool:
     except Exception as e:
         logger.error(f"❌ conversation_rag.store_turn failed: {e}")
         return False
+    finally:
+        conn.close()
 
 
 def store_turn_async(session_id: int, role: str, content: str) -> None:
@@ -158,16 +157,19 @@ def retrieve_context(
 
         # Load only this session's turns from DB (not the whole RAG store)
         conn = get_connection()
-        cursor = conn.cursor()
+        try:
+            cursor = conn.cursor()
 
-        cursor.execute("""
-            SELECT id, text, embedding, source
-            FROM documents
-            WHERE session_id = ?
-            ORDER BY created_at ASC
-        """, (str(session_id),))
+            cursor.execute("""
+                SELECT id, embedding, source, created_at
+                FROM documents
+                WHERE session_id = ?
+                ORDER BY created_at ASC
+            """, (str(session_id),))
 
-        rows = cursor.fetchall()
+            rows = cursor.fetchall()
+        finally:
+            conn.close()
 
         if not rows:
             logger.debug(f"💬 No RAG turns found for session {session_id}")
@@ -175,9 +177,15 @@ def retrieve_context(
 
         import numpy as np
 
+        # Load this session's messages from sessions.db for text lookup
+        from client.session_manager import SessionManager
+        session_messages = SessionManager().get_session_messages(session_id)
+        # Index by position for O(1) lookup — created_at order matches ASC query
+        messages_by_index = {i: m for i, m in enumerate(session_messages)}
+
         results = []
-        for row in rows:
-            embedding_data = row[2]
+        for i, row in enumerate(rows):
+            embedding_data = row[1]
 
             # Handle binary format
             if isinstance(embedding_data, bytes):
@@ -189,12 +197,15 @@ def retrieve_context(
             score = cosine_similarity(query_embedding, embedding)
 
             if score >= min_score:
-                # Infer role from stored text prefix or source
-                text = row[1]
+                # Look up original text from sessions.db
+                msg = messages_by_index.get(i)
+                text = msg["text"] if msg else ""
+                if not text:
+                    continue
                 results.append({
                     "text": text,
                     "score": float(score),
-                    "source": row[3],
+                    "source": row[2],
                 })
 
         # Sort by relevance
@@ -222,8 +233,8 @@ def purge_session(session_id: int) -> int:
     """
     from tools.rag.rag_utils import get_connection
 
+    conn = get_connection()
     try:
-        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM documents WHERE session_id = ?", (str(session_id),))
         deleted = cursor.rowcount
@@ -233,3 +244,5 @@ def purge_session(session_id: int) -> int:
     except Exception as e:
         logger.error(f"❌ conversation_rag.purge_session failed: {e}")
         return 0
+    finally:
+        conn.close()

@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import yaml
 
+try:
+    from tools.tool_control import is_tool_enabled
+except ImportError:
+    def is_tool_enabled(name, category=None): return True  # fallback: all enabled
+
 
 class Skill:
     """Represents a single skill with metadata"""
@@ -104,12 +109,15 @@ class SkillRegistry:
 class SkillLoader:
     """Loads skills from directory structure"""
 
-    def __init__(self, available_tools: List[str]):
+    def __init__(self, available_tools: List[str], category: Optional[str] = None):
         """
         Args:
             available_tools: List of tool names available in this server
+            category:        Optional category name (e.g. "knowledge_base") used
+                             to match DISABLED_TOOLS=knowledge_base:* patterns
         """
         self.available_tools = set(available_tools)
+        self.category = category
         self.logger = logging.getLogger("skill_loader")
 
     def load_all(self, skills_dir: Path) -> SkillRegistry:
@@ -144,6 +152,12 @@ class SkillLoader:
         for skill_file in skill_files:
             try:
                 skill = Skill(skill_file)
+
+                # Skip skills disabled via DISABLED_TOOLS in .env
+                # Checks both exact name and category:* wildcard
+                if not is_tool_enabled(skill.name, self.category):
+                    self.logger.info(f"🚫 Skipping disabled skill: {skill.name}")
+                    continue
 
                 # Validate that referenced tools exist
                 missing_tools = set(skill.tools) - self.available_tools

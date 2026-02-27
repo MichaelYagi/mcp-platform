@@ -381,7 +381,7 @@ if __name__ == "__main__":
 
     # Load skills
     skills_dir = Path(__file__).parent / "skills"
-    loader = SkillLoader(server_tools)
+    loader = SkillLoader(server_tools, category="knowledge_base")
     skill_registry = loader.load_all(skills_dir)
 
     logger.info(f"🛠  {len(server_tools)} tools: {', '.join(server_tools)}")

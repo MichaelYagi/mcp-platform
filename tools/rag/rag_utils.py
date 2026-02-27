@@ -63,37 +63,18 @@ def _initialize_database(conn: sqlite3.Connection):
     """Create tables and indexes if they don't exist, migrate schema if needed."""
     cursor = conn.cursor()
 
-    # Main documents table (original schema)
+    # Main documents table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS documents (
             id TEXT PRIMARY KEY,
-            text TEXT NOT NULL,
             embedding BLOB NOT NULL,
             source TEXT,
-            length INTEGER,
-            word_count INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            session_id TEXT
         )
     """)
 
-    # ── Schema migration: add session_id column if it doesn't exist ──────────
-    cursor.execute("PRAGMA table_info(documents)")
-    existing_columns = {row[1] for row in cursor.fetchall()}
-
-    if "session_id" not in existing_columns:
-        try:
-            logger.info("🔄 Migrating RAG schema: adding session_id column")
-            cursor.execute("ALTER TABLE documents ADD COLUMN session_id TEXT")
-            cursor.execute("""
-                CREATE INDEX IF NOT EXISTS idx_documents_session_id
-                ON documents(session_id)
-            """)
-            logger.info("✅ session_id column added to documents table")
-        except Exception as e:
-            if "duplicate column name" in str(e).lower():
-                logger.debug("session_id column already exists — skipping migration")
-            else:
-                raise
+    # session_id is part of the base schema — no migration needed
 
     # ── Standard indexes ──────────────────────────────────────────────────────
     cursor.execute("""
@@ -127,7 +108,7 @@ def load_rag_db() -> List[Dict[str, Any]]:
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, text, embedding, source, length, word_count
+            SELECT id, embedding, source
             FROM documents
             WHERE session_id IS NULL
             ORDER BY created_at
@@ -144,12 +125,9 @@ def load_rag_db() -> List[Dict[str, Any]]:
 
             doc = {
                 "id": row['id'],
-                "text": row['text'],
                 "embedding": embedding,
                 "metadata": {
                     "source": row['source'],
-                    "length": row['length'],
-                    "word_count": row['word_count']
                 }
             }
             documents.append(doc)
@@ -181,15 +159,12 @@ def save_rag_db(db: List[Dict[str, Any]]):
 
             cursor.execute("""
                 INSERT OR REPLACE INTO documents 
-                (id, text, embedding, source, session_id, length, word_count)
-                VALUES (?, ?, ?, ?, NULL, ?, ?)
+                (id, embedding, source, session_id)
+                VALUES (?, ?, ?, NULL)
             """, (
                 doc['id'],
-                doc['text'],
                 embedding_blob,
                 metadata.get('source'),
-                metadata.get('length'),
-                metadata.get('word_count')
             ))
 
         cursor.execute("COMMIT")
@@ -219,19 +194,16 @@ def save_rag_db_batch(documents: List[Dict[str, Any]]):
 
             data.append((
                 doc['id'],
-                doc['text'],
                 embedding_blob,
                 metadata.get('source'),
                 None,  # session_id — external docs never have one
-                metadata.get('length'),
-                metadata.get('word_count')
             ))
 
         cursor.execute("BEGIN TRANSACTION")
         cursor.executemany("""
             INSERT OR REPLACE INTO documents 
-            (id, text, embedding, source, session_id, length, word_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (id, embedding, source, session_id)
+            VALUES (?, ?, ?, ?)
         """, data)
         cursor.execute("COMMIT")
 
@@ -269,7 +241,7 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, text, embedding, source, length, word_count
+            SELECT id, embedding, source
             FROM documents
             WHERE source = ? AND session_id IS NULL
             ORDER BY created_at
@@ -286,12 +258,9 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
 
             doc = {
                 "id": row['id'],
-                "text": row['text'],
                 "embedding": embedding,
                 "metadata": {
                     "source": row['source'],
-                    "length": row['length'],
-                    "word_count": row['word_count']
                 }
             }
             documents.append(doc)
@@ -379,9 +348,6 @@ def get_database_stats() -> Dict[str, Any]:
         cursor.execute("SELECT COUNT(*) FROM documents WHERE session_id IS NOT NULL")
         conversation_turns = cursor.fetchone()[0]
 
-        cursor.execute("SELECT SUM(word_count) FROM documents WHERE session_id IS NULL")
-        total_words = cursor.fetchone()[0] or 0
-
         cursor.execute("SELECT COUNT(DISTINCT source) FROM documents WHERE session_id IS NULL")
         unique_sources = cursor.fetchone()[0]
 
@@ -395,7 +361,6 @@ def get_database_stats() -> Dict[str, Any]:
             "total_documents": total_docs,
             "conversation_turns_indexed": conversation_turns,
             "unique_sessions_indexed": unique_sessions,
-            "total_words": total_words,
             "unique_sources": unique_sources,
             "database_size_mb": round(db_size_mb, 2),
             "database_file": str(RAG_DB_FILE)
