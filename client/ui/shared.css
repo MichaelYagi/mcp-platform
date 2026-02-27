@@ -611,6 +611,85 @@ body {
     --swatch3:          #01080a; /* black */
 }
 
+[data-theme="tmnt"] {
+    /* Header — Turtle Green */
+    --header-bg:        #3c8d0d;
+    --header-border:    #2e6c0a;
+
+    /* Sidebar (chat interface) — Sewer grey + bandana accents */
+    --sidebar-bg:       #01080a;
+    --sidebar-header:   #3c8d0d;
+    --sidebar-item:     #0f2a57; /* Leo blue accent */
+    --sidebar-hover:    #1c4595;
+    --sidebar-active:   #e76a24; /* Mikey orange */
+    --sidebar-border:   #4a4a4a;
+    --sidebar-search:   #2e6c0a;
+
+    /* Page & Chat — neutral sewer greys */
+    --page-bg:          #e7e5e8;
+    --chat-bg:          #ffffff;
+    --chat-border:      #c9c7cc;
+    --chat-assistant:   #f3f2f4;
+    --chat-asst-border: #dcdbe0;
+    --chat-asst-color:  #01080a;
+    --input-bg:         #ffffff;
+    --input-border:     #bfc2cc;
+    --status-color:     #3c8d0d;
+
+    /* User bubbles & buttons — bandana colors */
+    --user-bubble:      linear-gradient(135deg, #1c4595, #6a2ca0); /* Leo → Donnie */
+    --send-btn:         #3c8d0d;
+    --send-btn-hover:   #2e6c0a;
+    --send-btn-focus:   rgba(60,141,13,0.35);
+
+    --btn-logs:         #1c4595; /* Leo */
+    --btn-logs-hover:   #16356f;
+    --btn-monitor:      #6a2ca0; /* Donnie */
+    --btn-monitor-hover:#572383;
+    --btn-dashboard:    #e76a24; /* Mikey */
+    --btn-dashboard-hover:#c85a1f;
+    --btn-newsession:   #ff0000; /* Raph */
+    --btn-newsession-hover:#cc0000;
+
+    /* Log panel — sewer tech */
+    --log-bg:           #01080a;
+    --log-header:       #4a4a4a;
+    --log-border:       #3c8d0d;
+    --log-filter-bg:    #0b0f14;
+    --log-filter-btn:   #3c8d0d;
+
+    /* System monitor — ooze green */
+    --monitor-gradient: linear-gradient(135deg, #c4b000 0%, #3c8d0d 100%);
+    --monitor-header:   rgba(0,0,0,0.25);
+
+    /* Dashboard specific */
+    --btn-back:         #3c8d0d;
+    --btn-back-hover:   #2e6c0a;
+    --card-bg:          #ffffff;
+    --card-border:      #d0d7de;
+    --card-shadow:      rgba(0,0,0,0.08);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #3c8d0d;
+    --metric-color:     #e76a24;
+    --subtitle-color:   #555;
+    --label-color:      #666;
+    --chart-blue:       #1c4595;
+    --chart-purple:     #6a2ca0;
+    --tool-border:      #3c8d0d;
+    --tool-bg:          #f8f9fa;
+    --status-bg:        #ffffff;
+
+    /* Scrollbars */
+    --scrollbar-track:  #e7e5e8;
+    --scrollbar-thumb:  #3c8d0d;
+    --scrollbar-hover:  #2e6c0a;
+
+    /* Swatch colors */
+    --swatch1:          #3c8d0d; /* Turtle green */
+    --swatch2:          #1c4595; /* Leo blue */
+    --swatch3:          #e76a24; /* Mikey orange */
+}
+
 /* Crimson – deep red accents */
 [data-theme="crimson"] {
     --header-bg:        #1c1c1e;
@@ -1150,5 +1229,5 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,dragonball,optimus,neon,dracula,nimbus,tokyo,garbagefire";
+    --theme-list: "default,midnight,forest,crimson,tmnt,dragonball,optimus,neon,dracula,nimbus,tokyo,garbagefire";
 }
