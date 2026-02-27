@@ -531,6 +531,86 @@ body {
     --swatch3:          #ffcc00;
 }
 
+/* DBZ – orange and blue */
+[data-theme="dragonball"] {
+    /* Header — primary orange */
+    --header-bg:        #e76a24;
+    --header-border:    #c85a1f;
+
+    /* Sidebar — blue‑dominant with black base + orange accents */
+    --sidebar-bg:       #01080a;
+    --sidebar-header:   #1c4595;
+    --sidebar-item:     #0f2a57;
+    --sidebar-hover:    #1c4595;
+    --sidebar-active:   #e76a24;
+    --sidebar-border:   #1c4595;
+    --sidebar-search:   #0f2a57;
+
+    /* Page & Chat — Capsule Corp neutrals */
+    --page-bg:          #e7e5e8;
+    --chat-bg:          #ffffff;
+    --chat-border:      #c9c7cc;
+    --chat-assistant:   #f3f2f4;
+    --chat-asst-border: #dcdbe0;
+    --chat-asst-color:  #01080a;
+    --input-bg:         #ffffff;
+    --input-border:     #bfc2cc;
+    --status-color:     #1c4595;
+
+    /* User bubbles & buttons — blue primary, orange secondary, gold accent */
+    --user-bubble:      linear-gradient(135deg, #1c4595, #fbbc42);
+    --send-btn:         #1c4595;
+    --send-btn-hover:   #16356f;
+    --send-btn-focus:   rgba(28,69,149,0.35);
+
+    --btn-logs:         #1c4595;
+    --btn-logs-hover:   #16356f;
+    --btn-monitor:      #fbbc42;
+    --btn-monitor-hover:#e0a637;
+    --btn-dashboard:    #1c4595;
+    --btn-dashboard-hover:#16356f;
+    --btn-newsession:   #e76a24;
+    --btn-newsession-hover:#c85a1f;
+
+    /* Log panel — black base with blue structure + orange highlight */
+    --log-bg:           #01080a;
+    --log-header:       #1c4595;
+    --log-border:       #1c4595;
+    --log-filter-bg:    #0b0f14;
+    --log-filter-btn:   #e76a24;
+
+    /* System monitor — gold/orange aura */
+    --monitor-gradient: linear-gradient(135deg, #fbbc42 0%, #e76a24 100%);
+    --monitor-header:   rgba(0,0,0,0.25);
+
+    /* Dashboard — blue titles, orange metrics, gold optional accents */
+    --btn-back:         #1c4595;
+    --btn-back-hover:   #16356f;
+    --card-bg:          #ffffff;
+    --card-border:      #d0d7de;
+    --card-shadow:      rgba(0,0,0,0.10);
+    --card-shadow-hover:rgba(0,0,0,0.15);
+    --title-color:      #1c4595;
+    --metric-color:     #e76a24;
+    --subtitle-color:   #555;
+    --label-color:      #666;
+    --chart-blue:       #1c4595;
+    --chart-purple:     #9b59b6;
+    --tool-border:      #1c4595;
+    --tool-bg:          #f8f9fa;
+    --status-bg:        #ffffff;
+
+    /* Scrollbars — blue thumb, neutral track */
+    --scrollbar-track:  #e7e5e8;
+    --scrollbar-thumb:  #1c4595;
+    --scrollbar-hover:  #16356f;
+
+    /* Swatches — all required colors represented */
+    --swatch1:          #e76a24; /* orange */
+    --swatch2:          #1c4595; /* blue */
+    --swatch3:          #01080a; /* black */
+}
+
 /* Crimson – deep red accents */
 [data-theme="crimson"] {
     --header-bg:        #1c1c1e;
@@ -1070,5 +1150,5 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,optimus,neon,dracula,nimbus,tokyo,garbagefire";
+    --theme-list: "default,midnight,forest,crimson,dragonball,optimus,neon,dracula,nimbus,tokyo,garbagefire";
 }
