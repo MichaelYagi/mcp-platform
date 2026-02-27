@@ -1488,9 +1488,11 @@ def create_langgraph_agent(llm_with_tools, tools):
                     logger.info(f"   → {len(filtered)} tools: {[t.name for t in filtered[:5]]}")
                     return base_llm.bind_tools(filtered), intent.category
 
-            # General fallback — bind everything
-            logger.info(f"🎯 General query → all {len(all_tools)} tools")
-            return base_llm.bind_tools(all_tools), "general"
+            # General fallback — no tools. The model answers from context/knowledge.
+            # Binding all 92 tools here crowds out conversation history for weak models.
+            # If the query genuinely needed a tool it would have matched an intent above.
+            logger.info("🎯 General query → binding 0 tools")
+            return base_llm.bind_tools([]), "general"
 
         # Apply pattern matching
         if user_message:
