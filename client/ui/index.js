@@ -522,18 +522,26 @@ const ws = new WebSocket(`ws://${hostname}:8765`);
 ws.onerror = () => { status.textContent = "WebSocket error"; hideThinking(); };
 ws.onclose = () => { status.textContent = "Disconnected"; sendBtn.disabled = true; hideThinking(); };
 
+// Only restore session on the FIRST connection, not on every reconnect.
+// Reconnects (network blips, tab focus) were resetting backend conversation
+// state mid-session, causing instructions and context to be lost.
+let _wsHasConnected = false;
+
 ws.onopen = () => {
     sendBtn.disabled = false;
     updateStatusWithMode();
     ws.send(JSON.stringify({ type:"list_models" }));
     ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
     connectLogWebSocket();
-    const savedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
-    if (savedSessionId && savedSessionId !== '') {
-        const sessionId = parseInt(savedSessionId);
-        if (!isNaN(sessionId)) {
-            ws.send(JSON.stringify({ type:"list_sessions" }));
-            setTimeout(() => selectSession(sessionId), 100);
+    if (!_wsHasConnected) {
+        _wsHasConnected = true;
+        const savedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
+        if (savedSessionId && savedSessionId !== '') {
+            const sessionId = parseInt(savedSessionId);
+            if (!isNaN(sessionId)) {
+                ws.send(JSON.stringify({ type:"list_sessions" }));
+                setTimeout(() => selectSession(sessionId), 100);
+            }
         }
     }
 };
