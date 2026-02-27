@@ -16,8 +16,10 @@ logger = logging.getLogger("mcp_server")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 RAG_DB_FILE = PROJECT_ROOT / "data" / "rag_database.db"
 
-# Connection pool
-_db_connection = None
+# Schema init lock — prevents two coroutines racing to run ALTER TABLE
+import threading
+_init_lock = threading.Lock()
+_db_initialized = False
 
 
 def ensure_data_dir():
@@ -26,24 +28,35 @@ def ensure_data_dir():
 
 
 def get_connection() -> sqlite3.Connection:
-    """Get or create database connection with optimizations"""
-    global _db_connection
+    """
+    Open a new SQLite connection for the current call.
+    Matches session_manager.py's per-call pattern — no shared connection,
+    no cross-thread I/O errors.
 
-    if _db_connection is None:
-        ensure_data_dir()
-        _db_connection = sqlite3.connect(str(RAG_DB_FILE), check_same_thread=False)
-        _db_connection.row_factory = sqlite3.Row
+    Callers are responsible for calling conn.close() when done, or using
+    the connection as a context manager.
+    """
+    global _db_initialized
+    ensure_data_dir()
 
-        # Performance optimizations
-        _db_connection.execute("PRAGMA journal_mode=WAL")  # Write-Ahead Logging
-        _db_connection.execute("PRAGMA synchronous=NORMAL")  # Faster writes
-        _db_connection.execute("PRAGMA cache_size=-64000")  # 64MB cache
-        _db_connection.execute("PRAGMA temp_store=MEMORY")  # In-memory temp tables
+    conn = sqlite3.connect(str(RAG_DB_FILE))
+    conn.row_factory = sqlite3.Row
 
-        # Create / migrate tables
-        _initialize_database(_db_connection)
+    # Performance PRAGMAs — applied per connection (cheap, idempotent)
+    conn.execute("PRAGMA journal_mode=WAL")   # WAL persists; safe to re-set
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=-64000")
+    conn.execute("PRAGMA temp_store=MEMORY")
 
-    return _db_connection
+    # Schema init only needed once per process — lock prevents race condition
+    # where two coroutines both read _db_initialized=False and both run ALTER TABLE
+    if not _db_initialized:
+        with _init_lock:
+            if not _db_initialized:  # double-checked locking
+                _initialize_database(conn)
+                _db_initialized = True
+
+    return conn
 
 
 def _initialize_database(conn: sqlite3.Connection):
@@ -68,13 +81,19 @@ def _initialize_database(conn: sqlite3.Connection):
     existing_columns = {row[1] for row in cursor.fetchall()}
 
     if "session_id" not in existing_columns:
-        logger.info("🔄 Migrating RAG schema: adding session_id column")
-        cursor.execute("ALTER TABLE documents ADD COLUMN session_id TEXT")
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_documents_session_id
-            ON documents(session_id)
-        """)
-        logger.info("✅ session_id column added to documents table")
+        try:
+            logger.info("🔄 Migrating RAG schema: adding session_id column")
+            cursor.execute("ALTER TABLE documents ADD COLUMN session_id TEXT")
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_documents_session_id
+                ON documents(session_id)
+            """)
+            logger.info("✅ session_id column added to documents table")
+        except Exception as e:
+            if "duplicate column name" in str(e).lower():
+                logger.debug("session_id column already exists — skipping migration")
+            else:
+                raise
 
     # ── Standard indexes ──────────────────────────────────────────────────────
     cursor.execute("""
@@ -141,6 +160,8 @@ def load_rag_db() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"❌ Error loading RAG database: {e}")
         return []
+    finally:
+        conn.close()
 
 
 def save_rag_db(db: List[Dict[str, Any]]):
@@ -181,6 +202,8 @@ def save_rag_db(db: List[Dict[str, Any]]):
         except:
             pass
         raise
+    finally:
+        conn.close()
 
 
 def save_rag_db_batch(documents: List[Dict[str, Any]]):
@@ -221,6 +244,8 @@ def save_rag_db_batch(documents: List[Dict[str, Any]]):
         except:
             pass
         raise
+    finally:
+        conn.close()
 
 
 def get_document_count() -> int:
@@ -233,6 +258,8 @@ def get_document_count() -> int:
     except Exception as e:
         logger.error(f"❌ Error getting document count: {e}")
         return 0
+    finally:
+        conn.close()
 
 
 def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
@@ -274,6 +301,8 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"❌ Error getting documents by source: {e}")
         return []
+    finally:
+        conn.close()
 
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -307,40 +336,9 @@ def clear_rag_db():
         logger.info("🗑️  Cleared document RAG database (conversation turns preserved)")
     except Exception as e:
         logger.error(f"❌ Error clearing database: {e}")
+    finally:
+        conn.close()
 
-def delete_conversation_session(session_id: int):
-    """
-    Delete all RAG conversation turns for a specific session.
-    Called by :clear session <id> to keep rag_database.db in sync with sessions.db.
-    """
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "DELETE FROM documents WHERE session_id = ?",
-            (str(session_id),)
-        )
-        deleted = cursor.rowcount
-        conn.commit()
-        logger.info(f"🗑️  Deleted {deleted} RAG turns for session {session_id}")
-    except Exception as e:
-        logger.error(f"❌ Error deleting RAG turns for session {session_id}: {e}")
-
-def clear_all_conversation_turns():
-    """
-    Delete ALL conversation turns from the RAG database.
-    Called by :clear sessions to keep rag_database.db in sync with sessions.db.
-    Ingested media documents (session_id IS NULL) are preserved.
-    """
-    try:
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM documents WHERE session_id IS NOT NULL")
-        deleted = cursor.rowcount
-        conn.commit()
-        logger.info(f"🗑️  Cleared {deleted} conversation turns from RAG database")
-    except Exception as e:
-        logger.error(f"❌ Error clearing conversation turns from RAG database: {e}")
 
 def migrate_from_json():
     """Migrate from old JSON database to SQLite."""
@@ -406,3 +404,41 @@ def get_database_stats() -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"❌ Error getting database stats: {e}")
         return {}
+    finally:
+        conn.close()
+
+def delete_conversation_session(session_id: int):
+    """
+    Delete all RAG conversation turns for a specific session.
+    Called by :clear session <id> to keep rag_database.db in sync with sessions.db.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM documents WHERE session_id = ?", (str(session_id),))
+        deleted = cursor.rowcount
+        conn.commit()
+        logger.info(f"🗑️  Deleted {deleted} RAG turns for session {session_id}")
+    except Exception as e:
+        logger.error(f"❌ Error deleting RAG turns for session {session_id}: {e}")
+    finally:
+        conn.close()
+
+
+def clear_all_conversation_turns():
+    """
+    Delete ALL conversation turns from the RAG database.
+    Called by :clear sessions to keep rag_database.db in sync with sessions.db.
+    Ingested media documents (session_id IS NULL) are preserved.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM documents WHERE session_id IS NOT NULL")
+        deleted = cursor.rowcount
+        conn.commit()
+        logger.info(f"🗑️  Cleared {deleted} conversation turns from RAG database")
+    except Exception as e:
+        logger.error(f"❌ Error clearing conversation turns from RAG database: {e}")
+    finally:
+        conn.close()

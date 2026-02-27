@@ -194,28 +194,44 @@ class SessionManager:
         return sessions
 
     def delete_session(self, session_id: int):
-        """Delete a session and all its messages"""
+        """Delete a session, all its messages, and its RAG conversation turns"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         cursor.execute('DELETE FROM sessions WHERE id = ?', (session_id,))
-
         cursor.execute('DELETE FROM messages WHERE session_id = ?', (session_id,))
 
         conn.commit()
         conn.close()
 
+        try:
+            from tools.rag.rag_utils import delete_conversation_session
+            delete_conversation_session(session_id)
+        except Exception as e:
+            import logging
+            logging.getLogger("session_manager").warning(
+                f"⚠️ Could not clear RAG turns for session {session_id}: {e}"
+            )
+
     def delete_all_sessions(self):
-        """Delete all sessions and all its messages"""
+        """Delete all sessions, all messages, and all RAG conversation turns"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         cursor.execute('DELETE FROM sessions')
-
         cursor.execute('DELETE FROM messages')
 
         conn.commit()
         conn.close()
+
+        try:
+            from tools.rag.rag_utils import clear_all_conversation_turns
+            clear_all_conversation_turns()
+        except Exception as e:
+            import logging
+            logging.getLogger("session_manager").warning(
+                f"⚠️ Could not clear RAG conversation turns: {e}"
+            )
 
     def get_sessions(self) -> list[Dict]:
         """Get session details"""
