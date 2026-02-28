@@ -64,7 +64,7 @@ A tool exists for the requested source in your tool registry.
 ### How It Works
 
 ```mermaid
-graph LR
+graph TD
     A[User Query] --> B[Extract Source]
     B --> C[Normalize Source Name]
     C --> D[Check Tool Mappings]
@@ -147,7 +147,7 @@ No native tool exists, but the source has pre-configured URLs in `DIRECT_SOURCE_
 ### How It Works
 
 ```mermaid
-graph LR
+graph TD
     A[Check DIRECT_SOURCE_URLS] --> B{URLs Found?}
     B -->|Yes| C[Fetch URLs]
     B -->|No| D[Fall to Tier 2B]
@@ -266,7 +266,7 @@ No native tool exists AND no URLs in `DIRECT_SOURCE_URLS`.
 ### How It Works
 
 ```mermaid
-graph LR
+graph TD
     A[No Direct URLs] --> B[Call Ollama Search]
     B --> C[Search: 'source query']
     C --> D[Extract URLs from Results]
@@ -378,7 +378,7 @@ All previous tiers have failed:
 ### How It Works
 
 ```mermaid
-graph LR
+graph TD
     A[All Tiers Failed] --> B[Build Fallback Prompt]
     B --> C[Include Failure Context]
     C --> D[Call LLM]

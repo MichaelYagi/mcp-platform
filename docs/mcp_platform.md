@@ -4,30 +4,24 @@
 
 This MCP platform is a **multi-agent orchestration system** that connects multiple MCP servers (RAG, Plex, Trilium, Code Assistant, etc.) through a centralized client with both CLI and web interfaces.
 
-```
-┌───────────────────────────────────────────────────────────┐
-│                        MCP PLATFORM                       │
-│                                                           │
-│  ┌──────────────┐                    ┌─────────────────┐  │
-│  │     CLI      │                    │      Web UI     │  │
-│  │  Interface   │                    │   (WebSocket)   │  │
-│  └──────┬───────┘                    └──────────┬──────┘  │
-│         │                                       │         │
-│         └──────────────┬────────────────────────┘         │
-│                        │                                  │
-│                 ┌──────▼──────┐                           │
-│                 │   CLIENT    │                           │
-│                 │  (Unified)  │                           │
-│                 └──────┬──────┘                           │
-│                        │                                  │
-│        ┌───────────────┼──────────────┬──────── ...       │
-│        │               │              │                   │
-│   ┌────▼────┐     ┌────▼────┐    ┌────▼────┐              │
-│   │   RAG   │     │  Plex   │    │ Trilium │              │
-│   │ Server  │     │ Server  │    │ Server  │              │
-│   └─────────┘     └─────────┘    └─────────┘              │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph MCP_PLATFORM["MCP PLATFORM"]
+        CLI["CLI\nInterface"]
+        WebUI["Web UI\n(WebSocket)"]
+        CLIENT["CLIENT\n(Unified)"]
+        RAG["RAG\nServer"]
+        Plex["Plex\nServer"]
+        Trilium["Trilium\nServer"]
+        MORE["..."]
+
+        CLI --> CLIENT
+        WebUI --> CLIENT
+        CLIENT --> RAG
+        CLIENT --> Plex
+        CLIENT --> Trilium
+        CLIENT --> MORE
+    end
 ```
 
 ---
