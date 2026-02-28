@@ -68,8 +68,10 @@ def read_file_tool(file_path: str) -> Dict[str, Any]:
 
     Args:
         file_path: Absolute or relative path to the file.
-                   Windows paths like C:\\Users\\... are also accepted
-                   and translated to /mnt/c/... for WSL.
+                   IMPORTANT: Always pass the COMPLETE path including any spaces
+                   in the filename. Do not truncate at spaces.
+                   Windows paths like C:\\Users\\... are accepted and
+                   translated to /mnt/c/... for WSL automatically.
 
     Returns:
         Dict with:
@@ -84,7 +86,8 @@ def read_file_tool(file_path: str) -> Dict[str, Any]:
           - error: (on failure) error message
     """
     # ── Normalise path ────────────────────────────────────────────
-    path_str = file_path.strip().strip('"\'')
+    # Strip outer whitespace and any wrapping quotes the LLM may add
+    path_str = file_path.strip().strip('"\'').strip()
 
     # Translate Windows paths to WSL mount points
     if len(path_str) >= 3 and path_str[1] == ':':
@@ -93,6 +96,33 @@ def read_file_tool(file_path: str) -> Dict[str, Any]:
         path_str = f"/mnt/{drive}{rest}"
 
     path = Path(path_str)
+
+    # ── Fuzzy fallback for paths with spaces ──────────────────────
+    # LLMs sometimes truncate filenames at the first space when the path
+    # isn't quoted. If the path doesn't exist but the parent dir does,
+    # search for a file whose name starts with the stem we were given.
+    if not path.exists() and path.parent.exists():
+        stem = path.name  # e.g. "2025-2026"
+        candidates = [
+            f for f in path.parent.iterdir()
+            if f.is_file() and f.name.startswith(stem)
+        ]
+        if len(candidates) == 1:
+            logger.info(
+                f"🔍 Fuzzy match: '{path.name}' → '{candidates[0].name}'"
+            )
+            path = candidates[0]
+        elif len(candidates) > 1:
+            # Multiple matches — return helpful error listing them
+            names = [f.name for f in candidates]
+            return {
+                "success": False,
+                "error": (
+                    f"Ambiguous path — multiple files match '{stem}': {names}. "
+                    f"Please provide the full filename including any spaces."
+                ),
+                "file_path": str(path)
+            }
 
     logger.info(f"📂 read_file_tool: {path}")
 
