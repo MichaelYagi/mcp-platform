@@ -611,7 +611,7 @@ body {
     --swatch3:          #01080a; /* black */
 }
 
-[data-theme="tmnt"] {
+[data-theme="TMNT"] {
     /* Header — Turtle Green */
     --header-bg:        #3c8d0d;
     --header-border:    #2e6c0a;
@@ -691,82 +691,82 @@ body {
 }
 
 [data-theme="superman"] {
-    /* Header — Superman blue */
-    --header-bg:        #2b4fa8;   /* primary blue */
-    --header-border:    #1c2f63;   /* shadow blue */
+    /* Header — Superman blue (unchanged) */
+    --header-bg:        #2b4fa8;
+    --header-border:    #1c2f63;
 
-    /* Sidebar — blue base with red/yellow accents */
-    --sidebar-bg:       #1c2f63;   /* deep suit shadow */
-    --sidebar-header:   #2b4fa8;
-    --sidebar-item:     #2b4fa8;
-    --sidebar-hover:    #b02025;   /* cape red */
-    --sidebar-active:   #f2c200;   /* emblem yellow */
-    --sidebar-border:   #1c2f63;
-    --sidebar-search:   #2b4fa8;
+    /* Sidebar — red base replacing blue */
+    --sidebar-bg:       #7a1518;   /* deep cape red */
+    --sidebar-header:   #b02025;
+    --sidebar-item:     #b02025;
+    --sidebar-hover:    #d42a30;   /* brighter red on hover */
+    --sidebar-active:   #f2c200;   /* keep yellow for active — makes it pop */
+    --sidebar-border:   #5a0f12;
+    --sidebar-search:   #8f1a1f;
 
-    /* Page & Chat — neutral greys for readability */
+    /* Page & Chat — unchanged */
     --page-bg:          #e7e5e8;
     --chat-bg:          #ffffff;
     --chat-border:      #c9c7cc;
     --chat-assistant:   #f3f2f4;
     --chat-asst-border: #dcdbe0;
-    --chat-asst-color:  #1c2f63;
+    --chat-asst-color:  #1c2f63;   /* blue text in assistant bubbles, reads well */
     --input-bg:         #ffffff;
     --input-border:     #bfc2cc;
-    --status-color:     #2b4fa8;
+    --status-color:     #b02025;   /* red status */
 
-    /* User bubbles & buttons — blue primary, red secondary */
-    --user-bubble:      linear-gradient(135deg, #2b4fa8, #b02025);
-    --send-btn:         #2b4fa8;
-    --send-btn-hover:   #1c2f63;
-    --send-btn-focus:   rgba(43,79,168,0.35);
+    /* User bubbles & buttons — red primary */
+    --user-bubble:      linear-gradient(135deg, #b02025, #7a1518);
+    --send-btn:         #b02025;
+    --send-btn-hover:   #8f1a1f;
+    --send-btn-focus:   rgba(176,32,37,0.35);
 
-    --btn-logs:         #2b4fa8;
-    --btn-logs-hover:   #1c2f63;
-    --btn-monitor:      #f2c200; /* yellow */
-    --btn-monitor-hover:#d4a800;
-    --btn-dashboard:    #b02025; /* red */
-    --btn-dashboard-hover:#8f1a1f;
-    --btn-newsession:   #2b4fa8;
-    --btn-newsession-hover:#1c2f63;
+    --btn-logs:         #b02025;
+    --btn-logs-hover:   #8f1a1f;
+    --btn-monitor:      #b02025;   /* was yellow, now red */
+    --btn-monitor-hover:#8f1a1f;
+    --btn-dashboard:    #2b4fa8;   /* swap: dashboard gets blue accent */
+    --btn-dashboard-hover:#1c2f63;
+    --btn-newsession:   #b02025;
+    --btn-newsession-hover:#8f1a1f;
 
-    /* Log panel — blue/black Superman tones */
+    /* Log panel */
     --log-bg:           #01080a;
-    --log-header:       #2b4fa8;
-    --log-border:       #1c2f63;
+    --log-header:       #b02025;   /* red header */
+    --log-border:       #5a0f12;
     --log-filter-bg:    #0b0f14;
     --log-filter-btn:   #b02025;
 
-    /* System monitor — Superman emblem gradient */
-    --monitor-gradient: linear-gradient(135deg, #f2c200 0%, #b02025 100%);
+    /* System monitor — red dominant, yellow as highlight only */
+    --monitor-gradient: linear-gradient(135deg, #b02025 0%, #7a1518 100%);
     --monitor-header:   rgba(0,0,0,0.25);
 
-    /* Dashboard — clean, heroic */
-    --btn-back:         #2b4fa8;
-    --btn-back-hover:   #1c2f63;
+    /* Dashboard */
+    --btn-back:         #b02025;
+    --btn-back-hover:   #8f1a1f;
     --card-bg:          #ffffff;
     --card-border:      #d0d7de;
     --card-shadow:      rgba(0,0,0,0.10);
     --card-shadow-hover:rgba(0,0,0,0.15);
-    --title-color:      #2b4fa8;
-    --metric-color:     #b02025;
+    --title-color:      #b02025;   /* red titles */
+    --metric-color:     #2b4fa8;   /* blue metrics for contrast */
     --subtitle-color:   #555;
     --label-color:      #666;
     --chart-blue:       #2b4fa8;
     --chart-purple:     #6a2ca0;
-    --tool-border:      #2b4fa8;
+    --tool-border:      #b02025;
     --tool-bg:          #f8f9fa;
     --status-bg:        #ffffff;
 
-    /* Scrollbars — blue */
+    /* Scrollbars — red */
     --scrollbar-track:  #e7e5e8;
-    --scrollbar-thumb:  #2b4fa8;
-    --scrollbar-hover:  #1c2f63;
+    --scrollbar-thumb:  #b02025;
+    --scrollbar-hover:  #8f1a1f;
 
-    /* Swatch colors — suit only */
-    --swatch1:          #2b4fa8; /* blue */
-    --swatch2:          #b02025; /* red */
-    --swatch3:          #f2c200; /* yellow */
+    /* Swatches */
+    --swatch1:          #2b4fa8;
+    --swatch2:          #b02025;
+    --swatch3:          #f2c200;
 }
 
 [data-theme="batman"] {
@@ -1387,5 +1387,5 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,tmnt,superman,batman,dragonball,neon,dracula,nimbus,tokyo,garbagefire";
+    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,dragonball,neon,dracula,nimbus,tokyo,garbagefire";
 }
