@@ -28,6 +28,7 @@ from tools.text_tools.summarize_text import summarize_text
 from tools.text_tools.summarize_direct import summarize_direct
 from tools.text_tools.explain_simplified import explain_simplified
 from tools.text_tools.concept_contextualizer import concept_contextualizer
+from tools.text_tools.read_file_tool import read_file_tool
 
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -229,6 +230,38 @@ def concept_contextualizer_tool(concept: str) -> str:
     logger.info(f"🛠 [server] concept_contextualizer_tool called with concept: {concept}")
     result = concept_contextualizer(concept)
     return json.dumps(result)
+
+@mcp.tool()
+@check_tool_enabled(category="text_tools")
+def read_file_tool_handler(file_path: str) -> str:
+    """
+    Read any local file and return its contents for analysis or summarization.
+
+    Args:
+        file_path (str, required): Absolute path to the file.
+            Supports Linux paths (/mnt/c/...) and Windows paths (C:\\Users\\...).
+            Supported types: CSV, TSV, TXT, MD, JSON, YAML, TOML, XML, LOG,
+                             PY, JS, TS, INI, CFG, CONF, SH and more.
+
+    Returns:
+        JSON string with:
+        - success: Whether the file was read successfully
+        - content: Full file text (up to 100KB)
+        - file_name: Filename
+        - file_type: Extension
+        - size_bytes: File size
+        - truncated: True if file exceeded 100KB limit
+        - columns: (CSV/TSV only) List of column headers
+        - row_count: (CSV/TSV only) Number of data rows
+
+    Use this first when the user provides a file path and wants insights,
+    analysis, or a summary of the file contents.
+    Chain with summarize_text_tool or summarize_direct_tool for long files.
+    """
+    logger.info(f"🛠 [server] read_file_tool called: {file_path}")
+    result = read_file_tool(file_path)
+    return json.dumps(result, indent=2)
+
 
 skill_registry = None
 

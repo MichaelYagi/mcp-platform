@@ -1463,16 +1463,27 @@ def create_langgraph_agent(llm_with_tools, tools):
                 logger.info("🎯 No-tool query → binding 0 tools")
                 return base_llm.bind_tools([]), "no_tools"
 
-            # Project context override: CONVERSATION CONTEXT in recent system messages
-            # means a code review workflow is active — force code_assistant tools
+            # Project context override: only force code tools when the injected context
+            # contains an "Active Project:" path pointing to actual code.
+            # CSV files, Downloads folders, and other non-code paths are skipped
+            # so they route through the normal file_analyst intent instead.
+            import re as _re
+            _CODE_PATH_RE = _re.compile(
+                r'Active Project:.*\.(py|js|ts|jsx|tsx|go|rs|java|kt|cs|cpp|c|rb|php)'
+                r'|Active Project:.*(src|lib|app|packages?|node_modules|venv)',
+                _re.IGNORECASE
+            )
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
-                if isinstance(msg, SystemMessage) and "CONVERSATION CONTEXT" in msg.content:
-                    logger.info("[LangGraph] 🎯 Found project context → forcing code_assistant tools")
-                    config = next((e for e in INTENT_CATALOG if e["name"] == "code_assistant"), {})
-                    filtered = _filter_tools(all_tools, config.get("tools", []))
-                    if filtered:
-                        logger.info(f"   → {len(filtered)} code tools (context-based routing)")
-                        return base_llm.bind_tools(filtered), "code_assistant"
+                if isinstance(msg, SystemMessage) and "Active Project:" in msg.content:
+                    if _CODE_PATH_RE.search(msg.content):
+                        logger.info("[LangGraph] 🎯 Found code project context → forcing code_assistant tools")
+                        config = next((e for e in INTENT_CATALOG if e["name"] == "code_assistant"), {})
+                        filtered = _filter_tools(all_tools, config.get("tools", []))
+                        if filtered:
+                            logger.info(f"   → {len(filtered)} code tools (context-based routing)")
+                            return base_llm.bind_tools(filtered), "code_assistant"
+                    else:
+                        logger.info("[LangGraph] 📁 Project context is not a code path — skipping code tool override")
                     break
 
             # Web-search-only intents: classified but no MCP tools needed

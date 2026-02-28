@@ -41,9 +41,6 @@ from typing import Optional
 # ═══════════════════════════════════════════════════════════════════
 
 INTENT_CATALOG = [
-
-    # ── Priority 2: High-specificity intents ─────────────────────
-
     {
         "name": "github_review",
         "pattern": (
@@ -67,7 +64,21 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": True,
     },
-
+    {
+        "name": "file_analyst",
+        "pattern": (
+            r'\b(/mnt/[a-zA-Z]/|/home/|/tmp/|/var/|~/)'
+            r'|[A-Za-z]:[/\\]'
+            r'|\b(open|read|look\s+at|load|analys[ei]|analyze|review|inspect|check|examine|show)\b.*\.(csv|tsv|txt|md|json|yaml|yml|toml|xml|log|py|js|ts|ini|cfg|conf|sh|bash)\b'
+            r'|\S+\.(csv|tsv|txt|md|json|yaml|yml|toml|xml|log|ini|cfg|conf)\b'
+            r'|\b(budget|spreadsheet|expenses?|transactions?|ledger|invoice)\b'
+            r'|\b(insights?\s+into|analys[ei]\s+my|analyze\s+my|summarize\s+my)\b.*\bfile\b'
+        ),
+        "tools": ["read_file_tool_handler"],
+        "priority": 2,
+        "web_search": False,
+        "skills": True,
+    },
     {
         "name": "code_assistant",
         "pattern": (
@@ -105,7 +116,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": True,
     },
-
     {
         "name": "plex_search",
         "pattern": (
@@ -126,7 +136,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "rag",
         "pattern": (
@@ -157,7 +166,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "trilium",
         "pattern": (
@@ -180,9 +188,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
-    # ── Priority 3: Broader intents ───────────────────────────────
-
     {
         "name": "weather",
         "pattern": (
@@ -194,7 +199,6 @@ INTENT_CATALOG = [
         "web_search": False,   # MCP tools handle this — never web search
         "skills": False,
     },
-
     {
         "name": "location",
         "pattern": (
@@ -206,7 +210,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "time",
         "pattern": (
@@ -218,7 +221,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "system",
         "pattern": (
@@ -234,7 +236,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "ml_recommendation",
         "pattern": (
@@ -256,7 +257,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": True,
     },
-
     {
         "name": "code",
         "pattern": (
@@ -271,7 +271,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": True,
     },
-
     {
         "name": "text",
         "pattern": r'\b(summarize|summary|explain|simplify|break\s+down)\b',
@@ -284,7 +283,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "todo",
         "pattern": (
@@ -299,7 +297,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "knowledge",
         "pattern": (
@@ -314,7 +311,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "ingest",
         "pattern": (
@@ -327,7 +323,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
     {
         "name": "a2a",
         "pattern": (
@@ -340,9 +335,6 @@ INTENT_CATALOG = [
         "web_search": False,
         "skills": False,
     },
-
-    # ── Web search intents (no MCP tools) ─────────────────────────
-
     {
         "name": "current_events",
         "pattern": (
@@ -355,7 +347,6 @@ INTENT_CATALOG = [
         "web_search": True,
         "skills": False,
     },
-
     {
         "name": "stock_price",
         "pattern": r'\b(stock|share)\s+price\b|\btrading\s+at\b|\bmarket\s+cap\b',
