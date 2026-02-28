@@ -690,6 +690,85 @@ body {
     --swatch3:          #e76a24; /* Mikey orange */
 }
 
+[data-theme="batman"] {
+    /* Header — dark, noir */
+    --header-bg:        #0a0a0a;   /* shadow black */
+    --header-border:    #1a1a1a;   /* soft charcoal */
+
+    /* Sidebar — blue‑black with muted gold accents */
+    --sidebar-bg:       #0a0a0a;
+    --sidebar-header:   #0d1a2b;   /* cape/cowl blue-black */
+    --sidebar-item:     #2a3f5f;   /* cool highlight blue */
+    --sidebar-hover:    #3a5578;
+    --sidebar-active:   #d6b100;   /* belt yellow */
+    --sidebar-border:   #1f1f1f;
+    --sidebar-search:   #2a3f5f;
+
+    /* Page & Chat — suit greys */
+    --page-bg:          #1a1a1a;
+    --chat-bg:          #222222;
+    --chat-border:      #3a3a3a;
+    --chat-assistant:   #2c2c2c;
+    --chat-asst-border: #3d3d3d;
+    --chat-asst-color:  #e0e0e0;
+    --input-bg:         #2a2a2a;
+    --input-border:     #444444;
+    --status-color:     #d6b100;   /* muted gold */
+
+    /* User bubbles & buttons — blue-black + gold */
+    --user-bubble:      linear-gradient(135deg, #0d1a2b, #2a3f5f);
+    --send-btn:         #d6b100;
+    --send-btn-hover:   #b89600;
+    --send-btn-focus:   rgba(214,177,0,0.35);
+
+    --btn-logs:         #2a3f5f;
+    --btn-logs-hover:   #3a5578;
+    --btn-monitor:      #d6b100;
+    --btn-monitor-hover:#b89600;
+    --btn-dashboard:    #2a3f5f;
+    --btn-dashboard-hover:#0d1a2b;
+    --btn-newsession:   #d6b100;
+    --btn-newsession-hover:#b89600;
+
+    /* Log panel — Gotham night */
+    --log-bg:           #0a0a0a;
+    --log-header:       #0d1a2b;
+    --log-border:       #2a3f5f;
+    --log-filter-bg:    #111111;
+    --log-filter-btn:   #d6b100;
+
+    /* System monitor — Bat-signal gold glow */
+    --monitor-gradient: linear-gradient(135deg, #d6b100 0%, #0a0a0a 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    /* Dashboard — noir panels with gold + blue */
+    --btn-back:         #2a3f5f;
+    --btn-back-hover:   #3a5578;
+    --card-bg:          #222222;
+    --card-border:      #3a3a3a;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.55);
+    --title-color:      #d6b100;
+    --metric-color:     #2a3f5f;
+    --subtitle-color:   #aaaaaa;
+    --label-color:      #888888;
+    --chart-blue:       #2a3f5f;
+    --chart-purple:     #6a2ca0;
+    --tool-border:      #0d1a2b;
+    --tool-bg:          #2a2a2a;
+    --status-bg:        #222222;
+
+    /* Scrollbars — Gotham steel */
+    --scrollbar-track:  #1a1a1a;
+    --scrollbar-thumb:  #2a3f5f;
+    --scrollbar-hover:  #0d1a2b;
+
+    /* Swatch colors */
+    --swatch1:          #0d1a2b; /* cape/cowl blue-black */
+    --swatch2:          #6b6f78; /* suit grey */
+    --swatch3:          #d6b100; /* belt yellow */
+}
+
 /* Crimson – deep red accents */
 [data-theme="crimson"] {
     --header-bg:        #1c1c1e;
@@ -1229,5 +1308,5 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,tmnt,dragonball,optimus,neon,dracula,nimbus,tokyo,garbagefire";
+    --theme-list: "default,midnight,forest,crimson,tmnt,batman,dragonball,optimus,neon,dracula,nimbus,tokyo,garbagefire";
 }
