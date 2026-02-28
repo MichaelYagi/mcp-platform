@@ -7,6 +7,7 @@ Binary files (images, executables) are rejected gracefully.
 
 import logging
 import os
+import threading
 from pathlib import Path
 from typing import Dict, Any
 
@@ -26,6 +27,39 @@ BINARY_EXTENSIONS = {
 
 # Extensions we treat as CSV-like (show row count, column names in summary)
 CSV_EXTENSIONS = {".csv", ".tsv"}
+
+
+def _ingest_file_to_rag(text: str, filename: str) -> None:
+    """
+    Fire-and-forget: chunk, embed, and insert file content into the RAG store.
+    Runs in a daemon thread — never blocks the caller.
+    Source is set to "file:<filename>" so it's queryable and identifiable.
+    If rag_add is unavailable (import error), logs a warning and continues.
+    """
+    def _run():
+        try:
+            from tools.rag.rag_add import rag_add
+            source = f"file:{filename}"
+            result = rag_add(text, source=source)
+            if result.get("success"):
+                logger.info(
+                    f"📚 RAG ingest complete: {filename} "
+                    f"({result.get('chunks_added', 0)} chunks, "
+                    f"{result.get('processing_time_seconds', 0):.1f}s)"
+                )
+            else:
+                logger.warning(
+                    f"⚠️ RAG ingest partial/failed for {filename}: "
+                    f"{result.get('error', 'unknown error')}"
+                )
+        except ImportError:
+            logger.warning("⚠️ rag_add not available — skipping RAG ingest for file read")
+        except Exception as e:
+            logger.error(f"❌ RAG ingest failed for {filename}: {e}")
+
+    thread = threading.Thread(target=_run, daemon=True, name=f"rag-ingest-{filename}")
+    thread.start()
+    logger.debug(f"🔄 RAG ingest started in background for: {filename}")
 
 
 def read_file_tool(file_path: str) -> Dict[str, Any]:
@@ -131,6 +165,12 @@ def read_file_tool(file_path: str) -> Dict[str, Any]:
             f"{MAX_FILE_BYTES:,} bytes are shown. "
             f"Ask to see a specific section if needed."
         )
+
+    # ── Ingest into RAG — fire-and-forget ─────────────────────────
+    # Run in a background thread so it never blocks the response.
+    # Source format: "file:<filename>" so it's queryable and distinct
+    # from conversation turns (which use session_id) and web sources.
+    _ingest_file_to_rag(text, path.name)
 
     # ── CSV extras — column names + row count ─────────────────────
     if ext in CSV_EXTENSIONS:
