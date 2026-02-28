@@ -557,7 +557,15 @@ ws.onmessage = (event) => {
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
         data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp));
-        renderSessions(allSessions); return;
+        renderSessions(allSessions);
+        // If the last message is from the user, a response is still in-flight.
+        // Show the thinking indicator so the user knows to wait.
+        const msgs = data.messages;
+        if (msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
+            showThinking(); isProcessing = true;
+            sendBtn.disabled = true; status.textContent = 'Processing…';
+        }
+        return;
     }
     if (data.type==='session_created') {
         currentSessionId = data.session_id;

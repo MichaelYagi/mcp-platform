@@ -33,7 +33,10 @@ except ImportError:
 
 CONNECTED_WEBSOCKETS = set()
 SYSTEM_MONITOR_CLIENTS = set()
-IS_PROCESSING = False  # Module-level: True while any query is being processed
+# Per-session tracking: set of session_ids currently processing a query.
+# Replaces the single IS_PROCESSING bool which blocked ALL connections
+# when any one tab was busy. Each connection now only blocks itself.
+PROCESSING_SESSIONS = set()
 
 
 async def broadcast_message(message_type, data):
@@ -49,8 +52,8 @@ async def broadcast_message(message_type, data):
 async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools,
                         session_manager=None, session_id=None, system_prompt=None):
     """Process a query in the background"""
-    global IS_PROCESSING
-    IS_PROCESSING = True
+    if session_id:
+        PROCESSING_SESSIONS.add(session_id)
     try:
         print(f"\n> {original_prompt}")
         await broadcast_message("user_message", {"text": original_prompt})
@@ -199,24 +202,23 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         if history_question_detected and response_text:
             print("\n" + response_text + "\n")
 
+            # Persist before delivery
             if session_manager and session_id:
                 MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                 model_name = "direct-answer"
                 session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
-                # Store direct-answer turn in session-scoped RAG
                 _rag_store_turn(session_id, "assistant", response_text)
 
-            await broadcast_message("assistant_message", {
-                "text": response_text,
-                "multi_agent": False,
-                "a2a": False,
-                "model": "direct-answer"
-            })
-
-            await websocket.send(json.dumps({
-                "type": "complete",
-                "stopped": False
-            }))
+            try:
+                await broadcast_message("assistant_message", {
+                    "text": response_text,
+                    "multi_agent": False,
+                    "a2a": False,
+                    "model": "direct-answer"
+                })
+                await broadcast_message("complete", {"stopped": False})
+            except Exception as send_err:
+                logger.warning(f"⚠️ Direct-answer delivery failed (session {session_id}): {send_err}")
 
             return  # Exit early - don't call LLM
 
@@ -240,43 +242,38 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
 
         print("\n" + assistant_text + "\n")
 
-        # Save to session
+        # Persist FIRST — response is safe in SQLite before delivery attempt.
+        # If the socket dies mid-send, the message is already saved and
+        # broadcast will reach any reconnected socket in CONNECTED_WEBSOCKETS.
         if session_manager and session_id:
             MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
             model_name = result.get("current_model", "unknown")
             session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
-            # Store assistant turn in session-scoped RAG for semantic context retrieval
             _rag_store_turn(session_id, "assistant", assistant_text)
 
-        # Broadcast to WebSocket clients
-        await broadcast_message("assistant_message", {
-            "text": assistant_text,
-            "multi_agent": result.get("multi_agent", False),
-            "a2a": result.get("a2a", False),
-            "model": result.get("current_model", "unknown")
-        })
-
-        await websocket.send(json.dumps({
-            "type": "complete",
-            "stopped": result.get("stopped", False)
-        }))
+        # Broadcast to ALL connected sockets — covers reconnect case where
+        # original socket died but new socket is already in CONNECTED_WEBSOCKETS
+        try:
+            await broadcast_message("assistant_message", {
+                "text": assistant_text,
+                "multi_agent": result.get("multi_agent", False),
+                "a2a": result.get("a2a", False),
+                "model": result.get("current_model", "unknown")
+            })
+            await broadcast_message("complete", {"stopped": result.get("stopped", False)})
+        except Exception as send_err:
+            logger.warning(f"⚠️ Delivery failed (session {session_id}): {send_err}")
 
     except Exception as e:
         logger.error(f"❌ Error processing query: {e}")
         import traceback
         traceback.print_exc()
 
-        await websocket.send(json.dumps({
-            "type": "error",
-            "text": str(e)
-        }))
-
-        await websocket.send(json.dumps({
-            "type": "complete",
-            "stopped": False
-        }))
+        await broadcast_message("error", {"text": str(e)})
+        await broadcast_message("complete", {"stopped": False})
     finally:
-        IS_PROCESSING = False
+        if session_id:
+            PROCESSING_SESSIONS.discard(session_id)
 
 async def websocket_handler(websocket, agent_ref, tools, logger, conversation_state, run_agent_fn,
                             models_module, model_name, system_prompt, orchestrator=None,
@@ -365,6 +362,24 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     "session_id": session_id,
                     "messages": messages
                 }))
+
+                # Orphan detection: if the last message is from the user and this
+                # session is not currently processing, the socket died before the
+                # response was delivered. Notify user to resend.
+                # If still processing, the reconnected socket is already in
+                # CONNECTED_WEBSOCKETS so broadcast will reach it automatically.
+                if messages and messages[-1]["role"] == "user":
+                    if session_id not in PROCESSING_SESSIONS:
+                        logger.warning(f"⚠️ Session {session_id} ends on user message with no active processing")
+                        await websocket.send(json.dumps({
+                            "type": "assistant_message",
+                            "text": "⚠️ It looks like your previous message may not have received a response. "
+                                     "Please resend it.",
+                            "model": "system"
+                        }))
+                        await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                    else:
+                        logger.info(f"⏳ Session {session_id}: response still in-flight, reconnected socket will receive broadcast")
                 continue
 
             if data.get("type") == "new_session":
@@ -496,11 +511,18 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 original_prompt = data.get("text")
                 prompt = original_prompt
 
-                # Block new prompts while a query is in flight (allow :stop through)
-                if IS_PROCESSING and original_prompt != ":stop":
+                # Block new prompts while THIS connection's task is in flight
+                # Uses current_task (per-connection) not PROCESSING_SESSIONS (global)
+                # so other tabs are never affected by this connection's state
+                this_session_busy = (
+                    current_task is not None and
+                    not current_task.done() and
+                    original_prompt != ":stop"
+                )
+                if this_session_busy:
                     await websocket.send(json.dumps({
                         "type": "assistant_message",
-                        "text": "\u23f3 A response is already being processed. Please wait, or send `:stop` to cancel.",
+                        "text": "⏳ A response is already being processed. Please wait, or send `:stop` to cancel.",
                         "model": None
                     }))
                     await websocket.send(json.dumps({"type": "complete", "stopped": False}))
