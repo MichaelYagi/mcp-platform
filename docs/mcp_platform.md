@@ -7,12 +7,12 @@ This MCP platform is a **multi-agent orchestration system** that connects multip
 ```mermaid
 graph TD
     subgraph MCP_PLATFORM["MCP PLATFORM"]
-        CLI["CLI\nInterface"]
-        WebUI["Web UI\n(WebSocket)"]
-        CLIENT["CLIENT\n(Unified)"]
-        RAG["RAG\nServer"]
-        Plex["Plex\nServer"]
-        Trilium["Trilium\nServer"]
+        CLI["CLI Interface"]
+        WebUI["Web UI (WebSocket)"]
+        CLIENT["CLIENT (Unified)"]
+        RAG["RAG Server"]
+        Plex["Plex Server"]
+        Trilium["Trilium Server"]
         MORE["..."]
 
         CLI --> CLIENT
