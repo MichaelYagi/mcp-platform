@@ -533,11 +533,11 @@ body {
 
 /* DBZ – orange and blue */
 [data-theme="dragonball"] {
-    /* Header — primary orange */
+    /* Header — primary orange (unchanged) */
     --header-bg:        #e76a24;
     --header-border:    #c85a1f;
 
-    /* Sidebar — blue‑dominant with black base + orange accents */
+    /* Sidebar — unchanged */
     --sidebar-bg:       #01080a;
     --sidebar-header:   #1c4595;
     --sidebar-item:     #0f2a57;
@@ -546,18 +546,18 @@ body {
     --sidebar-border:   #1c4595;
     --sidebar-search:   #0f2a57;
 
-    /* Page & Chat — Capsule Corp neutrals */
-    --page-bg:          #e7e5e8;
-    --chat-bg:          #ffffff;
-    --chat-border:      #c9c7cc;
-    --chat-assistant:   #f3f2f4;
-    --chat-asst-border: #dcdbe0;
-    --chat-asst-color:  #01080a;
-    --input-bg:         #ffffff;
-    --input-border:     #bfc2cc;
+    /* Page & Chat — orange tint for window, blue tint for assistant bubbles */
+    --page-bg:          #f5e0cc;   /* warm gi orange */
+    --chat-bg:          #faebd7;   /* soft orange parchment */
+    --chat-border:      #e0aa80;
+    --chat-assistant:   #ccd6f0;   /* Capsule Corp blue for assistant bubbles */
+    --chat-asst-border: #8fa8d8;
+    --chat-asst-color:  #0f1f4a;   /* dark navy — readable on blue */
+    --input-bg:         #faebd7;
+    --input-border:     #e0aa80;
     --status-color:     #1c4595;
 
-    /* User bubbles & buttons — blue primary, orange secondary, gold accent */
+    /* User bubbles & buttons — unchanged */
     --user-bubble:      linear-gradient(135deg, #1c4595, #fbbc42);
     --send-btn:         #1c4595;
     --send-btn-hover:   #16356f;
@@ -572,43 +572,43 @@ body {
     --btn-newsession:   #e76a24;
     --btn-newsession-hover:#c85a1f;
 
-    /* Log panel — black base with blue structure + orange highlight */
+    /* Log panel — unchanged */
     --log-bg:           #01080a;
     --log-header:       #1c4595;
     --log-border:       #1c4595;
     --log-filter-bg:    #0b0f14;
     --log-filter-btn:   #e76a24;
 
-    /* System monitor — gold/orange aura */
+    /* System monitor — unchanged */
     --monitor-gradient: linear-gradient(135deg, #fbbc42 0%, #e76a24 100%);
     --monitor-header:   rgba(0,0,0,0.25);
 
-    /* Dashboard — blue titles, orange metrics, gold optional accents */
+    /* Dashboard */
     --btn-back:         #1c4595;
     --btn-back-hover:   #16356f;
-    --card-bg:          #ffffff;
-    --card-border:      #d0d7de;
+    --card-bg:          #faebd7;   /* orange tint on cards */
+    --card-border:      #e0aa80;
     --card-shadow:      rgba(0,0,0,0.10);
     --card-shadow-hover:rgba(0,0,0,0.15);
     --title-color:      #1c4595;
     --metric-color:     #e76a24;
-    --subtitle-color:   #555;
-    --label-color:      #666;
+    --subtitle-color:   #6b3a1f;
+    --label-color:      #7a4a2a;
     --chart-blue:       #1c4595;
     --chart-purple:     #9b59b6;
     --tool-border:      #1c4595;
-    --tool-bg:          #f8f9fa;
-    --status-bg:        #ffffff;
+    --tool-bg:          #f5e0cc;
+    --status-bg:        #faebd7;
 
-    /* Scrollbars — blue thumb, neutral track */
-    --scrollbar-track:  #e7e5e8;
+    /* Scrollbars — orange track, blue thumb */
+    --scrollbar-track:  #f5e0cc;
     --scrollbar-thumb:  #1c4595;
     --scrollbar-hover:  #16356f;
 
-    /* Swatches — all required colors represented */
-    --swatch1:          #e76a24; /* orange */
-    --swatch2:          #1c4595; /* blue */
-    --swatch3:          #01080a; /* black */
+    /* Swatches */
+    --swatch1:          #e76a24;
+    --swatch2:          #1c4595;
+    --swatch3:          #01080a;
 }
 
 [data-theme="TMNT"] {
@@ -695,27 +695,27 @@ body {
     --header-bg:        #2b4fa8;
     --header-border:    #1c2f63;
 
-    /* Sidebar — red base replacing blue */
-    --sidebar-bg:       #7a1518;   /* deep cape red */
+    /* Sidebar — red base (unchanged) */
+    --sidebar-bg:       #7a1518;
     --sidebar-header:   #b02025;
     --sidebar-item:     #b02025;
-    --sidebar-hover:    #d42a30;   /* brighter red on hover */
-    --sidebar-active:   #f2c200;   /* keep yellow for active — makes it pop */
+    --sidebar-hover:    #d42a30;
+    --sidebar-active:   #f2c200;
     --sidebar-border:   #5a0f12;
     --sidebar-search:   #8f1a1f;
 
-    /* Page & Chat — unchanged */
-    --page-bg:          #e7e5e8;
-    --chat-bg:          #ffffff;
-    --chat-border:      #c9c7cc;
-    --chat-assistant:   #f3f2f4;
-    --chat-asst-border: #dcdbe0;
-    --chat-asst-color:  #1c2f63;   /* blue text in assistant bubbles, reads well */
-    --input-bg:         #ffffff;
-    --input-border:     #bfc2cc;
-    --status-color:     #b02025;   /* red status */
+    /* Page & Chat — blue-tinted */
+    --page-bg:          #d8e0f5;   /* soft cape blue */
+    --chat-bg:          #eaeffa;   /* light sky blue */
+    --chat-border:      #9ab0e0;
+    --chat-assistant:   #ccd6f0;   /* muted suit blue for assistant bubbles */
+    --chat-asst-border: #8fa8d8;
+    --chat-asst-color:  #0f1f4a;   /* dark navy — readable on blue */
+    --input-bg:         #eaeffa;
+    --input-border:     #8fa8d8;
+    --status-color:     #b02025;
 
-    /* User bubbles & buttons — red primary */
+    /* User bubbles & buttons — unchanged */
     --user-bubble:      linear-gradient(135deg, #b02025, #7a1518);
     --send-btn:         #b02025;
     --send-btn-hover:   #8f1a1f;
@@ -723,45 +723,45 @@ body {
 
     --btn-logs:         #b02025;
     --btn-logs-hover:   #8f1a1f;
-    --btn-monitor:      #b02025;   /* was yellow, now red */
+    --btn-monitor:      #b02025;
     --btn-monitor-hover:#8f1a1f;
-    --btn-dashboard:    #2b4fa8;   /* swap: dashboard gets blue accent */
+    --btn-dashboard:    #2b4fa8;
     --btn-dashboard-hover:#1c2f63;
     --btn-newsession:   #b02025;
     --btn-newsession-hover:#8f1a1f;
 
-    /* Log panel */
+    /* Log panel — unchanged */
     --log-bg:           #01080a;
-    --log-header:       #b02025;   /* red header */
+    --log-header:       #b02025;
     --log-border:       #5a0f12;
     --log-filter-bg:    #0b0f14;
     --log-filter-btn:   #b02025;
 
-    /* System monitor — red dominant, yellow as highlight only */
+    /* System monitor — unchanged */
     --monitor-gradient: linear-gradient(135deg, #b02025 0%, #7a1518 100%);
     --monitor-header:   rgba(0,0,0,0.25);
 
     /* Dashboard */
     --btn-back:         #b02025;
     --btn-back-hover:   #8f1a1f;
-    --card-bg:          #ffffff;
-    --card-border:      #d0d7de;
+    --card-bg:          #eaeffa;   /* blue tint on cards */
+    --card-border:      #9ab0e0;
     --card-shadow:      rgba(0,0,0,0.10);
     --card-shadow-hover:rgba(0,0,0,0.15);
-    --title-color:      #b02025;   /* red titles */
-    --metric-color:     #2b4fa8;   /* blue metrics for contrast */
-    --subtitle-color:   #555;
-    --label-color:      #666;
+    --title-color:      #b02025;
+    --metric-color:     #2b4fa8;
+    --subtitle-color:   #2a3a6a;
+    --label-color:      #3a4e80;
     --chart-blue:       #2b4fa8;
     --chart-purple:     #6a2ca0;
     --tool-border:      #b02025;
-    --tool-bg:          #f8f9fa;
-    --status-bg:        #ffffff;
+    --tool-bg:          #d8e0f5;
+    --status-bg:        #eaeffa;
 
-    /* Scrollbars — red */
-    --scrollbar-track:  #e7e5e8;
-    --scrollbar-thumb:  #b02025;
-    --scrollbar-hover:  #8f1a1f;
+    /* Scrollbars — blue */
+    --scrollbar-track:  #d8e0f5;
+    --scrollbar-thumb:  #2b4fa8;
+    --scrollbar-hover:  #1c2f63;
 
     /* Swatches */
     --swatch1:          #2b4fa8;
