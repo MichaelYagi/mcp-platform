@@ -204,7 +204,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
 
             # Persist before delivery
             if session_manager and session_id:
-                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 20))
                 model_name = "direct-answer"
                 session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
                 _rag_store_turn(session_id, "assistant", response_text)
@@ -246,7 +246,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # If the socket dies mid-send, the message is already saved and
         # broadcast will reach any reconnected socket in CONNECTED_WEBSOCKETS.
         if session_manager and session_id:
-            MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+            MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 20))
             model_name = result.get("current_model", "unknown")
             session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
             _rag_store_turn(session_id, "assistant", assistant_text)
@@ -345,7 +345,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 conversation_state["session_id"] = session_id
 
-                MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "30"))
+                MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
 
                 for msg in messages[-MAX_MESSAGE_HISTORY:]:
                     if msg["role"] == "system":
@@ -582,7 +582,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "session_id": current_session_id
                         }))
 
-                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 20))
                     session_manager.add_message(current_session_id, "user", prompt, MAX_MESSAGE_HISTORY, model=None)
                     # Store user turn in session-scoped RAG for semantic context retrieval
                     _rag_store_turn(current_session_id, "user", prompt)
