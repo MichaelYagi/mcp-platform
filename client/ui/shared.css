@@ -848,6 +848,85 @@ body {
     --swatch3:          #d6b100; /* belt yellow */
 }
 
+[data-theme="tron"] {
+    /* Header — deep black with cyan glow */
+    --header-bg:        #0a0e1a;
+    --header-border:    #00d4ff;
+
+    /* Sidebar — black grid with cyan accents */
+    --sidebar-bg:       #050810;
+    --sidebar-header:   #0a0e1a;
+    --sidebar-item:     #0d1525;
+    --sidebar-hover:    #00d4ff22;
+    --sidebar-active:   #00d4ff;
+    --sidebar-border:   #00d4ff44;
+    --sidebar-search:   #0d1525;
+
+    /* Page & Chat — dark grid with cyan tint */
+    --page-bg:          #080c18;
+    --chat-bg:          #0a0f1e;
+    --chat-border:      #00d4ff44;
+    --chat-assistant:   #0d1a2e;   /* slightly lighter dark blue panel */
+    --chat-asst-border: #00d4ff66;
+    --chat-asst-color:  #00d4ff;   /* cyan text — classic Tron */
+    --input-bg:         #0a0f1e;
+    --input-border:     #00d4ff66;
+    --status-color:     #00d4ff;
+
+    /* User bubbles — cyan to purple light cycle */
+    --user-bubble:      linear-gradient(135deg, #00d4ff, #9d00ff);
+    --send-btn:         #00d4ff;
+    --send-btn-hover:   #00a8cc;
+    --send-btn-focus:   rgba(0,212,255,0.35);
+
+    --btn-logs:         #00d4ff;
+    --btn-logs-hover:   #00a8cc;
+    --btn-monitor:      #9d00ff;
+    --btn-monitor-hover:#7a00cc;
+    --btn-dashboard:    #00d4ff;
+    --btn-dashboard-hover:#00a8cc;
+    --btn-newsession:   #9d00ff;
+    --btn-newsession-hover:#7a00cc;
+
+    /* Log panel — terminal black */
+    --log-bg:           #020408;
+    --log-header:       #0a0e1a;
+    --log-border:       #00d4ff44;
+    --log-filter-bg:    #050810;
+    --log-filter-btn:   #00d4ff;
+
+    /* System monitor — cyan to purple */
+    --monitor-gradient: linear-gradient(135deg, #00d4ff 0%, #9d00ff 100%);
+    --monitor-header:   rgba(0,0,0,0.5);
+
+    /* Dashboard */
+    --btn-back:         #00d4ff;
+    --btn-back-hover:   #00a8cc;
+    --card-bg:          #0d1525;
+    --card-border:      #00d4ff44;
+    --card-shadow:      rgba(0,212,255,0.10);
+    --card-shadow-hover:rgba(0,212,255,0.20);
+    --title-color:      #00d4ff;
+    --metric-color:     #9d00ff;
+    --subtitle-color:   #00d4ff99;
+    --label-color:      #00d4ff77;
+    --chart-blue:       #00d4ff;
+    --chart-purple:     #9d00ff;
+    --tool-border:      #00d4ff44;
+    --tool-bg:          #0d1525;
+    --status-bg:        #0a0f1e;
+
+    /* Scrollbars — cyan on black */
+    --scrollbar-track:  #050810;
+    --scrollbar-thumb:  #00d4ff;
+    --scrollbar-hover:  #9d00ff;
+
+    /* Swatches */
+    --swatch1:          #00d4ff;   /* cyan */
+    --swatch2:          #9d00ff;   /* purple */
+    --swatch3:          #0a0e1a;   /* grid black */
+}
+
 /* Crimson – deep red accents */
 [data-theme="crimson"] {
     --header-bg:        #1c1c1e;
@@ -1387,5 +1466,5 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,dragonball,neon,dracula,nimbus,tokyo,garbagefire";
+    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,tron,dragonball,neon,dracula,nimbus,tokyo,garbagefire";
 }
