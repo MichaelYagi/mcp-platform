@@ -237,9 +237,14 @@ def read_file_tool_handler(file_path: str) -> str:
     """
     Read any local file and return its contents for analysis or summarization.
 
+    IMPORTANT: You have direct filesystem access. When the user provides a file
+    path, you MUST call this tool immediately. Do NOT ask the user to upload
+    the file or say you cannot access it — you can and should read it directly.
+
     Args:
-        file_path (str, required): Absolute path to the file.
-            Supports Linux paths (/mnt/c/...) and Windows paths (C:\\Users\\...).
+        file_path (str, required): The COMPLETE path to the file, including any
+            spaces in the filename. Do not truncate the path at spaces.
+            Supported: Linux (/mnt/c/..., /home/...) and Windows (C:\\Users\\...).
             Supported types: CSV, TSV, TXT, MD, JSON, YAML, TOML, XML, LOG,
                              PY, JS, TS, INI, CFG, CONF, SH and more.
 
@@ -254,8 +259,8 @@ def read_file_tool_handler(file_path: str) -> str:
         - columns: (CSV/TSV only) List of column headers
         - row_count: (CSV/TSV only) Number of data rows
 
-    Use this first when the user provides a file path and wants insights,
-    analysis, or a summary of the file contents.
+    Always call this tool first when the user provides any file path.
+    Never ask the user to upload a file if a path has been provided.
     Chain with summarize_text_tool or summarize_direct_tool for long files.
     """
     logger.info(f"🛠 [server] read_file_tool called: {file_path}")
