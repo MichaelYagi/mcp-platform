@@ -616,42 +616,42 @@ body {
     --header-bg:        #3c8d0d;
     --header-border:    #2e6c0a;
 
-    /* Sidebar (chat interface) — Sewer grey + bandana accents */
+    /* Sidebar — unchanged */
     --sidebar-bg:       #01080a;
     --sidebar-header:   #3c8d0d;
-    --sidebar-item:     #0f2a57; /* Leo blue accent */
+    --sidebar-item:     #0f2a57;
     --sidebar-hover:    #1c4595;
-    --sidebar-active:   #e76a24; /* Mikey orange */
+    --sidebar-active:   #e76a24;
     --sidebar-border:   #4a4a4a;
     --sidebar-search:   #2e6c0a;
 
-    /* Page & Chat — neutral sewer greys */
-    --page-bg:          #e7e5e8;
-    --chat-bg:          #ffffff;
-    --chat-border:      #c9c7cc;
-    --chat-assistant:   #f3f2f4;
-    --chat-asst-border: #dcdbe0;
-    --chat-asst-color:  #01080a;
-    --input-bg:         #ffffff;
-    --input-border:     #bfc2cc;
+    /* Page & Chat — ooze-tinted greens */
+    --page-bg:          #d8ecd0;   /* soft sage green */
+    --chat-bg:          #edf7e6;   /* light ooze green */
+    --chat-border:      #a8cc90;
+    --chat-assistant:   #d0eac4;   /* muted turtle green for assistant bubbles */
+    --chat-asst-border: #9bbe85;
+    --chat-asst-color:  #0f2a0a;   /* dark green text — readable */
+    --input-bg:         #edf7e6;
+    --input-border:     #9bbe85;
     --status-color:     #3c8d0d;
 
-    /* User bubbles & buttons — bandana colors */
-    --user-bubble:      linear-gradient(135deg, #1c4595, #6a2ca0); /* Leo → Donnie */
+    /* User bubbles & buttons — unchanged */
+    --user-bubble:      linear-gradient(135deg, #1c4595, #6a2ca0);
     --send-btn:         #3c8d0d;
     --send-btn-hover:   #2e6c0a;
     --send-btn-focus:   rgba(60,141,13,0.35);
 
-    --btn-logs:         #1c4595; /* Leo */
+    --btn-logs:         #1c4595;
     --btn-logs-hover:   #16356f;
-    --btn-monitor:      #6a2ca0; /* Donnie */
+    --btn-monitor:      #6a2ca0;
     --btn-monitor-hover:#572383;
-    --btn-dashboard:    #e76a24; /* Mikey */
+    --btn-dashboard:    #e76a24;
     --btn-dashboard-hover:#c85a1f;
-    --btn-newsession:   #ff0000; /* Raph */
+    --btn-newsession:   #ff0000;
     --btn-newsession-hover:#cc0000;
 
-    /* Log panel — sewer tech */
+    /* Log panel — unchanged */
     --log-bg:           #01080a;
     --log-header:       #4a4a4a;
     --log-border:       #3c8d0d;
@@ -662,32 +662,32 @@ body {
     --monitor-gradient: linear-gradient(135deg, #c4b000 0%, #3c8d0d 100%);
     --monitor-header:   rgba(0,0,0,0.25);
 
-    /* Dashboard specific */
+    /* Dashboard */
     --btn-back:         #3c8d0d;
     --btn-back-hover:   #2e6c0a;
-    --card-bg:          #ffffff;
-    --card-border:      #d0d7de;
+    --card-bg:          #edf7e6;   /* green tint on cards too */
+    --card-border:      #a8cc90;
     --card-shadow:      rgba(0,0,0,0.08);
     --card-shadow-hover:rgba(0,0,0,0.12);
     --title-color:      #3c8d0d;
     --metric-color:     #e76a24;
-    --subtitle-color:   #555;
-    --label-color:      #666;
+    --subtitle-color:   #3a5c2a;
+    --label-color:      #4a6e38;
     --chart-blue:       #1c4595;
     --chart-purple:     #6a2ca0;
     --tool-border:      #3c8d0d;
-    --tool-bg:          #f8f9fa;
-    --status-bg:        #ffffff;
+    --tool-bg:          #d8ecd0;
+    --status-bg:        #edf7e6;
 
     /* Scrollbars */
-    --scrollbar-track:  #e7e5e8;
+    --scrollbar-track:  #d8ecd0;
     --scrollbar-thumb:  #3c8d0d;
     --scrollbar-hover:  #2e6c0a;
 
-    /* Swatch colors */
-    --swatch1:          #3c8d0d; /* Turtle green */
-    --swatch2:          #1c4595; /* Leo blue */
-    --swatch3:          #e76a24; /* Mikey orange */
+    /* Swatches */
+    --swatch1:          #3c8d0d;
+    --swatch2:          #1c4595;
+    --swatch3:          #e76a24;
 }
 
 [data-theme="superman"] {
