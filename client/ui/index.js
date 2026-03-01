@@ -656,6 +656,7 @@ function formatMessage(text) {
     text=text.replace(/\n\s*\n/g,"<br><br>").replace(/\n/g,"<br>").replace(/(<\/h[1-6]>)(<br>){2}/g,"$1<br>");
     const processMath=(math)=>{
         math=math.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+        math=math.replace(/\\text\{([^}]+)\}/g,'$1');
         const symbols={'\\pm':'±','\\times':'×','\\div':'÷','\\cdot':'·','\\neq':'≠','\\leq':'≤','\\geq':'≥','\\approx':'≈','\\infty':'∞','\\pi':'π','\\rightarrow':'→','\\forall':'∀','\\exists':'∃','\\degree':'°','\\phi':'Φ'};
         Object.entries(symbols).forEach(([t,s])=>{math=math.split(t).join(s);});
         math=math.replace(/\\sqrt\[([^\]]+)\]\{([^}]+)\}/g,'<sup>$1</sup>√($2)').replace(/\\sqrt\{([^}]+)\}/g,'√($1)').replace(/\^\{([^}]+)\}/g,'<sup>$1</sup>').replace(/\^([a-zA-Z0-9+-]+)/g,'<sup>$1</sup>').replace(/_\{([^}]+)\}/g,'<sub>$1</sub>').replace(/_([a-zA-Z0-9+-]+)/g,'<sub>$1</sub>').replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)');
