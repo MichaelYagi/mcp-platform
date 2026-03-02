@@ -37,6 +37,17 @@ SYSTEM_MONITOR_CLIENTS = set()
 # Replaces the single IS_PROCESSING bool which blocked ALL connections
 # when any one tab was busy. Each connection now only blocks itself.
 PROCESSING_SESSIONS = set()
+# Module-level task registry: session_id -> asyncio.Task
+# Tasks live here instead of inside websocket_handler so they survive
+# connection drops. A reconnecting client picks up the running task.
+SESSION_TASKS: dict = {}
+
+# Per-session locks — serializes load_session adoption so two rapid
+# reconnects cannot both adopt the same task simultaneously.
+SESSION_LOCKS: dict = {}
+
+# Timestamp of when each task was created — used by TTL cleanup.
+SESSION_TASK_CREATED: dict = {}
 
 
 async def broadcast_message(message_type, data):
@@ -52,6 +63,10 @@ async def broadcast_message(message_type, data):
 async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools,
                         session_manager=None, session_id=None, system_prompt=None):
     """Process a query in the background"""
+    # Snapshot conversation messages immediately so a reconnect that rebuilds
+    # conversation_state["messages"] cannot mutate what this task reads.
+    conversation_state = dict(conversation_state)
+    conversation_state["messages"] = list(conversation_state.get("messages", []))
     if session_id:
         PROCESSING_SESSIONS.add(session_id)
     try:
@@ -204,7 +219,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
 
             # Persist before delivery
             if session_manager and session_id:
-                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 20))
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                 model_name = "direct-answer"
                 session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
                 _rag_store_turn(session_id, "assistant", response_text)
@@ -246,7 +261,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # If the socket dies mid-send, the message is already saved and
         # broadcast will reach any reconnected socket in CONNECTED_WEBSOCKETS.
         if session_manager and session_id:
-            MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 20))
+            MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
             model_name = result.get("current_model", "unknown")
             session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
             _rag_store_turn(session_id, "assistant", assistant_text)
@@ -274,6 +289,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
     finally:
         if session_id:
             PROCESSING_SESSIONS.discard(session_id)
+            SESSION_TASKS.pop(session_id, None)
+            SESSION_TASK_CREATED.pop(session_id, None)
+            # Remove lock only if no task is pending — keep it if a new
+            # query already acquired it for this session.
+            SESSION_LOCKS.pop(session_id, None)
 
 async def websocket_handler(websocket, agent_ref, tools, logger, conversation_state, run_agent_fn,
                             models_module, model_name, system_prompt, orchestrator=None,
@@ -345,7 +365,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 conversation_state["session_id"] = session_id
 
-                MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
+                MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "30"))
 
                 for msg in messages[-MAX_MESSAGE_HISTORY:]:
                     if msg["role"] == "system":
@@ -363,13 +383,25 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     "messages": messages
                 }))
 
-                # Orphan detection: if the last message is from the user and this
-                # session is not currently processing, the socket died before the
-                # response was delivered. Notify user to resend.
-                # If still processing, the reconnected socket is already in
-                # CONNECTED_WEBSOCKETS so broadcast will reach it automatically.
+                # Re-adopt any in-flight task for this session.
+                # Use a per-session Lock to prevent two rapid reconnects from
+                # both adopting the same task simultaneously (race condition).
+                if session_id not in SESSION_LOCKS:
+                    SESSION_LOCKS[session_id] = asyncio.Lock()
+                async with SESSION_LOCKS[session_id]:
+                    in_flight = SESSION_TASKS.get(session_id)
+                    if in_flight and not in_flight.done():
+                        current_task = in_flight
+                        logger.info(f"🔁 Session {session_id}: re-attached to in-flight task on reconnect")
+
+                # Orphan / status detection based on last message role
                 if messages and messages[-1]["role"] == "user":
-                    if session_id not in PROCESSING_SESSIONS:
+                    if session_id in PROCESSING_SESSIONS:
+                        # Still computing — new socket is in CONNECTED_WEBSOCKETS,
+                        # broadcast will deliver result automatically.
+                        logger.info(f"⏳ Session {session_id}: in-flight, reconnected socket will receive broadcast")
+                    else:
+                        # Task finished but socket was dead — response lost
                         logger.warning(f"⚠️ Session {session_id} ends on user message with no active processing")
                         await websocket.send(json.dumps({
                             "type": "assistant_message",
@@ -378,8 +410,6 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "model": "system"
                         }))
                         await websocket.send(json.dumps({"type": "complete", "stopped": False}))
-                    else:
-                        logger.info(f"⏳ Session {session_id}: response still in-flight, reconnected socket will receive broadcast")
                 continue
 
             if data.get("type") == "new_session":
@@ -421,6 +451,13 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 logger.warning("🛑 STOP SIGNAL ACTIVATED - Operations will halt at next checkpoint")
                 request_stop()
+                # Cancel via SESSION_TASKS so the correct task is always hit
+                # regardless of whether current_task matches (e.g. after reconnect).
+                if current_session_id and current_session_id in SESSION_TASKS:
+                    t = SESSION_TASKS.get(current_session_id)
+                    if t and not t.done():
+                        t.cancel()
+                        logger.info(f"🛑 Cancelled SESSION_TASKS task for session {current_session_id}")
 
                 print("\n🛑 Stop requested - operation will halt at next checkpoint")
                 print("   This may take a few seconds for the current step to complete.")
@@ -582,7 +619,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "session_id": current_session_id
                         }))
 
-                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 20))
+                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                     session_manager.add_message(current_session_id, "user", prompt, MAX_MESSAGE_HISTORY, model=None)
                     # Store user turn in session-scoped RAG for semantic context retrieval
                     _rag_store_turn(current_session_id, "user", prompt)
@@ -602,20 +639,64 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         except Exception as e:
                             logger.error(f"Failed to generate session name: {e}")
 
-                if current_task and not current_task.done():
-                    logger.warning("⚠️ Cancelling previous task")
-                    current_task.cancel()
+                # Cancel only if a task is already running for THIS session
+                existing = SESSION_TASKS.get(current_session_id)
+                if existing and not existing.done():
+                    logger.warning("⚠️ Cancelling previous task for session")
+                    existing.cancel()
 
                 current_task = asyncio.create_task(
                     process_query(websocket, prompt, original_prompt, agent_ref, conversation_state,
                                   run_agent_fn, logger, tools, session_manager, current_session_id, system_prompt)
                 )
+                # Store at module level so task survives connection drops.
+                # Record creation time for TTL cleanup of abandoned tasks.
+                if current_session_id:
+                    SESSION_TASKS[current_session_id] = current_task
+                    import time as _time
+                    SESSION_TASK_CREATED[current_session_id] = _time.monotonic()
+                    # Ensure a lock exists for this session
+                    if current_session_id not in SESSION_LOCKS:
+                        SESSION_LOCKS[current_session_id] = asyncio.Lock()
 
     finally:
+        # Do NOT cancel the task here — it may still be computing a response.
+        # Tasks are only cancelled by :stop or when a new query replaces them.
+        # The task will broadcast its result to any reconnected socket.
         if current_task and not current_task.done():
-            current_task.cancel()
+            logger.info(f"🔌 Connection closed but task still running for session "
+                        f"{current_session_id} — keeping alive")
         CONNECTED_WEBSOCKETS.discard(websocket)
         SYSTEM_MONITOR_CLIENTS.discard(websocket)
+
+
+async def _cleanup_stale_tasks(max_age_seconds: int = 3600):
+    """
+    Periodically remove abandoned tasks from SESSION_TASKS.
+    Handles the case where process_query raises before its finally block
+    (e.g. unhandled exception in LangGraph internals) and never self-cleans.
+    Runs every 5 minutes, removes tasks older than max_age_seconds (default 1hr).
+    """
+    import time as _time
+    while True:
+        await asyncio.sleep(300)  # check every 5 minutes
+        now = _time.monotonic()
+        stale = [
+            sid for sid, created in list(SESSION_TASK_CREATED.items())
+            if (now - created) > max_age_seconds
+        ]
+        for sid in stale:
+            task = SESSION_TASKS.get(sid)
+            if task and not task.done():
+                logger.warning(f"🧹 TTL cleanup: cancelling stale task for session {sid} "
+                               f"(age={(now - SESSION_TASK_CREATED[sid]):.0f}s)")
+                task.cancel()
+            SESSION_TASKS.pop(sid, None)
+            SESSION_TASK_CREATED.pop(sid, None)
+            SESSION_LOCKS.pop(sid, None)
+            PROCESSING_SESSIONS.discard(sid)
+        if stale:
+            logger.info(f"🧹 TTL cleanup removed {len(stale)} stale session entries")
 
 
 async def start_websocket_server(agent, tools, logger, conversation_state, run_agent_fn, models_module,
@@ -637,7 +718,11 @@ async def start_websocket_server(agent, tools, logger, conversation_state, run_a
         except websockets.exceptions.ConnectionClosed:
             pass
 
-    server = await websockets.serve(handler, host, port)
+    # ping_interval keeps the TCP connection alive through sleep/idle.
+    # ping_timeout gives the client 60s to respond before dropping.
+    server = await websockets.serve(handler, host, port,
+                                    ping_interval=30, ping_timeout=60)
+    asyncio.create_task(_cleanup_stale_tasks())
 
     try:
         hostname = socket.gethostname()
