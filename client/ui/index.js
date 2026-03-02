@@ -500,7 +500,8 @@ function updateSystemStats(stats) {
 // THINKING INDICATOR
 // ============================================================
 function showThinking() {
-    if (thinkingIndicator) return;
+    if (thinkingIndicator && document.contains(thinkingIndicator)) return;
+    thinkingIndicator = null;
     thinkingIndicator = document.createElement("div");
     thinkingIndicator.className = "thinking";
     thinkingIndicator.innerHTML = '<div class="thinking-dots"><span>&bull;</span><span>&bull;</span><span>&bull;</span></div>';
