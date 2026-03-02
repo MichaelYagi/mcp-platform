@@ -48,8 +48,12 @@ class LLMBackendManager:
 
         # ✅ CHECK: Is this the same model we already loaded?
         if _CURRENT_MODEL_NAME == model_name and _CURRENT_LLM is not None:
-            logger.info(f"✅ Model already loaded: {model_name} (no reload)")
-            return _CURRENT_LLM
+            cached_ctx = getattr(_CURRENT_LLM, 'num_ctx', None)
+            requested_ctx = kwargs.get('num_ctx')
+            if requested_ctx is None or cached_ctx == requested_ctx:
+                logger.info(f"✅ Model already loaded: {model_name} (no reload)")
+                return _CURRENT_LLM
+            logger.info(f"🔄 Reloading: num_ctx changed ({cached_ctx} → {requested_ctx})")
 
         # Different model - need to load
         logger.info(f"🔄 Loading new model: {model_name}")

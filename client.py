@@ -572,7 +572,11 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     logger.info(f"🤖 Using {backend}/{model_name}")
 
     # Initialize LLM
-    llm = LLMBackendManager.create_llm(model_name, temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")))
+    llm = LLMBackendManager.create_llm(
+        model_name,
+        temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
+        num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "2048"))
+    )
 
     mcp_agent = MCPAgent(
         llm=llm,
@@ -989,8 +993,11 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         logger.info(f"   Syncing to: {expected_model}")
 
                         from client.llm_backend import LLMBackendManager
-                        fresh_llm = LLMBackendManager.create_llm(expected_model, temperature=float(
-                            os.getenv("LLM_TEMPERATURE", "0.3")))
+                        fresh_llm = LLMBackendManager.create_llm(
+                            expected_model,
+                            temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
+                            num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "2048"))
+                        )
 
                         if hasattr(orchestrator, 'update_llm'):
                             orchestrator.update_llm(fresh_llm)
