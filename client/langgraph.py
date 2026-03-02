@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import operator
+import os
 import re
 import time
 from typing import TypedDict, Annotated, Sequence
@@ -33,6 +34,9 @@ from client.query_patterns import (
     RESEARCH_SOURCE_PATTERN, extract_research_sources,
     OLLAMA_SEARCH_PATTERN, WEB_SEARCH_EXPLICIT_PATTERN
 )
+
+MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
+LLM_CONTEXT_WINDOW = int(os.getenv("LLM_CONTEXT_WINDOW", "6"))
 
 # Try to import metrics
 try:
@@ -2070,20 +2074,30 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             conversation_state["messages"].insert(0, original_system_msg)
             logger.info("[LangGraph] Created new SystemMessage from parameter")
 
-        # STEP 2: Add user message and truncate
+        # STEP 2: Add user message
         conversation_state["messages"].append(HumanMessage(content=user_message))
 
+        # Build LLM-only message list: system prompt + RAG context + last N turns
+        # MAX_MESSAGE_HISTORY is for the UI only — LLM_CONTEXT_WINDOW controls what the LLM sees
         system_msg = conversation_state["messages"][0]
-        other_messages = conversation_state["messages"][1:]
 
-        if len(other_messages) > max_history - 1:
-            other_messages = other_messages[-(max_history - 1):]
-            logger.info(f"[LangGraph] Truncated to last {max_history} messages")
+        rag_context_msgs = [
+            msg for msg in conversation_state["messages"][1:]
+            if isinstance(msg, SystemMessage)
+        ]
 
-        conversation_state["messages"] = [system_msg] + other_messages
+        non_system_msgs = [
+            msg for msg in conversation_state["messages"][1:]
+            if not isinstance(msg, SystemMessage)
+        ]
+
+        # LLM sees: system prompt + RAG injections + last LLM_CONTEXT_WINDOW messages
+        llm_messages = [system_msg] + rag_context_msgs + non_system_msgs[-LLM_CONTEXT_WINDOW:]
+        logger.info(
+            f"🧠 LLM context: {len(llm_messages)} messages (window={LLM_CONTEXT_WINDOW}, rag={len(rag_context_msgs)})")
 
         # STEP 3: Run the agent
-        logger.info(f"🧠 Starting agent with {len(conversation_state['messages'])} messages")
+        logger.info(f"🧠 Starting agent with {len(llm_messages)} messages")
 
         tool_registry = {tool.name: tool for tool in tools}
 
@@ -2093,7 +2107,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         #   Previous conversation history (truncated to max_history, default 20)
         #   The new HumanMessage with the user's input (appended just before in Step 2)
         result = await agent.ainvoke({
-            "messages": conversation_state["messages"],
+            "messages": llm_messages,
             "tools": tool_registry,
             "llm": llm,
             "ingest_completed": False,
