@@ -71,9 +71,7 @@ async def resolve_tool_server(tools: list, mcp_agent, project_root: Path) -> dic
 
 def load_external_server_names(project_root: Path) -> set:
     """Returns the set of external server names from external_servers.json."""
-    cfg = project_root / "client" / "external_servers.json"
-    if not cfg.exists():
-        cfg = project_root / "external_servers.json"
+    cfg = project_root / "external_servers.json"
     if not cfg.exists():
         return set()
     try:

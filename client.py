@@ -358,7 +358,7 @@ async def auto_discover_servers(servers_dir: Path, logger):
                         logger.warning(f"⏭️  Skipping local '{server_name}': Venv python not found at {venv_python}")
 
     # 2. Process external_servers.json
-    external_config = PROJECT_ROOT / "client" / "external_servers.json"
+    external_config = PROJECT_ROOT / "external_servers.json"
     if not external_config.exists():
         return mcp_servers
 

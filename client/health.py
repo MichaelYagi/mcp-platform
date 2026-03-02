@@ -148,7 +148,7 @@ def _get_sanity_payload(tool_name: str) -> dict | None:
 # ─────────────────────────────────────────────────────────────────────
 
 def _load_external_servers(project_root: Path) -> dict:
-    cfg = project_root / "client" / "external_servers.json"
+    cfg = project_root / "external_servers.json"
     if not cfg.exists():
         return {}
     try:

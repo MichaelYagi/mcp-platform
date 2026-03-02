@@ -36,7 +36,7 @@ from client.query_patterns import (
 )
 
 MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
-LLM_CONTEXT_WINDOW = int(os.getenv("LLM_CONTEXT_WINDOW", "6"))
+LLM_MESSAGE_WINDOW = int(os.getenv("LLM_MESSAGE_WINDOW", "6"))
 
 # Try to import metrics
 try:
@@ -2078,7 +2078,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         conversation_state["messages"].append(HumanMessage(content=user_message))
 
         # Build LLM-only message list: system prompt + RAG context + last N turns
-        # MAX_MESSAGE_HISTORY is for the UI only — LLM_CONTEXT_WINDOW controls what the LLM sees
+        # MAX_MESSAGE_HISTORY is for the UI only — LLM_MESSAGE_WINDOW controls what the LLM sees
         system_msg = conversation_state["messages"][0]
 
         rag_context_msgs = [
@@ -2091,10 +2091,10 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             if not isinstance(msg, SystemMessage)
         ]
 
-        # LLM sees: system prompt + RAG injections + last LLM_CONTEXT_WINDOW messages
-        llm_messages = [system_msg] + rag_context_msgs + non_system_msgs[-LLM_CONTEXT_WINDOW:]
+        # LLM sees: system prompt + RAG injections + last LLM_MESSAGE_WINDOW messages
+        llm_messages = [system_msg] + rag_context_msgs + non_system_msgs[-LLM_MESSAGE_WINDOW:]
         logger.info(
-            f"🧠 LLM context: {len(llm_messages)} messages (window={LLM_CONTEXT_WINDOW}, rag={len(rag_context_msgs)})")
+            f"🧠 LLM context: {len(llm_messages)} messages (window={LLM_MESSAGE_WINDOW}, rag={len(rag_context_msgs)})")
 
         # STEP 3: Run the agent
         logger.info(f"🧠 Starting agent with {len(llm_messages)} messages")
