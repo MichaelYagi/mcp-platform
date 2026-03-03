@@ -364,13 +364,11 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 }
 
 .assistant {
-    align-self: stretch;
-    background: transparent;
-    border: none;
+    align-self: flex-start;
+    background: var(--chat-assistant);
+    border: 1px solid var(--chat-asst-border);
     color: var(--chat-asst-color);
-    box-shadow: none;
-    max-width: 100%;
-    padding: 0.25rem 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .assistant.multi-agent {
@@ -379,10 +377,10 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 }
 
 .thinking {
-    align-self: flex-start; max-width: 100%; padding: 0.25rem 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
+    align-self: flex-start; max-width: 70%; padding: 0.75rem 1rem; border-radius: 10px;
+    background: var(--chat-assistant);
+    border: 1px solid var(--chat-asst-border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     color: #666; font-size: 1.5rem; line-height: 1;
 }
 .thinking-dots { display: inline-block; letter-spacing: 0.2rem; }
@@ -603,13 +601,19 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 .sessions-list::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 4px; }
 .sessions-list::-webkit-scrollbar-thumb:hover { background: var(--sidebar-hover); }
 
+.msg-timestamp {
+    font-size: 0.7rem;
+    color: var(--status-color);
+    opacity: 0.5;
+    padding-left: 0.25rem;
+}
+
 .msg-wrapper {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.15rem;
-    width: 65%;
-    max-width: 65%;
+    max-width: 75%;
 }
 
 .msg-meta {
@@ -782,5 +786,5 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     }
     .mobile-close { display: flex !important; }
     .msg { max-width: 100%; }
-    .msg-wrapper { width: 100%;max-width: 100%; }
+    .msg-wrapper { max-width: 100%; }
 }
