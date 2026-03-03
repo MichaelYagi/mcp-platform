@@ -601,13 +601,6 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 .sessions-list::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 4px; }
 .sessions-list::-webkit-scrollbar-thumb:hover { background: var(--sidebar-hover); }
 
-.msg-timestamp {
-    font-size: 0.7rem;
-    color: var(--status-color);
-    opacity: 0.5;
-    padding-left: 0.25rem;
-}
-
 .msg-wrapper {
     display: flex;
     flex-direction: column;
@@ -625,8 +618,10 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 }
 
 .msg-timestamp {
+    font-size: 0.7rem;
     color: var(--status-color);
     opacity: 0.5;
+    padding-left: 0.25rem;
 }
 
 .msg-model {
@@ -786,5 +781,7 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     }
     .mobile-close { display: flex !important; }
     .msg { max-width: 100%; }
-    .msg-wrapper { max-width: 100%; }
 }
+/* ── Narrow chat area: triggered by ResizeObserver in JS ── */
+#chatContainer.narrow .msg { max-width: 100%; }
+#chatContainer.narrow .msg-wrapper { max-width: 100%; }

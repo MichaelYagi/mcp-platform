@@ -813,3 +813,19 @@ function send() {
 
 sendBtn.addEventListener('click', send);
 input.addEventListener("keydown", (e) => { if (e.key==="Enter"&&!e.shiftKey) { e.preventDefault(); send(); } });
+// ============================================================
+// CHAT CONTAINER RESIZE OBSERVER
+// Adds .narrow class when chatContainer width <= 768px so
+// CSS can scale message widths regardless of which panels are open
+// ============================================================
+(function() {
+    const chatContainer = document.getElementById('chatContainer');
+    if (!chatContainer || !window.ResizeObserver) return;
+    const observer = new ResizeObserver(entries => {
+        for (const entry of entries) {
+            const width = entry.contentRect.width;
+            chatContainer.classList.toggle('narrow', width <= 768);
+        }
+    });
+    observer.observe(chatContainer);
+})();
