@@ -18,6 +18,10 @@ import urllib.parse
 from html.parser import HTMLParser
 from concurrent.futures import ThreadPoolExecutor
 
+from dotenv import load_dotenv
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
+
 from tools.rag.rag_vector_db import should_refresh_source
 from .stop_signal import is_stop_requested, clear_stop
 from .search_client import get_search_client

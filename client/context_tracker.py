@@ -17,6 +17,10 @@ import logging
 from typing import Dict, Optional, List, Any
 from langchain_core.messages import SystemMessage
 
+from dotenv import load_dotenv
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
+
 MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
 # How many RAG-retrieved turns to inject (keeps prompt lean)
 RAG_CONTEXT_TOP_K = int(os.getenv("RAG_CONTEXT_TOP_K", "4"))
