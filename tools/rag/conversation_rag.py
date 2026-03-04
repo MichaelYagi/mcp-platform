@@ -155,7 +155,7 @@ def retrieve_context(
         Sorted by score descending.
     """
     from tools.rag.rag_utils import get_connection, cosine_similarity
-    from tools.rag.rag_search import RERANKER_MODEL, RERANK_CANDIDATES, _check_reranker, _rerank
+    from tools.rag.rag_search import RERANKER_MODEL, RERANK_CANDIDATES, _reranker_available, _check_reranker, _rerank
     from client.session_manager import SessionManager
 
     if not query or not query.strip():
@@ -230,15 +230,16 @@ def retrieve_context(
         if not populated:
             return []
 
-        # Optional reranking pass
-        if _check_reranker():
+        # Optional reranking pass — use cached flag to avoid repeated availability checks
+        reranker_on = _reranker_available
+        if reranker_on:
             logger.debug(f"🔀 Reranking {len(populated)} conversation candidates with {RERANKER_MODEL}")
             populated = _rerank(query, populated)
 
         top = populated[:top_k]
         logger.debug(
             f"🔍 conv_rag: {len(top)}/{len(rows)} turns matched for session {session_id} "
-            f"(reranked={_check_reranker()})"
+            f"(reranked={reranker_on})"
         )
         return top
 

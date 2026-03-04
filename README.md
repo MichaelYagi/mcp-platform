@@ -53,10 +53,6 @@ ollama serve
 # Model required for RAG ingestion and semantic search
 ollama pull bge-large
 
-# Optional: reranker model — improves RAG result quality, not required
-# If not installed, RAG search falls back to cosine similarity ranking
-ollama pull sam860/qwen3-reranker:0.6b-Q8_0
-
 # Download a model (use 14B+ for best results)
 ollama pull qwen2.5:14b-instruct-q4_K_M
 ```

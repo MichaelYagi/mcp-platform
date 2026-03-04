@@ -2117,10 +2117,25 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         })
 
         # STEP 4: Update conversation state
-        input_count = len(conversation_state["messages"])
-        truly_new = result["messages"][input_count:]
+        # result["messages"] only contains llm_messages (the windowed slice).
+        # We must NOT store it back wholesale or history is lost.
+        # Instead: find new messages added by LangGraph and append them
+        # to the FULL conversation_state history.
+        #
+        # llm_messages was: [system] + [rag...] + [last N non-system]
+        # result["messages"] is that same list + new AI response(s)
+        # We only want the net-new AIMessage(s) at the tail.
+        result_msgs = result["messages"]
+        # Identify truly new messages: anything in result not in llm_messages
+        truly_new = result_msgs[len(llm_messages):]
         logger.info(f"📨 Agent added {len(truly_new)} new messages")
-        conversation_state["messages"] = result["messages"]
+        # Append new messages to FULL history (not the windowed slice)
+        # Strip any RAG SystemMessages from the full history — they are
+        # ephemeral per-query injections, not permanent conversation turns.
+        conversation_state["messages"] = [
+            msg for msg in conversation_state["messages"]
+            if not (isinstance(msg, SystemMessage) and msg is not conversation_state["messages"][0])
+        ] + truly_new
 
         # STEP 5: Return results
         if METRICS_AVAILABLE:

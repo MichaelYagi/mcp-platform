@@ -16,7 +16,6 @@ and search continues with cosine-only ranking.
 from typing import Dict, Any, List, Optional
 from langchain_ollama import OllamaEmbeddings
 import logging
-import requests
 
 from .rag_utils import load_rag_db, cosine_similarity
 
@@ -26,88 +25,91 @@ logger = logging.getLogger("mcp_server")
 embeddings_model = OllamaEmbeddings(model="bge-large")
 
 # Reranker config
-RERANKER_MODEL      = "sam860/qwen3-reranker:0.6b-Q8_0"
-RERANK_CANDIDATES   = 20      # How many cosine hits to pass to the reranker
-OLLAMA_API_BASE     = "http://localhost:11434"
+# Uses sentence-transformers CrossEncoder — runs locally on CPU, no Ollama needed.
+# Install: pip install sentence-transformers
+# Model downloads automatically on first use (~80MB, cached in ~/.cache/huggingface)
+RERANKER_MODEL    = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+RERANK_CANDIDATES = 20      # How many cosine hits to pass to the reranker
 
 # Probe for reranker availability once at import time
 _reranker_available: Optional[bool] = None
+_cross_encoder = None        # Lazy-loaded CrossEncoder instance
 
 
 def _check_reranker() -> bool:
     """
-    Return True if bge-reranker-v2-m3 is present in the local Ollama instance.
-    Result is cached after the first call.
+    Return True if sentence-transformers is installed and CrossEncoder loads.
+    Result is cached after the first call. Model is lazy-loaded on first use.
     """
     global _reranker_available
     if _reranker_available is not None:
         return _reranker_available
 
     try:
-        resp = requests.get(f"{OLLAMA_API_BASE}/api/tags", timeout=3)
-        if resp.status_code == 200:
-            models = [m["name"] for m in resp.json().get("models", [])]
-            # Match full name or with/without tag suffix
-            _reranker_available = any(
-                m == RERANKER_MODEL or m.startswith(RERANKER_MODEL.split(":")[0])
-                for m in models
-            )
-        else:
-            _reranker_available = False
-    except Exception:
+        from sentence_transformers import CrossEncoder  # noqa: F401
+        _reranker_available = True
+        logger.info(f"✅ Reranker available: {RERANKER_MODEL} (sentence-transformers)")
+    except ImportError:
         _reranker_available = False
-
-    if not _reranker_available:
         logger.warning(
-            f"⚠️  Reranker model '{RERANKER_MODEL}' is not installed. "
-            f"RAG search will use cosine similarity only. "
-            f"Run `ollama pull {RERANKER_MODEL}` to enable reranking."
+            "⚠️  sentence-transformers not installed — RAG search will use cosine similarity only. "
+            "Run `pip install sentence-transformers` to enable reranking."
         )
-    else:
-        logger.info(f"✅ Reranker '{RERANKER_MODEL}' is available")
 
     return _reranker_available
 
 
+def _get_cross_encoder():
+    """Lazy-load the CrossEncoder model (downloads once, cached locally)."""
+    global _cross_encoder
+    if _cross_encoder is None:
+        from sentence_transformers import CrossEncoder
+        logger.info(f"⏳ Loading cross-encoder model: {RERANKER_MODEL}")
+        _cross_encoder = CrossEncoder(RERANKER_MODEL)
+        logger.info(f"✅ Cross-encoder loaded: {RERANKER_MODEL}")
+    return _cross_encoder
+
+
 def _rerank(query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Re-score candidates using bge-reranker-v2-m3 cross-encoder via the Ollama
-    /api/embed endpoint. Returns candidates sorted by rerank score descending.
+    Re-score candidates using a sentence-transformers CrossEncoder.
+    Scores all candidates in a single batched call — fast on CPU.
 
+    Falls back to original cosine order on any error.
     Each candidate dict must have a 'text' field populated before calling this.
-    Candidates with missing text are passed through with their original cosine score.
     """
-    reranked = []
+    # Separate candidates with text from those without
+    indexed  = [(i, c) for i, c in enumerate(candidates) if c.get("text")]
+    no_text  = [(i, c) for i, c in enumerate(candidates) if not c.get("text")]
 
-    for candidate in candidates:
-        text = candidate.get("text", "")
-        if not text:
-            reranked.append(candidate)
-            continue
-        try:
-            resp = requests.post(
-                f"{OLLAMA_API_BASE}/api/embed",
-                json={"model": RERANKER_MODEL, "input": [query, text]},
-                timeout=20,
-            )
-            if resp.status_code == 200:
-                embeddings = resp.json().get("embeddings", [])
-                if len(embeddings) == 2:
-                    rerank_score = cosine_similarity(embeddings[0], embeddings[1])
-                    reranked.append({**candidate, "score": rerank_score, "reranked": True})
-                else:
-                    reranked.append(candidate)
-            else:
-                reranked.append(candidate)
-        except Exception as e:
-            logger.warning(f"⚠️ Reranker call failed for candidate: {e}")
+    if not indexed:
+        return candidates
+
+    try:
+        cross_encoder = _get_cross_encoder()
+
+        # Score all query-passage pairs in one batch
+        pairs  = [(query, c.get("text")) for _, c in indexed]
+        scores = cross_encoder.predict(pairs)   # returns numpy array of floats
+
+        reranked = []
+        for score, (_, candidate) in zip(scores, indexed):
+            reranked.append({**candidate, "score": float(score), "reranked": True})
+
+        # Append no-text candidates at the tail with their original cosine score
+        for _, candidate in no_text:
             reranked.append(candidate)
 
-    reranked.sort(key=lambda x: x["score"], reverse=True)
-    return reranked
+        reranked.sort(key=lambda x: x["score"], reverse=True)
+        return reranked
+
+    except Exception as e:
+        logger.warning(f"⚠️ Reranker failed ({e}), falling back to cosine order")
+        return candidates
 
 
-# Probe on module load so the warning appears at startup, not on first search
+# Probe on module load so the warning appears at startup, not on first search.
+# CrossEncoder itself is lazy-loaded on first actual rerank call.
 _check_reranker()
 
 
@@ -178,13 +180,14 @@ def rag_search(query: str, top_k: int = 5, min_score: float = 0.3) -> Dict[str, 
                 candidate["text"] = ""
                 logger.warning(f"⚠️ Document {candidate['id']} has no chunk_id — text unavailable")
 
-        # Optional reranking pass
-        if _check_reranker():
+        # Optional reranking pass — use cached flag, avoid repeated availability checks
+        reranker_on = _reranker_available
+        if reranker_on:
             logger.debug(f"🔀 Reranking {len(candidates)} candidates with {RERANKER_MODEL}")
             candidates = _rerank(query, candidates)
 
         top_results = candidates[:top_k]
-        logger.info(f"✅ Returning {len(top_results)} results (reranked={_check_reranker()})")
+        logger.info(f"✅ Returning {len(top_results)} results (reranked={reranker_on})")
 
         return {
             "success": True,
@@ -192,7 +195,7 @@ def rag_search(query: str, top_k: int = 5, min_score: float = 0.3) -> Dict[str, 
             "results": top_results,
             "total_matches": len(cosine_results),
             "returned": len(top_results),
-            "reranked": _check_reranker(),
+            "reranked": reranker_on,
         }
 
     except Exception as e:
