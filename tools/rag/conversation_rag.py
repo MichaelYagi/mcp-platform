@@ -3,8 +3,12 @@ Conversation RAG Bridge
 Handles storing and retrieving conversation turns in the RAG store,
 scoped by session_id. Completely separate from document/external RAG.
 
-Store:    store_turn(session_id, role, content)
+Store:    store_turn(session_id, role, content, message_id)
 Retrieve: retrieve_context(session_id, query, top_k) -> List[Dict]
+
+Turn text is never stored in rag_database.db. The message_id FK into
+sessions.db messages.id is stored instead, and text is fetched directly
+by primary key at retrieval time — no positional indexing, no drift.
 """
 
 import logging
@@ -15,22 +19,18 @@ from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger("mcp_server")
 
-# Single shared thread pool for embedding conversation turns
 _embed_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="conv_rag")
 
-# Role prefix used when embedding so the model understands speaker context
 ROLE_PREFIX = {
-    "user": "User said: ",
+    "user":      "User said: ",
     "assistant": "Assistant said: ",
 }
 
-# Maximum characters to embed per turn (conversation turns don't need chunking,
-# but very long assistant responses should be trimmed to a representative window)
 MAX_TURN_CHARS = 1200
 
 
 def _get_embeddings_model():
-    """Lazy-load embeddings model (same model as rest of RAG)"""
+    """Lazy-load embeddings model (same model as the rest of RAG)"""
     from langchain_ollama import OllamaEmbeddings
     return OllamaEmbeddings(model="bge-large")
 
@@ -38,22 +38,25 @@ def _get_embeddings_model():
 def _embed_text(text: str) -> Optional[List[float]]:
     """Generate embedding for a single text string. Returns None on failure."""
     try:
-        model = _get_embeddings_model()
-        return model.embed_query(text)
+        return _get_embeddings_model().embed_query(text)
     except Exception as e:
         logger.error(f"❌ conversation_rag: embedding failed: {e}")
         return None
 
 
-def store_turn(session_id: int, role: str, content: str) -> bool:
+def store_turn(session_id: int, role: str, content: str, message_id: int) -> bool:
     """
     Embed a single conversation turn and store it in the RAG database,
-    tagged with session_id so it can be retrieved in isolation later.
+    tagged with session_id and message_id for reliable text retrieval.
+
+    Text is NOT stored in rag_database.db. At retrieval time, message_id
+    is used to fetch content directly from sessions.db messages table.
 
     Args:
         session_id: Integer session ID from session_manager
         role:       'user' or 'assistant'
-        content:    Message text
+        content:    Message text (used only for embedding, not persisted here)
+        message_id: messages.id PK from sessions.db — stored as FK in RAG DB
 
     Returns:
         True if stored successfully, False otherwise
@@ -63,7 +66,6 @@ def store_turn(session_id: int, role: str, content: str) -> bool:
     if not content or not content.strip():
         return False
 
-    # Prefix with role so embeddings carry speaker context
     prefix = ROLE_PREFIX.get(role, f"{role}: ")
     text_to_embed = prefix + content[:MAX_TURN_CHARS]
 
@@ -78,19 +80,21 @@ def store_turn(session_id: int, role: str, content: str) -> bool:
     conn = get_connection()
     try:
         cursor = conn.cursor()
-
         cursor.execute("""
-            INSERT INTO documents (id, embedding, source, session_id)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO documents (id, embedding, source, session_id, message_id)
+            VALUES (?, ?, ?, ?, ?)
         """, (
             doc_id,
             embedding_bytes,
             "conversation",
             str(session_id),
+            message_id,
         ))
         conn.commit()
-
-        logger.debug(f"💬 Stored {role} turn for session {session_id} (doc {doc_id[:8]})")
+        logger.debug(
+            f"💬 Stored {role} turn for session {session_id} "
+            f"(doc {doc_id[:8]}, message_id={message_id})"
+        )
         return True
 
     except Exception as e:
@@ -100,24 +104,30 @@ def store_turn(session_id: int, role: str, content: str) -> bool:
         conn.close()
 
 
-def store_turn_async(session_id: int, role: str, content: str) -> None:
+def store_turn_async(session_id: int, role: str, content: str, message_id: int) -> None:
     """
-    Fire-and-forget version of store_turn. Runs embedding in background
+    Fire-and-forget version of store_turn. Runs embedding in a background
     thread so it never blocks the WebSocket response path.
 
     Args:
         session_id: Integer session ID
         role:       'user' or 'assistant'
         content:    Message text
+        message_id: messages.id PK returned by session_manager.add_message()
     """
     def _run():
         start = time.time()
-        ok = store_turn(session_id, role, content)
+        ok = store_turn(session_id, role, content, message_id)
         elapsed = time.time() - start
         if ok:
-            logger.debug(f"✅ conv_rag async store done ({elapsed:.2f}s) session={session_id} role={role}")
+            logger.debug(
+                f"✅ conv_rag async store done ({elapsed:.2f}s) "
+                f"session={session_id} role={role} message_id={message_id}"
+            )
         else:
-            logger.warning(f"⚠️ conv_rag async store failed session={session_id} role={role}")
+            logger.warning(
+                f"⚠️ conv_rag async store failed session={session_id} role={role} message_id={message_id}"
+            )
 
     _embed_executor.submit(_run)
 
@@ -126,13 +136,13 @@ def retrieve_context(
     session_id: int,
     query: str,
     top_k: int = 5,
-    min_score: float = 0.35
+    min_score: float = 0.35,
 ) -> List[Dict[str, Any]]:
     """
     Retrieve the most semantically relevant past turns from this session.
 
-    Does NOT return the full history — only what's relevant to the current query.
-    The caller (context_tracker) decides how to format this into the prompt.
+    Does NOT return full history — only what's relevant to the current query.
+    Text is fetched from sessions.db by message_id (direct PK lookup).
 
     Args:
         session_id:  Integer session ID to scope retrieval
@@ -141,32 +151,30 @@ def retrieve_context(
         min_score:   Minimum cosine similarity threshold
 
     Returns:
-        List of dicts with keys: text, role, score
+        List of dicts with keys: text, role, score, reranked
         Sorted by score descending.
     """
     from tools.rag.rag_utils import get_connection, cosine_similarity
+    from tools.rag.rag_search import RERANKER_MODEL, RERANK_CANDIDATES, _check_reranker, _rerank
+    from client.session_manager import SessionManager
 
     if not query or not query.strip():
         return []
 
     try:
-        # Embed the query
         query_embedding = _embed_text(query)
         if query_embedding is None:
             return []
 
-        # Load only this session's turns from DB (not the whole RAG store)
         conn = get_connection()
         try:
             cursor = conn.cursor()
-
             cursor.execute("""
-                SELECT id, embedding, source, created_at
+                SELECT id, embedding, message_id
                 FROM documents
                 WHERE session_id = ?
                 ORDER BY created_at ASC
             """, (str(session_id),))
-
             rows = cursor.fetchall()
         finally:
             conn.close()
@@ -177,17 +185,10 @@ def retrieve_context(
 
         import numpy as np
 
-        # Load this session's messages from sessions.db for text lookup
-        from client.session_manager import SessionManager
-        session_messages = SessionManager().get_session_messages(session_id)
-        # Index by position for O(1) lookup — created_at order matches ASC query
-        messages_by_index = {i: m for i, m in enumerate(session_messages)}
-
-        results = []
-        for i, row in enumerate(rows):
+        # Cosine pass
+        cosine_results = []
+        for row in rows:
             embedding_data = row[1]
-
-            # Handle binary format
             if isinstance(embedding_data, bytes):
                 embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
             else:
@@ -195,24 +196,50 @@ def retrieve_context(
                 embedding = json.loads(embedding_data)
 
             score = cosine_similarity(query_embedding, embedding)
-
             if score >= min_score:
-                # Look up original text from sessions.db
-                msg = messages_by_index.get(i)
-                text = msg["text"] if msg else ""
-                if not text:
-                    continue
-                results.append({
-                    "text": text,
-                    "score": float(score),
-                    "source": row[2],
+                cosine_results.append({
+                    "message_id": row[2],
+                    "score":      float(score),
+                    "reranked":   False,
                 })
 
-        # Sort by relevance
-        results.sort(key=lambda x: x["score"], reverse=True)
-        top = results[:top_k]
+        cosine_results.sort(key=lambda x: x["score"], reverse=True)
+        candidates = cosine_results[:RERANK_CANDIDATES]
 
-        logger.debug(f"🔍 conv_rag: {len(top)}/{len(rows)} turns matched for session {session_id}")
+        if not candidates:
+            return []
+
+        # Fetch turn text from sessions.db by message_id (direct PK lookup — no positional drift)
+        session_manager = SessionManager()
+        populated = []
+        for candidate in candidates:
+            message_id = candidate.get("message_id")
+            if message_id is None:
+                logger.warning(f"⚠️ RAG turn has no message_id for session {session_id} — skipping")
+                continue
+            msg = session_manager.get_message_by_id(message_id)
+            if not msg or not msg.get("text"):
+                logger.debug(f"💬 message_id={message_id} not found in sessions.db (may have been trimmed)")
+                continue
+            populated.append({
+                **candidate,
+                "text": msg["text"],
+                "role": msg["role"],
+            })
+
+        if not populated:
+            return []
+
+        # Optional reranking pass
+        if _check_reranker():
+            logger.debug(f"🔀 Reranking {len(populated)} conversation candidates with {RERANKER_MODEL}")
+            populated = _rerank(query, populated)
+
+        top = populated[:top_k]
+        logger.debug(
+            f"🔍 conv_rag: {len(top)}/{len(rows)} turns matched for session {session_id} "
+            f"(reranked={_check_reranker()})"
+        )
         return top
 
     except Exception as e:

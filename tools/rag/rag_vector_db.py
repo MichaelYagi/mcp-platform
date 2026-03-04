@@ -1,6 +1,8 @@
 """
 RAG Vector Database
-Handles storage and retrieval of embeddings
+Handles storage and retrieval of embeddings.
+Text is never stored here — chunk text lives in sessions.db (chunks table),
+looked up via chunk_id at search time.
 """
 import json
 import logging
@@ -35,97 +37,79 @@ def save_rag_database():
         _db_dirty = False
 
 
-def add_to_rag(text: str, source: str = None, save: bool = True) -> Dict[str, Any]:
+def add_to_rag(text: str, source: str = None, chunk_id: int = None, save: bool = True) -> Dict[str, Any]:
     """
-    Add a single text chunk to the RAG database.
+    Embed a single text chunk and add it to the RAG database.
 
     Args:
-        text: Text chunk to add
-        source: Source identifier (e.g., "plex:12345")
-        save: Whether to save immediately (False for batch operations)
+        text:     Text chunk to embed
+        source:   Source identifier (e.g. URL, file path)
+        chunk_id: FK into sessions.db chunks.id — must be pre-created by the caller
+                  via session_manager.store_chunk() before calling this function
+        save:     Whether to persist immediately (False for batch operations)
 
     Returns:
-        Dictionary with success status
+        Dictionary with success status and doc id
     """
     global _db_cache, _db_dirty
 
     try:
-        # Load database into cache
         db = load_rag_database()
 
-        # Generate embedding for the text
         logger.debug(f"🔮 Generating embedding for text (length: {len(text)})")
         embedding = embeddings_model.embed_query(text)
 
-        # Create document entry
         doc_id = str(uuid.uuid4())
         doc = {
-            "id": doc_id,
+            "id":        doc_id,
             "embedding": embedding,
-            "metadata": {
-                "source": source,
-            }
+            "chunk_id":  chunk_id,
+            "metadata":  {"source": source},
         }
 
-        # Add to in-memory database
         db.append(doc)
         _db_dirty = True
 
-        # Save if requested
         if save:
             save_rag_database()
 
-        logger.debug(f"✅ Added document {doc_id} to RAG (save={save})")
-
-        return {
-            "success": True,
-            "id": doc_id,
-            "length": len(text)
-        }
+        logger.debug(f"✅ Added document {doc_id} to RAG (chunk_id={chunk_id}, save={save})")
+        return {"success": True, "id": doc_id, "length": len(text)}
 
     except Exception as e:
         logger.error(f"❌ Error adding to RAG: {e}")
-        raise  # Re-raise to be caught by rag_add
+        raise
 
 
 def get_rag_stats() -> Dict[str, Any]:
-    """
-    Get statistics about the RAG database.
-
-    Returns:
-        Dictionary with database statistics
-    """
+    """Get statistics about the RAG database."""
     try:
         db = load_rag_database()
-
         if not db:
-            return {
-                "total_documents": 0,
-                "total_words": 0,
-                "sources": []
-            }
+            return {"total_documents": 0, "sources": []}
 
-        sources = list(set(doc["metadata"]["source"] for doc in db if doc["metadata"].get("source")))
-
+        sources = list(set(
+            doc["metadata"]["source"] for doc in db if doc["metadata"].get("source")
+        ))
         return {
             "total_documents": len(db),
             "sources": sources,
-            "unique_sources": len(sources)
+            "unique_sources": len(sources),
         }
 
     except Exception as e:
         logger.error(f"❌ Error getting RAG stats: {e}")
-        return {
-            "error": str(e)
-        }
+        return {"error": str(e)}
 
-def add_to_rag_batch(text: str, source: str = None) -> Dict[str, Any]:
+
+def add_to_rag_batch(text: str, source: str = None, chunk_id: int = None) -> Dict[str, Any]:
     """
-    Add a chunk to the pending batch (doesn't save yet).
+    Queue a chunk for batch insertion (does not persist yet).
 
     Args:
-        text: Text chunk to add
-        source: Source identifier
+        text:     Text chunk to embed
+        source:   Source identifier
+        chunk_id: FK into sessions.db chunks.id
 
     Returns:
         Dictionary with success status
@@ -133,30 +117,20 @@ def add_to_rag_batch(text: str, source: str = None) -> Dict[str, Any]:
     global _pending_chunks
 
     try:
-        # Generate embedding
         logger.debug(f"🔮 Generating embedding for text (length: {len(text)})")
         embedding = embeddings_model.embed_query(text)
 
-        # Create document entry
         doc_id = str(uuid.uuid4())
         doc = {
-            "id": doc_id,
+            "id":        doc_id,
             "embedding": embedding,
-            "metadata": {
-                "source": source,
-            }
+            "chunk_id":  chunk_id,
+            "metadata":  {"source": source},
         }
 
-        # Add to pending batch
         _pending_chunks.append(doc)
-
         logger.debug(f"✅ Queued document {doc_id} (pending: {len(_pending_chunks)})")
-
-        return {
-            "success": True,
-            "id": doc_id,
-            "length": len(text)
-        }
+        return {"success": True, "id": doc_id, "length": len(text)}
 
     except Exception as e:
         logger.error(f"❌ Error adding to batch: {e}")
@@ -164,10 +138,7 @@ def add_to_rag_batch(text: str, source: str = None) -> Dict[str, Any]:
 
 
 def flush_batch():
-    """
-    Save all pending chunks to database.
-    Call this after processing a complete movie.
-    """
+    """Save all pending chunks to the database."""
     global _db_cache, _pending_chunks
 
     if not _pending_chunks:
@@ -175,49 +146,29 @@ def flush_batch():
 
     logger.info(f"💾 Flushing {len(_pending_chunks)} chunks to database...")
 
-    # Load database
     db = load_rag_database()
-
-    # Add all pending chunks
     db.extend(_pending_chunks)
-
-    # Save to disk
     save_rag_db(db)
-
-    # Clear pending
     _pending_chunks = []
 
-    logger.info(f"✅ Batch saved successfully")
+    logger.info("✅ Batch saved successfully")
+
 
 def should_refresh_source(source: str, max_age_days: int = 30) -> bool:
-    """
-    Check if source should be refreshed based on age.
-
-    Args:
-        source: Source URL
-        max_age_days: Maximum age in days before refresh
-
-    Returns:
-        True if should refresh, False if recent enough
-    """
+    """Check if a source should be refreshed based on age."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
         cursor.execute("""
-                       SELECT created_at
-                       FROM documents
-                       WHERE source = ?
-                       ORDER BY created_at DESC LIMIT 1
-                       """, (source,))
-
+            SELECT created_at FROM documents
+            WHERE source = ? ORDER BY created_at DESC LIMIT 1
+        """, (source,))
         row = cursor.fetchone()
 
         if not row:
-            return True  # Not found, should fetch
+            return True
 
-        # Check age
-        from datetime import datetime, timedelta
+        from datetime import datetime
         created_at = datetime.fromisoformat(row[0])
         age = datetime.now() - created_at
 
@@ -229,70 +180,57 @@ def should_refresh_source(source: str, max_age_days: int = 30) -> bool:
         return False
 
     except Exception as e:
-        logger.error(f"❌ Error checking age: {e}")
-        return True  # Default to fetching on error
+        logger.error(f"❌ Error checking source age: {e}")
+        return True
+    finally:
+        conn.close()
 
 
 def has_source(source: str) -> bool:
-    """
-    Check if a source URL already exists in RAG.
-
-    Args:
-        source: Source URL to check
-
-    Returns:
-        True if source exists, False otherwise
-    """
+    """Check if a source URL already exists in the RAG DB."""
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
-        cursor.execute("""
-                       SELECT COUNT(*)
-                       FROM documents
-                       WHERE source = ? LIMIT 1
-                       """, (source,))
-
-        count = cursor.fetchone()[0]
-        return count > 0
-
+        cursor.execute("SELECT COUNT(*) FROM documents WHERE source = ? LIMIT 1", (source,))
+        return cursor.fetchone()[0] > 0
     except Exception as e:
         logger.error(f"❌ Error checking source: {e}")
-        return False  # Default to allowing storage on error
+        return False
+    finally:
+        conn.close()
+
 
 def batch_insert_documents(documents: List[Dict[str, Any]]) -> int:
     """
     Optimized batch insert with binary embeddings.
+
+    Each document dict must contain:
+        embedding  — list of floats
+        source     — source identifier string
+        chunk_id   — int FK into sessions.db chunks.id
     """
-    import uuid
     import numpy as np
 
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
-        # Prepare data with binary embeddings (MUCH faster than JSON)
         batch_data = []
         for doc in documents:
             doc_id = str(uuid.uuid4())
-
-            # Convert embedding to numpy array then bytes (binary is faster than JSON)
-            embedding_array = np.array(doc['embedding'], dtype=np.float32)
-            embedding_bytes = embedding_array.tobytes()
-
+            embedding_bytes = np.array(doc['embedding'], dtype=np.float32).tobytes()
             batch_data.append((
                 doc_id,
                 embedding_bytes,
                 doc.get('source'),
+                doc.get('chunk_id'),
             ))
 
-        # Fast transaction
         cursor.execute("BEGIN IMMEDIATE")
         cursor.executemany("""
-                           INSERT INTO documents
-                               (id, embedding, source)
-                           VALUES (?, ?, ?)
-                           """, batch_data)
+            INSERT INTO documents (id, embedding, source, chunk_id)
+            VALUES (?, ?, ?, ?)
+        """, batch_data)
         cursor.execute("COMMIT")
 
         logger.debug(f"💾 Batch inserted {len(batch_data)} documents")
@@ -302,6 +240,8 @@ def batch_insert_documents(documents: List[Dict[str, Any]]) -> int:
         logger.error(f"❌ Batch insert failed: {e}")
         try:
             cursor.execute("ROLLBACK")
-        except:
+        except Exception:
             pass
         return 0
+    finally:
+        conn.close()

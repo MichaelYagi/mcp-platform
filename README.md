@@ -50,8 +50,12 @@ curl -fsSL https://ollama.com/install.sh | sh
 # Start Ollama server
 ollama serve
 
-# Model required for RAG ingestion
+# Model required for RAG ingestion and semantic search
 ollama pull bge-large
+
+# Optional: reranker model — improves RAG result quality, not required
+# If not installed, RAG search falls back to cosine similarity ranking
+ollama pull sam860/qwen3-reranker:0.6b-Q8_0
 
 # Download a model (use 14B+ for best results)
 ollama pull qwen2.5:14b-instruct-q4_K_M
@@ -205,6 +209,7 @@ Some features require additional setup before they will function. The table belo
 | Feature | Required env vars | Additional setup |
 |---------|-------------------|------------------|
 | RAG ingestion & search | — | Ollama running + `bge-large` pulled |
+| RAG reranking (optional) | — | `bge-reranker-v2-m3` pulled — improves result ranking, falls back to cosine if absent |
 | Plex media library | `PLEX_URL`, `PLEX_TOKEN` | Plex Media Server running |
 | Plex ingestion & recommendations | `PLEX_URL`, `PLEX_TOKEN` | Ollama running + `bge-large` pulled |
 | Ollama web search | `OLLAMA_TOKEN` | Ollama account + API key |
@@ -600,9 +605,11 @@ mcp_a2a/
 
 **How RAG works:**
 - Content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
+- Chunk text is stored in `sessions.db` (chunks table); only embeddings live in `rag_database.db`
 - URLs are deduplicated — the same page won't be stored twice
 - Semantic search finds the most relevant content even if exact keywords don't match
 - Search returns top 5 results with similarity scores and source URLs
+- If `bge-reranker-v2-m3` is installed, a reranking pass re-scores the top 20 cosine candidates for higher precision
 
 ### Troubleshooting
 

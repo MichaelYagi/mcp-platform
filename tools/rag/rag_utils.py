@@ -16,7 +16,6 @@ logger = logging.getLogger("mcp_server")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 RAG_DB_FILE = PROJECT_ROOT / "data" / "rag_database.db"
 
-# Schema init lock — prevents two coroutines racing to run ALTER TABLE
 import threading
 _init_lock = threading.Lock()
 _db_initialized = False
@@ -30,11 +29,7 @@ def ensure_data_dir():
 def get_connection() -> sqlite3.Connection:
     """
     Open a new SQLite connection for the current call.
-    Matches session_manager.py's per-call pattern — no shared connection,
-    no cross-thread I/O errors.
-
-    Callers are responsible for calling conn.close() when done, or using
-    the connection as a context manager.
+    Callers are responsible for calling conn.close() when done.
     """
     global _db_initialized
     ensure_data_dir()
@@ -42,17 +37,14 @@ def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(RAG_DB_FILE))
     conn.row_factory = sqlite3.Row
 
-    # Performance PRAGMAs — applied per connection (cheap, idempotent)
-    conn.execute("PRAGMA journal_mode=WAL")   # WAL persists; safe to re-set
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA cache_size=-64000")
     conn.execute("PRAGMA temp_store=MEMORY")
 
-    # Schema init only needed once per process — lock prevents race condition
-    # where two coroutines both read _db_initialized=False and both run ALTER TABLE
     if not _db_initialized:
         with _init_lock:
-            if not _db_initialized:  # double-checked locking
+            if not _db_initialized:
                 _initialize_database(conn)
                 _db_initialized = True
 
@@ -63,52 +55,69 @@ def _initialize_database(conn: sqlite3.Connection):
     """Create tables and indexes if they don't exist, migrate schema if needed."""
     cursor = conn.cursor()
 
-    # Main documents table
+    # Main documents table.
+    # chunk_id   — FK into sessions.db chunks.id for document RAG rows (session_id IS NULL)
+    # message_id — FK into sessions.db messages.id for conversation turn rows (session_id IS NOT NULL)
+    # Text is never stored here; always retrieved from sessions.db via chunk_id or message_id.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS documents (
-            id TEXT PRIMARY KEY,
-            embedding BLOB NOT NULL,
-            source TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            session_id TEXT
+            id         TEXT PRIMARY KEY,
+            embedding  BLOB NOT NULL,
+            source     TEXT,
+            chunk_id   INTEGER,
+            message_id INTEGER,
+            session_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # session_id is part of the base schema — no migration needed
+    # Migrate existing rows: add chunk_id / message_id columns if absent
+    cursor.execute("PRAGMA table_info(documents)")
+    existing_cols = {row[1] for row in cursor.fetchall()}
+    for col, typedef in [("chunk_id", "INTEGER"), ("message_id", "INTEGER")]:
+        if col not in existing_cols:
+            cursor.execute(f"ALTER TABLE documents ADD COLUMN {col} {typedef}")
 
-    # ── Standard indexes ──────────────────────────────────────────────────────
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_source 
         ON documents(source)
     """)
-
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_created 
         ON documents(created_at)
     """)
-
-    # Composite index: session queries filter on session_id then order by created_at
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_documents_session_created
         ON documents(session_id, created_at)
     """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_documents_chunk_id
+        ON documents(chunk_id)
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_documents_message_id
+        ON documents(message_id)
+    """)
 
     conn.commit()
-    logger.debug("✅ Database initialized")
+    logger.debug("✅ RAG database initialized")
 
 
 def load_rag_db() -> List[Dict[str, Any]]:
     """
-    Load all NON-conversation documents from the RAG database.
-    Conversation turns (session_id IS NOT NULL) are excluded — they are
-    accessed via conversation_rag.retrieve_context() instead.
+    Load all non-conversation documents from the RAG database.
+    Conversation turns (session_id IS NOT NULL) are excluded — accessed
+    via conversation_rag.retrieve_context() instead.
+
+    Returns dicts with: id, embedding, source, chunk_id
+    Text is NOT stored here — callers retrieve it from sessions.db via chunk_id.
     """
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, embedding, source
+            SELECT id, embedding, source, chunk_id
             FROM documents
             WHERE session_id IS NULL
             ORDER BY created_at
@@ -117,22 +126,19 @@ def load_rag_db() -> List[Dict[str, Any]]:
         documents = []
         for row in cursor.fetchall():
             embedding_data = row['embedding']
-
             if isinstance(embedding_data, bytes):
                 embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
             else:
                 embedding = json.loads(embedding_data)
 
-            doc = {
-                "id": row['id'],
+            documents.append({
+                "id":       row['id'],
                 "embedding": embedding,
-                "metadata": {
-                    "source": row['source'],
-                }
-            }
-            documents.append(doc)
+                "chunk_id": row['chunk_id'],
+                "metadata": {"source": row['source']},
+            })
 
-        logger.debug(f"📂 Loaded {len(documents)} documents from database")
+        logger.debug(f"📂 Loaded {len(documents)} documents from RAG database")
         return documents
 
     except Exception as e:
@@ -150,31 +156,29 @@ def save_rag_db(db: List[Dict[str, Any]]):
     try:
         conn = get_connection()
         cursor = conn.cursor()
-
         cursor.execute("BEGIN TRANSACTION")
 
         for doc in db:
             embedding_blob = json.dumps(doc['embedding'])
             metadata = doc.get('metadata', {})
-
             cursor.execute("""
-                INSERT OR REPLACE INTO documents 
-                (id, embedding, source, session_id)
-                VALUES (?, ?, ?, NULL)
+                INSERT OR REPLACE INTO documents (id, embedding, source, chunk_id, session_id)
+                VALUES (?, ?, ?, ?, NULL)
             """, (
                 doc['id'],
                 embedding_blob,
                 metadata.get('source'),
+                doc.get('chunk_id'),
             ))
 
         cursor.execute("COMMIT")
-        logger.debug(f"💾 Saved {len(db)} documents to database")
+        logger.debug(f"💾 Saved {len(db)} documents to RAG database")
 
     except Exception as e:
         logger.error(f"❌ Error saving RAG database: {e}")
         try:
             cursor.execute("ROLLBACK")
-        except:
+        except Exception:
             pass
         raise
     finally:
@@ -191,29 +195,27 @@ def save_rag_db_batch(documents: List[Dict[str, Any]]):
         for doc in documents:
             embedding_blob = json.dumps(doc['embedding'])
             metadata = doc.get('metadata', {})
-
             data.append((
                 doc['id'],
                 embedding_blob,
                 metadata.get('source'),
+                doc.get('chunk_id'),
                 None,  # session_id — external docs never have one
             ))
 
         cursor.execute("BEGIN TRANSACTION")
         cursor.executemany("""
-            INSERT OR REPLACE INTO documents 
-            (id, embedding, source, session_id)
-            VALUES (?, ?, ?, ?)
+            INSERT OR REPLACE INTO documents (id, embedding, source, chunk_id, session_id)
+            VALUES (?, ?, ?, ?, ?)
         """, data)
         cursor.execute("COMMIT")
-
         logger.debug(f"💾 Batch saved {len(documents)} documents")
 
     except Exception as e:
         logger.error(f"❌ Error in batch save: {e}")
         try:
             cursor.execute("ROLLBACK")
-        except:
+        except Exception:
             pass
         raise
     finally:
@@ -241,7 +243,7 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT id, embedding, source
+            SELECT id, embedding, source, chunk_id
             FROM documents
             WHERE source = ? AND session_id IS NULL
             ORDER BY created_at
@@ -250,20 +252,17 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
         documents = []
         for row in cursor.fetchall():
             embedding_data = row['embedding']
-
             if isinstance(embedding_data, bytes):
                 embedding = np.frombuffer(embedding_data, dtype=np.float32).tolist()
             else:
                 embedding = json.loads(embedding_data)
 
-            doc = {
-                "id": row['id'],
+            documents.append({
+                "id":        row['id'],
                 "embedding": embedding,
-                "metadata": {
-                    "source": row['source'],
-                }
-            }
-            documents.append(doc)
+                "chunk_id":  row['chunk_id'],
+                "metadata":  {"source": row['source']},
+            })
 
         return documents
 
@@ -277,25 +276,23 @@ def get_documents_by_source(source: str) -> List[Dict[str, Any]]:
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
     """Calculate cosine similarity between two vectors."""
     try:
-        vec1_np = np.array(vec1)
-        vec2_np = np.array(vec2)
-
-        dot_product = np.dot(vec1_np, vec2_np)
-        norm1 = np.linalg.norm(vec1_np)
-        norm2 = np.linalg.norm(vec2_np)
-
-        if norm1 == 0 or norm2 == 0:
+        v1 = np.array(vec1)
+        v2 = np.array(vec2)
+        dot = np.dot(v1, v2)
+        n1, n2 = np.linalg.norm(v1), np.linalg.norm(v2)
+        if n1 == 0 or n2 == 0:
             return 0.0
-
-        return float(max(0.0, min(1.0, dot_product / (norm1 * norm2))))
-
+        return float(max(0.0, min(1.0, dot / (n1 * n2))))
     except Exception as e:
         logger.error(f"❌ Error calculating cosine similarity: {e}")
         return 0.0
 
 
 def clear_rag_db():
-    """Clear only external/document RAG entries (preserves conversation turns)"""
+    """
+    Clear only external/document RAG entries (preserves conversation turns).
+    Also clears the corresponding chunk text rows from sessions.db.
+    """
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -307,6 +304,14 @@ def clear_rag_db():
         logger.error(f"❌ Error clearing database: {e}")
     finally:
         conn.close()
+
+    # Purge chunk text from sessions.db
+    try:
+        from client.session_manager import SessionManager
+        deleted = SessionManager().delete_all_chunks()
+        logger.info(f"🗑️  Cleared {deleted} chunk text rows from sessions.db")
+    except Exception as e:
+        logger.warning(f"⚠️ Could not clear chunk text from sessions.db: {e}")
 
 
 def migrate_from_json():
@@ -372,6 +377,7 @@ def get_database_stats() -> Dict[str, Any]:
     finally:
         conn.close()
 
+
 def delete_conversation_session(session_id: int):
     """
     Delete all RAG conversation turns for a specific session.
@@ -394,7 +400,7 @@ def clear_all_conversation_turns():
     """
     Delete ALL conversation turns from the RAG database.
     Called by :clear sessions to keep rag_database.db in sync with sessions.db.
-    Ingested media documents (session_id IS NULL) are preserved.
+    Ingested document rows (session_id IS NULL) are preserved.
     """
     conn = get_connection()
     try:

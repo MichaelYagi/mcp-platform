@@ -20,7 +20,7 @@ try:
     _CONV_RAG_AVAILABLE = True
 except ImportError:
     _CONV_RAG_AVAILABLE = False
-    def _rag_store_turn(*args, **kwargs): pass
+    def _rag_store_turn(session_id, role, content, message_id=None): pass
     def _rag_purge_session(*args, **kwargs): pass
     def _rag_search_turns(*args, **kwargs): return []
 
@@ -221,8 +221,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             if session_manager and session_id:
                 MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                 model_name = "direct-answer"
-                session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
-                _rag_store_turn(session_id, "assistant", response_text)
+                _msg_id = session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
+                _rag_store_turn(session_id, "assistant", response_text, _msg_id)
 
             try:
                 await broadcast_message("assistant_message", {
@@ -263,8 +263,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         if session_manager and session_id:
             MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
             model_name = result.get("current_model", "unknown")
-            session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
-            _rag_store_turn(session_id, "assistant", assistant_text)
+            _msg_id = session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
+            _rag_store_turn(session_id, "assistant", assistant_text, _msg_id)
 
         # Broadcast to ALL connected sockets — covers reconnect case where
         # original socket died but new socket is already in CONNECTED_WEBSOCKETS
@@ -620,9 +620,9 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         }))
 
                     MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
-                    session_manager.add_message(current_session_id, "user", prompt, MAX_MESSAGE_HISTORY, model=None)
+                    _msg_id = session_manager.add_message(current_session_id, "user", prompt, MAX_MESSAGE_HISTORY, model=None)
                     # Store user turn in session-scoped RAG for semantic context retrieval
-                    _rag_store_turn(current_session_id, "user", prompt)
+                    _rag_store_turn(current_session_id, "user", prompt, _msg_id)
 
                     messages = session_manager.get_session_messages(current_session_id)
                     if len(messages) == 1:
@@ -688,15 +688,15 @@ async def _cleanup_stale_tasks(max_age_seconds: int = 3600):
         for sid in stale:
             task = SESSION_TASKS.get(sid)
             if task and not task.done():
-                logger.warning(f"🧹 TTL cleanup: cancelling stale task for session {sid} "
-                               f"(age={(now - SESSION_TASK_CREATED[sid]):.0f}s)")
+                # logger.warning(f"🧹 TTL cleanup: cancelling stale task for session {sid} "
+                #                f"(age={(now - SESSION_TASK_CREATED[sid]):.0f}s)")
                 task.cancel()
             SESSION_TASKS.pop(sid, None)
             SESSION_TASK_CREATED.pop(sid, None)
             SESSION_LOCKS.pop(sid, None)
             PROCESSING_SESSIONS.discard(sid)
-        if stale:
-            logger.info(f"🧹 TTL cleanup removed {len(stale)} stale session entries")
+        # if stale:
+        #     logger.info(f"🧹 TTL cleanup removed {len(stale)} stale session entries")
 
 
 async def start_websocket_server(agent, tools, logger, conversation_state, run_agent_fn, models_module,

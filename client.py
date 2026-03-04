@@ -660,8 +660,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
             mcp_agent._tools = [_make_tool(t) for t in recovered]
             logger.info(f"⚠️  Partial initialization: {len(mcp_agent._tools)} tools recovered")
-        else:
-            logger.warning("⚠️  No tools recovered — all servers may have failed")
+        # else:
+        #     logger.warning("⚠️  No tools recovered — all servers may have failed")
     except Exception as re:
         logger.error(f"❌ Recovery failed: {re}")
 
