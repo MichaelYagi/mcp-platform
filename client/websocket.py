@@ -258,6 +258,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # ═══════════════════════════════════════════════════════════════
         final_message = result["messages"][-1]
         assistant_text = final_message.content
+        import re
+        assistant_text = re.sub(r'<\|[^|]+\|>', '', assistant_text).strip()
 
         # Write updated history back to the outer conversation_state so
         # the next call sees the accumulated Human+AI pairs.
