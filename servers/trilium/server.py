@@ -40,7 +40,7 @@ root_logger.handlers.clear()
 formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 # Create file handler
-file_handler = logging.FileHandler(LOG_DIR / "trilium-server.log", encoding="utf-8")
+file_handler = logging.FileHandler(LOG_DIR / "mcp-server.log", encoding="utf-8")
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 
