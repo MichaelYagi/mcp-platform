@@ -117,6 +117,54 @@ INTENT_CATALOG = [
         "skills": True,
     },
     {
+        "name": "analyze_image",
+        "pattern": (
+            r'\banalyze\b.*https?://'
+            r'|\bdescribe\b.*https?://'
+            r'|\bwhat.*https?://.*\b(image|photo|picture|pic)\b'
+            r'|\b(image|photo|picture|pic)\b.*https?://'
+            r'|\banalyze\s+(this\s+)?(image|photo|picture)\b'
+            r'|\blook\s+at\s+(this\s+)?(image|photo|picture)\b'
+            r'|\banalyze\b.*\.(jpg|jpeg|png|gif|webp|bmp|heic)\b'
+            r'|\bdescribe\b.*\.(jpg|jpeg|png|gif|webp|bmp|heic)\b'
+            r'|\b(image|photo|picture)\b.*\.(jpg|jpeg|png|gif|webp|bmp|heic)\b'
+        ),
+        "tools": ["analyze_image_tool"],
+        "priority": 2,
+        "web_search": False,
+        "skills": True,
+    },
+    {
+        "name": "shashin_analyze",
+        "pattern": (
+            r'\banalyze\b.*(photo|image|picture|pic)\b'
+            r'|\b(photo|image|picture|pic)\b.*\banalyze\b'
+            r'|\bdescribe\b.*(photo|image|picture|pic)\b'
+            r'|\b(photo|image|picture|pic)\b.*\bdescribe\b'
+            r'|\bwhat.*(photo|image|picture|pic).*(show|in|of)\b'
+            r'|\bvision\b.*(photo|image|picture|pic)\b'
+            r'|\bshashin.*analyz\b|\banalyz.*shashin\b'
+        ),
+        "tools": ["shashin_search_tool", "shashin_analyze_tool"],
+        "priority": 2,
+        "web_search": False,
+        "skills": True,
+    },
+    {
+        "name": "shashin_search",
+        "pattern": (
+            r'\b(find|search|show|look\s+for)\b.*(photo|image|picture|pic)\b'
+            r'|\bmy\s+(photos?|images?|pictures?|gallery)\b'
+            r'|\bshashin\b'
+            r'|\bphotos?\s+(of|with|by|from|taken|featuring)\b'
+            r'|\b(browse|list)\b.*(photos?|images?|gallery)\b'
+        ),
+        "tools": ["shashin_search_tool"],
+        "priority": 2,
+        "web_search": False,
+        "skills": True,
+    },
+    {
         "name": "plex_search",
         "pattern": (
             r'\b(find|search|look\s+for|show\s+me)\s+.*\b(movie|film|show|media|series)\b'
