@@ -1932,7 +1932,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 )
                 tool_messages.append(result_msg)
                 logger.info(f"✅ Tool {tool_name} completed in {tool_duration:.2f}s")
-                logger.info(f"✅ ToolMessage result: {str(result)}")
+                logger.info(f"✅ ToolMessage result: {str(result)[:30]}")
                 from client.health import record_tool_call
                 record_tool_call(tool_name, tool_duration)
 
