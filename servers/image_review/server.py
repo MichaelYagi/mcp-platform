@@ -274,25 +274,63 @@ def shashin_search_tool(
             "originalUrl":  f"{SHASHIN_BASE_URL}{img.get('thumbnailUrlOriginal', '')}",
         })
 
-    if not results:
-        return f'No photos found matching "{term}".'
+    return json.dumps({
+        "success":     True,
+        "term":        term,
+        "count":       len(results),
+        "page":        page,
+        "total_pages": total_pages,
+        "results":     results,
+    }, indent=2)
 
-    lines = [f'Found {len(results)} photo(s) matching "{term}" (page {page + 1} of {total_pages}):\n']
-    for i, img in enumerate(results, 1):
-        taken = (img["takenAt"] or "")[:10]
-        keywords = img["keywords"] or ""
-        lines.append(f'{i}. {img["fileName"]} — {taken}')
-        lines.append(f'   ID: {img["id"]}')
-        if keywords:
-            lines.append(f'   Keywords: {keywords}')
-        if img.get("placeName"):
-            lines.append(f'   Location: {img["placeName"]}')
-        lines.append("")
 
-    if total_pages > 1:
-        lines.append(f'Showing page {page + 1} of {total_pages}. Ask for "next page" to see more.')
+# ─────────────────────────────────────────────────────────────────────────────
+# shashin_random_tool
+# ─────────────────────────────────────────────────────────────────────────────
 
-    return "\n".join(lines)
+@mcp.tool()
+@check_tool_enabled(category="image_tools")
+def shashin_random_tool() -> str:
+    """
+    Fetch metadata for a random image from the Shashin gallery.
+
+    Calls the Shashin random metadata endpoint and returns the image ID and
+    basic metadata. Pass the returned image_id to shashin_analyze_tool to
+    fetch and describe the image via vision inference.
+
+    Returns:
+        JSON string with:
+        - success (bool)
+        - image_id (str)   — UUID, pass to shashin_analyze_tool
+        - fileName (str)
+        - takenAt (str)
+        - camera (str)
+        - placeName (str)
+        - keywords (str)
+        - error (str)      — present only on failure
+    """
+    logger.info("🛠 [server] shashin_random_tool called")
+
+    result = _shashin_get("/api/v1/random/metadata/type/image")
+
+    if not result["ok"]:
+        return json.dumps({"success": False, "error": result["error"]}, indent=2)
+
+    data = result["data"]
+    image_id = data.get("id")
+
+    if not image_id:
+        return json.dumps({"success": False, "error": "No image ID in random response"}, indent=2)
+
+    return json.dumps({
+        "success":   True,
+        "image_id":  image_id,
+        "fileName":  data.get("fileName"),
+        "takenAt":   data.get("takenAt"),
+        "camera":    data.get("camera"),
+        "placeName": data.get("placeName"),
+        "keywords":  data.get("keywords"),
+    }, indent=2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

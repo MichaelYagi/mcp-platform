@@ -137,6 +137,20 @@ INTENT_CATALOG = [
         "skills": True,
     },
     {
+        "name": "shashin_random",
+        "pattern": (
+            r'\brandom\b.*(photo|image|picture|pic)\b'
+            r'|\b(photo|image|picture|pic)\b.*\brandom\b'
+            r'|\bsurprise\s+me\b'
+            r'|\bshow\s+me\s+a\s+random\b'
+            r'|\brandom\s+shashin\b|\bshashin.*random\b'
+        ),
+        "tools": ["shashin_random_tool", "shashin_analyze_tool"],
+        "priority": 1,
+        "web_search": False,
+        "skills": True,
+    },
+    {
         "name": "shashin_analyze",
         "pattern": (
             r'\banalyze\b.*(photo|image|picture|pic)\b'
