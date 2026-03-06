@@ -64,8 +64,16 @@ def _get_cross_encoder():
     global _cross_encoder
     if _cross_encoder is None:
         from sentence_transformers import CrossEncoder
+        from pathlib import Path
+        import os
+
+        # Check if model is already cached — if so, skip the HuggingFace update check
+        cache_dir = Path(os.getenv("HF_HOME", Path.home() / ".cache" / "huggingface")) / "hub"
+        model_slug = RERANKER_MODEL.replace("/", "--")
+        already_cached = any(cache_dir.glob(f"models--{model_slug}*")) if cache_dir.exists() else False
+
         logger.info(f"⏳ Loading cross-encoder model: {RERANKER_MODEL}")
-        _cross_encoder = CrossEncoder(RERANKER_MODEL)
+        _cross_encoder = CrossEncoder(RERANKER_MODEL, local_files_only=already_cached)
         logger.info(f"✅ Cross-encoder loaded: {RERANKER_MODEL}")
     return _cross_encoder
 

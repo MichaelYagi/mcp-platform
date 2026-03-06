@@ -128,9 +128,11 @@ INTENT_CATALOG = [
             r'|\banalyze\b.*\.(jpg|jpeg|png|gif|webp|bmp|heic)\b'
             r'|\bdescribe\b.*\.(jpg|jpeg|png|gif|webp|bmp|heic)\b'
             r'|\b(image|photo|picture)\b.*\.(jpg|jpeg|png|gif|webp|bmp|heic)\b'
+            r'|\bdescribe\b.*(image|photo|picture)\b.*(/mnt/|/home/|/tmp/|https?://)'
+            r'|\banalyze\b.*(image|photo|picture)\b.*(/mnt/|/home/|/tmp/|https?://)'
         ),
         "tools": ["analyze_image_tool"],
-        "priority": 2,
+        "priority": 1,
         "web_search": False,
         "skills": True,
     },
@@ -145,6 +147,7 @@ INTENT_CATALOG = [
             r'|\bvision\b.*(photo|image|picture|pic)\b'
             r'|\bshashin.*analyz\b|\banalyz.*shashin\b'
         ),
+        "exclude_pattern": r'(/mnt/|/home/|/tmp/|https?://|\.(jpg|jpeg|png|gif|webp|bmp|heic)\b)',
         "tools": ["shashin_search_tool", "shashin_analyze_tool"],
         "priority": 2,
         "web_search": False,
