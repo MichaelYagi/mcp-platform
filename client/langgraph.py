@@ -1359,7 +1359,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     b64 = tool_data.get("image_base64")
                     image_source = tool_data.get("image_source")
 
-                    # If no base64 payload, fetch the image from image_source
+                    # If no base64 payload, fetch from image_source (e.g. shashin_analyze_tool)
                     if not b64 and image_source:
                         logger.info(f"[LangGraph] 🖼️ Fetching image from source: {image_source}")
                         import httpx as _httpx
@@ -1372,21 +1372,30 @@ def create_langgraph_agent(llm_with_tools, tools):
                             img_resp.raise_for_status()
                         import base64 as _b64
                         b64 = _b64.b64encode(img_resp.content).decode("utf-8")
-                        logger.info(f"[LangGraph] 🖼️ Fetched {len(img_resp.content)} bytes from {image_source}")
+                        logger.info(f"[LangGraph] 🖼️ Fetched {len(img_resp.content)} bytes")
 
                     # Strip data URI prefix if present
                     if b64 and "," in b64:
                         b64 = b64.split(",", 1)[1]
 
-                    # Find the user's original prompt (last HumanMessage)
-                    user_prompt = "Describe this image."
-                    for msg in reversed(messages):
-                        if isinstance(msg, HumanMessage):
-                            user_prompt = msg.content if isinstance(msg.content, str) else "Describe this image."
-                            break
+                    # Always use a clean prompt for Ollama — the raw user message
+                    # often contains instructions like "show the image" that confuse
+                    # the vision model. We just want a description.
+                    user_prompt = "Describe this image in detail."
 
+                    # Use the dedicated vision model from env, falling back to current model.
+                    # This allows qwen2.5:14b to handle tool selection while a separate
+                    # vision model handles image inference.
+                    # Get Ollama URL from the already-initialized LLM client
+                    ollama_url = (
+                        getattr(base_llm, "base_url", None)
+                        or getattr(base_llm, "client_kwargs", {}).get("base_url")
+                        or os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+                    )
+                    # Strip trailing slash
+                    ollama_url = str(ollama_url).rstrip("/")
                     model_name = get_model_name(base_llm)
-                    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+                    logger.info(f"[LangGraph] 🖼️ Using vision model: {model_name}")
 
                     import httpx
                     payload = {
@@ -1414,6 +1423,7 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                     # Store the description in RAG keyed by the image source path/URL
                     # so future queries about the same image skip the vision model.
+                    image_source = tool_data.get("image_source")
                     if image_source:
                         try:
                             rag_add_tool = state.get("tools", {}).get("rag_add_tool")
@@ -1804,6 +1814,61 @@ def create_langgraph_agent(llm_with_tools, tools):
                 current_model = get_model_name(base_llm)
 
             elif not has_tool_calls and has_content:
+
+                # If intent was analyze_image or shashin_analyze but LLM answered
+                # from context instead of calling the tool, force the tool call.
+                if pattern_name in ("analyze_image", "shashin_analyze"):
+                    import re as _img_re, uuid as _uuid
+                    _file_re = _img_re.compile(
+                        r'([A-Za-z]:[/\\][^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|heic)'  # Windows C:\... or C:/...
+                        r'|(?:/mnt/|/home/|/tmp/|/var/|/Users/|~/)[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|heic))',  # WSL/Linux/Mac/tilde
+                        _img_re.IGNORECASE
+                    )
+                    _url_re = _img_re.compile(
+                        r'(https?://[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|heic))',
+                        _img_re.IGNORECASE
+                    )
+                    _uuid_re = _img_re.compile(
+                        r'\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b',
+                        _img_re.IGNORECASE
+                    )
+                    file_match = _file_re.search(user_message or "")
+                    url_match = _url_re.search(user_message or "")
+                    uuid_match = _uuid_re.search(user_message or "")
+
+                    forced_tool = None
+                    forced_args = None
+                    if file_match:
+                        forced_tool = "analyze_image_tool"
+                        forced_args = {"image_file_path": file_match.group(1)}
+                    elif url_match:
+                        forced_tool = "analyze_image_tool"
+                        forced_args = {"image_url": url_match.group(1)}
+                    elif uuid_match:
+                        forced_tool = "shashin_analyze_tool"
+                        forced_args = {"image_id": uuid_match.group(1)}
+
+                    if forced_tool and forced_args:
+                        import uuid as _uuid2
+                        tool_call_id = str(_uuid2.uuid4())
+                        forced = AIMessage(
+                            content="",
+                            tool_calls=[{
+                                "id": tool_call_id,
+                                "name": forced_tool,
+                                "args": forced_args
+                            }]
+                        )
+                        logger.info(f"[LangGraph] 🖼️ Forced {forced_tool} call: {forced_args}")
+                        return {
+                            "messages": [forced],
+                            "tools": state.get("tools", {}),
+                            "llm": state.get("llm"),
+                            "ingest_completed": state.get("ingest_completed", False),
+                            "stopped": state.get("stopped", False),
+                            "current_model": current_model
+                        }
+
                 needs_current_info = _needs_web_search(user_message)
 
                 if needs_current_info:
