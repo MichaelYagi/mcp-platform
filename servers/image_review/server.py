@@ -316,20 +316,23 @@ def shashin_random_tool() -> str:
     if not result["ok"]:
         return json.dumps({"success": False, "error": result["error"]}, indent=2)
 
-    data = result["data"]
+    body = result["data"]
+    if body.get("status") != "success":
+        return json.dumps({"success": False, "error": body.get("msg", "Unknown error")}, indent=2)
+
+    data = body.get("metadata", {})
     image_id = data.get("id")
 
     if not image_id:
         return json.dumps({"success": False, "error": "No image ID in random response"}, indent=2)
 
     return json.dumps({
-        "success":   True,
-        "image_id":  image_id,
-        "fileName":  data.get("fileName"),
-        "takenAt":   data.get("takenAt"),
-        "camera":    data.get("camera"),
-        "placeName": data.get("placeName"),
-        "keywords":  data.get("keywords"),
+        "success":        True,
+        "image_id":       image_id,
+        "fileName":       data.get("fileName"),
+        "takenAt":        data.get("takenAt"),
+        "camera":         data.get("camera"),
+        "placeName":      data.get("placeName")
     }, indent=2)
 
 
