@@ -1354,11 +1354,28 @@ def create_langgraph_agent(llm_with_tools, tools):
                         tool_data = json.loads(raw)
                     except json.JSONDecodeError:
                         tool_data = None
-                if isinstance(tool_data, dict) and tool_data.get("image_base64"):
+                if isinstance(tool_data, dict) and (tool_data.get("image_base64") or tool_data.get("image_source")):
                     logger.info("[LangGraph] 🖼️ Image result — calling Ollama vision directly")
-                    b64 = tool_data["image_base64"]
+                    b64 = tool_data.get("image_base64")
+                    image_source = tool_data.get("image_source")
+
+                    # If no base64 payload, fetch the image from image_source
+                    if not b64 and image_source:
+                        logger.info(f"[LangGraph] 🖼️ Fetching image from source: {image_source}")
+                        import httpx as _httpx
+                        fetch_headers = {}
+                        shashin_key = os.getenv("SHASHIN_API_KEY", "")
+                        if shashin_key and ("192.168." in image_source or "shashin" in image_source.lower()):
+                            fetch_headers = {"x-api-key": shashin_key, "Content-Type": "application/json"}
+                        async with _httpx.AsyncClient(timeout=30.0) as hc:
+                            img_resp = await hc.get(image_source, headers=fetch_headers)
+                            img_resp.raise_for_status()
+                        import base64 as _b64
+                        b64 = _b64.b64encode(img_resp.content).decode("utf-8")
+                        logger.info(f"[LangGraph] 🖼️ Fetched {len(img_resp.content)} bytes from {image_source}")
+
                     # Strip data URI prefix if present
-                    if "," in b64:
+                    if b64 and "," in b64:
                         b64 = b64.split(",", 1)[1]
 
                     # Find the user's original prompt (last HumanMessage)
@@ -1397,7 +1414,6 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                     # Store the description in RAG keyed by the image source path/URL
                     # so future queries about the same image skip the vision model.
-                    image_source = tool_data.get("image_source")
                     if image_source:
                         try:
                             rag_add_tool = state.get("tools", {}).get("rag_add_tool")

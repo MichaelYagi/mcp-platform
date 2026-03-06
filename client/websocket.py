@@ -296,11 +296,27 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         pass
             try:
                 tool_data = json.loads(raw)
-                if isinstance(tool_data, dict) and tool_data.get("image_base64"):
-                    b64 = tool_data["image_base64"]
-                    image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
+                if isinstance(tool_data, dict) and (tool_data.get("image_base64") or tool_data.get("image_source")):
                     image_source = tool_data.get("image_source")
-                    logger.info(f"🖼️ image_b64 extracted length={len(image_b64)}, source={image_source}")
+                    b64 = tool_data.get("image_base64")
+                    if b64:
+                        image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
+                    elif image_source:
+                        # No base64 in tool result — fetch from source for UI display
+                        try:
+                            import httpx as _httpx, base64 as _b64
+                            fetch_headers = {}
+                            shashin_key = os.getenv("SHASHIN_API_KEY", "")
+                            if shashin_key and ("192.168." in image_source or "shashin" in image_source.lower()):
+                                fetch_headers = {"x-api-key": shashin_key, "Content-Type": "application/json"}
+                            async with _httpx.AsyncClient(timeout=30.0) as hc:
+                                img_resp = await hc.get(image_source, headers=fetch_headers)
+                                img_resp.raise_for_status()
+                            image_b64 = _b64.b64encode(img_resp.content).decode("utf-8")
+                            logger.info(f"🖼️ Fetched image for UI display from {image_source}, length={len(image_b64)}")
+                        except Exception as fetch_err:
+                            logger.warning(f"🖼️ Failed to fetch image for UI: {fetch_err}")
+                    logger.info(f"🖼️ image_b64={'set' if image_b64 else 'None'}, source={image_source}")
             except Exception as parse_err:
                 logger.warning(f"🖼️ JSON parse failed: {parse_err}")
             break

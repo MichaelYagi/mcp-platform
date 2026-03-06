@@ -336,18 +336,9 @@ def shashin_analyze_tool(
     else:
         image_url = f"{SHASHIN_BASE_URL}/api/v1/image/{image_id}"
 
-    fetch_result = _fetch_image_as_base64(image_url)
-
-    if not fetch_result["success"]:
-        return json.dumps({
-            "success":  False,
-            "error":    fetch_result["error"],
-            "image_id": image_id,
-        }, indent=2)
-
     return json.dumps({
         "success":        True,
-        "image_base64":   fetch_result["image_base64"],
+        "image_source":   image_url,
         "image_id":       image_id,
         "thumbnail_used": use_thumbnail,
     }, indent=2)
