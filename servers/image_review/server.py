@@ -274,14 +274,25 @@ def shashin_search_tool(
             "originalUrl":  f"{SHASHIN_BASE_URL}{img.get('thumbnailUrlOriginal', '')}",
         })
 
-    return json.dumps({
-        "success":     True,
-        "term":        term,
-        "count":       len(results),
-        "page":        page,
-        "total_pages": total_pages,
-        "results":     results,
-    }, indent=2)
+    if not results:
+        return f'No photos found matching "{term}".'
+
+    lines = [f'Found {len(results)} photo(s) matching "{term}" (page {page + 1} of {total_pages}):\n']
+    for i, img in enumerate(results, 1):
+        taken = (img["takenAt"] or "")[:10]
+        keywords = img["keywords"] or ""
+        lines.append(f'{i}. {img["fileName"]} — {taken}')
+        lines.append(f'   ID: {img["id"]}')
+        if keywords:
+            lines.append(f'   Keywords: {keywords}')
+        if img.get("placeName"):
+            lines.append(f'   Location: {img["placeName"]}')
+        lines.append("")
+
+    if total_pages > 1:
+        lines.append(f'Showing page {page + 1} of {total_pages}. Ask for "next page" to see more.')
+
+    return "\n".join(lines)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -336,9 +347,18 @@ def shashin_analyze_tool(
     else:
         image_url = f"{SHASHIN_BASE_URL}/api/v1/image/{image_id}"
 
+    fetch_result = _fetch_image_as_base64(image_url)
+
+    if not fetch_result["success"]:
+        return json.dumps({
+            "success":  False,
+            "error":    fetch_result["error"],
+            "image_id": image_id,
+        }, indent=2)
+
     return json.dumps({
         "success":        True,
-        "image_source":   image_url,
+        "image_base64":   fetch_result["image_base64"],
         "image_id":       image_id,
         "thumbnail_used": use_thumbnail,
     }, indent=2)
