@@ -261,26 +261,42 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         import re
         assistant_text = re.sub(r'<\|[^|]+\|>', '', assistant_text).strip()
 
-        # Extract any image payloads from JSON tool results so the UI can
-        # render them as <img> elements rather than raw base64 strings.
-        images = []
-        try:
-            raw_payload = assistant_text
-            # Handle TextContent wrapper: [TextContent(type='text', text='...')]
-            if raw_payload.startswith("[TextContent("):
-                import re as _re
-                m = _re.search(r"text='([\s\S]*)'", raw_payload)
-                if m:
-                    raw_payload = m.group(1)
-            payload = json.loads(raw_payload)
-            if isinstance(payload, dict) and payload.get("image_base64"):
-                b64 = payload.pop("image_base64")
-                images.append(b64)
-                # Replace the text with just the metadata (no giant base64 blob)
-                remaining = {k: v for k, v in payload.items() if k != "image_base64"}
-                assistant_text = remaining.get("description") or remaining.get("error") or ""
-        except (json.JSONDecodeError, AttributeError):
-            pass
+        # Extract image_base64 from the ToolMessage in message history.
+        # The final AIMessage is now the vision description text, not JSON,
+        # so we need to look back at the tool result that triggered the vision call.
+        image_b64 = None
+        from langchain_core.messages import ToolMessage
+        for msg in reversed(result["messages"]):
+            if isinstance(msg, ToolMessage):
+                raw = msg.content if isinstance(msg.content, str) else ""
+                if "TextContent" in raw:
+                    idx = raw.find("text='")
+                    if idx != -1:
+                        raw = raw[idx + 6:]
+                        depth, end, in_str, esc = 0, -1, False, False
+                        for i, ch in enumerate(raw):
+                            if esc: esc = False; continue
+                            if ch == '\\': esc = True; continue
+                            if ch == '"': in_str = not in_str
+                            if not in_str:
+                                if ch == '{': depth += 1
+                                elif ch == '}':
+                                    depth -= 1
+                                    if depth == 0: end = i; break
+                        if end != -1:
+                            raw = raw[:end + 1]
+                        try:
+                            raw = raw.encode('raw_unicode_escape').decode('unicode_escape')
+                        except Exception:
+                            pass
+                try:
+                    tool_data = json.loads(raw)
+                    if isinstance(tool_data, dict) and tool_data.get("image_base64"):
+                        b64 = tool_data["image_base64"]
+                        image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
+                except Exception:
+                    pass
+                break
 
         # Write updated history back to the outer conversation_state so
         # the next call sees the accumulated Human+AI pairs.
@@ -305,7 +321,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         try:
             await broadcast_message("assistant_message", {
                 "text": assistant_text,
-                "images": images,
+                "image": image_b64,
                 "multi_agent": result.get("multi_agent", False),
                 "a2a": result.get("a2a", False),
                 "model": result.get("current_model", "unknown")
