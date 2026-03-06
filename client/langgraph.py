@@ -1381,7 +1381,11 @@ def create_langgraph_agent(llm_with_tools, tools):
                     # Always use a clean prompt for Ollama — the raw user message
                     # often contains instructions like "show the image" that confuse
                     # the vision model. We just want a description.
-                    user_prompt = "Describe this image in detail."
+                    place = tool_data.get("placeName") if isinstance(tool_data, dict) else None
+                    if place:
+                        user_prompt = f"Describe this image in detail. It was taken at: {place}."
+                    else:
+                        user_prompt = "Describe this image in detail."
 
                     # Use the dedicated vision model from env, falling back to current model.
                     # This allows qwen2.5:14b to handle tool selection while a separate
