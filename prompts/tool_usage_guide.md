@@ -100,6 +100,30 @@ You: [uses same project path from context]
 - Search: `semantic_media_search_text(query, limit)`
 - Keywords: find movies, search plex, show me films
 
+### Shashin Photo Gallery
+- Search: `shashin_search_tool(term, page)`
+- Analyze: `shashin_analyze_tool(image_id)`
+- Keywords: find photos, search gallery, photos of, pictures of, show me photos
+
+**CRITICAL — Shashin search output format:**
+After calling `shashin_search_tool`, you MUST present results as a simple numbered list.
+Do NOT write analysis, summaries, or descriptions of the JSON structure.
+Do NOT explain what the data contains or how it is organized.
+
+CORRECT format:
+```
+Found X photos matching "term":
+
+1. filename.jpg — YYYY-MM-DD
+   ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   Keywords: tag1, tag2
+
+2. filename2.jpg — YYYY-MM-DD
+   ID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+WRONG: Writing paragraphs about the data structure, metadata fields, or JSON format.
+
 ### Code & Projects
 - Analyze: `analyze_project(project_path)`
 - Dependencies: `get_project_dependencies(project_path, dep_type)`
