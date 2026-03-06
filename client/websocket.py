@@ -244,6 +244,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # ═══════════════════════════════════════════════════════════════
         # Normal flow - Run agent (langgraph will preserve SystemMessage)
         # ═══════════════════════════════════════════════════════════════
+        msgs_before = len(conversation_state["messages"])
         result = await run_agent_fn(
             agent,
             conversation_state,
@@ -264,39 +265,45 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # Extract image_base64 from the ToolMessage in message history.
         # The final AIMessage is now the vision description text, not JSON,
         # so we need to look back at the tool result that triggered the vision call.
+        # Only scan messages added in THIS run — msgs_before was captured before run_agent_fn.
         image_b64 = None
+        image_source = None
         from langchain_core.messages import ToolMessage
-        for msg in reversed(result["messages"]):
-            if isinstance(msg, ToolMessage):
-                raw = msg.content if isinstance(msg.content, str) else ""
-                if "TextContent" in raw:
-                    idx = raw.find("text='")
-                    if idx != -1:
-                        raw = raw[idx + 6:]
-                        depth, end, in_str, esc = 0, -1, False, False
-                        for i, ch in enumerate(raw):
-                            if esc: esc = False; continue
-                            if ch == '\\': esc = True; continue
-                            if ch == '"': in_str = not in_str
-                            if not in_str:
-                                if ch == '{': depth += 1
-                                elif ch == '}':
-                                    depth -= 1
-                                    if depth == 0: end = i; break
-                        if end != -1:
-                            raw = raw[:end + 1]
-                        try:
-                            raw = raw.encode('raw_unicode_escape').decode('unicode_escape')
-                        except Exception:
-                            pass
-                try:
-                    tool_data = json.loads(raw)
-                    if isinstance(tool_data, dict) and tool_data.get("image_base64"):
-                        b64 = tool_data["image_base64"]
-                        image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
-                except Exception:
-                    pass
-                break
+        new_messages = result["messages"][msgs_before:]
+        tool_messages = [m for m in reversed(new_messages) if isinstance(m, ToolMessage)]
+        logger.info(f"🖼️ Scanning {len(tool_messages)} new ToolMessage(s) for image_base64")
+        for msg in tool_messages:
+            raw = msg.content if isinstance(msg.content, str) else ""
+            if "TextContent" in raw:
+                idx = raw.find("text='")
+                if idx != -1:
+                    raw = raw[idx + 6:]
+                    depth, end, in_str, esc = 0, -1, False, False
+                    for i, ch in enumerate(raw):
+                        if esc: esc = False; continue
+                        if ch == '\\': esc = True; continue
+                        if ch == '"': in_str = not in_str
+                        if not in_str:
+                            if ch == '{': depth += 1
+                            elif ch == '}':
+                                depth -= 1
+                                if depth == 0: end = i; break
+                    if end != -1:
+                        raw = raw[:end + 1]
+                    try:
+                        raw = raw.encode('raw_unicode_escape').decode('unicode_escape')
+                    except Exception:
+                        pass
+            try:
+                tool_data = json.loads(raw)
+                if isinstance(tool_data, dict) and tool_data.get("image_base64"):
+                    b64 = tool_data["image_base64"]
+                    image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
+                    image_source = tool_data.get("image_source")
+                    logger.info(f"🖼️ image_b64 extracted length={len(image_b64)}, source={image_source}")
+            except Exception as parse_err:
+                logger.warning(f"🖼️ JSON parse failed: {parse_err}")
+            break
 
         # Write updated history back to the outer conversation_state so
         # the next call sees the accumulated Human+AI pairs.
@@ -315,6 +322,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             model_name = result.get("current_model", "unknown")
             msg_id = session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
             _rag_store_turn(session_id, "assistant", assistant_text, msg_id)
+            if image_source:
+                session_manager.set_message_image_source(msg_id, image_source)
 
         # Broadcast to ALL connected sockets — covers reconnect case where
         # original socket died but new socket is already in CONNECTED_WEBSOCKETS

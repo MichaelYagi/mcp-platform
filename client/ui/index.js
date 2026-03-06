@@ -557,7 +557,7 @@ ws.onmessage = (event) => {
         chat.innerHTML = "";
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
-        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp));
+        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null));
         renderSessions(allSessions);
         // If the last message is from the user, a response is still in-flight.
         // Show the thinking indicator so the user knows to wait.
@@ -742,6 +742,7 @@ function fallbackCopy(text, onSuccess) {
 // ADD MESSAGE
 // ============================================================
 function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, imageB64=null) {
+    text = text || "";
     if (text.startsWith("[TextContent(")) return;
     if (text.trim()===""&&!imageB64) return;
     const div = document.createElement("div");

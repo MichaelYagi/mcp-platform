@@ -192,9 +192,13 @@ def analyze_image_tool(
 
     if image_file_path:
         result = _read_image_file_as_base64(image_file_path)
+        if result.get("success"):
+            result["image_source"] = image_file_path
         return json.dumps(result, indent=2)
 
     result = _fetch_image_as_base64(image_url)
+    if result.get("success"):
+        result["image_source"] = image_url
     return json.dumps(result, indent=2)
 
 

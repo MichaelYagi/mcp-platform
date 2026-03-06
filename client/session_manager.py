@@ -65,6 +65,8 @@ class SessionManager:
         columns = [col[1] for col in cursor.fetchall()]
         if 'model' not in columns:
             cursor.execute('ALTER TABLE messages ADD COLUMN model TEXT')
+        if 'image_source' not in columns:
+            cursor.execute('ALTER TABLE messages ADD COLUMN image_source TEXT')
 
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_messages_session 
@@ -149,18 +151,43 @@ class SessionManager:
         conn.close()
         return message_id
 
+    def set_message_image_source(self, message_id: int, source: str):
+        """
+        Store the original image source (file path or URL) for a message.
+        On session reload, get_session_messages reads this back and re-encodes
+        the image as base64 for the frontend — no separate file storage needed.
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('UPDATE messages SET image_source = ? WHERE id = ?', (source, message_id))
+        conn.commit()
+        conn.close()
+
     def get_session_messages(self, session_id: int) -> List[Dict]:
         """Get all messages for a session"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT role, content, model, created_at 
+            SELECT role, content, model, created_at, image_source
             FROM messages WHERE session_id = ? ORDER BY created_at ASC
         ''', (session_id,))
-        messages = [
-            {'role': r[0], 'text': r[1], 'model': r[2], 'timestamp': r[3]}
-            for r in cursor.fetchall()
-        ]
+        messages = []
+        for r in cursor.fetchall():
+            msg = {'role': r[0], 'text': r[1], 'model': r[2], 'timestamp': r[3]}
+            image_source = r[4]
+            if image_source:
+                try:
+                    import base64 as _b64
+                    if image_source.startswith('http://') or image_source.startswith('https://'):
+                        import urllib.request
+                        with urllib.request.urlopen(image_source, timeout=5) as resp:
+                            msg['image'] = _b64.b64encode(resp.read()).decode('utf-8')
+                    else:
+                        with open(image_source, 'rb') as f:
+                            msg['image'] = _b64.b64encode(f.read()).decode('utf-8')
+                except Exception:
+                    pass  # Image unavailable — message still loads without it
+            messages.append(msg)
         conn.close()
         return messages
 

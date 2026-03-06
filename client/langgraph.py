@@ -1768,6 +1768,51 @@ def create_langgraph_agent(llm_with_tools, tools):
                 current_model = get_model_name(base_llm)
 
             elif not has_tool_calls and has_content:
+
+                # If intent was analyze_image but the LLM answered from context
+                # instead of calling the tool, force the tool call. This prevents
+                # the model from recycling a previous image description via RAG.
+                if pattern_name == "analyze_image":
+                    import re as _img_re
+                    _file_re = _img_re.compile(
+                        r'(/mnt/[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|heic))',
+                        _img_re.IGNORECASE
+                    )
+                    _url_re = _img_re.compile(
+                        r'(https?://[^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|heic))',
+                        _img_re.IGNORECASE
+                    )
+                    file_match = _file_re.search(user_message or "")
+                    url_match = _url_re.search(user_message or "")
+                    forced_arg = None
+                    forced_key = None
+                    if file_match:
+                        forced_arg = file_match.group(1)
+                        forced_key = "image_file_path"
+                    elif url_match:
+                        forced_arg = url_match.group(1)
+                        forced_key = "image_url"
+                    if forced_arg:
+                        import uuid
+                        tool_call_id = str(uuid.uuid4())
+                        forced = AIMessage(
+                            content="",
+                            tool_calls=[{
+                                "id": tool_call_id,
+                                "name": "analyze_image_tool",
+                                "args": {forced_key: forced_arg}
+                            }]
+                        )
+                        logger.info(f"[LangGraph] 🖼️ Forced analyze_image_tool call: {forced_key}={forced_arg}")
+                        return {
+                            "messages": [forced],
+                            "tools": state.get("tools", {}),
+                            "llm": state.get("llm"),
+                            "ingest_completed": state.get("ingest_completed", False),
+                            "stopped": state.get("stopped", False),
+                            "current_model": current_model
+                        }
+
                 needs_current_info = _needs_web_search(user_message)
 
                 if needs_current_info:
