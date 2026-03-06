@@ -261,12 +261,35 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         import re
         assistant_text = re.sub(r'<\|[^|]+\|>', '', assistant_text).strip()
 
+        # Extract any image payloads from JSON tool results so the UI can
+        # render them as <img> elements rather than raw base64 strings.
+        images = []
+        try:
+            raw_payload = assistant_text
+            # Handle TextContent wrapper: [TextContent(type='text', text='...')]
+            if raw_payload.startswith("[TextContent("):
+                import re as _re
+                m = _re.search(r"text='([\s\S]*)'", raw_payload)
+                if m:
+                    raw_payload = m.group(1)
+            payload = json.loads(raw_payload)
+            if isinstance(payload, dict) and payload.get("image_base64"):
+                b64 = payload.pop("image_base64")
+                images.append(b64)
+                # Replace the text with just the metadata (no giant base64 blob)
+                remaining = {k: v for k, v in payload.items() if k != "image_base64"}
+                assistant_text = remaining.get("description") or remaining.get("error") or ""
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
         # Write updated history back to the outer conversation_state so
         # the next call sees the accumulated Human+AI pairs.
         # Only update messages — leave other keys (session_id etc.) intact.
         outer_conversation_state["messages"] = conversation_state["messages"]
 
-        print("\n" + assistant_text + "\n")
+        # CLI: truncate any stray base64 blobs before printing
+        print_text = re.sub(r'[A-Za-z0-9+/]{100,}={0,2}', '[base64 data]', assistant_text)
+        print("\n" + print_text + "\n")
 
         # Persist FIRST — response is safe in SQLite before delivery attempt.
         # If the socket dies mid-send, the message is already saved and
@@ -282,6 +305,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         try:
             await broadcast_message("assistant_message", {
                 "text": assistant_text,
+                "images": images,
                 "multi_agent": result.get("multi_agent", False),
                 "a2a": result.get("a2a", False),
                 "model": result.get("current_model", "unknown")

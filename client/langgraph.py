@@ -1306,6 +1306,113 @@ def create_langgraph_agent(llm_with_tools, tools):
         # If formatting tool results, use base LLM
         if isinstance(last_message, ToolMessage):
             logger.info("[LangGraph] 🎯 Formatting tool results")
+
+            # ── Vision shortcut ──────────────────────────────────────────────
+            # If the tool result carries image_base64, bypass the LLM message
+            # loop entirely. The Ollama vision API requires images to be passed
+            # in the `images` array of /api/chat — not as text content — so we
+            # make a direct httpx call here and return the description as the
+            # final AIMessage.
+            try:
+                raw = last_message.content
+                # Unwrap MCP TextContent: [TextContent(type='text', text='...', annotations=None, meta=None)]
+                # The repr escapes newlines as \n etc, so we scan for balanced braces
+                # then decode escape sequences before JSON parsing.
+                if isinstance(raw, str) and "TextContent" in raw:
+                    idx = raw.find("text='")
+                    if idx != -1:
+                        raw = raw[idx + 6:]
+                        # Scan for end of JSON object using brace depth
+                        depth, end, in_str, esc = 0, -1, False, False
+                        for i, ch in enumerate(raw):
+                            if esc:
+                                esc = False; continue
+                            if ch == '\\':
+                                esc = True; continue
+                            if ch == '"':
+                                in_str = not in_str
+                            if not in_str:
+                                if ch == '{': depth += 1
+                                elif ch == '}':
+                                    depth -= 1
+                                    if depth == 0:
+                                        end = i; break
+                        if end != -1:
+                            raw = raw[:end + 1]
+                        # Decode Python repr escapes (\n \t \' etc.)
+                        try:
+                            raw = raw.encode('raw_unicode_escape').decode('unicode_escape')
+                        except Exception:
+                            pass
+                    try:
+                        tool_data = json.loads(raw)
+                    except json.JSONDecodeError:
+                        tool_data = None
+                    logger.info(f"[LangGraph] 🖼️ Unwrapped TextContent, keys={list(tool_data.keys()) if isinstance(tool_data, dict) else 'parse failed'}")
+                else:
+                    try:
+                        tool_data = json.loads(raw)
+                    except json.JSONDecodeError:
+                        tool_data = None
+                if isinstance(tool_data, dict) and tool_data.get("image_base64"):
+                    logger.info("[LangGraph] 🖼️ Image result — calling Ollama vision directly")
+                    b64 = tool_data["image_base64"]
+                    # Strip data URI prefix if present
+                    if "," in b64:
+                        b64 = b64.split(",", 1)[1]
+
+                    # Find the user's original prompt (last HumanMessage)
+                    user_prompt = "Describe this image."
+                    for msg in reversed(messages):
+                        if isinstance(msg, HumanMessage):
+                            user_prompt = msg.content if isinstance(msg.content, str) else "Describe this image."
+                            break
+
+                    model_name = get_model_name(base_llm)
+                    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+
+                    import httpx
+                    payload = {
+                        "model": model_name,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": user_prompt,
+                                "images": [b64]
+                            }
+                        ],
+                        "stream": False
+                    }
+                    start_time = time.time()
+                    async with httpx.AsyncClient(timeout=300.0) as hc:
+                        vision_resp = await hc.post(
+                            f"{ollama_url}/api/chat",
+                            json=payload
+                        )
+                        vision_resp.raise_for_status()
+
+                    duration = time.time() - start_time
+                    vision_text = vision_resp.json()["message"]["content"]
+                    logger.info(f"[LangGraph] 🖼️ Vision response in {duration:.2f}s: {vision_text[:80]}")
+
+                    if METRICS_AVAILABLE:
+                        metrics["llm_calls"] += 1
+                        metrics["llm_times"].append((time.time(), duration))
+
+                    return {
+                        "messages": [AIMessage(content=vision_text)],
+                        "tools": state.get("tools", {}),
+                        "llm": state.get("llm"),
+                        "ingest_completed": state.get("ingest_completed", False),
+                        "stopped": state.get("stopped", False),
+                        "current_model": model_name
+                    }
+            except (json.JSONDecodeError, AttributeError, KeyError):
+                pass
+            except Exception as vision_err:
+                logger.error(f"[LangGraph] 🖼️ Vision call failed: {vision_err} — falling back to LLM")
+            # ── End vision shortcut ──────────────────────────────────────────
+
             start_time = time.time()
             try:
                 response = await asyncio.wait_for(
@@ -1892,8 +1999,23 @@ def create_langgraph_agent(llm_with_tools, tools):
                     metrics["tool_times"][tool_name].append((time.time(), tool_duration))
 
                 if isinstance(result, list) and len(result) > 0:
-                    if hasattr(result[0], 'text'):
-                        result = result[0].text
+                    first = result[0]
+                    logger.info(f"[LangGraph] 🔧 Tool result item type: {type(first).__name__}, attrs: {[a for a in dir(first) if not a.startswith('_')][:8]}")
+                    if hasattr(first, 'text'):
+                        result = first.text
+                    elif hasattr(first, 'content'):
+                        result = first.content
+                    else:
+                        # str(TextContent(...)) gives us the repr — extract the text value
+                        joined = str(first)
+                        idx = joined.find("text='")
+                        if idx != -1:
+                            extracted = joined[idx + 6:]
+                            # find closing quote before ', annotations= or end of string
+                            end_q = extracted.find("', ")
+                            result = extracted[:end_q] if end_q != -1 else extracted.rstrip("')")
+                        else:
+                            result = joined
 
                 if tool_name in ("plex_ingest_batch", "plex_ingest_items"):
                     try:

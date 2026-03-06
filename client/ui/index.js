@@ -595,7 +595,7 @@ ws.onmessage = (event) => {
             hideThinking(); addMessage(data.text,"assistant",false,false,data.model); isProcessing=false; resetControlButtons(); return;
         }
         hideThinking(); lastResponseWasMultiAgent = data.multi_agent===true;
-        addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString());
+        addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString(),data.images||[]);
         const modelLabel = data.model ? `[${data.model}] ` : '';
         addLocalLogEntry('ASSISTANT', modelLabel+data.text);
         isProcessing=false; sendBtn.style.display='flex'; sendBtn.disabled=false; sendBtn.style.opacity='1'; sendBtn.style.cursor="pointer";
@@ -741,17 +741,30 @@ function fallbackCopy(text, onSuccess) {
 // ============================================================
 // ADD MESSAGE
 // ============================================================
-function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null) {
+function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, images=[]) {
     if (text.startsWith("[TextContent(")) return;
-    if (text.trim()==="") return;
+    if (text.trim()===""&&images.length===0) return;
     const div = document.createElement("div");
     div.className = `msg ${role}`;
     if (role==="assistant"&&isMultiAgent) div.className += " multi-agent";
     if (role==="user") {
         div.textContent = text;
     } else {
-        div.innerHTML = formatMessage(text);
-
+        // Render any images before the text
+        if (images && images.length > 0) {
+            images.forEach(b64 => {
+                const img = document.createElement("img");
+                img.src = b64.startsWith("data:") ? b64 : `data:image/jpeg;base64,${b64}`;
+                img.style.cssText = "max-width:100%;max-height:480px;border-radius:6px;display:block;margin-bottom:8px;";
+                img.alt = "Image result";
+                div.appendChild(img);
+            });
+        }
+        if (text.trim()) {
+            const textNode = document.createElement("span");
+            textNode.innerHTML = formatMessage(text);
+            div.appendChild(textNode);
+        }
     }
     if (role === 'assistant') {
         const wrapper = document.createElement('div');
