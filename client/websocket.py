@@ -304,24 +304,28 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 if not place_name and tool_data.get("placeName"):
                     place_name = tool_data["placeName"]
 
-                # Pick up image from first ToolMessage that has image_base64 or image_source
-                if image_b64 is None and (tool_data.get("image_base64") or tool_data.get("image_source")):
-                    image_source = tool_data.get("image_source")
+                # Pick up image from first ToolMessage that has image_base64 or image_source.
+                # Shashin images: pass URL directly — browser loads it with no server round-trip.
+                # Local files / other sources: keep as base64.
+                if image_source is None and image_b64 is None and (tool_data.get("image_base64") or tool_data.get("image_source")):
+                    src = tool_data.get("image_source")
                     b64 = tool_data.get("image_base64")
-                    if b64:
+                    shashin_key = os.getenv("SHASHIN_API_KEY", "")
+                    is_shashin = bool(src and shashin_key and (
+                        "192.168." in src or "shashin" in src.lower()
+                    ))
+                    if is_shashin:
+                        image_source = src  # sent as image_url to frontend
+                    elif b64:
                         image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
-                    elif image_source:
+                    elif src:
+                        # Non-Shashin URL — fetch and encode
                         try:
                             import httpx as _httpx, base64 as _b64
-                            fetch_headers = {}
-                            shashin_key = os.getenv("SHASHIN_API_KEY", "")
-                            if shashin_key and ("192.168." in image_source or "shashin" in image_source.lower()):
-                                fetch_headers = {"x-api-key": shashin_key, "Content-Type": "application/json"}
                             async with _httpx.AsyncClient(timeout=30.0) as hc:
-                                img_resp = await hc.get(image_source, headers=fetch_headers)
+                                img_resp = await hc.get(src)
                                 img_resp.raise_for_status()
                             image_b64 = _b64.b64encode(img_resp.content).decode("utf-8")
-                            logger.info(f"🖼️ Fetched image for UI display from {image_source}, length={len(image_b64)}")
                         except Exception as fetch_err:
                             logger.warning(f"🖼️ Failed to fetch image for UI: {fetch_err}")
 
@@ -356,6 +360,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             await broadcast_message("assistant_message", {
                 "text": assistant_text,
                 "image": image_b64,
+                "image_url": image_source,  # Shashin URL, None for non-Shashin
                 "multi_agent": result.get("multi_agent", False),
                 "a2a": result.get("a2a", False),
                 "model": result.get("current_model", "unknown")

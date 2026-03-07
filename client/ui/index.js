@@ -557,7 +557,7 @@ ws.onmessage = (event) => {
         chat.innerHTML = "";
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
-        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null));
+        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null, msg.image_url||null));
         renderSessions(allSessions);
         // If the last message is from the user, a response is still in-flight.
         // Show the thinking indicator so the user knows to wait.
@@ -595,7 +595,7 @@ ws.onmessage = (event) => {
             hideThinking(); addMessage(data.text,"assistant",false,false,data.model); isProcessing=false; resetControlButtons(); return;
         }
         hideThinking(); lastResponseWasMultiAgent = data.multi_agent===true;
-        addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString(),data.image||null);
+        addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString(),data.image||null,data.image_url||null);
         const modelLabel = data.model ? `[${data.model}] ` : '';
         addLocalLogEntry('ASSISTANT', modelLabel+data.text);
         isProcessing=false; sendBtn.style.display='flex'; sendBtn.disabled=false; sendBtn.style.opacity='1'; sendBtn.style.cursor="pointer";
@@ -741,19 +741,20 @@ function fallbackCopy(text, onSuccess) {
 // ============================================================
 // ADD MESSAGE
 // ============================================================
-function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, imageB64=null) {
+function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, imageB64=null, imageUrl=null) {
     text = text || "";
     if (text.startsWith("[TextContent(")) return;
-    if (text.trim()===""&&!imageB64) return;
+    if (text.trim()===""&&!imageB64&&!imageUrl) return;
     const div = document.createElement("div");
     div.className = `msg ${role}`;
     if (role==="assistant"&&isMultiAgent) div.className += " multi-agent";
     if (role==="user") {
         div.textContent = text;
     } else {
-        if (imageB64) {
+        const imgSrc = imageUrl || (imageB64 ? `data:image/jpeg;base64,${imageB64}` : null);
+        if (imgSrc) {
             const img = document.createElement("img");
-            img.src = `data:image/jpeg;base64,${imageB64}`;
+            img.src = imgSrc;
             img.style.cssText = "max-width:100%;max-height:320px;border-radius:6px;display:block;margin-bottom:8px;object-fit:contain;";
             img.alt = "Image result";
             div.appendChild(img);
