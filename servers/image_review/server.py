@@ -274,14 +274,20 @@ def shashin_search_tool(
             "originalUrl":  f"{SHASHIN_BASE_URL}{img.get('thumbnailUrlOriginal', '')}",
         })
 
-    return json.dumps({
-        "success":     True,
-        "term":        term,
-        "count":       len(results),
-        "page":        page,
-        "total_pages": total_pages,
-        "results":     results,
-    }, indent=2)
+    lines = [f'Found {len(results)} photo(s) matching "{term}" (page {page + 1} of {total_pages}):\n']
+    for i, r in enumerate(results, 1):
+        lines.append(f"{i}. {r['fileName']} — {r['takenAt']}")
+        lines.append(f"   ID: {r['id']}")
+        if r.get("placeName"):
+            lines.append(f"   📍 {r['placeName']}")
+        if r.get("camera"):
+            lines.append(f"   📷 {r['camera']}")
+        if r.get("keywords"):
+            kw = r["keywords"] if isinstance(r["keywords"], str) else ", ".join(r["keywords"])
+            lines.append(f"   🏷  {kw}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
