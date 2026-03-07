@@ -636,10 +636,15 @@ def extract_research_sources(content: str) -> list:
         parts = re.split(r'\s+and\s+|,\s*', source_text)
         sources.extend([p.strip().rstrip(',.;:!?') for p in parts if p.strip()])
 
+    _image_url_re = re.compile(
+        r'/api/v1/(thumbnails|image)/'
+        r'|\.(?:jpg|jpeg|png|gif|webp|bmp|heic|tiff?)(?:[?#]|$)',
+        re.IGNORECASE
+    )
     url_pattern = re.compile(r'https?://[^\s]+')
     for url in url_pattern.findall(content):
         cleaned = url.rstrip(',.;:!?')
-        if cleaned:
+        if cleaned and not _image_url_re.search(cleaned):
             sources.append(cleaned)
 
     return sources
