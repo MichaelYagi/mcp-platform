@@ -332,18 +332,19 @@ def shashin_random_tool() -> str:
     if not image_id:
         return json.dumps({"success": False, "error": "No image ID in random response"}, indent=2)
 
-    # Include image_source so the vision shortcut in langgraph.py fires
-    # immediately — no second shashin_analyze_tool call needed.
-    image_source = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/225/{image_id}"
+    # 225px thumbnail for the chat UI, original for vision inference
+    image_source          = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/225/{image_id}"
+    image_source_original = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/original/{image_id}"
 
     return json.dumps({
-        "success":        True,
-        "image_id":       image_id,
-        "image_source":   image_source,
-        "fileName":       data.get("fileName"),
-        "takenAt":        data.get("takenAt"),
-        "camera":         data.get("camera"),
-        "placeName":      data.get("placeName")
+        "success":                True,
+        "image_id":               image_id,
+        "image_source":           image_source,
+        "image_source_original":  image_source_original,
+        "fileName":               data.get("fileName"),
+        "takenAt":                data.get("takenAt"),
+        "camera":                 data.get("camera"),
+        "placeName":              data.get("placeName"),
     }, indent=2)
 
 
@@ -402,20 +403,19 @@ Use th        - image_source (str)  — Shashin thumbnail URL, passed to vision 
     else:
         meta = {}
 
-    if use_thumbnail:
-        image_url = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/225/{image_id}"
-    else:
-        image_url = f"{SHASHIN_BASE_URL}/api/v1/image/{image_id}"
+    # 225px thumbnail for the chat UI, original for vision inference
+    image_source          = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/225/{image_id}"
+    image_source_original = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/original/{image_id}"
 
     return json.dumps({
-        "success":        True,
-        "image_source":   image_url,
-        "image_id":       image_id,
-        "thumbnail_used": use_thumbnail,
-        "fileName":       meta.get("fileName"),
-        "takenAt":        meta.get("takenAt"),
-        "camera":         meta.get("camera"),
-        "placeName":      meta.get("placeName"),
+        "success":                True,
+        "image_source":           image_source,
+        "image_source_original":  image_source_original,
+        "image_id":               image_id,
+        "fileName":               meta.get("fileName"),
+        "takenAt":                meta.get("takenAt"),
+        "camera":                 meta.get("camera"),
+        "placeName":              meta.get("placeName"),
     }, indent=2)
 
 

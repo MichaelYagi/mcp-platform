@@ -1357,18 +1357,19 @@ def create_langgraph_agent(llm_with_tools, tools):
                 if isinstance(tool_data, dict) and (tool_data.get("image_base64") or tool_data.get("image_source")):
                     logger.info("[LangGraph] 🖼️ Image result — calling Ollama vision directly")
                     b64 = tool_data.get("image_base64")
-                    image_source = tool_data.get("image_source")
+                    image_source  = tool_data.get("image_source")           # 225px thumbnail → UI
+                    vision_source = tool_data.get("image_source_original") or image_source  # original → Ollama
 
-                    # If no base64 payload, fetch from image_source (e.g. shashin_analyze_tool)
-                    if not b64 and image_source:
-                        logger.info(f"[LangGraph] 🖼️ Fetching image from source: {image_source}")
+                    # If no base64 payload, fetch original for Ollama vision
+                    if not b64 and vision_source:
+                        logger.info(f"[LangGraph] 🖼️ Fetching image from source: {vision_source}")
                         import httpx as _httpx
                         fetch_headers = {}
                         shashin_key = os.getenv("SHASHIN_API_KEY", "")
-                        if shashin_key and ("192.168." in image_source or "shashin" in image_source.lower()):
+                        if shashin_key and ("192.168." in vision_source or "shashin" in vision_source.lower()):
                             fetch_headers = {"x-api-key": shashin_key, "Content-Type": "application/json"}
-                        async with _httpx.AsyncClient(timeout=30.0) as hc:
-                            img_resp = await hc.get(image_source, headers=fetch_headers)
+                        async with _httpx.AsyncClient(timeout=60.0) as hc:
+                            img_resp = await hc.get(vision_source, headers=fetch_headers)
                             img_resp.raise_for_status()
                         import base64 as _b64
                         b64 = _b64.b64encode(img_resp.content).decode("utf-8")
