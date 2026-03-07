@@ -145,7 +145,7 @@ INTENT_CATALOG = [
             r'|\bshow\s+me\s+a\s+random\b'
             r'|\brandom\s+shashin\b|\bshashin.*random\b'
         ),
-        "tools": ["shashin_random_tool", "shashin_analyze_tool"],
+        "tools": ["shashin_random_tool"],
         "priority": 1,
         "web_search": False,
         "skills": True,

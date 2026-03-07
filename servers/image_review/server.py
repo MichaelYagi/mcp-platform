@@ -196,9 +196,10 @@ def analyze_image_tool(
             result["image_source"] = image_file_path
         return json.dumps(result, indent=2)
 
-    # URL case — return image_source so langgraph/websocket fetch it
-    # directly rather than embedding a large base64 blob in the tool result.
-    return json.dumps({"success": True, "image_source": image_url}, indent=2)
+    result = _fetch_image_as_base64(image_url)
+    if result.get("success"):
+        result["image_source"] = image_url
+    return json.dumps(result, indent=2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -325,9 +326,14 @@ def shashin_random_tool() -> str:
     if not image_id:
         return json.dumps({"success": False, "error": "No image ID in random response"}, indent=2)
 
+    # Include image_source so the vision shortcut in langgraph.py fires
+    # immediately — no second shashin_analyze_tool call needed.
+    image_source = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/225/{image_id}"
+
     return json.dumps({
         "success":        True,
         "image_id":       image_id,
+        "image_source":   image_source,
         "fileName":       data.get("fileName"),
         "takenAt":        data.get("takenAt"),
         "camera":         data.get("camera"),
