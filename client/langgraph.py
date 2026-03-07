@@ -1378,28 +1378,47 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if b64 and "," in b64:
                         b64 = b64.split(",", 1)[1]
 
-                    # placeName/lat/lng may be in an earlier ToolMessage (e.g. shashin_random_tool)
+                    # placeName/takenAt may be in an earlier ToolMessage (e.g. shashin_random_tool)
                     # rather than the current one — scan all messages for it.
-                    place   = tool_data.get("placeName")
+                    place    = tool_data.get("placeName")
                     taken_at = tool_data.get("takenAt")
-                    lat     = tool_data.get("lat")
-                    lng     = tool_data.get("lng")
+                    logger.info(f"[LangGraph] 🖼️ place={place!r}, taken_at={taken_at!r} from tool_data")
                     if not place:
                         for m in reversed(messages):
-                            if isinstance(m, ToolMessage):
-                                try:
-                                    m_raw = m.content if isinstance(m.content, str) else ""
-                                    if "TextContent" in m_raw:
-                                        idx = m_raw.find("text='")
-                                        if idx != -1:
-                                            m_raw = m_raw[idx + 6:]
-                                    m_data = json.loads(m_raw.split("')", 1)[0] if "TextContent" not in m_raw else m_raw)
-                                    if isinstance(m_data, dict) and m_data.get("placeName"):
-                                        place    = m_data["placeName"]
-                                        taken_at = m_data.get("takenAt") or taken_at
-                                        break
-                                except Exception:
-                                    pass
+                            if not isinstance(m, ToolMessage):
+                                continue
+                            try:
+                                m_raw = m.content if isinstance(m.content, str) else ""
+                                if "TextContent" in m_raw:
+                                    idx = m_raw.find("text='")
+                                    if idx == -1:
+                                        continue
+                                    m_raw = m_raw[idx + 6:]
+                                    # brace-depth scan
+                                    depth, end, in_str, esc = 0, -1, False, False
+                                    for i, ch in enumerate(m_raw):
+                                        if esc: esc = False; continue
+                                        if ch == '\\': esc = True; continue
+                                        if ch == '"': in_str = not in_str
+                                        if not in_str:
+                                            if ch == '{': depth += 1
+                                            elif ch == '}':
+                                                depth -= 1
+                                                if depth == 0: end = i; break
+                                    if end != -1:
+                                        m_raw = m_raw[:end + 1]
+                                    try:
+                                        m_raw = m_raw.encode('raw_unicode_escape').decode('unicode_escape')
+                                    except Exception:
+                                        pass
+                                m_data = json.loads(m_raw)
+                                if isinstance(m_data, dict) and m_data.get("placeName"):
+                                    place    = m_data["placeName"]
+                                    taken_at = m_data.get("takenAt") or taken_at
+                                    logger.info(f"[LangGraph] 🖼️ place={place!r} found in earlier ToolMessage")
+                                    break
+                            except Exception as e:
+                                logger.debug(f"[LangGraph] 🖼️ fallback scan parse error: {e}")
                     if place:
                         user_prompt = f"Describe this image in detail. It was taken at: {place}."
                     else:
@@ -1846,9 +1865,10 @@ def create_langgraph_agent(llm_with_tools, tools):
 
             elif not has_tool_calls and has_content:
 
-                # If intent was analyze_image or shashin_analyze but LLM answered
-                # from context instead of calling the tool, force the tool call.
-                if pattern_name in ("analyze_image", "shashin_analyze"):
+                # If intent was analyze_image, shashin_analyze, or an explicit tool
+                # request, but LLM answered from context instead of calling the tool,
+                # force the tool call.
+                if pattern_name in ("analyze_image", "shashin_analyze", "explicit_tool"):
                     import re as _img_re, uuid as _uuid
                     _file_re = _img_re.compile(
                         r'([A-Za-z]:[/\\][^\s]+\.(?:jpg|jpeg|png|gif|webp|bmp|heic)'  # Windows C:\... or C:/...

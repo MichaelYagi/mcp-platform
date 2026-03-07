@@ -389,7 +389,7 @@ Use th        - image_source (str)  — Shashin thumbnail URL, passed to vision 
     )
 
     # Fetch metadata for this image
-    meta_result = _shashin_get(f"/api/v1/image/metadata/{image_id}")
+    meta_result = _shashin_get(f"/api/v1/media/metadata/{image_id}")
     if meta_result["ok"]:
         body = meta_result["data"]
         meta = body.get("metadata", {})
