@@ -196,10 +196,9 @@ def analyze_image_tool(
             result["image_source"] = image_file_path
         return json.dumps(result, indent=2)
 
-    result = _fetch_image_as_base64(image_url)
-    if result.get("success"):
-        result["image_source"] = image_url
-    return json.dumps(result, indent=2)
+    # URL case — return image_source so langgraph/websocket fetch it
+    # directly rather than embedding a large base64 blob in the tool result.
+    return json.dumps({"success": True, "image_source": image_url}, indent=2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -268,10 +268,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # Only scan messages added in THIS run — msgs_before was captured before run_agent_fn.
         image_b64 = None
         image_source = None
+        place_name = None
         from langchain_core.messages import ToolMessage
         new_messages = result["messages"][msgs_before:]
         tool_messages = [m for m in reversed(new_messages) if isinstance(m, ToolMessage)]
-        logger.info(f"🖼️ Scanning {len(tool_messages)} new ToolMessage(s) for image_base64")
+        logger.info(f"🖼️ Scanning {len(tool_messages)} new ToolMessage(s) for image/location data")
         for msg in tool_messages:
             raw = msg.content if isinstance(msg.content, str) else ""
             if "TextContent" in raw:
@@ -296,13 +297,20 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         pass
             try:
                 tool_data = json.loads(raw)
-                if isinstance(tool_data, dict) and (tool_data.get("image_base64") or tool_data.get("image_source")):
+                if not isinstance(tool_data, dict):
+                    continue
+
+                # Pick up placeName from any ToolMessage that has it
+                if not place_name and tool_data.get("placeName"):
+                    place_name = tool_data["placeName"]
+
+                # Pick up image from first ToolMessage that has image_base64 or image_source
+                if image_b64 is None and (tool_data.get("image_base64") or tool_data.get("image_source")):
                     image_source = tool_data.get("image_source")
                     b64 = tool_data.get("image_base64")
                     if b64:
                         image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
                     elif image_source:
-                        # No base64 in tool result — fetch from source for UI display
                         try:
                             import httpx as _httpx, base64 as _b64
                             fetch_headers = {}
@@ -316,10 +324,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                             logger.info(f"🖼️ Fetched image for UI display from {image_source}, length={len(image_b64)}")
                         except Exception as fetch_err:
                             logger.warning(f"🖼️ Failed to fetch image for UI: {fetch_err}")
-                    logger.info(f"🖼️ image_b64={'set' if image_b64 else 'None'}, source={image_source}")
+
             except Exception as parse_err:
                 logger.warning(f"🖼️ JSON parse failed: {parse_err}")
-            break
+
+        logger.info(f"🖼️ image_b64={'set' if image_b64 else 'None'}, source={image_source}, place={place_name}")
 
         # Write updated history back to the outer conversation_state so
         # the next call sees the accumulated Human+AI pairs.

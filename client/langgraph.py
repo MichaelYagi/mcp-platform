@@ -1378,10 +1378,24 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if b64 and "," in b64:
                         b64 = b64.split(",", 1)[1]
 
-                    # Always use a clean prompt for Ollama — the raw user message
-                    # often contains instructions like "show the image" that confuse
-                    # the vision model. We just want a description.
-                    place = tool_data.get("placeName") if isinstance(tool_data, dict) else None
+                    # placeName may be in an earlier ToolMessage (e.g. shashin_random_tool)
+                    # rather than the current one — scan all messages for it.
+                    place = tool_data.get("placeName")
+                    if not place:
+                        for m in reversed(messages):
+                            if isinstance(m, ToolMessage):
+                                try:
+                                    m_raw = m.content if isinstance(m.content, str) else ""
+                                    if "TextContent" in m_raw:
+                                        idx = m_raw.find("text='")
+                                        if idx != -1:
+                                            m_raw = m_raw[idx + 6:]
+                                    m_data = json.loads(m_raw.split("')", 1)[0] if "TextContent" not in m_raw else m_raw)
+                                    if isinstance(m_data, dict) and m_data.get("placeName"):
+                                        place = m_data["placeName"]
+                                        break
+                                except Exception:
+                                    pass
                     if place:
                         user_prompt = f"Describe this image in detail. It was taken at: {place}."
                     else:
@@ -1424,6 +1438,10 @@ def create_langgraph_agent(llm_with_tools, tools):
                     duration = time.time() - start_time
                     vision_text = vision_resp.json()["message"]["content"]
                     logger.info(f"[LangGraph] 🖼️ Vision response in {duration:.2f}s: {vision_text[:80]}")
+
+                    # Prepend placeName to the response so it appears in the chat bubble
+                    if place:
+                        vision_text = f"📍 {place}\n\n{vision_text}"
 
                     # Store the description in RAG keyed by the image source path/URL
                     # so future queries about the same image skip the vision model.
