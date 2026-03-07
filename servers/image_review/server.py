@@ -372,12 +372,14 @@ def shashin_analyze_tool(
     Returns:
         JSON string with:
         - success (bool)
-        - image_base64 (str)      — base64-encoded image, pass this to Ollama
-        - existing_label (str)    — Shashin face recognition label if any
-        - existing_keywords (str) — Shashin object detection tags if any
+Use th        - image_source (str)  — Shashin thumbnail URL, passed to vision shortcut
         - image_id (str)
         - thumbnail_used (bool)
-        - error (str)             — present only on failure
+        - fileName (str)
+        - takenAt (str)       — e.g. "2021-03-27 14:44:52"
+        - camera (str)
+        - placeName (str)
+        - error (str)         — present only on failure
 
     Always call shashin_search_tool first to obtain the image_id.
     """
@@ -386,27 +388,28 @@ def shashin_analyze_tool(
         f"image_id={image_id}, use_thumbnail={use_thumbnail}"
     )
 
-    # Keywords come from shashin_search_tool results; no extra metadata fetch needed.
+    # Fetch metadata for this image
+    meta_result = _shashin_get(f"/api/v1/image/metadata/{image_id}")
+    if meta_result["ok"]:
+        body = meta_result["data"]
+        meta = body.get("metadata", {})
+    else:
+        meta = {}
 
     if use_thumbnail:
         image_url = f"{SHASHIN_BASE_URL}/api/v1/thumbnails/225/{image_id}"
     else:
         image_url = f"{SHASHIN_BASE_URL}/api/v1/image/{image_id}"
 
-    fetch_result = _fetch_image_as_base64(image_url)
-
-    if not fetch_result["success"]:
-        return json.dumps({
-            "success":  False,
-            "error":    fetch_result["error"],
-            "image_id": image_id,
-        }, indent=2)
-
     return json.dumps({
         "success":        True,
-        "image_base64":   fetch_result["image_base64"],
+        "image_source":   image_url,
         "image_id":       image_id,
         "thumbnail_used": use_thumbnail,
+        "fileName":       meta.get("fileName"),
+        "takenAt":        meta.get("takenAt"),
+        "camera":         meta.get("camera"),
+        "placeName":      meta.get("placeName"),
     }, indent=2)
 
 
