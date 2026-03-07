@@ -1378,9 +1378,12 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if b64 and "," in b64:
                         b64 = b64.split(",", 1)[1]
 
-                    # placeName may be in an earlier ToolMessage (e.g. shashin_random_tool)
+                    # placeName/lat/lng may be in an earlier ToolMessage (e.g. shashin_random_tool)
                     # rather than the current one — scan all messages for it.
-                    place = tool_data.get("placeName")
+                    place   = tool_data.get("placeName")
+                    taken_at = tool_data.get("takenAt")
+                    lat     = tool_data.get("lat")
+                    lng     = tool_data.get("lng")
                     if not place:
                         for m in reversed(messages):
                             if isinstance(m, ToolMessage):
@@ -1392,7 +1395,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                                             m_raw = m_raw[idx + 6:]
                                     m_data = json.loads(m_raw.split("')", 1)[0] if "TextContent" not in m_raw else m_raw)
                                     if isinstance(m_data, dict) and m_data.get("placeName"):
-                                        place = m_data["placeName"]
+                                        place    = m_data["placeName"]
+                                        taken_at = m_data.get("takenAt") or taken_at
                                         break
                                 except Exception:
                                     pass
@@ -1439,9 +1443,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                     vision_text = vision_resp.json()["message"]["content"]
                     logger.info(f"[LangGraph] 🖼️ Vision response in {duration:.2f}s: {vision_text[:80]}")
 
-                    # Prepend placeName to the response so it appears in the chat bubble
+                    # Prepend location and date/time to the chat bubble
+                    header_parts = []
                     if place:
-                        vision_text = f"📍 {place}\n\n{vision_text}"
+                        header_parts.append(f"📍 {place}")
+                    if taken_at:
+                        header_parts.append(f"📅 {taken_at}")
+                    if header_parts:
+                        vision_text = "\n".join(header_parts) + "\n\n" + vision_text
 
                     # Store the description in RAG keyed by the image source path/URL
                     # so future queries about the same image skip the vision model.
