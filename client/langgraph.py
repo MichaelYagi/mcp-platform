@@ -1380,7 +1380,7 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                     # placeName/takenAt may be in an earlier ToolMessage (e.g. shashin_random_tool)
                     # rather than the current one — scan all messages for it.
-                    shashin_id = tool_data.get("id")
+                    image_id = tool_data.get("image_id")
                     place    = tool_data.get("placeName")
                     taken_at = tool_data.get("takenAt")
                     logger.info(f"[LangGraph] 🖼️ place={place!r}, taken_at={taken_at!r} from tool_data")
@@ -1414,7 +1414,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                         pass
                                 m_data = json.loads(m_raw)
                                 if isinstance(m_data, dict) and m_data.get("placeName"):
-                                    shashin_id = m_data["id"]
+                                    image_id = m_data["image_id"]
                                     place    = m_data["placeName"]
                                     taken_at = m_data.get("takenAt") or taken_at
                                     logger.info(f"[LangGraph] 🖼️ place={place!r} found in earlier ToolMessage")
@@ -1466,8 +1466,8 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                     # Prepend location and date/time to the chat bubble
                     header_parts = []
-                    if shashin_id:
-                        header_parts.append(f"🆔 {shashin_id}")
+                    if image_id:
+                        header_parts.append(f"🆔 {image_id}")
                     if place:
                         header_parts.append(f"📍 {place}")
                     if taken_at:
