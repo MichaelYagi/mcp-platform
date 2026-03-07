@@ -1414,7 +1414,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                         pass
                                 m_data = json.loads(m_raw)
                                 if isinstance(m_data, dict) and m_data.get("placeName"):
-                                    shashin_id = m_data.get("id")
+                                    shashin_id = m_data["id"]
                                     place    = m_data["placeName"]
                                     taken_at = m_data.get("takenAt") or taken_at
                                     logger.info(f"[LangGraph] 🖼️ place={place!r} found in earlier ToolMessage")
