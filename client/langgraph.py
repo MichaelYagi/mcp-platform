@@ -1502,15 +1502,16 @@ def create_langgraph_agent(llm_with_tools, tools):
                         metrics["llm_times"].append((time.time(), duration))
 
                     # ── Auto-tag: write description + keywords back to Shashin ──
-                    # Always update — no LLM call, extract directly from vision_text.
-                    if image_id:
+                    # Only tag if Shashin has no description yet for this image.
+                    existing_description = tool_data.get("description", "")
+                    if image_id and not existing_description:
                         try:
                             shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
                             shashin_key  = os.getenv("SHASHIN_API_KEY", "")
                             tag_headers  = {"x-api-key": shashin_key, "Content-Type": "application/json"}
 
                             # Description: first 2 sentences from vision_text,
-                            # skipping the header lines (🆔 📍 📅) and bold section headers
+                            # skipping header lines (🆔 📍 📅) and bold section headers
                             desc_lines = [
                                 l.strip() for l in vision_text.splitlines()
                                 if l.strip()
@@ -1568,6 +1569,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                                         logger.warning(f"[LangGraph] 🏷️ Keywords PUT failed: {kw_resp.status_code} — {kw_resp.text[:200]}")
                         except Exception as tag_err:
                             logger.warning(f"[LangGraph] 🏷️ Auto-tag failed for {image_id}: {tag_err}")
+                    elif image_id and existing_description:
+                        logger.info(f"[LangGraph] 🏷️ Skipping auto-tag for {image_id} — description already exists")
                     # ── End auto-tag ─────────────────────────────────────────────
 
                     return {
