@@ -1501,6 +1501,69 @@ def create_langgraph_agent(llm_with_tools, tools):
                         metrics["llm_calls"] += 1
                         metrics["llm_times"].append((time.time(), duration))
 
+                    # ── Auto-tag: write description + keywords back to Shashin ──
+                    # Only tag if Shashin has no description yet for this image.
+                    existing_description = tool_data.get("description", "")
+                    if image_id and not existing_description:
+                        try:
+                            shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
+                            shashin_key  = os.getenv("SHASHIN_API_KEY", "")
+                            tag_headers  = {"x-api-key": shashin_key, "Content-Type": "application/json"}
+
+                            # Ask LLM to extract a clean description and keyword list
+                            tag_prompt = (
+                                f"From this image description, write:\n"
+                                f"1. A concise 1-2 sentence description suitable for an image caption.\n"
+                                f"2. A comma-separated list of 5-10 lowercase keywords (no spaces in individual keywords).\n\n"
+                                f"Description:\n{vision_text}\n\n"
+                                f"Respond EXACTLY in this format (no other text):\n"
+                                f"DESCRIPTION: <your caption here>\n"
+                                f"KEYWORDS: <kw1,kw2,kw3>"
+                            )
+                            tag_response = await asyncio.wait_for(
+                                base_llm.ainvoke([HumanMessage(content=tag_prompt)]),
+                                timeout=60.0
+                            )
+                            tag_text = tag_response.content if hasattr(tag_response, "content") else str(tag_response)
+
+                            # Parse DESCRIPTION and KEYWORDS lines
+                            auto_description, auto_keywords = "", ""
+                            for line in tag_text.splitlines():
+                                line = line.strip()
+                                if line.upper().startswith("DESCRIPTION:"):
+                                    auto_description = line[len("DESCRIPTION:"):].strip()
+                                elif line.upper().startswith("KEYWORDS:"):
+                                    auto_keywords = line[len("KEYWORDS:"):].strip().replace(" ", "")
+
+                            async with httpx.AsyncClient(timeout=15.0) as hc:
+                                if auto_description:
+                                    desc_resp = await hc.put(
+                                        f"{shashin_base}/api/v1/update/metadata/description/{image_id}",
+                                        headers=tag_headers,
+                                        json={"description": auto_description}
+                                    )
+                                    if desc_resp.status_code == 200:
+                                        logger.info(f"[LangGraph] 🏷️ Auto-tagged description for {image_id}")
+                                    else:
+                                        logger.warning(f"[LangGraph] 🏷️ Description PUT failed: {desc_resp.status_code}")
+                                if auto_keywords:
+                                    kw_resp = await hc.put(
+                                        f"{shashin_base}/api/v1/update/metadata/keywords/{image_id}",
+                                        headers=tag_headers,
+                                        json={"keywords": auto_keywords}
+                                    )
+                                    if kw_resp.status_code == 200:
+                                        logger.info(f"[LangGraph] 🏷️ Auto-tagged keywords for {image_id}: {auto_keywords}")
+                                    else:
+                                        logger.warning(f"[LangGraph] 🏷️ Keywords PUT failed: {kw_resp.status_code}")
+                        except asyncio.TimeoutError:
+                            logger.warning(f"[LangGraph] 🏷️ Auto-tag timed out for {image_id}")
+                        except Exception as tag_err:
+                            logger.warning(f"[LangGraph] 🏷️ Auto-tag failed for {image_id}: {tag_err}")
+                    elif image_id and existing_description:
+                        logger.info(f"[LangGraph] 🏷️ Skipping auto-tag for {image_id} — description already exists")
+                    # ── End auto-tag ─────────────────────────────────────────────
+
                     return {
                         "messages": [AIMessage(content=vision_text)],
                         "tools": state.get("tools", {}),
