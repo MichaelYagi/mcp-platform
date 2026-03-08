@@ -1502,38 +1502,48 @@ def create_langgraph_agent(llm_with_tools, tools):
                         metrics["llm_times"].append((time.time(), duration))
 
                     # ── Auto-tag: write description + keywords back to Shashin ──
-                    # Only tag if Shashin has no description yet for this image.
-                    existing_description = tool_data.get("description", "")
-                    if image_id and not existing_description:
+                    # Always update — no LLM call, extract directly from vision_text.
+                    if image_id:
                         try:
                             shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
                             shashin_key  = os.getenv("SHASHIN_API_KEY", "")
                             tag_headers  = {"x-api-key": shashin_key, "Content-Type": "application/json"}
 
-                            # Ask LLM to extract a clean description and keyword list
-                            tag_prompt = (
-                                f"From this image description, write:\n"
-                                f"1. A concise 1-2 sentence description suitable for an image caption.\n"
-                                f"2. A comma-separated list of 5-10 lowercase keywords (no spaces in individual keywords).\n\n"
-                                f"Description:\n{vision_text}\n\n"
-                                f"Respond EXACTLY in this format (no other text):\n"
-                                f"DESCRIPTION: <your caption here>\n"
-                                f"KEYWORDS: <kw1,kw2,kw3>"
-                            )
-                            tag_response = await asyncio.wait_for(
-                                base_llm.ainvoke([HumanMessage(content=tag_prompt)]),
-                                timeout=60.0
-                            )
-                            tag_text = tag_response.content if hasattr(tag_response, "content") else str(tag_response)
+                            # Description: first 2 sentences from vision_text,
+                            # skipping the header lines (🆔 📍 📅) and bold section headers
+                            desc_lines = [
+                                l.strip() for l in vision_text.splitlines()
+                                if l.strip()
+                                and not l.strip().startswith(("🆔", "📍", "📅", "**", "*"))
+                            ]
+                            raw_desc = " ".join(desc_lines)
+                            sentences = re.split(r'(?<=[.!?])\s+', raw_desc)
+                            auto_description = " ".join(sentences[:2]).strip()
+                            if len(auto_description) > 500:
+                                auto_description = auto_description[:497] + "..."
 
-                            # Parse DESCRIPTION and KEYWORDS lines
-                            auto_description, auto_keywords = "", ""
-                            for line in tag_text.splitlines():
-                                line = line.strip()
-                                if line.upper().startswith("DESCRIPTION:"):
-                                    auto_description = line[len("DESCRIPTION:"):].strip()
-                                elif line.upper().startswith("KEYWORDS:"):
-                                    auto_keywords = line[len("KEYWORDS:"):].strip().replace(" ", "")
+                            # Keywords: bold section headers + significant words from description
+                            _STOPWORDS = {
+                                "about", "above", "after", "also", "appears", "being",
+                                "between", "captured", "could", "image", "photo",
+                                "photograph", "scene", "their", "there", "these",
+                                "while", "which", "with", "within", "would", "other",
+                                "another", "where", "have", "from", "that", "this",
+                            }
+                            kw_candidates = set()
+                            for bold_match in re.finditer(r'\*\*([^*:]+)', vision_text):
+                                word = bold_match.group(1).strip().lower()
+                                if 2 < len(word) < 30 and " " not in word:
+                                    kw_candidates.add(word)
+                            for word in re.findall(r'\b[a-zA-Z]{5,}\b', auto_description):
+                                w = word.lower()
+                                if w not in _STOPWORDS:
+                                    kw_candidates.add(w)
+                            if place:
+                                place_kw = place.split(",")[0].strip().lower().replace(" ", "-")
+                                if place_kw:
+                                    kw_candidates.add(place_kw)
+                            auto_keywords = ",".join(sorted(kw_candidates)[:10])
 
                             async with httpx.AsyncClient(timeout=15.0) as hc:
                                 if auto_description:
@@ -1545,7 +1555,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                     if desc_resp.status_code == 200:
                                         logger.info(f"[LangGraph] 🏷️ Auto-tagged description for {image_id}")
                                     else:
-                                        logger.warning(f"[LangGraph] 🏷️ Description PUT failed: {desc_resp.status_code}")
+                                        logger.warning(f"[LangGraph] 🏷️ Description PUT failed: {desc_resp.status_code} — {desc_resp.text[:200]}")
                                 if auto_keywords:
                                     kw_resp = await hc.put(
                                         f"{shashin_base}/api/v1/update/metadata/keywords/{image_id}",
@@ -1555,13 +1565,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                                     if kw_resp.status_code == 200:
                                         logger.info(f"[LangGraph] 🏷️ Auto-tagged keywords for {image_id}: {auto_keywords}")
                                     else:
-                                        logger.warning(f"[LangGraph] 🏷️ Keywords PUT failed: {kw_resp.status_code}")
-                        except asyncio.TimeoutError:
-                            logger.warning(f"[LangGraph] 🏷️ Auto-tag timed out for {image_id}")
+                                        logger.warning(f"[LangGraph] 🏷️ Keywords PUT failed: {kw_resp.status_code} — {kw_resp.text[:200]}")
                         except Exception as tag_err:
                             logger.warning(f"[LangGraph] 🏷️ Auto-tag failed for {image_id}: {tag_err}")
-                    elif image_id and existing_description:
-                        logger.info(f"[LangGraph] 🏷️ Skipping auto-tag for {image_id} — description already exists")
                     # ── End auto-tag ─────────────────────────────────────────────
 
                     return {
