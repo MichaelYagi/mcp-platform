@@ -1471,6 +1471,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if image_id:
                         header_parts.append(f"🆔 {image_id}")
                     if place:
+                        place = place.split(';', 1)[0]
                         header_parts.append(f"📍 {place}")
                     if taken_at:
                         header_parts.append(f"📅 {taken_at}")
