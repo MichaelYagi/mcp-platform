@@ -345,6 +345,7 @@ def shashin_random_tool() -> str:
         "takenAt":                data.get("takenAt"),
         "camera":                 data.get("camera"),
         "placeName":              data.get("placeName"),
+        "description":            data.get("description"),
     }, indent=2)
 
 
@@ -416,6 +417,7 @@ Use th        - image_source (str)  — Shashin thumbnail URL, passed to vision 
         "takenAt":                meta.get("takenAt"),
         "camera":                 meta.get("camera"),
         "placeName":              meta.get("placeName"),
+        "description":            meta.get("description"),
     }, indent=2)
 
 

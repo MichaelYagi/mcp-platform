@@ -1496,6 +1496,56 @@ def create_langgraph_agent(llm_with_tools, tools):
                         except Exception as rag_err:
                             logger.warning(f"[LangGraph] 🖼️ Failed to store vision description in RAG: {rag_err}")
 
+                    # ── Auto-tag: write description + keywords back to Shashin ──
+                    # Only fires if the image had no description in its metadata.
+                    existing_description = tool_data.get("description") if isinstance(tool_data, dict) else None
+                    _shashin_key  = os.getenv("SHASHIN_API_KEY", "")
+                    _shashin_base = os.getenv("SHASHIN_BASE_URL", "")
+                    if image_id and _shashin_key and _shashin_base and not existing_description:
+                        try:
+                            logger.info(f"[LangGraph] 🏷️ No description found — generating auto-tag for {image_id}")
+                            tag_prompt = (
+                                "Based on the image analysis below, provide:\n"
+                                "1. DESCRIPTION: A single concise sentence describing the image.\n"
+                                "2. KEYWORDS: A comma-separated list of relevant keywords with no spaces after commas.\n\n"
+                                "Format your response exactly as:\n"
+                                "DESCRIPTION: <text>\n"
+                                "KEYWORDS: <kw1,kw2,kw3>\n\n"
+                                f"Image analysis:\n{vision_text}"
+                            )
+                            tag_response = base_llm.invoke(tag_prompt)
+                            tag_content  = tag_response.content if hasattr(tag_response, "content") else str(tag_response)
+
+                            desc_match = re.search(r'DESCRIPTION:\s*(.+)', tag_content)
+                            kw_match   = re.search(r'KEYWORDS:\s*(.+)',    tag_content)
+                            short_desc = desc_match.group(1).strip() if desc_match else None
+                            keywords   = kw_match.group(1).strip()   if kw_match   else None
+                            if keywords:
+                                keywords = re.sub(r'\s*,\s*', ',', keywords).strip(',')
+
+                            import httpx as _htag
+                            _tag_headers = {
+                                "x-api-key":    _shashin_key,
+                                "Content-Type": "application/json",
+                            }
+                            async with _htag.AsyncClient(timeout=15.0) as _hc:
+                                if short_desc:
+                                    _dr = await _hc.put(
+                                        f"{_shashin_base}/api/v1/update/metadata/description/{image_id}",
+                                        headers=_tag_headers,
+                                        json={"description": short_desc},
+                                    )
+                                    logger.info(f"[LangGraph] 🏷️ Description updated ({_dr.status_code}): {short_desc[:80]}")
+                                if keywords:
+                                    _kr = await _hc.put(
+                                        f"{_shashin_base}/api/v1/update/metadata/keywords/{image_id}",
+                                        headers=_tag_headers,
+                                        json={"keywords": keywords},
+                                    )
+                                    logger.info(f"[LangGraph] 🏷️ Keywords updated ({_kr.status_code}): {keywords[:80]}")
+                        except Exception as tag_err:
+                            logger.warning(f"[LangGraph] 🏷️ Auto-tag failed: {tag_err}")
+
                     if METRICS_AVAILABLE:
                         metrics["llm_calls"] += 1
                         metrics["llm_times"].append((time.time(), duration))
