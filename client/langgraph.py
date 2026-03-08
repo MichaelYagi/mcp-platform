@@ -1524,28 +1524,60 @@ def create_langgraph_agent(llm_with_tools, tools):
                             if len(auto_description) > 500:
                                 auto_description = auto_description[:497] + "..."
 
-                            # Keywords: bold section headers + significant words from description
+                            # Keywords: prioritize subject nouns over generic words
                             _STOPWORDS = {
                                 "about", "above", "after", "also", "appears", "being",
-                                "between", "captured", "could", "image", "photo",
-                                "photograph", "scene", "their", "there", "these",
+                                "between", "captured", "captures", "capturing", "could", "image",
+                                "photo", "photograph", "scene", "their", "there", "these",
                                 "while", "which", "with", "within", "would", "other",
                                 "another", "where", "have", "from", "that", "this",
+                                "taken", "shows", "shown", "likely", "detail", "detailed",
+                                "description", "high", "angle", "clear", "filled", "focused",
+                                "active", "background", "foreground", "division", "complex",
                             }
-                            kw_candidates = set()
+
+                            kw_candidates = {}  # word -> score
+
+                            # Bold section headers = highest priority (score 3)
                             for bold_match in re.finditer(r'\*\*([^*:]+)', vision_text):
                                 word = bold_match.group(1).strip().lower()
-                                if 2 < len(word) < 30 and " " not in word:
-                                    kw_candidates.add(word)
-                            for word in re.findall(r'\b[a-zA-Z]{5,}\b', auto_description):
+                                if 2 < len(word) < 30 and " " not in word and word not in _STOPWORDS:
+                                    kw_candidates[word] = kw_candidates.get(word, 0) + 3
+
+                            # All words from description, scored by importance
+                            words = re.findall(r'\b[a-zA-Z][a-zA-Z\-]{2,}\b', auto_description)
+                            for word in words:
                                 w = word.lower()
-                                if w not in _STOPWORDS:
-                                    kw_candidates.add(w)
+                                if w in _STOPWORDS:
+                                    continue
+                                score = kw_candidates.get(w, 0)
+                                # Boost short meaningful nouns (pool, band, stage, choir)
+                                if len(w) <= 6:
+                                    score += 2
+                                # Boost longer subject nouns (orchestra, swimming, musician)
+                                elif len(w) <= 10:
+                                    score += 1
+                                # Penalize very long words that are usually adjectives/adverbs
+                                else:
+                                    score += 0
+                                kw_candidates[w] = score
+
+                            # Also scan full vision_text for capitalized subject words (proper nouns / subjects)
+                            for word in re.findall(r'\b[A-Z][a-z]{2,}\b', vision_text):
+                                w = word.lower()
+                                if w not in _STOPWORDS and w not in ("this", "the", "it"):
+                                    kw_candidates[w] = kw_candidates.get(w, 0) + 2
+
+                            # Place keyword
                             if place:
                                 place_kw = place.split(",")[0].strip().lower().replace(" ", "-")
                                 if place_kw:
-                                    kw_candidates.add(place_kw)
-                            auto_keywords = ",".join(sorted(kw_candidates)[:10])
+                                    kw_candidates[place_kw] = kw_candidates.get(place_kw, 0) + 3
+
+                            # Sort by score descending, take top 10
+                            auto_keywords = ",".join(
+                                w for w, _ in sorted(kw_candidates.items(), key=lambda x: -x[1])[:10]
+                            )
 
                             async with httpx.AsyncClient(timeout=15.0) as hc:
                                 if auto_description:
