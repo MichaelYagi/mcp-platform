@@ -1439,7 +1439,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     )
                     # Strip trailing slash
                     ollama_url = str(ollama_url).rstrip("/")
-                    model_name = get_model_name(base_llm)
+                    model_name = os.getenv("OLLAMA_VISION_MODEL") or get_model_name(base_llm)
                     logger.info(f"[LangGraph] 🖼️ Using vision model: {model_name}")
 
                     import httpx
