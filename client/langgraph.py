@@ -1568,12 +1568,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 if w not in _STOPWORDS and w not in ("this", "the", "it"):
                                     kw_candidates[w] = kw_candidates.get(w, 0) + 2
 
-                            # Place keyword
-                            if place:
-                                place_kw = place.split(",")[0].strip().lower().replace(" ", "-")
-                                if place_kw:
-                                    kw_candidates[place_kw] = kw_candidates.get(place_kw, 0) + 3
-
                             # Sort by score descending, take top 10
                             auto_keywords = ",".join(
                                 w for w, _ in sorted(kw_candidates.items(), key=lambda x: -x[1])[:10]
