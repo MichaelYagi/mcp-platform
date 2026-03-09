@@ -20,7 +20,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 from pathlib import Path
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS as _SKL_STOPS
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 
 from tools.rag.rag_vector_db import should_refresh_source
@@ -42,14 +41,6 @@ from client.query_patterns import (
 
 MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
 LLM_MESSAGE_WINDOW = int(os.getenv("LLM_MESSAGE_WINDOW", "6"))
-
-# Vision keyword extraction — combined sklearn + domain-specific stopwords
-_VISION_STOPS = _SKL_STOPS | frozenset({
-    "image", "photo", "photograph", "scene", "captured", "captures",
-    "capturing", "taken", "shows", "shown", "likely", "description",
-    "detail", "detailed", "high", "angle", "clear", "filled", "focused",
-    "active", "background", "foreground", "division", "complex",
-})
 
 # Try to import metrics
 try:
@@ -1510,95 +1501,6 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if METRICS_AVAILABLE:
                         metrics["llm_calls"] += 1
                         metrics["llm_times"].append((time.time(), duration))
-
-                    # ── Auto-tag: write description + keywords back to Shashin ──
-                    # Only tag if Shashin has no description yet for this image.
-                    existing_description = tool_data.get("description", "")
-                    if image_id and not existing_description:
-                        try:
-                            shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
-                            shashin_key  = os.getenv("SHASHIN_API_KEY", "")
-                            tag_headers  = {"x-api-key": shashin_key, "Content-Type": "application/json"}
-
-                            # Description: first 2 sentences from vision_text,
-                            # skipping header lines (🆔 📍 📅) and bold section headers
-                            desc_lines = [
-                                l.strip() for l in vision_text.splitlines()
-                                if l.strip()
-                                and not l.strip().startswith(("🆔", "📍", "📅", "**", "*"))
-                            ]
-                            raw_desc = " ".join(desc_lines)
-                            sentences = re.split(r'(?<=[.!?])\s+', raw_desc)
-                            auto_description = " ".join(sentences[:2]).strip()
-                            if len(auto_description) > 500:
-                                auto_description = auto_description[:497] + "..."
-
-                            # Keywords: prioritize subject nouns over generic words
-                            _STOPWORDS = _VISION_STOPS
-
-                            kw_candidates = {}  # word -> score
-
-                            # Bold section headers = highest priority (score 3)
-                            for bold_match in re.finditer(r'\*\*([^*:]+)', vision_text):
-                                word = bold_match.group(1).strip().lower()
-                                if 2 < len(word) < 30 and " " not in word and word not in _STOPWORDS:
-                                    kw_candidates[word] = kw_candidates.get(word, 0) + 3
-
-                            # All words from description, scored by importance
-                            words = re.findall(r'\b[a-zA-Z][a-zA-Z\-]{2,}\b', auto_description)
-                            for word in words:
-                                w = word.lower()
-                                if w in _STOPWORDS:
-                                    continue
-                                score = kw_candidates.get(w, 0)
-                                # Boost short meaningful nouns (pool, band, stage, choir)
-                                if len(w) <= 6:
-                                    score += 2
-                                # Boost longer subject nouns (orchestra, swimming, musician)
-                                elif len(w) <= 10:
-                                    score += 1
-                                # Penalize very long words that are usually adjectives/adverbs
-                                else:
-                                    score += 0
-                                kw_candidates[w] = score
-
-                            # Also scan full vision_text for capitalized subject words (proper nouns / subjects)
-                            for word in re.findall(r'\b[A-Z][a-z]{2,}\b', vision_text):
-                                w = word.lower()
-                                if w not in _STOPWORDS:
-                                    kw_candidates[w] = kw_candidates.get(w, 0) + 2
-
-                            # Sort by score descending, take top 10
-                            auto_keywords = ",".join(
-                                w for w, _ in sorted(kw_candidates.items(), key=lambda x: -x[1])[:10]
-                            )
-
-                            async with httpx.AsyncClient(timeout=15.0) as hc:
-                                if auto_description:
-                                    desc_resp = await hc.put(
-                                        f"{shashin_base}/api/v1/update/metadata/description/{image_id}",
-                                        headers=tag_headers,
-                                        json={"description": auto_description}
-                                    )
-                                    if desc_resp.status_code == 200:
-                                        logger.info(f"[LangGraph] 🏷️ Auto-tagged description for {image_id}")
-                                    else:
-                                        logger.warning(f"[LangGraph] 🏷️ Description PUT failed: {desc_resp.status_code} — {desc_resp.text[:200]}")
-                                if auto_keywords:
-                                    kw_resp = await hc.put(
-                                        f"{shashin_base}/api/v1/update/metadata/keywords/{image_id}",
-                                        headers=tag_headers,
-                                        json={"keywords": auto_keywords}
-                                    )
-                                    if kw_resp.status_code == 200:
-                                        logger.info(f"[LangGraph] 🏷️ Auto-tagged keywords for {image_id}: {auto_keywords}")
-                                    else:
-                                        logger.warning(f"[LangGraph] 🏷️ Keywords PUT failed: {kw_resp.status_code} — {kw_resp.text[:200]}")
-                        except Exception as tag_err:
-                            logger.warning(f"[LangGraph] 🏷️ Auto-tag failed for {image_id}: {tag_err}")
-                    elif image_id and existing_description:
-                        logger.info(f"[LangGraph] 🏷️ Skipping auto-tag for {image_id} — description already exists")
-                    # ── End auto-tag ─────────────────────────────────────────────
 
                     return {
                         "messages": [AIMessage(content=vision_text)],
