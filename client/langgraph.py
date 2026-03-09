@@ -20,6 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from dotenv import load_dotenv
 from pathlib import Path
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS as _SKL_STOPS
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 
 from tools.rag.rag_vector_db import should_refresh_source
@@ -41,6 +42,14 @@ from client.query_patterns import (
 
 MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
 LLM_MESSAGE_WINDOW = int(os.getenv("LLM_MESSAGE_WINDOW", "6"))
+
+# Vision keyword extraction — combined sklearn + domain-specific stopwords
+_VISION_STOPS = _SKL_STOPS | frozenset({
+    "image", "photo", "photograph", "scene", "captured", "captures",
+    "capturing", "taken", "shows", "shown", "likely", "description",
+    "detail", "detailed", "high", "angle", "clear", "filled", "focused",
+    "active", "background", "foreground", "division", "complex",
+})
 
 # Try to import metrics
 try:
@@ -1525,16 +1534,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 auto_description = auto_description[:497] + "..."
 
                             # Keywords: prioritize subject nouns over generic words
-                            _STOPWORDS = {
-                                "about", "above", "after", "also", "appears", "being",
-                                "between", "captured", "captures", "capturing", "could", "image",
-                                "photo", "photograph", "scene", "their", "there", "these",
-                                "while", "which", "with", "within", "would", "other",
-                                "another", "where", "have", "from", "that", "this",
-                                "taken", "shows", "shown", "likely", "detail", "detailed",
-                                "description", "high", "angle", "clear", "filled", "focused",
-                                "active", "background", "foreground", "division", "complex",
-                            }
+                            _STOPWORDS = _VISION_STOPS
 
                             kw_candidates = {}  # word -> score
 
@@ -1565,7 +1565,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                             # Also scan full vision_text for capitalized subject words (proper nouns / subjects)
                             for word in re.findall(r'\b[A-Z][a-z]{2,}\b', vision_text):
                                 w = word.lower()
-                                if w not in _STOPWORDS and w not in ("this", "the", "it"):
+                                if w not in _STOPWORDS:
                                     kw_candidates[w] = kw_candidates.get(w, 0) + 2
 
                             # Sort by score descending, take top 10
