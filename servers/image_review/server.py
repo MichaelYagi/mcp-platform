@@ -219,6 +219,11 @@ def shashin_search_tool(
     including thumbnail/original URLs, camera info, and detected keywords.
     Use the returned image IDs with shashin_analyze_tool for vision inference.
 
+    IMPORTANT: Always return the results as a plain numbered list exactly as
+    formatted in the tool output. Never summarize, group by location, or omit
+    the ID field. Every result must show the filename, date, and ID on separate
+    lines. Do not paraphrase or reorganize the results.
+
     Args:
         term (str, required): Search term e.g. "cat", "Noah", "beach", "sunset"
         page (int, optional): Pagination page index, 0-based (default: 0)
