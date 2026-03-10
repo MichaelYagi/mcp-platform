@@ -1432,10 +1432,42 @@ def create_langgraph_agent(llm_with_tools, tools):
                                     break
                             except Exception as e:
                                 logger.debug(f"[LangGraph] 🖼️ fallback scan parse error: {e}")
-                    if place:
-                        user_prompt = f"Describe this image in detail. It was taken at: {place}."
+                    # Extract the user's actual intent from the last HumanMessage
+                    # Extract user intent from the last HumanMessage, stripping
+                    # tool-invocation preamble. If the message is purely a tool call
+                    # with no real question (e.g. "Use shashin_analyze_tool with <id>"),
+                    # fall through to the generic description prompt.
+                    import re as _re
+                    _TOOL_ONLY_RE = _re.compile(
+                        r'^(?:use|using|run|call)\s+\w+\s+(?:with|using|on|for)?\s*[\w\-]+\s*$',
+                        _re.IGNORECASE
+                    )
+                    _PREAMBLE_RE = _re.compile(
+                        r'^(?:using\s+\w+[\w_]*\s*(?:tool)?\s*[,.]?\s*)',
+                        _re.IGNORECASE
+                    )
+                    user_intent = None
+                    for m in reversed(messages):
+                        if isinstance(m, HumanMessage):
+                            raw_intent = m.content if isinstance(m.content, str) else None
+                            if raw_intent and not _TOOL_ONLY_RE.match(raw_intent.strip()):
+                                user_intent = _PREAMBLE_RE.sub("", raw_intent, count=1).strip()
+                            break
+
+                    DESCRIBE_PLAIN = (
+                        "Describe this image in plain prose. "
+                        "Do not use JSON, markdown code blocks, or structured formats. "
+                        "Write naturally as if explaining to someone who cannot see the image."
+                    )
+                    if user_intent:
+                        if place:
+                            user_prompt = f"{user_intent}\n\nContext: this image was taken at {place}."
+                        else:
+                            user_prompt = user_intent
+                    elif place:
+                        user_prompt = f"{DESCRIBE_PLAIN} It was taken at: {place}."
                     else:
-                        user_prompt = "Describe this image in detail."
+                        user_prompt = DESCRIBE_PLAIN
 
                     # Use the dedicated vision model from env, falling back to current model.
                     # This allows qwen2.5:14b to handle tool selection while a separate
