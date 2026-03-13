@@ -398,7 +398,7 @@ def shashin_analyze_tool(
     Returns:
         JSON string with:
         - success (bool)
-Use th        - image_source (str)  — Shashin thumbnail URL, passed to vision shortcut
+        - image_source (str)  — Shashin thumbnail URL, passed to vision shortcut
         - image_id (str)
         - thumbnail_used (bool)
         - fileName (str)
