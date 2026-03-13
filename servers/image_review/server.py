@@ -283,10 +283,14 @@ def shashin_search_tool(
     for i, r in enumerate(results, 1):
         lines.append(f"{i}. {r['fileName']} — {r['takenAt']}")
         lines.append(f"   ID: {r['id']}")
+
+        if r.get("id"):
+            shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
+            lines.append(f"   🔗 {shashin_base}/search?term={r['id']}")
+        if r.get("description"):
+            lines.append(f"   📝 {r['description']}")
         if r.get("placeName"):
             lines.append(f"   📍 {r['placeName']}")
-        if r.get("camera"):
-            lines.append(f"   📷 {r['camera']}")
         if r.get("keywords"):
             kw = r["keywords"] if isinstance(r["keywords"], str) else ", ".join(r["keywords"])
             lines.append(f"   🏷  {kw}")
