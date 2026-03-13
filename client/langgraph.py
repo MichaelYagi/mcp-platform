@@ -1510,7 +1510,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                     # Prepend location and date/time to the chat bubble
                     header_parts = []
                     if image_id:
+                        shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
                         header_parts.append(f"🆔 {image_id}")
+                        header_parts.append(f"🔗 {shashin_base}/search?term={image_id}")
                     if place:
                         place = place.split(';', 1)[0]
                         header_parts.append(f"📍 {place}")
