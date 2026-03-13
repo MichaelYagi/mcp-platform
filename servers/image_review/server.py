@@ -282,7 +282,7 @@ def shashin_search_tool(
     lines = [f'Found {len(results)} photo(s) matching "{term}" (page {page + 1} of {total_pages}):\n']
     for i, r in enumerate(results, 1):
         lines.append(f"{i}. {r['fileName']} — {r['takenAt']}")
-        lines.append(f"   ID: {r['id']}")
+        lines.append(f"   🆔 {r['id']}")
 
         if r.get("id"):
             shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
