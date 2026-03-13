@@ -644,6 +644,8 @@ function formatMessage(text) {
     });
     text=text.replace(/'''([\s\S]*?)'''/g,(m,code)=>{const i=blocks.length;blocks.push({lang:"code",code});return`@@CODEBLOCK_${i}@@`;});
     text=text.replace(/`([^`]+)`/g,(m,code)=>{const i=inline.length;inline.push(code);return`@@INLINE_${i}@@`;});
+    const images=[];
+    text=text.replace(/!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g,(m,alt,url)=>{const i=images.length;images.push({alt,url});return`@@IMAGE_${i}@@`;});
     text=text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,(m,label,url)=>{const i=links.length;links.push({label,url});return`@@LINK_${i}@@`;});
     text=text.replace(/(?<!\]\()(?<!")https?:\/\/[^\s<>"]+/g,(url)=>{const trailing=url.match(/[.,;:!?'")\]]+$/)?.[0]||'';const cleanUrl=url.slice(0,url.length-trailing.length);const i=links.length;links.push({label:cleanUrl,url:cleanUrl});return`@@LINK_${i}@@${trailing}`;});
     text=text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -671,6 +673,7 @@ function formatMessage(text) {
     text=text.replace(/@@MATHINLINE_(\d+)@@/g,(m,i)=>processMath(mathInline[i]));
     text=text.replace(/@@MATHBLOCK_(\d+)@@/g,(m,i)=>processMath(mathBlock[i]));
     text=text.replace(/@@LINK_(\d+)@@/g,(m,i)=>`<a href="${links[i].url}" target="_blank">${links[i].label}</a>`);
+    text=text.replace(/@@IMAGE_(\d+)@@/g,(m,i)=>`<img src="${images[i].url}" alt="${images[i].alt}" style="max-width:100%;max-height:200px;border-radius:6px;display:block;margin:4px 0;object-fit:contain;">`);
     return text;
 }
 

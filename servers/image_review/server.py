@@ -280,12 +280,15 @@ def shashin_search_tool(
         })
 
     lines = [f'Found {len(results)} photo(s) matching "{term}" (page {page + 1} of {total_pages}):\n']
+    shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
+
     for i, r in enumerate(results, 1):
         lines.append(f"{i}. {r['fileName']} — {r['takenAt']}")
         lines.append(f"   🆔 {r['id']}")
 
+        if r.get("thumbnailUrl"):
+            lines.append(f"   ![{r['fileName']}]({shashin_base}/api/v1/thumbnails/225/{r['id']})")
         if r.get("id"):
-            shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
             lines.append(f"   🔗 {shashin_base}/search?term={r['id']}")
         if r.get("description"):
             lines.append(f"   📝 {r['description']}")
