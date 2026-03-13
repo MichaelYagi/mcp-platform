@@ -210,7 +210,7 @@ def analyze_image_tool(
 @check_tool_enabled(category="image_tools")
 def shashin_search_tool(
     term: str,
-    page: int = 0,
+    page: Optional[int] = 0,
 ) -> str:
     """
     Search the Shashin self-hosted media gallery by keyword term.
@@ -245,6 +245,12 @@ def shashin_search_tool(
             - originalUrl (str)  — full URL to original image
         - error (str)          — present only on failure
     """
+    # Coerce page to int in case a small model passes {} or None
+    try:
+        page = int(page) if page else 0
+    except (TypeError, ValueError):
+        page = 0
+
     logger.info(
         f"🛠 [server] shashin_search_tool called — term={term}, page={page}"
     )
