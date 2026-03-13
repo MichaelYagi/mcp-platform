@@ -293,7 +293,7 @@ def shashin_search_tool(
             lines.append(f"   📍 {r['placeName']}")
         if r.get("keywords"):
             kw = r["keywords"] if isinstance(r["keywords"], str) else ", ".join(r["keywords"])
-            lines.append(f"   🏷  {kw}")
+            lines.append(f"   🏷️ {kw}")
         lines.append("")
 
     return "\n".join(lines)
