@@ -60,6 +60,16 @@ INTENT_CATALOG = [
             "github_cleanup_repo", "analyze_project", "analyze_code_file",
             "review_code", "scan_project_structure"
         ],
+        "examples": {
+            "github_clone_repo": "review the repo at ",
+            "github_list_files": "list files in ",
+            "github_get_file_content": "get file content from ",
+            "github_cleanup_repo": "clean up the cloned repo",
+            "analyze_project": "analyze the project at ",
+            "analyze_code_file": "analyze the code in ",
+            "review_code": "review this code: ",
+            "scan_project_structure": "scan project structure at "
+        },
         "priority": 2,
         "web_search": False,
         "skills": True,
@@ -75,6 +85,9 @@ INTENT_CATALOG = [
             r'|\b(insights?\s+into|analys[ei]\s+my|analyze\s+my|summarize\s+my)\b.*\bfile\b'
         ),
         "tools": ["read_file_tool_handler"],
+        "examples": {
+            "read_file_tool_handler": "analyze this file: "
+        },
         "priority": 2,
         "web_search": False,
         "skills": True,
@@ -112,6 +125,18 @@ INTENT_CATALOG = [
             "analyze_code_file", "fix_code_file", "suggest_improvements",
             "explain_code", "generate_tests", "refactor_code", "generate_code"
         ],
+        "examples": {
+            "analyze_project": "analyze the project at ",
+            "get_project_dependencies": "list dependencies for ",
+            "scan_project_structure": "scan project structure at ",
+            "analyze_code_file": "analyze the code in ",
+            "fix_code_file": "fix the bug in ",
+            "suggest_improvements": "suggest improvements for ",
+            "explain_code": "explain this code: ",
+            "generate_tests": "generate tests for ",
+            "refactor_code": "refactor ",
+            "generate_code": "write a function that "
+        },
         "priority": 2,
         "web_search": False,
         "skills": True,
@@ -132,6 +157,9 @@ INTENT_CATALOG = [
             r'|\banalyze\b.*(image|photo|picture)\b.*(/mnt/|/home/|/tmp/|https?://)'
         ),
         "tools": ["analyze_image_tool"],
+        "examples": {
+            "analyze_image_tool": "describe this image: "
+        },
         "priority": 1,
         "web_search": False,
         "skills": True,
@@ -146,6 +174,9 @@ INTENT_CATALOG = [
             r'|\brandom\s+shashin\b|\bshashin.*random\b'
         ),
         "tools": ["shashin_random_tool"],
+        "examples": {
+            "shashin_random_tool": "show me a random photo"
+        },
         "priority": 1,
         "web_search": False,
         "skills": True,
@@ -161,6 +192,9 @@ INTENT_CATALOG = [
         ),
         "exclude_pattern": r'\bmy\b|\bshashin\b|\bphoto\s+of\s+[a-f0-9\-]{36}\b',
         "tools": ["web_image_search_tool"],
+        "examples": {
+            "web_image_search_tool": "show me a picture of "
+        },
         "priority": 1,
         "web_search": False,
         "skills": False,
@@ -178,6 +212,10 @@ INTENT_CATALOG = [
         ),
         "exclude_pattern": r'(/mnt/|/home/|/tmp/|https?://|\.(jpg|jpeg|png|gif|webp|bmp|heic)\b)',
         "tools": ["shashin_search_tool", "shashin_analyze_tool"],
+        "examples": {
+            "shashin_search_tool": "find photos of ",
+            "shashin_analyze_tool": "describe the photo of "
+        },
         "priority": 2,
         "web_search": False,
         "skills": True,
@@ -192,6 +230,9 @@ INTENT_CATALOG = [
             r'|\b(browse|list)\b.*(photos?|images?|gallery)\b'
         ),
         "tools": ["shashin_search_tool"],
+        "examples": {
+            "shashin_search_tool": "find photos of "
+        },
         "priority": 2,
         "web_search": False,
         "skills": True,
@@ -212,6 +253,11 @@ INTENT_CATALOG = [
             "rag_search_tool", "semantic_media_search_text",
             "scene_locator_tool", "find_scene_by_title"
         ],
+        "examples": {
+            "semantic_media_search_text": "find movies about ",
+            "scene_locator_tool": "find the scene where ",
+            "find_scene_by_title": "find a scene in "
+        },
         "priority": 2,
         "web_search": False,
         "skills": False,
@@ -242,6 +288,14 @@ INTENT_CATALOG = [
             "rag_search_tool", "rag_status_tool", "rag_list_sources_tool",
             "rag_browse_tool", "rag_diagnose_tool", "rag_add_tool"
         ],
+        "examples": {
+            "rag_search_tool": "search RAG for ",
+            "rag_status_tool": "show RAG stats",
+            "rag_list_sources_tool": "list RAG sources",
+            "rag_browse_tool": "browse RAG content",
+            "rag_diagnose_tool": "diagnose the RAG database",
+            "rag_add_tool": "add this to RAG: "
+        },
         "priority": 2,
         "web_search": False,
         "skills": False,
@@ -264,6 +318,19 @@ INTENT_CATALOG = [
             "delete_note", "add_label_to_note", "get_note_labels",
             "get_note_children", "get_recent_notes"
         ],
+        "examples": {
+            "search_notes": "search my notes for ",
+            "search_by_label": "find notes tagged ",
+            "get_note_by_id": "get note ",
+            "create_note": "create a note titled ",
+            "update_note_content": "update note ",
+            "update_note_title": "rename note ",
+            "delete_note": "delete note ",
+            "add_label_to_note": "tag note ",
+            "get_note_labels": "list labels for note ",
+            "get_note_children": "list children of note ",
+            "get_recent_notes": "show my recent notes"
+        },
         "priority": 2,
         "web_search": False,
         "skills": False,
@@ -275,6 +342,9 @@ INTENT_CATALOG = [
             r'|\brain\b|\bsnow\b|\bwind\b|\bconditions\b'
         ),
         "tools": ["get_location_tool", "get_weather_tool"],
+        "examples": {
+            "get_weather_tool": "what's the weather in "
+        },
         "priority": 3,
         "web_search": False,   # MCP tools handle this — never web search
         "skills": False,
@@ -286,6 +356,9 @@ INTENT_CATALOG = [
             r'|\bwhere\s+am\s+i\b|\bcurrent\s+location\b|\bwhere\s+do\s+i\s+live\b'
         ),
         "tools": ["get_location_tool"],
+        "examples": {
+            "get_location_tool": "what's my current location"
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -297,6 +370,9 @@ INTENT_CATALOG = [
             r'|\bcurrent\s+date\b|\btime\s+now\b|\btime\s+is\s+it\b'
         ),
         "tools": ["get_time_tool"],
+        "examples": {
+            "get_time_tool": "what time is it"
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -312,6 +388,12 @@ INTENT_CATALOG = [
             "get_hardware_specs_tool", "get_system_info",
             "list_system_processes", "terminate_process"
         ],
+        "examples": {
+            "get_hardware_specs_tool": "show my hardware specs",
+            "get_system_info": "show system info",
+            "list_system_processes": "list running processes",
+            "terminate_process": "terminate process "
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -333,6 +415,16 @@ INTENT_CATALOG = [
             "get_recommender_stats", "import_plex_history", "auto_train_from_plex",
             "reset_recommender", "auto_recommend_from_plex"
         ],
+        "examples": {
+            "record_viewing": "record that I watched ",
+            "train_recommender": "train the recommendation model",
+            "recommend_content": "what should I watch",
+            "get_recommender_stats": "show recommender stats",
+            "import_plex_history": "import my Plex viewing history",
+            "auto_train_from_plex": "auto train from my Plex history",
+            "reset_recommender": "reset the recommendation model",
+            "auto_recommend_from_plex": "recommend based on my Plex history"
+        },
         "priority": 3,
         "web_search": False,
         "skills": True,
@@ -347,6 +439,14 @@ INTENT_CATALOG = [
             "review_code", "summarize_code_file", "search_code_in_directory",
             "scan_code_directory", "summarize_code", "debug_fix"
         ],
+        "examples": {
+            "review_code": "review this code: ",
+            "summarize_code_file": "summarize code in ",
+            "search_code_in_directory": "search code for ",
+            "scan_code_directory": "scan code directory ",
+            "summarize_code": "summarize this code: ",
+            "debug_fix": "fix this error: "
+        },
         "priority": 3,
         "web_search": False,
         "skills": True,
@@ -359,6 +459,12 @@ INTENT_CATALOG = [
             "summarize_text_tool", "concept_contextualizer_tool",
             "summarize_direct_tool", "explain_simplified_tool"
         ],
+        "examples": {
+            "summarize_text_tool": "summarize: ",
+            "concept_contextualizer_tool": "explain ",
+            "summarize_direct_tool": "summarize: ",
+            "explain_simplified_tool": "simplify: "
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -373,6 +479,14 @@ INTENT_CATALOG = [
             "add_todo_item", "list_todo_items", "search_todo_items",
             "update_todo_item", "delete_todo_item", "delete_all_todo_items"
         ],
+        "examples": {
+            "add_todo_item": "add task: ",
+            "list_todo_items": "show my todos",
+            "search_todo_items": "search todos for ",
+            "update_todo_item": "mark done: ",
+            "delete_todo_item": "delete todo: ",
+            "delete_all_todo_items": "clear all my todos"
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -387,6 +501,16 @@ INTENT_CATALOG = [
             "add_entry", "list_entries", "get_entry", "search_entries",
             "search_by_tag", "search_semantic", "update_entry", "delete_entry"
         ],
+        "examples": {
+            "add_entry": "remember: ",
+            "list_entries": "show all knowledge entries",
+            "get_entry": "retrieve entry ",
+            "search_entries": "search my knowledge for ",
+            "search_by_tag": "find entries tagged ",
+            "search_semantic": "semantically search for ",
+            "update_entry": "update entry ",
+            "delete_entry": "delete entry "
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -399,6 +523,10 @@ INTENT_CATALOG = [
             r'|\bprocess\s+subtitles?\b|\bextract\s+subtitles?\b'
         ),
         "tools": ["ingest_movies", "ingest_batch_tool"],
+        "examples": {
+            "ingest_movies": "ingest movies now",
+            "ingest_batch_tool": "ingest a batch"
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -411,6 +539,10 @@ INTENT_CATALOG = [
             r'|\buse\s+remote\s+agent\b|\bconnect\s+to\s+agent\b'
         ),
         "tools": ["send_a2a*", "discover_a2a"],
+        "examples": {
+            "send_a2a*": "send to remote agent: ",
+            "discover_a2a": "discover remote agents"
+        },
         "priority": 3,
         "web_search": False,
         "skills": False,
@@ -423,6 +555,8 @@ INTENT_CATALOG = [
             r'|\bin\s+the\s+news\b'
         ),
         "tools": [],
+        "examples": {
+        },
         "priority": 3,
         "web_search": True,
         "skills": False,
@@ -431,6 +565,8 @@ INTENT_CATALOG = [
         "name": "stock_price",
         "pattern": r'\b(stock|share)\s+price\b|\btrading\s+at\b|\bmarket\s+cap\b',
         "tools": [],
+        "examples": {
+        },
         "priority": 3,
         "web_search": True,
         "skills": False,

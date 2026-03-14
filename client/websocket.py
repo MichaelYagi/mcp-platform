@@ -631,6 +631,17 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     # (same logic used by :tools command)
                     _tool_to_server = await resolve_tool_server(tools, mcp_agent, _project_root)
 
+                    # Build tool→example map from INTENT_CATALOG
+                    _tool_examples: dict = {}
+                    try:
+                        from client.query_patterns import INTENT_CATALOG as _IC
+                        for _entry in _IC:
+                            for _tool, _prompt in _entry.get("examples", {}).items():
+                                if _tool not in _tool_examples:
+                                    _tool_examples[_tool] = _prompt
+                    except Exception:
+                        pass
+
                     tools_payload = []
                     seen_names = set()
                     for tool in tools:
@@ -649,6 +660,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "description": (tool.description or "").strip(),
                             "source_server": source,
                             "external": source in _external_names,
+                            "example": _tool_examples.get(tool.name, ""),
                         })
 
                     await websocket.send(json.dumps({
