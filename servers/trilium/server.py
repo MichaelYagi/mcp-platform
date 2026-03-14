@@ -163,7 +163,7 @@ def make_request(method: str, endpoint: str, data: dict = None, params: dict = N
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-def search_notes(query: str, limit: int = 50, include_content: bool = True) -> str:
+def search_notes(query: str, limit: Optional[int] = 50, include_content: Optional[bool] = True) -> str:
     """
     Search Trilium notes using full-text search.
 
@@ -185,6 +185,8 @@ def search_notes(query: str, limit: int = 50, include_content: bool = True) -> s
     if not TRILIUM_AVAILABLE:
         return json.dumps(trilium_unavailable_error(), indent=2)
 
+    limit = int(limit) if limit is not None else 50
+    include_content = bool(include_content) if include_content is not None else True
     logger.info(f"🔍 [server] search_notes called with query: '{query}' (limit: {limit}, content: {include_content})")
 
     result = make_request(
@@ -246,7 +248,7 @@ def search_notes(query: str, limit: int = 50, include_content: bool = True) -> s
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-def search_by_label(label: str, value: str = None, limit: int = 50) -> str:
+def search_by_label(label: str, value: str = None, limit: Optional[int] = 50) -> str:
     """
     Search notes by label (attribute).
 
@@ -275,6 +277,7 @@ def search_by_label(label: str, value: str = None, limit: int = 50) -> str:
     else:
         query = f"#{label}"
 
+    limit = int(limit) if limit is not None else 50
     logger.info(f"🏷️  [server] search_by_label called with label: {query}")
 
     # Use the search endpoint with label query
@@ -629,7 +632,7 @@ def get_note_children(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-def get_recent_notes(limit: int = 20) -> str:
+def get_recent_notes(limit: Optional[int] = 20) -> str:
     """
     Get recently modified notes.
 
@@ -642,6 +645,7 @@ def get_recent_notes(limit: int = 20) -> str:
     if not TRILIUM_AVAILABLE:
         return json.dumps(trilium_unavailable_error(), indent=2)
 
+    limit = int(limit) if limit is not None else 20
     logger.info(f"📅 [server] get_recent_notes called (limit: {limit})")
 
     # Search with empty query returns all notes, sorted by modification date

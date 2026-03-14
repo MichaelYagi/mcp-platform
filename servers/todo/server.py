@@ -129,7 +129,7 @@ def search_todo_items(text: Optional[str] = None,
                       due_before: Optional[str] = None,
                       due_after: Optional[str] = None,
                       order_by: Optional[str] = None,
-                      ascending: bool = True) -> str:
+                      ascending: Optional[bool] = True) -> str:
     """
     Search and filter todo items with multiple criteria.
 
@@ -154,6 +154,7 @@ def search_todo_items(text: Optional[str] = None,
     """
     logger.info(
         f"🛠 [server] search_todo_items called with text: {text}, status: {status}, due_before: {due_before}, due_after: {due_after}")
+    ascending = bool(ascending) if ascending is not None else True
     result = search_todos(
         text=text,
         status=status,

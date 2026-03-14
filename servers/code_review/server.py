@@ -69,7 +69,7 @@ mcp = FastMCP("code-review-server")
 
 @mcp.tool()
 @check_tool_enabled(category="code_reviewer")
-def review_code(path: str, max_bytes: int = 200_000) -> str:
+def review_code(path: str, max_bytes: Optional[int] = 200_000) -> str:
     """
     Perform comprehensive code review and static analysis on a Python file or directory.
 
@@ -115,6 +115,7 @@ def review_code(path: str, max_bytes: int = 200_000) -> str:
     - Audit code before deployment
     - Scan entire package/directory for issues
     """
+    max_bytes = int(max_bytes) if max_bytes is not None else 200_000
     logger.info(f"🛠 [server] review_code called with path: {path}, max_bytes: {max_bytes}")
 
     try:
@@ -130,7 +131,7 @@ def review_code(path: str, max_bytes: int = 200_000) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="code_reviewer")
-def summarize_code_file(path: str, max_bytes: int = 200_000) -> str:
+def summarize_code_file(path: str, max_bytes: Optional[int] = 200_000) -> str:
     """
     Read a code file and return a structured summary (basic version).
 
@@ -153,6 +154,7 @@ def summarize_code_file(path: str, max_bytes: int = 200_000) -> str:
 
     Use for quick file summary. For detailed analysis, use review_code.
     """
+    max_bytes = int(max_bytes) if max_bytes is not None else 200_000
     logger.info(f"🛠 [server] summarize_code_file called with path: {path}, max_bytes: {max_bytes}")
     from pathlib import Path
     import json

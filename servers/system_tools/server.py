@@ -111,7 +111,7 @@ def get_system_info() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="system_tools")
-def list_system_processes(top_n: int = 10) -> str:
+def list_system_processes(top_n: Optional[int] = 10) -> str:
     """
     List active system processes sorted by resource usage.
 
@@ -128,6 +128,7 @@ def list_system_processes(top_n: int = 10) -> str:
 
     Use when user asks what is running or wants to inspect system activity.
     """
+    top_n = int(top_n) if top_n is not None else 10
     logger.info(f"🛠 [server] list_system_processes called with top_n: {top_n}")
     return list_processes(top_n)
 

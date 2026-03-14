@@ -146,7 +146,7 @@ def search_by_tag(tag: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="knowledge_base")
-def search_semantic(query: str, top_k: int = 5) -> str:
+def search_semantic(query: str, top_k: Optional[int] = 5) -> str:
     """
     Perform semantic (embedding-based) search across the knowledge base.
 
@@ -164,6 +164,7 @@ def search_semantic(query: str, top_k: int = 5) -> str:
 
     Use for finding conceptually related ideas, similar content, or concept-level matches.
     """
+    top_k = int(top_k) if top_k is not None else 5
     logger.info(f"🛠 [server] search_semantic called with query: {query}")
     result = kb_search_semantic(query, top_k)
     return json.dumps(result, indent=2)

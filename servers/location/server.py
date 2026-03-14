@@ -142,7 +142,7 @@ def get_weather_tool(
         city: str | None = None,
         state: str | None = None,
         country: str | None = None,
-        forecast_days: int = 7
+        forecast_days: Optional[int] = 7
 ) -> str:
     """
     Get weather forecast. Returns current conditions plus daily forecasts.
@@ -173,6 +173,7 @@ def get_weather_tool(
         - relative_day: "tomorrow" (machine readable - use this!)
         - condition, temperatures, precipitation, etc.
     """
+    forecast_days = int(forecast_days) if forecast_days is not None else 7
     logger.info(
         f"🛠 [server] get_weather_tool called with city: {city}, state: {state}, country: {country}, forecast_days: {forecast_days}")
     logger.info(f"🌤️  CLIENT_IP = {CLIENT_IP}")

@@ -68,7 +68,7 @@ mcp = FastMCP("text-tools-server")
 
 @mcp.tool()
 @check_tool_enabled(category="text_tools")
-def split_text_tool(text: str, max_chunk_size: int = 2000) -> str:
+def split_text_tool(text: str, max_chunk_size: Optional[int] = 2000) -> str:
     """
     Split long text into manageable chunks for processing.
 
@@ -84,13 +84,14 @@ def split_text_tool(text: str, max_chunk_size: int = 2000) -> str:
 
     Use for breaking down large documents before summarization or analysis.
     """
+    max_chunk_size = int(max_chunk_size) if max_chunk_size is not None else 2000
     logger.info(f"🛠 [server] split_text_tool called with text: {text}, max_chunk_size: {max_chunk_size}")
     return json.dumps(split_text(text, max_chunk_size))
 
 
 @mcp.tool()
 @check_tool_enabled(category="text_tools")
-def summarize_chunk_tool(chunk: str, style: str = "short") -> str:
+def summarize_chunk_tool(chunk: str, style: Optional[str] = "short") -> str:
     """
     Summarize a single text chunk.
 
@@ -107,13 +108,14 @@ def summarize_chunk_tool(chunk: str, style: str = "short") -> str:
 
     Use for summarizing individual text segments or chunks.
     """
+    style = style if style is not None else "short"
     logger.info(f"🛠 [server] summarize_chunk_tool called with chunk: {chunk}, style: {style}")
     return json.dumps(summarize_chunk(chunk, style))
 
 
 @mcp.tool()
 @check_tool_enabled(category="text_tools")
-def merge_summaries_tool(summaries: List[str], style: str = "medium") -> str:
+def merge_summaries_tool(summaries: List[str], style: Optional[str] = "medium") -> str:
     """
     Combine multiple summaries into one cohesive summary.
 
@@ -130,6 +132,7 @@ def merge_summaries_tool(summaries: List[str], style: str = "medium") -> str:
 
     Use for combining chunk summaries into a final document summary.
     """
+    style = style if style is not None else "medium"
     logger.info(f"🛠 [server] merge_summaries_tool called with summaries: {summaries}, style: {style}")
     return json.dumps(merge_summaries(summaries, style))
 
@@ -138,7 +141,7 @@ def merge_summaries_tool(summaries: List[str], style: str = "medium") -> str:
 @check_tool_enabled(category="text_tools")
 def summarize_text_tool(text: str | None = None,
                         file_path: str | None = None,
-                        style: str = "medium") -> str:
+                        style: Optional[str] = "medium") -> str:
     """
     Summarize text from direct input or file.
 
@@ -158,13 +161,14 @@ def summarize_text_tool(text: str | None = None,
 
     Use for comprehensive text summarization from various sources.
     """
+    style = style if style is not None else "medium"
     logger.info(f"🛠 [server] summarize_text_tool called with text: {text}, file_path: {file_path}, style: {style}")
     return json.dumps(summarize_text(text, file_path, style))
 
 
 @mcp.tool()
 @check_tool_enabled(category="text_tools")
-def summarize_direct_tool(text: str, style: str = "medium") -> str:
+def summarize_direct_tool(text: str, style: Optional[str] = "medium") -> str:
     """
     Summarize text in a single LLM call (for shorter texts).
 
@@ -180,6 +184,7 @@ def summarize_direct_tool(text: str, style: str = "medium") -> str:
 
     Use for quick summarization of shorter texts without chunking overhead.
     """
+    style = style if style is not None else "medium"
     logger.info(f"🛠 [server] summarize_direct_tool called with text: {text}, style: {style}")
     return json.dumps(summarize_direct(text, style))
 
