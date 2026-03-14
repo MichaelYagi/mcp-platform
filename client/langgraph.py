@@ -2353,6 +2353,14 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                 logger.info(f"🔍 Final tool_args: {tool_args}")
 
+            # Coerce args that weak models pass as empty dicts {} or None.
+            # Pydantic rejects {} for int/str fields before the function body runs.
+            # Replace {} with None so Optional fields use their default values.
+            for k, v in list(tool_args.items()):
+                if isinstance(v, dict) and len(v) == 0:
+                    tool_args[k] = None
+                    tool_call["args"][k] = None
+
             logger.info(f"🔧 Executing tool: {tool_name}")
 
             tools_dict = state.get("tools", {})

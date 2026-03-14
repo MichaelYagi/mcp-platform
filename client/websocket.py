@@ -655,12 +655,28 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         if _is_disabled(tool.name, source):
                             continue
 
+                        # Extract required parameter names from args_schema
+                        required_params = []
+                        try:
+                            schema = tool.args_schema
+                            if schema is not None:
+                                s = schema.schema() if callable(getattr(schema, 'schema', None)) else {}
+                                req = s.get("required", [])
+                                props = s.get("properties", {})
+                                required_params = [
+                                    {"name": p, "type": props.get(p, {}).get("type", "string")}
+                                    for p in req if p in props
+                                ]
+                        except Exception:
+                            pass
+
                         tools_payload.append({
                             "name": tool.name,
                             "description": (tool.description or "").strip(),
                             "source_server": source,
                             "external": source in _external_names,
                             "example": _tool_examples.get(tool.name, ""),
+                            "required_params": required_params,
                         })
 
                     await websocket.send(json.dumps({

@@ -555,6 +555,23 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     overflow: hidden;
 }
 
+.tool-item-params {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 4px;
+}
+
+.tool-param {
+    font-size: 0.68rem;
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: #9cdcfe;
+    background: rgba(86,156,214,0.12);
+    border: 1px solid rgba(86,156,214,0.25);
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
 /* ── Log Panel ── */
 #logPanel {
     width: 0; background: var(--log-bg);

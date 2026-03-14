@@ -469,11 +469,15 @@ function renderToolsPanel(tools) {
             // First sentence of description only for the preview
             const fullDesc = tool.description || '';
             const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
+            const params = (tool.required_params || []);
+            const paramsHtml = params.length
+                ? `<div class="tool-item-params">${params.map(p => `<span class="tool-param">${p.name}</span>`).join('')}</div>`
+                : '';
 
             item.innerHTML = `
                 <div class="tool-item-name">${tool.name}</div>
                 <div class="tool-item-desc">${previewDesc || 'No description available.'}</div>
-            `;
+                ${paramsHtml}`;
 
             item.onclick = () => {
                 const inputEl = document.getElementById('input');
