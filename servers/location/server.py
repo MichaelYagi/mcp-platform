@@ -174,6 +174,7 @@ def get_weather_tool(
         - condition, temperatures, precipitation, etc.
     """
     forecast_days = int(forecast_days) if forecast_days is not None else 7
+    forecast_days = int(forecast_days) if forecast_days is not None else 7
     logger.info(
         f"🛠 [server] get_weather_tool called with city: {city}, state: {state}, country: {country}, forecast_days: {forecast_days}")
     logger.info(f"🌤️  CLIENT_IP = {CLIENT_IP}")

@@ -116,6 +116,7 @@ def review_code(path: str, max_bytes: Optional[int] = 200_000) -> str:
     - Scan entire package/directory for issues
     """
     max_bytes = int(max_bytes) if max_bytes is not None else 200_000
+    max_bytes = int(max_bytes) if max_bytes is not None else 200_000
     logger.info(f"🛠 [server] review_code called with path: {path}, max_bytes: {max_bytes}")
 
     try:
@@ -154,6 +155,7 @@ def summarize_code_file(path: str, max_bytes: Optional[int] = 200_000) -> str:
 
     Use for quick file summary. For detailed analysis, use review_code.
     """
+    max_bytes = int(max_bytes) if max_bytes is not None else 200_000
     max_bytes = int(max_bytes) if max_bytes is not None else 200_000
     logger.info(f"🛠 [server] summarize_code_file called with path: {path}, max_bytes: {max_bytes}")
     from pathlib import Path

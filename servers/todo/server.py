@@ -155,6 +155,7 @@ def search_todo_items(text: Optional[str] = None,
     logger.info(
         f"🛠 [server] search_todo_items called with text: {text}, status: {status}, due_before: {due_before}, due_after: {due_after}")
     ascending = bool(ascending) if ascending is not None else True
+    ascending = bool(ascending) if ascending is not None else True
     result = search_todos(
         text=text,
         status=status,

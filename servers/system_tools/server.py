@@ -129,6 +129,7 @@ def list_system_processes(top_n: Optional[int] = 10) -> str:
     Use when user asks what is running or wants to inspect system activity.
     """
     top_n = int(top_n) if top_n is not None else 10
+    top_n = int(top_n) if top_n is not None else 10
     logger.info(f"🛠 [server] list_system_processes called with top_n: {top_n}")
     return list_processes(top_n)
 
