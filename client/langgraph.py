@@ -1439,7 +1439,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     # fall through to the generic description prompt.
                     import re as _re
                     _TOOL_ONLY_RE = _re.compile(
-                        r'^(?:use|using|run|call)\s+\w+\s+(?:with|using|on|for)?\s*[\w\-]+\s*$',
+                        r'^(?:use|using|run|call)\s+\w+(?:\s+(?:with|using|on|for)?\s*[\w\-]+)?\s*(?::\s*.+)?\s*$',
                         _re.IGNORECASE
                     )
                     _PREAMBLE_RE = _re.compile(
@@ -1720,6 +1720,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                     if abstract:
                         parts.append(abstract)
                     reply_text = "\n\n".join(parts) if parts else f"Here is an image for: {web_img_data.get('query', '')}"
+                    # Embed image_url as a scannable tag so websocket.py can
+                    # extract and broadcast it to the UI without a server fetch.
+                    reply_text += f"\n<!-- web_image_url: {img_url} -->"
                 else:
                     reply_text = (
                         f"I couldn't find an image for **{web_img_data.get('query', 'that')}** "
@@ -2360,6 +2363,31 @@ def create_langgraph_agent(llm_with_tools, tools):
                 if isinstance(v, dict) and len(v) == 0:
                     tool_args[k] = None
                     tool_call["args"][k] = None
+
+            # Auto-inject location into get_time_tool when model omits it.
+            # Calls get_location_tool first (uses CLIENT_IP env var on the server)
+            # and populates city/country from the result.
+            if tool_name == "get_time_tool" and not any([
+                tool_args.get("city"), tool_args.get("state"), tool_args.get("country")
+            ]):
+                try:
+                    loc_tool = tools_dict.get("get_location_tool") if (tools_dict := state.get("tools", {})) else None
+                    if loc_tool:
+                        logger.info("🔧 AUTO-FIX: get_time_tool missing location — pre-calling get_location_tool")
+                        loc_result = await loc_tool.ainvoke({})
+                        import json as _json
+                        loc_data = _json.loads(loc_result) if isinstance(loc_result, str) else loc_result
+                        city = loc_data.get("city")
+                        country = loc_data.get("country")
+                        if city:
+                            tool_args["city"] = city
+                            tool_call["args"]["city"] = city
+                        if country:
+                            tool_args["country"] = country
+                            tool_call["args"]["country"] = country
+                        logger.info(f"🔧 AUTO-FIX: Injected location → city={city}, country={country}")
+                except Exception as _le:
+                    logger.warning(f"🔧 AUTO-FIX: get_location_tool pre-call failed: {_le}")
 
             logger.info(f"🔧 Executing tool: {tool_name}")
 
