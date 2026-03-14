@@ -312,15 +312,15 @@ touch servers/my_tool/skills/my_feature.md
 
 ### Step 4: Update Intent Patterns (Optional)
 
-If your tool needs specific routing, update `client/langgraph.py`:
+If your tool needs specific routing, add an entry to `INTENT_CATALOG` in `client/query_patterns.py`:
 ```python
-INTENT_PATTERNS = {
-    # ... existing patterns ...
-    "my_tool": {
-        "pattern": r'\bmy keyword\b|\bmy phrase\b',
-        "tools": ["my_function"],
-        "priority": 3
-    }
+{
+    "name": "my_tool",
+    "pattern": r'\bmy keyword\b|\bmy phrase\b',
+    "tools": ["my_function"],
+    "priority": 3,
+    "web_search": False,
+    "skills": False,
 }
 ```
 
@@ -516,6 +516,7 @@ mcp_a2a/
 │   │   ├── index.html
 │   │   └── dashboard.html
 │   ├── langgraph.py
+│   ├── query_patterns.py  ← Intent routing catalog
 │   ├── search_client.py   ← Ollama web search & fetch
 │   ├── websocket.py
 │   └── ...
@@ -524,88 +525,67 @@ mcp_a2a/
 
 ---
 
-## 8. Example Prompts & Troubleshooting
+## 8. Intent Patterns & Troubleshooting
 
-### Example Prompts
+### Intent Patterns
 
-**Weather:**
-```
-> What's the weather in Vancouver?
-```
+The client uses a pattern catalog (`client/query_patterns.py`) to route queries to the right tools without sending all 75+ tools to the LLM on every message. Each intent has a priority — lower number wins when multiple patterns match.
 
-**Plex ML Recommendations:**
-```
-> What should I watch tonight?
-> Recommend unwatched SciFi movies
-> Show recommender stats
-```
+#### Priority 1 — specific, high-confidence routing
 
-**Code Analysis:**
-```
-> Analyze the code in /path/to/project
-> Review this Python file for bugs
-```
+| Intent | Example prompts | Tools | Key params |
+|--------|----------------|-------|------------|
+| `analyze_image` | "Analyze this image: https://…/photo.jpg", "Describe /home/mike/img.png" | `analyze_image_tool` | `image_url` or `image_file_path` |
+| `shashin_random` | "Show me a random photo", "Surprise me with a picture" | `shashin_random_tool` | none |
+| `web_image_search` | "Show me a picture of Jorma Tommila", "What does the Eiffel Tower look like?" | `web_image_search_tool` | `query: str` |
 
-**Task Management:**
-```
-> Add "deploy feature" to my todos
-> List my todos
-```
+> `web_image_search` excludes queries containing "my" or "shashin" — those fall through to `shashin_search` instead.
 
-**Web Search (via Ollama Search):**
-```
-> Who won the 2025 NBA championship?
-> Latest AI developments
-```
+#### Priority 2 — contextual, content-aware routing
 
-**RAG (Retrieval-Augmented Generation):**
+| Intent | Example prompts | Tools | Key params |
+|--------|----------------|-------|------------|
+| `github_review` | "Review github.com/user/repo", "Analyze this GitHub project" | `github_clone_repo`, `analyze_project`, `review_code` | `repo_url: str` |
+| `file_analyst` | "Analyze /home/mike/budget.csv", "Open C:\Users\data.json" | `read_file_tool_handler` | `file_path: str` |
+| `code_assistant` | "What's the tech stack?", "Fix the bug in auth.py", "List npm dependencies" | `analyze_project`, `get_project_dependencies`, `fix_code_file` | `project_path` or `file_path` |
+| `shashin_analyze` | "Describe the beach pictures", "What does the sunset photo show?" | `shashin_search_tool`, `shashin_analyze_tool` | `term: str` → `image_id: uuid` |
+| `shashin_search` | "Find photos of Noah", "Show my photos from Japan" | `shashin_search_tool` | `term: str`, `page: int` (default 0) |
+| `plex_search` | "Find movies about time travel", "Scene where the hero escapes the prison" | `rag_search_tool`, `semantic_media_search_text`, `scene_locator_tool` | `query: str` |
+| `rag` | "What do you know about quantum computing?", "How many items are in RAG?" | `rag_search_tool`, `rag_status_tool`, `rag_list_sources_tool` | `query: str` |
+| `trilium` | "Search my notes for project ideas", "Create a note about today's meeting" | `search_notes`, `create_note`, `update_note_content` | `query` / `title` / `content` / `note_id` |
 
-> ⚠️ **RAG requires Ollama + bge-large.** If either is missing, ingestion and search will fail. See [Choose LLM Backend](#choose-llm-backend) for setup steps.
+#### Priority 3 — utility, lower specificity
 
-*Automatic ingestion from web research:*
-```
-> Write a report about quantum computing using 
-  https://en.wikipedia.org/wiki/Quantum_computing and
-  https://en.wikipedia.org/wiki/Quantum_algorithm as sources
+| Intent | Example prompts | Tools | Key params |
+|--------|----------------|-------|------------|
+| `weather` | "What's the weather in Vancouver?", "Will it rain today?" | `get_location_tool`, `get_weather_tool` | location auto-resolved |
+| `location` | "Where am I?", "What's my current location?" | `get_location_tool` | none |
+| `time` | "What time is it?", "What's today's date?" | `get_time_tool` | none |
+| `system` | "What's my GPU utilization?", "Show running processes" | `get_hardware_specs_tool`, `list_system_processes` | none |
+| `ml_recommendation` | "What should I watch tonight?", "Train the recommender model" | `recommend_content`, `train_recommender`, `record_viewing` | `title` / `count` / `media_type` |
+| `code` | "Debug this code", "Review and summarize this file" | `review_code`, `summarize_code_file`, `debug_fix` | `file_path` or inline code |
+| `text` | "Summarize this", "Explain this concept simply" | `summarize_text_tool`, `explain_simplified_tool` | `text: str` |
+| `todo` | "Add 'deploy feature' to my todos", "List my tasks" | `add_todo_item`, `list_todo_items`, `update_todo_item` | `text` / `item_id` / `status` |
+| `knowledge` | "Remember that Mike prefers dark mode", "Search my notes for API keys" | `add_entry`, `search_entries`, `search_semantic` | `content` / `query` / `tag` |
+| `ingest` | "Ingest 5 items from Plex", "Process subtitles now" | `ingest_movies`, `ingest_batch_tool` | `limit: int` |
+| `a2a` | "Discover remote agents", "Send this task to the remote agent" | `send_a2a*`, `discover_a2a` | `agent_url` / `task` |
+| `current_events` | "What's the latest news?", "What's happening in the world?" | web search only | query passed to search |
+| `stock_price` | "What's NVIDIA trading at?", "Apple market cap today" | web search only | query passed to search |
 
-✅ Fetches both Wikipedia pages
-✅ Automatically stores content in RAG (16 chunks, ~2.5s)
-✅ Generates report using the content
-💾 Content available for future searches
-```
+#### Conversational bypass
 
-*Retrieving stored content:*
-```
-> Use the rag_search_tool to search for "quantum entanglement"
-> What do you have in the RAG about algorithm complexity?
-```
+Queries that start with personal statements (`"I like…"`, `"My favourite…"`), filler words (`"yes"`, `"thanks"`), creative tasks (`"write me a poem"`), or pronoun follow-ups (`"what did he do?"`, `"tell me more about them"`) bypass the catalog entirely — no tools are bound and the LLM answers from context.
 
-*Checking RAG status:*
+#### Overriding intent routing
+
+Prefix your message with `Using <tool_name>,` to bypass pattern matching entirely and force a specific tool:
+
 ```
-> Use rag_list_sources_tool
-> Show RAG stats
+Using shashin_search_tool, find photos of Noah
+Using web_image_search_tool, show me a picture of a red panda
 ```
 
-*GitHub analysis:*
-```
-> Analyze architecture at https://github.com/user/repo
-```
-
-*More Examples:*
-```
-> Create a document using https://some_link_to_chicken_nachos as a source
-> Search RAG for nachos
-> Ingest 3 items from Plex
-> Use rag_list_sources_tool to see what sources were used
-```
-
-**How RAG works:**
-- Content is automatically chunked (350 tokens max), embedded using `bge-large`, and stored in SQLite
-- Chunk text is stored in `sessions.db` (chunks table); only embeddings live in `rag_database.db`
-- URLs are deduplicated — the same page won't be stored twice
-- Semantic search finds the most relevant content even if exact keywords don't match
-- Search returns top 5 results with similarity scores and source URLs
-- If `bge-reranker-v2-m3` is installed, a reranking pass re-scores the top 20 cosine candidates for higher precision
+---
 
 ### Troubleshooting
 
@@ -662,6 +642,11 @@ curl http://localhost:8010/.well-known/agent-card.json
 - Models with good instruction following: `qwen2.5:14b` (80-95%), `llama3.1:8b` (~70%), `mistral-nemo` (~70%)
 - Avoid for this use case: `qwen2.5:3b`, `qwen2.5:7b` (~10-30%)
 
+**Query not routing to the right tool:**
+- Intent patterns are matched in priority order (1 → 3)
+- Use explicit phrasing: `"Using shashin_search_tool, find photos of Noah"` bypasses pattern matching entirely
+- Check active intents in `client/query_patterns.py`
+
 **Tools not appearing:**
 ```bash
 :tools --all        # check if disabled
@@ -672,6 +657,5 @@ python client.py    # restart
 ---
 
 ## License
-
 
 MIT License
