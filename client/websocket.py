@@ -262,13 +262,12 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         import re
         assistant_text = re.sub(r'<\|[^|]+\|>', '', assistant_text).strip()
 
-        # Extract image data from ToolMessages added in this run.
-        # Three delivery modes:
-        #   1. web_image_search_tool → image_url (external DDG URL, sent as-is to frontend)
-        #   2. Shashin image_source  → image_url (LAN URL, browser loads directly, no server fetch)
-        #   3. Local / other source  → image_b64 (fetched server-side, sent as base64)
+        # Extract image_base64 from the ToolMessage in message history.
+        # The final AIMessage is now the vision description text, not JSON,
+        # so we need to look back at the tool result that triggered the vision call.
+        # Only scan messages added in THIS run — msgs_before was captured before run_agent_fn.
         image_b64 = None
-        image_source = None   # used as image_url for modes 1 & 2
+        image_source = None
         place_name = None
         from langchain_core.messages import ToolMessage
         new_messages = result["messages"][msgs_before:]
@@ -305,40 +304,24 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 if not place_name and tool_data.get("placeName"):
                     place_name = tool_data["placeName"]
 
-                # Skip if we already have an image
-                if image_source is not None or image_b64 is not None:
-                    continue
-
-                # Mode 1: web_image_search_tool — external image_url, pass through directly
-                if tool_data.get("image_url"):
-                    image_source = tool_data["image_url"]
-                    logger.info(f"🖼️ image_url from web_image_search_tool: {image_source!r}")
-
-                # Mode 2 & 3: Shashin / local via image_base64 or image_source
-                elif tool_data.get("image_base64") or tool_data.get("image_source"):
-                    src = tool_data.get("image_source")
+                # Pick up image from first ToolMessage that has image_base64 or image_source
+                if image_b64 is None and (tool_data.get("image_base64") or tool_data.get("image_source")):
+                    image_source = tool_data.get("image_source")
                     b64 = tool_data.get("image_base64")
-                    shashin_key = os.getenv("SHASHIN_API_KEY", "")
-                    is_shashin = bool(src and shashin_key and (
-                        "192.168." in src or "shashin" in src.lower()
-                    ))
-                    if is_shashin:
-                        # Mode 2: Shashin URL — browser loads it directly (no server fetch)
-                        image_source = src
-                        logger.info(f"🖼️ Shashin image_url: {image_source!r}")
-                    elif b64:
-                        # Mode 3a: already have base64
+                    if b64:
                         image_b64 = b64.split(",", 1)[1] if "," in b64 else b64
-                    elif src:
-                        # Mode 3b: non-Shashin URL — fetch and base64-encode server-side
+                    elif image_source:
                         try:
                             import httpx as _httpx, base64 as _b64
                             fetch_headers = {}
+                            shashin_key = os.getenv("SHASHIN_API_KEY", "")
+                            if shashin_key and ("192.168." in image_source or "shashin" in image_source.lower()):
+                                fetch_headers = {"x-api-key": shashin_key, "Content-Type": "application/json"}
                             async with _httpx.AsyncClient(timeout=30.0) as hc:
-                                img_resp = await hc.get(src, headers=fetch_headers)
+                                img_resp = await hc.get(image_source, headers=fetch_headers)
                                 img_resp.raise_for_status()
                             image_b64 = _b64.b64encode(img_resp.content).decode("utf-8")
-                            logger.info(f"🖼️ Fetched image for UI display from {src}, length={len(image_b64)}")
+                            logger.info(f"🖼️ Fetched image for UI display from {image_source}, length={len(image_b64)}")
                         except Exception as fetch_err:
                             logger.warning(f"🖼️ Failed to fetch image for UI: {fetch_err}")
 
@@ -368,14 +351,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 session_manager.set_message_image_source(msg_id, image_source)
 
         # Broadcast to ALL connected sockets — covers reconnect case where
-        # original socket died but new socket is already in CONNECTED_WEBSOCKETS.
-        # image_source is sent as image_url — covers both DDG external URLs (mode 1)
-        # and Shashin LAN URLs (mode 2). image_b64 covers mode 3 (local/other).
+        # original socket died but new socket is already in CONNECTED_WEBSOCKETS
         try:
             await broadcast_message("assistant_message", {
                 "text": assistant_text,
                 "image": image_b64,
-                "image_url": image_source,
                 "multi_agent": result.get("multi_agent", False),
                 "a2a": result.get("a2a", False),
                 "model": result.get("current_model", "unknown")
@@ -600,6 +580,84 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     "all_models": all_models,
                     "last_used": last
                 }))
+                continue
+
+            if data.get("type") == "list_tools":
+                try:
+                    from pathlib import Path as _Path
+                    from client.tool_utils import resolve_tool_server, load_external_server_names
+
+                    # Authoritative disabled-tool check via tool_control
+                    _is_tool_enabled_fn = None
+                    try:
+                        from tools.tool_control import is_tool_enabled as _is_tool_enabled_fn
+                    except ImportError:
+                        pass
+
+                    # Fallback: parse DISABLED_TOOLS env var when tool_control unavailable
+                    _disabled_raw = os.getenv("DISABLED_TOOLS", "")
+                    _disabled_entries = [e.strip() for e in _disabled_raw.split(",") if ":" in e.strip()]
+
+                    def _is_disabled(tool_name, source_server):
+                        if _is_tool_enabled_fn is not None:
+                            try:
+                                # Check 1: no category — catches simple "tool_name" entries
+                                if not _is_tool_enabled_fn(tool_name):
+                                    return True
+                                # Check 2: source_server as category — catches "plex:*", "todo:*"
+                                # source_server is the directory name which matches the
+                                # category used in DISABLED_TOOLS for most servers
+                                if not _is_tool_enabled_fn(tool_name, source_server):
+                                    return True
+                                return False
+                            except Exception:
+                                pass
+                        # Fallback if import failed
+                        src = (source_server or "").lower()
+                        for entry in _disabled_entries:
+                            cat, tname = entry.split(":", 1)
+                            if cat.strip().lower() == src:
+                                if tname.strip() in ("*", tool_name):
+                                    return True
+                        return False
+
+                    # Infrastructure tools present on every server — never user-facing
+                    _INTERNAL_TOOLS = {"list_skills", "read_skill", "parse_github_url"}
+
+                    _project_root = _Path(__file__).resolve().parent.parent
+                    _external_names = load_external_server_names(_project_root)
+
+                    # resolve_tool_server gives authoritative tool→server mapping
+                    # (same logic used by :tools command)
+                    _tool_to_server = await resolve_tool_server(tools, mcp_agent, _project_root)
+
+                    tools_payload = []
+                    seen_names = set()
+                    for tool in tools:
+                        if tool.name in _INTERNAL_TOOLS:
+                            continue
+                        if tool.name in seen_names:
+                            continue
+                        seen_names.add(tool.name)
+
+                        source = _tool_to_server.get(tool.name, "unknown")
+                        if _is_disabled(tool.name, source):
+                            continue
+
+                        tools_payload.append({
+                            "name": tool.name,
+                            "description": (tool.description or "").strip(),
+                            "source_server": source,
+                            "external": source in _external_names,
+                        })
+
+                    await websocket.send(json.dumps({
+                        "type": "tools_list",
+                        "tools": tools_payload,
+                    }))
+                except Exception as _e:
+                    logger.error(f"❌ list_tools failed: {_e}")
+                    await websocket.send(json.dumps({"type": "tools_list", "tools": []}))
                 continue
 
             if data.get("type") == "history_request":

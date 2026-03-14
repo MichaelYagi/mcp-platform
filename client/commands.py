@@ -358,6 +358,9 @@ async def handle_command(
                 enabled = server_data['enabled']
                 disabled = server_data['disabled']
 
+                # Always count disabled tools regardless of whether server is shown
+                total_disabled += len(disabled)
+
                 if not enabled and not show_all:
                     continue
 
@@ -386,8 +389,6 @@ async def handle_command(
                         output.append(f"  ✗ {tool_name} [DISABLED]")
                         if desc_line:
                             output.append(f"    {desc_line}")
-
-                total_disabled += len(disabled)
 
             output.append("")
             output.append("=" * 60)

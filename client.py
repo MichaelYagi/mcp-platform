@@ -54,6 +54,19 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).parent
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 
+# Re-parse DISABLED_TOOLS now that .env is loaded.
+# tool_control is imported transitively before load_dotenv runs, so its
+# module-level _parse_disabled_tools() fires with an empty DISABLED_TOOLS.
+# Calling it again here ensures the cached sets reflect the actual .env values.
+try:
+    from tools import tool_control as _tc
+    _tc._DISABLED_TOOLS_RAW = os.getenv("DISABLED_TOOLS", "")
+    _tc._DISABLED_TOOLS = set()
+    _tc._DISABLED_CATEGORIES = {}
+    _tc._parse_disabled_tools()
+except Exception:
+    pass
+
 # Configuration
 MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
 

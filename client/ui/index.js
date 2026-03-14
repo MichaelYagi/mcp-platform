@@ -394,6 +394,220 @@ function resetControlButtons() {
 // ============================================================
 // LOG PANEL
 // ============================================================
+let toolsPanelOpen = false;
+
+function toggleToolsPanel() {
+    toolsPanelOpen = !toolsPanelOpen;
+    const panel  = document.getElementById('toolsPanel');
+    const button = document.getElementById('toolsToggle');
+    if (toolsPanelOpen) { panel.classList.add('open'); button.textContent = '✖ Tools'; }
+    else                { panel.classList.remove('open'); button.textContent = '🔧 Tools'; }
+}
+
+// Per-tool prompt templates derived from intent patterns.
+// Format: "Use <tool_name> to <what it does> <slot>"
+// Slots: [] = cursor goes at end, [QUERY] = user fills in search term, etc.
+const TOOL_PROMPTS = {
+    // ── Image tools ──
+    "analyze_image_tool":         "Use analyze_image_tool to describe this image: ",
+    "web_image_search_tool":      "Use web_image_search_tool to show me a picture of ",
+    "shashin_random_tool":        "Use shashin_random_tool to show me a random photo",
+    "shashin_search_tool":        "Use shashin_search_tool to find photos of ",
+    "shashin_analyze_tool":       "Use shashin_analyze_tool to describe the photo of ",
+    // ── Code / GitHub ──
+    "github_clone_repo":          "Use github_clone_repo to review ",
+    "github_list_files":          "Use github_list_files to list files in ",
+    "github_get_file_content":    "Use github_get_file_content to read ",
+    "github_cleanup_repo":        "Use github_cleanup_repo to clean up the cloned repo",
+    "analyze_project":            "Use analyze_project to analyze the project at ",
+    "analyze_code_file":          "Use analyze_code_file to analyze ",
+    "scan_project_structure":     "Use scan_project_structure to scan ",
+    "get_project_dependencies":   "Use get_project_dependencies to list dependencies for ",
+    "fix_code_file":              "Use fix_code_file to fix the bug in ",
+    "suggest_improvements":       "Use suggest_improvements to improve ",
+    "explain_code":               "Use explain_code to explain ",
+    "generate_tests":             "Use generate_tests to generate tests for ",
+    "refactor_code":              "Use refactor_code to refactor ",
+    "generate_code":              "Use generate_code to write a function that ",
+    "review_code":                "Use review_code to review ",
+    "summarize_code_file":        "Use summarize_code_file to summarize ",
+    "search_code_in_directory":   "Use search_code_in_directory to search for ",
+    "scan_code_directory":        "Use scan_code_directory to scan ",
+    "summarize_code":             "Use summarize_code to summarize: ",
+    "debug_fix":                  "Use debug_fix to fix this error: ",
+    "read_file_tool_handler":     "Use read_file_tool_handler to analyze ",
+    // ── Media / Plex ──
+    "rag_search_tool":            "Use rag_search_tool to search for ",
+    "semantic_media_search_text": "Use semantic_media_search_text to find movies about ",
+    "scene_locator_tool":         "Use scene_locator_tool to find the scene where ",
+    "find_scene_by_title":        "Use find_scene_by_title to find a scene in ",
+    "record_viewing":             "Use record_viewing to record that I watched ",
+    "train_recommender":          "Use train_recommender to train the recommendation model",
+    "recommend_content":          "Use recommend_content to recommend ",
+    "get_recommender_stats":      "Use get_recommender_stats to show recommendation stats",
+    "import_plex_history":        "Use import_plex_history to import my Plex viewing history",
+    "auto_train_from_plex":       "Use auto_train_from_plex to train from my Plex history",
+    "reset_recommender":          "Use reset_recommender to reset the recommendation model",
+    "auto_recommend_from_plex":   "Use auto_recommend_from_plex to recommend based on my Plex history",
+    "plex_find_unprocessed":      "Use plex_find_unprocessed to find unprocessed Plex items",
+    "plex_ingest_items":          "Use plex_ingest_items to ingest ",
+    "plex_ingest_single":         "Use plex_ingest_single to ingest ",
+    "plex_ingest_batch":          "Use plex_ingest_batch to ingest a batch from Plex",
+    "rag_rescan_no_subtitles":    "Use rag_rescan_no_subtitles to rescan items with no subtitles",
+    "plex_get_stats":             "Use plex_get_stats to show Plex library stats",
+    // ── RAG ──
+    "rag_add_tool":               "Use rag_add_tool to add this to RAG: ",
+    "rag_diagnose_tool":          "Use rag_diagnose_tool to diagnose the RAG database",
+    "rag_status_tool":            "Use rag_status_tool to show RAG stats",
+    "rag_browse_tool":            "Use rag_browse_tool to browse RAG content",
+    "rag_list_sources_tool":      "Use rag_list_sources_tool to list RAG sources",
+    // ── Trilium ──
+    "search_notes":               "Use search_notes to search my notes for ",
+    "search_by_label":            "Use search_by_label to find notes tagged ",
+    "get_note_by_id":             "Use get_note_by_id to get note ",
+    "create_note":                "Use create_note to create a note titled ",
+    "update_note_content":        "Use update_note_content to update note ",
+    "update_note_title":          "Use update_note_title to rename note ",
+    "delete_note":                "Use delete_note to delete note ",
+    "add_label_to_note":          "Use add_label_to_note to tag note ",
+    "get_note_labels":            "Use get_note_labels to list labels for note ",
+    "get_note_children":          "Use get_note_children to list children of note ",
+    "get_recent_notes":           "Use get_recent_notes to show my recent notes",
+    // ── Location / Time / System ──
+    "get_weather_tool":           "Use get_weather_tool to get the weather in ",
+    "get_location_tool":          "Use get_location_tool to show my current location",
+    "get_time_tool":              "Use get_time_tool to show the current time and date",
+    "get_hardware_specs_tool":    "Use get_hardware_specs_tool to show hardware specs",
+    "get_system_info":            "Use get_system_info to show system info",
+    "list_system_processes":      "Use list_system_processes to list running processes",
+    "terminate_process":          "Use terminate_process to terminate process ",
+    // ── Text tools ──
+    "summarize_text_tool":        "Use summarize_text_tool to summarize: ",
+    "concept_contextualizer_tool":"Use concept_contextualizer_tool to explain ",
+    "summarize_direct_tool":      "Use summarize_direct_tool to summarize: ",
+    "explain_simplified_tool":    "Use explain_simplified_tool to simplify: ",
+    "split_text_tool":            "Use split_text_tool to split: ",
+    "summarize_chunk_tool":       "Use summarize_chunk_tool to summarize chunk: ",
+    "merge_summaries_tool":       "Use merge_summaries_tool to merge summaries: ",
+    // ── Todo ──
+    "add_todo_item":              "Use add_todo_item to add task: ",
+    "list_todo_items":            "Use list_todo_items to show my todos",
+    "search_todo_items":          "Use search_todo_items to search todos for ",
+    "update_todo_item":           "Use update_todo_item to mark done: ",
+    "delete_todo_item":           "Use delete_todo_item to delete: ",
+    "delete_all_todo_items":      "Use delete_all_todo_items to clear all my todos",
+    // ── Knowledge base ──
+    "add_entry":                  "Use add_entry to remember: ",
+    "list_entries":               "Use list_entries to show all knowledge entries",
+    "get_entry":                  "Use get_entry to retrieve entry ",
+    "search_entries":             "Use search_entries to search knowledge for ",
+    "search_by_tag":              "Use search_by_tag to find entries tagged ",
+    "search_semantic":            "Use search_semantic to semantically search for ",
+    "update_entry":               "Use update_entry to update entry ",
+    "update_entry_versioned":     "Use update_entry_versioned to update entry ",
+    "delete_entry":               "Use delete_entry to delete entry ",
+    "delete_entries":             "Use delete_entries to delete entries matching ",
+    // ── Ingest ──
+    "ingest_movies":              "Use ingest_movies to ingest ",
+    "ingest_batch_tool":          "Use ingest_batch_tool to ingest a batch",
+    // ── A2A ──
+    "discover_a2a":               "Use discover_a2a to discover remote agents",
+    // ── DeepWiki (external) ──
+    "read_wiki_structure":        "Use read_wiki_structure to get docs structure for ",
+    "read_wiki_contents":         "Use read_wiki_contents to read docs for ",
+    "ask_question":               "Use ask_question to ask about repo ",
+    // ── Skills ──
+    "list_skills":                "Use list_skills to show available skills",
+    "read_skill":                 "Use read_skill to read skill ",
+};
+
+// No-arg tools: prompt is already complete, cursor at end = send immediately
+const NO_ARG_TOOLS = new Set([
+    "shashin_random_tool", "github_cleanup_repo",
+    "train_recommender", "get_recommender_stats", "import_plex_history",
+    "auto_train_from_plex", "reset_recommender", "auto_recommend_from_plex",
+    "plex_find_unprocessed", "plex_ingest_batch", "rag_rescan_no_subtitles", "plex_get_stats",
+    "rag_diagnose_tool", "rag_status_tool", "rag_browse_tool", "rag_list_sources_tool",
+    "get_recent_notes", "get_location_tool", "get_time_tool",
+    "get_hardware_specs_tool", "get_system_info", "list_system_processes",
+    "list_todo_items", "delete_all_todo_items",
+    "list_entries", "ingest_batch_tool",
+    "discover_a2a", "list_skills",
+]);
+
+function getToolPrompt(toolName) {
+    return TOOL_PROMPTS[toolName] || `Use ${toolName} to `;
+}
+
+function renderToolsPanel(tools) {
+    const body = document.getElementById('toolsBody');
+    if (!body) return;
+
+    // Group by source_server (FastMCP name), fall back to "unknown"
+    const groups = {};
+    tools.forEach(t => {
+        const server = (t.source_server || 'unknown');
+        if (!groups[server]) groups[server] = [];
+        groups[server].push(t);
+    });
+
+    body.innerHTML = '';
+
+    // Sort server names alphabetically
+    Object.keys(groups).sort().forEach(serverName => {
+        const items = groups[serverName];
+
+        const cat = document.createElement('div');
+        cat.className = 'tools-category';
+
+        const isExternal = items.some(t => t.external);
+        const header = document.createElement('div');
+        header.className = 'tools-category-header';
+        header.innerHTML = `<span>${serverName}${isExternal ? ' <span style="color:#858585;font-size:0.7rem;font-weight:normal;">[external]</span>' : ''} <span style="color:#858585;font-weight:normal;">(${items.length})</span></span><span class="tools-category-arrow">▶</span>`;
+        header.onclick = () => {
+            // Collapse all others, expand this one (accordion — one open at a time)
+            const allCats = body.querySelectorAll('.tools-category');
+            allCats.forEach(c => {
+                if (c !== cat) c.classList.remove('open');
+            });
+            cat.classList.toggle('open');
+        };
+
+        const itemsDiv = document.createElement('div');
+        itemsDiv.className = 'tools-category-items';
+
+        // Sort tools alphabetically within category
+        items.sort((a, b) => a.name.localeCompare(b.name)).forEach(tool => {
+            const item = document.createElement('div');
+            item.className = 'tool-item';
+
+            // First sentence of description only for the preview
+            const fullDesc = tool.description || '';
+            const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
+
+            item.innerHTML = `
+                <div class="tool-item-name">${tool.name}</div>
+                <div class="tool-item-desc">${previewDesc || 'No description available.'}</div>
+            `;
+
+            item.onclick = () => {
+                const inputEl = document.getElementById('input');
+                const prompt = getToolPrompt(tool.name);
+                inputEl.value = prompt;
+                inputEl.focus();
+                inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+                if (window.innerWidth <= 768) toggleToolsPanel();
+            };
+
+            itemsDiv.appendChild(item);
+        });
+
+        cat.appendChild(header);
+        cat.appendChild(itemsDiv);
+        body.appendChild(cat);
+    });
+}
+
 function toggleLogPanel() {
     logPanelOpen = !logPanelOpen;
     const panel  = document.getElementById('logPanel');
@@ -532,6 +746,7 @@ ws.onopen = () => {
     sendBtn.disabled = false;
     updateStatusWithMode();
     ws.send(JSON.stringify({ type:"list_models" }));
+    ws.send(JSON.stringify({ type:"list_tools" }));
     ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
     connectLogWebSocket();
     if (!_wsHasConnected) {
@@ -621,6 +836,11 @@ ws.onmessage = (event) => {
         if (ollamaModels.length>0&&ggufModels.length>0) { const sep=document.createElement("option"); sep.disabled=true; sep.value=""; sep.textContent=separatorText; sep.style.color="#888"; sep.style.fontStyle="italic"; select.appendChild(sep); }
         ggufModels.forEach(m => { const o=document.createElement("option"); o.value=m.name; o.textContent=`${m.name} [GGUF ${(m.size_mb/1024).toFixed(1)} GB]`; select.appendChild(o); });
         if (data.last_used&&data.all_models.some(m=>m.name===data.last_used)) { select.value=data.last_used; if(!isProcessing) updateStatusWithMode(); }
+    }
+
+    if (data.type==="tools_list") {
+        renderToolsPanel(data.tools);
+        return;
     }
 };
 

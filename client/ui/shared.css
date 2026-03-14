@@ -136,6 +136,8 @@ body {
     --btn-dashboard-hover:#229954;
     --btn-newsession:   #27ae60;
     --btn-newsession-hover:#229954;
+    --btn-tools:         #e67e22;
+    --btn-tools-hover:   #ca6f1e;
 
     /* Log panel */
     --log-bg:           #1e1e1e;
@@ -212,6 +214,8 @@ body {
     --btn-dashboard-hover: #007f92;
     --btn-newsession:   #009bb0;
     --btn-newsession-hover: #007f92;
+    --btn-tools:         #39d353;
+    --btn-tools-hover:   #28b040;
 
     --log-bg:           #0a0a1e;
     --log-header:       #0f0f1e;
@@ -283,6 +287,8 @@ body {
     --btn-dashboard-hover:#30da5b;
     --btn-newsession:   #50fa7b;
     --btn-newsession-hover:#30da5b;
+    --btn-tools:         #ffb86c;
+    --btn-tools-hover:   #e0a050;
 
     --log-bg:           #1e1f28;
     --log-header:       #21222c;
@@ -354,6 +360,8 @@ body {
     --btn-dashboard-hover:#0a5c39;
     --btn-newsession:   #0f7a4e;
     --btn-newsession-hover:#0a5c39;
+    --btn-tools:         #e67e22;
+    --btn-tools-hover:   #c8691c;
 
     --log-bg:           #010409;
     --log-header:       #0d1117;
@@ -425,6 +433,8 @@ body {
     --btn-dashboard-hover: #2d6a4f;
     --btn-newsession:   #40916c;
     --btn-newsession-hover: #2d6a4f;
+    --btn-tools:         #e9973a;
+    --btn-tools-hover:   #c97e2a;
 
     --log-bg:           #1a2e1a;
     --log-header:       #2a4a2a;
@@ -496,6 +506,8 @@ body {
     --btn-dashboard-hover:#a01515;
     --btn-newsession:   #4682BF;
     --btn-newsession-hover:#3672AF;
+    --btn-tools:         #00bcd4;
+    --btn-tools-hover:   #0097a7;
 
     --log-bg:           #0a0a0a;
     --log-header:       #111111;
@@ -571,6 +583,8 @@ body {
     --btn-dashboard-hover:#16356f;
     --btn-newsession:   #e76a24;
     --btn-newsession-hover:#c85a1f;
+    --btn-tools:         #009688;
+    --btn-tools-hover:   #00796b;
 
     /* Log panel — unchanged */
     --log-bg:           #01080a;
@@ -650,6 +664,8 @@ body {
     --btn-dashboard-hover:#c85a1f;
     --btn-newsession:   #ff0000;
     --btn-newsession-hover:#cc0000;
+    --btn-tools:         #e76a24;
+    --btn-tools-hover:   #c85a1f;
 
     /* Log panel — unchanged */
     --log-bg:           #01080a;
@@ -729,6 +745,8 @@ body {
     --btn-dashboard-hover:#1c2f63;
     --btn-newsession:   #b02025;
     --btn-newsession-hover:#8f1a1f;
+    --btn-tools:         #f2c200;
+    --btn-tools-hover:   #d4a900;
 
     /* Log panel — unchanged */
     --log-bg:           #01080a;
@@ -808,6 +826,8 @@ body {
     --btn-dashboard-hover:#0d1a2b;
     --btn-newsession:   #d6b100;
     --btn-newsession-hover:#b89600;
+    --btn-tools:         #1a7a6e;
+    --btn-tools-hover:   #136358;
 
     /* Log panel — Gotham night */
     --log-bg:           #0a0a0a;
@@ -887,6 +907,8 @@ body {
     --btn-dashboard-hover:#00a8cc;
     --btn-newsession:   #9d00ff;
     --btn-newsession-hover:#7a00cc;
+    --btn-tools:         #ff6600;
+    --btn-tools-hover:   #cc5200;
 
     /* Log panel — terminal black */
     --log-bg:           #020408;
@@ -963,6 +985,8 @@ body {
     --btn-dashboard-hover: #6e1515;
     --btn-newsession:   #8b1a1a;
     --btn-newsession-hover: #6e1515;
+    --btn-tools:         #2a9d8f;
+    --btn-tools-hover:   #218080;
 
     --log-bg:           #1a1a1a;
     --log-header:       #1c1c1e;
@@ -1039,6 +1063,8 @@ body {
     --btn-dashboard-hover:  #1e9eb8;
     --btn-newsession:       #2ac3de;
     --btn-newsession-hover: #1e9eb8;
+    --btn-tools:         #ff9e64;
+    --btn-tools-hover:   #e0843a;
 
     /* Log panel */
     --log-bg:           #16161e;
@@ -1129,6 +1155,8 @@ body {
     --btn-dashboard-hover:  #2f8f5c;
     --btn-newsession:       #3bb273;
     --btn-newsession-hover: #2f8f5c;
+    --btn-tools:         #5b7ec5;
+    --btn-tools-hover:   #4a6ab0;
 
     /* Log panel */
     --log-bg:           #e6e9ef;
@@ -1280,6 +1308,16 @@ body {
     color: var(--text-strong)
 }
 
+[data-theme="nimbus"] #toolsToggle {
+    background: #e4ebf5 !important;
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #toolsToggle:hover {
+    background: #d9e1ee !important;
+    color: var(--text-strong)
+}
+
 [data-theme="nimbus"] #backBtn {
     background: #e4ebf5 !important;   /* slightly darker pastel */
     color: var(--text-strong)
@@ -1420,6 +1458,8 @@ body {
 
     --btn-newsession:       #0000ff; /* blue */
     --btn-newsession-hover: #00008b; /* dark blue */
+    --btn-tools:         #00ffff;
+    --btn-tools-hover:   #00cccc;
 
     /* Log panel */
     --log-bg:           #7f7f7f;   /* depressing gray */

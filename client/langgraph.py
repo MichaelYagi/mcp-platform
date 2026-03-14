@@ -2349,6 +2349,29 @@ def create_langgraph_agent(llm_with_tools, tools):
                 tool_messages.append(error_msg)
                 continue
 
+            # Check if tool is disabled before invoking — avoids a round-trip
+            # to the server which would just return a disabled_tool_response JSON.
+            try:
+                from tools.tool_control import is_tool_enabled
+                # Resolve server name for category check
+                _tool_server = None
+                try:
+                    _meta = tool.metadata if hasattr(tool, "metadata") and tool.metadata else {}
+                    _tool_server = _meta.get("source_server")
+                except Exception:
+                    pass
+                if not is_tool_enabled(tool_name) and not is_tool_enabled(tool_name, _tool_server):
+                    logger.warning(f"🚫 Tool '{tool_name}' is disabled — skipping execution")
+                    disabled_msg = ToolMessage(
+                        content=f"Tool '{tool_name}' is disabled. Check DISABLED_TOOLS in .env.",
+                        tool_call_id=tool_id,
+                        name=tool_name
+                    )
+                    tool_messages.append(disabled_msg)
+                    continue
+            except ImportError:
+                pass
+
             try:
                 tool_start = time.time()
                 result = await tool.ainvoke(tool_args)
