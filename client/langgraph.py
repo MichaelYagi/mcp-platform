@@ -1446,12 +1446,31 @@ def create_langgraph_agent(llm_with_tools, tools):
                         r'^(?:using\s+\w+[\w_]*\s*(?:tool)?\s*[,.]?\s*)',
                         _re.IGNORECASE
                     )
+                    # Residual navigation phrases left after preamble stripping —
+                    # these are tool-invocation language, not real vision questions.
+                    _NAV_RE = _re.compile(
+                        r'^(?:show\s+me\s+(?:a\s+)?(?:random\s+)?(?:photo|picture|image|pic)\b'
+                        r'|show\s+me\s+(?:this|it)\b'
+                        r'|get\s+(?:a\s+)?(?:random\s+)?(?:photo|picture|image)\b'
+                        r'|display\s+(?:it|this|a\s+photo|an?\s+image)\b'
+                        r'|fetch\s+(?:a\s+)?(?:photo|picture|image)\b)\s*$',
+                        _re.IGNORECASE
+                    )
                     user_intent = None
                     for m in reversed(messages):
                         if isinstance(m, HumanMessage):
                             raw_intent = m.content if isinstance(m.content, str) else None
-                            if raw_intent and not _TOOL_ONLY_RE.match(raw_intent.strip()):
-                                user_intent = _PREAMBLE_RE.sub("", raw_intent, count=1).strip()
+                            if raw_intent:
+                                stripped = raw_intent.strip()
+                                # Skip pure tool-call messages (e.g. "Use shashin_random_tool with <id>")
+                                if _TOOL_ONLY_RE.match(stripped):
+                                    break
+                                # Strip tool-invocation preamble
+                                cleaned = _PREAMBLE_RE.sub("", stripped, count=1).strip()
+                                # Discard if what remains (or the original) is just
+                                # navigation language — applies both with and without preamble
+                                if cleaned and not _NAV_RE.match(cleaned):
+                                    user_intent = cleaned
                             break
 
                     DESCRIBE_PLAIN = (
