@@ -136,8 +136,6 @@ body {
     --btn-dashboard-hover:#229954;
     --btn-newsession:   #27ae60;
     --btn-newsession-hover:#229954;
-    --btn-tools:         #e67e22;
-    --btn-tools-hover:   #ca6f1e;
 
     /* Log panel */
     --log-bg:           #1e1e1e;
@@ -153,6 +151,8 @@ body {
     /* Dashboard specific */
     --btn-back:         #3498db;
     --btn-back-hover:   #2980b9;
+    --btn-tools:        #e67e22;
+    --btn-tools-hover:  #c96a18;
     --card-bg:          #ffffff;
     --card-border:      #d0d7de;
     --card-shadow:      rgba(0,0,0,0.08);
@@ -214,8 +214,6 @@ body {
     --btn-dashboard-hover: #007f92;
     --btn-newsession:   #009bb0;
     --btn-newsession-hover: #007f92;
-    --btn-tools:         #39d353;
-    --btn-tools-hover:   #28b040;
 
     --log-bg:           #0a0a1e;
     --log-header:       #0f0f1e;
@@ -228,6 +226,8 @@ body {
 
     --btn-back:         #00f5ff;
     --btn-back-hover:   #00d4e6;
+    --btn-tools:        #00d4e6;
+    --btn-tools-hover:  #00afc0;
     --card-bg:          #16213e;
     --card-border:      #3a4f6f;
     --card-shadow:      rgba(0,0,0,0.4);
@@ -287,8 +287,6 @@ body {
     --btn-dashboard-hover:#30da5b;
     --btn-newsession:   #50fa7b;
     --btn-newsession-hover:#30da5b;
-    --btn-tools:         #ffb86c;
-    --btn-tools-hover:   #e0a050;
 
     --log-bg:           #1e1f28;
     --log-header:       #21222c;
@@ -301,6 +299,8 @@ body {
 
     --btn-back:         #bd93f9;
     --btn-back-hover:   #9d73d9;
+    --btn-tools:        #ff5555;
+    --btn-tools-hover:  #cc3333;
     --card-bg:          #282a36;
     --card-border:      #44475a;
     --card-shadow:      rgba(0,0,0,0.4);
@@ -360,8 +360,6 @@ body {
     --btn-dashboard-hover:#0a5c39;
     --btn-newsession:   #0f7a4e;
     --btn-newsession-hover:#0a5c39;
-    --btn-tools:         #e67e22;
-    --btn-tools-hover:   #c8691c;
 
     --log-bg:           #010409;
     --log-header:       #0d1117;
@@ -374,6 +372,8 @@ body {
 
     --btn-back:         #00b4d8;
     --btn-back-hover:   #0096b7;
+    --btn-tools:        #9b59b6;
+    --btn-tools-hover:  #7d3f98;
     --card-bg:          #0d1117;
     --card-border:      #30363d;
     --card-shadow:      rgba(0,0,0,0.3);
@@ -433,8 +433,6 @@ body {
     --btn-dashboard-hover: #2d6a4f;
     --btn-newsession:   #40916c;
     --btn-newsession-hover: #2d6a4f;
-    --btn-tools:         #e9973a;
-    --btn-tools-hover:   #c97e2a;
 
     --log-bg:           #1a2e1a;
     --log-header:       #2a4a2a;
@@ -447,6 +445,8 @@ body {
 
     --btn-back:         #52b788;
     --btn-back-hover:   #40916c;
+    --btn-tools:        #74c69d;
+    --btn-tools-hover:  #52b788;
     --card-bg:          #fafcfa;
     --card-border:      #c8d8c8;
     --card-shadow:      rgba(0,0,0,0.06);
@@ -506,8 +506,6 @@ body {
     --btn-dashboard-hover:#a01515;
     --btn-newsession:   #4682BF;
     --btn-newsession-hover:#3672AF;
-    --btn-tools:         #00bcd4;
-    --btn-tools-hover:   #0097a7;
 
     --log-bg:           #0a0a0a;
     --log-header:       #111111;
@@ -520,6 +518,8 @@ body {
 
     --btn-back:         #D92121;
     --btn-back-hover:   #a01515;
+    --btn-tools:        #e67e22;
+    --btn-tools-hover:  #c96a18;
     --card-bg:          #1a1a1a;
     --card-border:      #4682BF;
     --card-shadow:      rgba(0,0,0,0.4);
@@ -583,8 +583,6 @@ body {
     --btn-dashboard-hover:#16356f;
     --btn-newsession:   #e76a24;
     --btn-newsession-hover:#c85a1f;
-    --btn-tools:         #009688;
-    --btn-tools-hover:   #00796b;
 
     /* Log panel — unchanged */
     --log-bg:           #01080a;
@@ -600,6 +598,8 @@ body {
     /* Dashboard */
     --btn-back:         #1c4595;
     --btn-back-hover:   #16356f;
+    --btn-tools:        #c1121f;
+    --btn-tools-hover:  #9d0208;
     --card-bg:          #faebd7;   /* orange tint on cards */
     --card-border:      #e0aa80;
     --card-shadow:      rgba(0,0,0,0.10);
@@ -664,8 +664,6 @@ body {
     --btn-dashboard-hover:#c85a1f;
     --btn-newsession:   #ff0000;
     --btn-newsession-hover:#cc0000;
-    --btn-tools:         #e76a24;
-    --btn-tools-hover:   #c85a1f;
 
     /* Log panel — unchanged */
     --log-bg:           #01080a;
@@ -681,6 +679,8 @@ body {
     /* Dashboard */
     --btn-back:         #3c8d0d;
     --btn-back-hover:   #2e6c0a;
+    --btn-tools:        #e76a24;
+    --btn-tools-hover:  #c85a1f;
     --card-bg:          #edf7e6;   /* green tint on cards too */
     --card-border:      #a8cc90;
     --card-shadow:      rgba(0,0,0,0.08);
@@ -745,8 +745,6 @@ body {
     --btn-dashboard-hover:#1c2f63;
     --btn-newsession:   #b02025;
     --btn-newsession-hover:#8f1a1f;
-    --btn-tools:         #f2c200;
-    --btn-tools-hover:   #d4a900;
 
     /* Log panel — unchanged */
     --log-bg:           #01080a;
@@ -762,6 +760,8 @@ body {
     /* Dashboard */
     --btn-back:         #b02025;
     --btn-back-hover:   #8f1a1f;
+    --btn-tools:        #f2c200;
+    --btn-tools-hover:  #d4a900;
     --card-bg:          #eaeffa;   /* blue tint on cards */
     --card-border:      #9ab0e0;
     --card-shadow:      rgba(0,0,0,0.10);
@@ -826,8 +826,6 @@ body {
     --btn-dashboard-hover:#0d1a2b;
     --btn-newsession:   #d6b100;
     --btn-newsession-hover:#b89600;
-    --btn-tools:         #1a7a6e;
-    --btn-tools-hover:   #136358;
 
     /* Log panel — Gotham night */
     --log-bg:           #0a0a0a;
@@ -843,6 +841,8 @@ body {
     /* Dashboard — noir panels with gold + blue */
     --btn-back:         #2a3f5f;
     --btn-back-hover:   #3a5578;
+    --btn-tools:        #4a6fa5;
+    --btn-tools-hover:  #3a5585;
     --card-bg:          #222222;
     --card-border:      #3a3a3a;
     --card-shadow:      rgba(0,0,0,0.4);
@@ -907,8 +907,6 @@ body {
     --btn-dashboard-hover:#00a8cc;
     --btn-newsession:   #9d00ff;
     --btn-newsession-hover:#7a00cc;
-    --btn-tools:         #ff6600;
-    --btn-tools-hover:   #cc5200;
 
     /* Log panel — terminal black */
     --log-bg:           #020408;
@@ -924,6 +922,8 @@ body {
     /* Dashboard */
     --btn-back:         #00d4ff;
     --btn-back-hover:   #00a8cc;
+    --btn-tools:        #e040fb;
+    --btn-tools-hover:  #b800d4;
     --card-bg:          #0d1525;
     --card-border:      #00d4ff44;
     --card-shadow:      rgba(0,212,255,0.10);
@@ -985,8 +985,6 @@ body {
     --btn-dashboard-hover: #6e1515;
     --btn-newsession:   #8b1a1a;
     --btn-newsession-hover: #6e1515;
-    --btn-tools:         #2a9d8f;
-    --btn-tools-hover:   #218080;
 
     --log-bg:           #1a1a1a;
     --log-header:       #1c1c1e;
@@ -999,6 +997,8 @@ body {
 
     --btn-back:         #e63946;
     --btn-back-hover:   #c1121f;
+    --btn-tools:        #9b1c31;
+    --btn-tools-hover:  #7a1526;
     --card-bg:          #ffffff;
     --card-border:      #e0c8c8;
     --card-shadow:      rgba(0,0,0,0.06);
@@ -1063,8 +1063,6 @@ body {
     --btn-dashboard-hover:  #1e9eb8;
     --btn-newsession:       #2ac3de;
     --btn-newsession-hover: #1e9eb8;
-    --btn-tools:         #ff9e64;
-    --btn-tools-hover:   #e0843a;
 
     /* Log panel */
     --log-bg:           #16161e;
@@ -1080,6 +1078,8 @@ body {
     /* Dashboard */
     --btn-back:         #7aa2f7;
     --btn-back-hover:   #5680c2;
+    --btn-tools:        #f7768e;
+    --btn-tools-hover:  #d45570;
     --card-bg:          #1f2335;
     --card-border:      #3b4261;
     --card-shadow:      rgba(0,0,0,0.35);
@@ -1155,8 +1155,6 @@ body {
     --btn-dashboard-hover:  #2f8f5c;
     --btn-newsession:       #3bb273;
     --btn-newsession-hover: #2f8f5c;
-    --btn-tools:         #5b7ec5;
-    --btn-tools-hover:   #4a6ab0;
 
     /* Log panel */
     --log-bg:           #e6e9ef;
@@ -1172,6 +1170,8 @@ body {
     /* Dashboard */
     --btn-back:         #4a90e2;
     --btn-back-hover:   #357acb;
+    --btn-tools:        #5b7ec5;
+    --btn-tools-hover:  #4a6db5;
     --card-bg:          #ffffff;
     --card-border:      #d0d5dd;
     --card-shadow:      rgba(0,0,0,0.06);
@@ -1305,16 +1305,6 @@ body {
 
 [data-theme="nimbus"] #monitorToggle:hover {
     background: #d9e1ee !important;   /* slightly darker pastel */
-    color: var(--text-strong)
-}
-
-[data-theme="nimbus"] #toolsToggle {
-    background: #e4ebf5 !important;
-    color: var(--text-strong)
-}
-
-[data-theme="nimbus"] #toolsToggle:hover {
-    background: #d9e1ee !important;
     color: var(--text-strong)
 }
 
@@ -1458,8 +1448,6 @@ body {
 
     --btn-newsession:       #0000ff; /* blue */
     --btn-newsession-hover: #00008b; /* dark blue */
-    --btn-tools:         #00ffff;
-    --btn-tools-hover:   #00cccc;
 
     /* Log panel */
     --log-bg:           #7f7f7f;   /* depressing gray */
@@ -1475,6 +1463,8 @@ body {
     /* Dashboard */
     --btn-back:         #ff0000;
     --btn-back-hover:   #00ff00;
+    --btn-tools:        #00ffff;
+    --btn-tools-hover:  #00cccc;
     --card-bg:          #ffefd5;   /* pale peach */
     --card-border:      #ff00ff;
     --card-shadow:      rgba(0,255,0,0.4);
