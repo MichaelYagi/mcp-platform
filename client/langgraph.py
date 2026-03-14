@@ -1670,6 +1670,53 @@ def create_langgraph_agent(llm_with_tools, tools):
                     "current_model": get_model_name(base_llm)
                 }
 
+            # ── web_image_search_tool shortcut ───────────────────────────────
+            # Parse the JSON result, extract image_url, and return a plain
+            # AIMessage. The websocket scanner will pick up image_url from the
+            # ToolMessage and send it to the frontend for inline rendering.
+            if last_tool_name == "web_image_search_tool":
+                raw_content = last_message.content if isinstance(last_message.content, str) else ""
+                # Unwrap MCP TextContent repr if needed (same pattern as vision block)
+                if "TextContent" in raw_content:
+                    idx = raw_content.find("text='")
+                    if idx != -1:
+                        raw_content = raw_content[idx + 6:]
+                        end = raw_content.rfind("'")
+                        if end != -1:
+                            raw_content = raw_content[:end]
+                        raw_content = raw_content.replace("\\n", "\n").replace("\\'", "'")
+                try:
+                    web_img_data = json.loads(raw_content)
+                except (json.JSONDecodeError, TypeError):
+                    web_img_data = {}
+
+                img_url  = web_img_data.get("image_url", "")
+                title    = web_img_data.get("title", "")
+                abstract = web_img_data.get("abstract", "")
+
+                if img_url:
+                    parts = []
+                    if title:
+                        parts.append(f"**{title}**")
+                    if abstract:
+                        parts.append(abstract)
+                    reply_text = "\n\n".join(parts) if parts else f"Here is an image for: {web_img_data.get('query', '')}"
+                else:
+                    reply_text = (
+                        f"I couldn't find an image for **{web_img_data.get('query', 'that')}** "
+                        f"via DuckDuckGo. Try rephrasing or using a more specific name."
+                    )
+
+                return {
+                    "messages": [AIMessage(content=reply_text)],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": get_model_name(base_llm)
+                }
+            # ── End web_image_search_tool shortcut ───────────────────────────
+
             start_time = time.time()
             try:
                 response = await asyncio.wait_for(

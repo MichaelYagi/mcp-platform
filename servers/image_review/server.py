@@ -440,6 +440,72 @@ def shashin_analyze_tool(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# web_image_search_tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+@check_tool_enabled(category="image_tools")
+def web_image_search_tool(query: str) -> str:
+    """
+    Search the web for an image of a person, place, or thing using DuckDuckGo.
+
+    Use this when the user asks to "show me a picture of X", "what does X look like",
+    or any request for a web image of a real-world entity that is NOT in Shashin.
+
+    Args:
+        query (str): The entity to search for, e.g. "Jorma Tommila", "Eiffel Tower"
+
+    Returns:
+        JSON string with:
+        - success (bool)
+        - query (str)         — echoed search term
+        - image_url (str)     — direct URL to image (empty string if not found)
+        - title (str)         — entity title from DuckDuckGo
+        - abstract (str)      — short description of the entity
+        - source (str)        — "DuckDuckGo Instant Answer"
+        - error (str)         — present only on failure
+    """
+    logger.info(f"🛠 [server] web_image_search_tool called — query={query!r}")
+
+    DDG_URL = "https://api.duckduckgo.com/"
+    try:
+        resp = requests.get(
+            DDG_URL,
+            params={"q": query, "format": "json", "no_redirect": "1", "no_html": "1"},
+            timeout=10,
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        logger.error(f"[web_image_search_tool] Request failed: {exc}")
+        return json.dumps({"success": False, "error": str(exc)})
+
+    raw_image = data.get("Image", "")
+    image_url = ""
+    if raw_image:
+        # DDG returns a relative path like /i/abc123.jpg — make it absolute
+        if raw_image.startswith("/"):
+            image_url = f"https://duckduckgo.com{raw_image}"
+        elif raw_image.startswith("http"):
+            image_url = raw_image
+
+    title    = data.get("Heading", "") or data.get("AbstractSource", "")
+    abstract = data.get("AbstractText", "") or data.get("Abstract", "")
+
+    logger.info(f"[web_image_search_tool] image_url={image_url!r}, title={title!r}")
+
+    return json.dumps({
+        "success": True,
+        "query": query,
+        "image_url": image_url,
+        "title": title,
+        "abstract": abstract,
+        "source": "DuckDuckGo Instant Answer",
+    }, indent=2)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Skills plumbing
 # ─────────────────────────────────────────────────────────────────────────────
 

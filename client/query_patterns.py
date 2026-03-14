@@ -151,6 +151,21 @@ INTENT_CATALOG = [
         "skills": True,
     },
     {
+        "name": "web_image_search",
+        "pattern": (
+            r'\bshow\s+me\s+a\s+(picture|photo|image)\s+of\b'
+            r'|\bwhat\s+does\b.+\blook\s+like\b'
+            r'|\b(picture|photo|image)\s+of\b.+\b(actor|person|place|building|animal)\b'
+            r'|\bweb\s+(image|photo|picture)\s+(of|search)\b'
+            r'|\bfind\s+(me\s+)?(a\s+)?(picture|photo|image)\s+of\b'
+        ),
+        "exclude_pattern": r'\bmy\b|\bshashin\b|\bphoto\s+of\s+[a-f0-9\-]{36}\b',
+        "tools": ["web_image_search_tool"],
+        "priority": 1,
+        "web_search": False,
+        "skills": False,
+    },
+    {
         "name": "shashin_analyze",
         "pattern": (
             r'\banalyze\b.*(photo|image|picture|pic)\b'
