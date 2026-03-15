@@ -1670,7 +1670,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             # For search tools that return plain text lists, bypass the LLM
             # entirely and return the tool output directly as the AI response.
             last_tool_name = last_message.name if hasattr(last_message, "name") else ""
-            if last_tool_name == "shashin_search_tool":
+            if last_tool_name in ("shashin_search_tool", "web_search_tool", "web_fetch_tool"):
                 raw_content = last_message.content
                 if isinstance(raw_content, str) and "TextContent" in raw_content:
                     idx = raw_content.find("text='")

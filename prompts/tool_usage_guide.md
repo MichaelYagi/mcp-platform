@@ -100,6 +100,22 @@ You: [uses same project path from context]
 - Search: `semantic_media_search_text(query, limit)`
 - Keywords: find movies, search plex, show me films
 
+### Web Search
+- Search: `web_search_tool(query, max_results)`
+- Fetch page: `web_fetch_tool(url)`
+- Keywords: search the web, look up, current news, latest, web search
+
+**CRITICAL — web_search_tool output format:**
+The tool result is a `TextContent` object. The ONLY thing that matters is the `text` field inside it.
+Do NOT describe the TextContent object, its type, annotations, or meta fields.
+Do NOT say "this is a TextContent object with the following properties".
+Do NOT explain the structure of the result.
+
+Simply extract the text content and present it as-is.
+
+CORRECT: Present the numbered list of search results exactly as they appear in the text field.
+WRONG: "This is a text content object with type='text' and the following properties..." ❌
+
 ### Shashin Photo Gallery
 - Search: `shashin_search_tool(term, page)`
 - Analyze: `shashin_analyze_tool(image_id)`

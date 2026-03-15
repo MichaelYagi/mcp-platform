@@ -30,6 +30,9 @@ from tools.text_tools.explain_simplified import explain_simplified
 from tools.text_tools.concept_contextualizer import concept_contextualizer
 from tools.text_tools.read_file_tool import read_file_tool
 
+# Web search client
+from client.search_client import get_search_client
+
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
@@ -279,6 +282,122 @@ def read_file_tool_handler(file_path: str) -> str:
 
 
 skill_registry = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# web_search_tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+@check_tool_enabled(category="text_tools")
+def web_search_tool(query: str, max_results: Optional[int] = 5) -> str:
+    """
+    Search the web for current information using Ollama's web search API.
+
+    Use this for current events, news, stock prices, or any query that needs
+    up-to-date information not available in the model's training data.
+
+    Requires OLLAMA_TOKEN in .env (free Ollama account).
+
+    Args:
+        query (str, required): The search query
+        max_results (int, optional): Number of results to return (default: 5, max: 10)
+
+    Returns:
+        Formatted list of search results, each with title, URL and summary.
+    """
+    import asyncio, concurrent.futures
+    max_results = int(max_results) if max_results is not None else 5
+    logger.info(f"🛠 [server] web_search_tool called — query={query!r}, max_results={max_results}")
+
+    async def _run():
+        client = get_search_client()
+        if not client.is_available():
+            return "Web search is not available. Set OLLAMA_TOKEN in your .env file."
+        return await client.search(query, max_results=max_results)
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                result = pool.submit(asyncio.run, _run()).result()
+        else:
+            result = loop.run_until_complete(_run())
+    except RuntimeError:
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            result = pool.submit(asyncio.run, _run()).result()
+
+    if isinstance(result, str):
+        return result
+    if not result.get("success"):
+        return f"Web search failed: {result.get('error', 'Unknown error')}"
+
+    pages = result.get("results", {}).get("webPages", {}).get("value", [])
+    if not pages:
+        return f'No results found for "{query}".'
+
+    lines = [f'Web search results for "{query}":\n']
+    for i, page in enumerate(pages, 1):
+        lines.append(f"{i}. {page.get('name', 'Untitled')}")
+        lines.append(f"   🔗 {page.get('url', '')}")
+        summary = page.get("summary", "").strip()
+        if summary:
+            lines.append(f"   {summary[:200]}{'…' if len(summary) > 200 else ''}")
+        lines.append("")
+
+    logger.info(f"[web_search_tool] returning {len(pages)} results")
+    return "\n".join(lines)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# web_fetch_tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+@check_tool_enabled(category="text_tools")
+def web_fetch_tool(url: str) -> str:
+    """
+    Fetch and return the clean text content of a web page.
+
+    Use this to read the full content of a URL found via web_search_tool.
+    Requires OLLAMA_TOKEN in .env (free Ollama account).
+
+    Args:
+        url (str, required): The full URL to fetch
+
+    Returns:
+        Clean text content of the page, truncated at 10,000 characters if needed.
+    """
+    import asyncio, concurrent.futures
+    logger.info(f"🛠 [server] web_fetch_tool called — url={url!r}")
+
+    async def _run():
+        client = get_search_client()
+        if not client.is_available():
+            return "Web fetch is not available. Set OLLAMA_TOKEN in your .env file."
+        return await client.fetch_url(url)
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                result = pool.submit(asyncio.run, _run()).result()
+        else:
+            result = loop.run_until_complete(_run())
+    except RuntimeError:
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            result = pool.submit(asyncio.run, _run()).result()
+
+    if isinstance(result, str):
+        return result
+    if not result.get("success"):
+        return f"Failed to fetch {url}: {result.get('error', 'Unknown error')}"
+
+    output = []
+    if result.get("title"):
+        output.append(f"# {result['title']}\n")
+    output.append(result.get("content", ""))
+    return "\n".join(output)
 
 @mcp.tool()
 @check_tool_enabled(category="text_tools")

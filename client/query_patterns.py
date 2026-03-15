@@ -555,19 +555,24 @@ INTENT_CATALOG = [
             r'|\bwhat\'?s\s+(happening|going\s+on)\b'
             r'|\bin\s+the\s+news\b'
         ),
-        "tools": [],
-        "examples": {},
+        "tools": ["web_search_tool", "web_fetch_tool"],
+        "examples": {
+            "web_search_tool": "use web_search_tool: ",
+            "web_fetch_tool":  "use web_fetch_tool: ",
+        },
         "priority": 3,
-        "web_search": True,
+        "web_search": False,
         "skills": False,
     },
     {
         "name": "stock_price",
         "pattern": r'\b(stock|share)\s+price\b|\btrading\s+at\b|\bmarket\s+cap\b',
-        "tools": [],
-        "examples": {},
+        "tools": ["web_search_tool"],
+        "examples": {
+            "web_search_tool": "use web_search_tool: ",
+        },
         "priority": 3,
-        "web_search": True,
+        "web_search": False,
         "skills": False,
     },
 ]
@@ -672,19 +677,11 @@ def classify(query: str, available_tool_names: list = None) -> QueryIntent:
             priority=entry["priority"],
         )
 
-    # ── Step 4: No match — check if current info needed ──────────
-    _WEB_SEARCH_PATTERN = re.compile(
-        r'\b(current|latest|recent|today|right now|as of)\b'
-        r'|\b(news|stock|price|score|update)\b'
-        r'|\bwho\s+is\s+the\s+(current|new)\b'
-        r'|\bwhat\'?s\s+the\s+(current|latest)\b',
-        re.IGNORECASE
-    )
-
+    # ── Step 4: No match — general query, no tools ────────────
     return QueryIntent(
         category="general",
         tools=[],
-        needs_web_search=bool(_WEB_SEARCH_PATTERN.search(msg)),
+        needs_web_search=False,
         needs_skills=False,
     )
 
@@ -799,24 +796,18 @@ def extract_research_sources(content: str) -> list:
 
     return sources
 
-
-# ═══════════════════════════════════════════════════════════════════
-# EXPLICIT SEARCH OVERRIDE PATTERNS
-# Moved from langgraph.py — triggers that bypass normal routing
-# ═══════════════════════════════════════════════════════════════════
-
-OLLAMA_SEARCH_PATTERN = re.compile(
-    r'\bollama\s+search\b'
-    r'|\bollama\s+search\s+(for|about|on)\b'
-    r'|\bweb\s+search\s+using\s+ollama\b',
-    re.IGNORECASE
-)
-
 WEB_SEARCH_EXPLICIT_PATTERN = re.compile(
     r'\buse\s+web\s+search\b'
     r'|\busing\s+web\s+search\b'
     r'|\bwith\s+web\s+search\b'
     r'|\bweb\s+search\s+for\b'
     r'|\bvia\s+web\s+search\b',
+    re.IGNORECASE
+)
+
+OLLAMA_SEARCH_PATTERN = re.compile(
+    r'\bollama\s+search\b'
+    r'|\bollama\s+search\s+(for|about|on)\b'
+    r'|\bweb\s+search\s+using\s+ollama\b',
     re.IGNORECASE
 )
