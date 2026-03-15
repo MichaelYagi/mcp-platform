@@ -8,7 +8,7 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 
 ## Prerequisites
 
-* Python 3.10+
+* Python 3.12+
 * 16GB+ RAM recommended
 * One of:
   * Ollama installed OR
