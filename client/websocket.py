@@ -272,18 +272,6 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         from langchain_core.messages import ToolMessage, AIMessage as _AIMessage
         new_messages = result["messages"][msgs_before:]
 
-        # Check for web_image_url tag embedded by web_image_search_tool bypass
-        _web_img_re = re.compile(r'\n<!-- web_image_url: (https?://\S+) -->')
-        for msg in reversed(new_messages):
-            if isinstance(msg, _AIMessage) and isinstance(msg.content, str):
-                m = _web_img_re.search(msg.content)
-                if m:
-                    image_source = m.group(1)
-                    # Strip tag from display text
-                    assistant_text = assistant_text.replace(m.group(0), "")
-                    logger.info(f"🖼️ Web image URL from AIMessage: {image_source}")
-                    break
-        new_messages = result["messages"][msgs_before:]
         tool_messages = [m for m in reversed(new_messages) if isinstance(m, ToolMessage)]
         logger.info(f"🖼️ Scanning {len(tool_messages)} new ToolMessage(s) for image/location data")
         for msg in tool_messages:

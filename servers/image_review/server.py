@@ -447,23 +447,18 @@ def shashin_analyze_tool(
 @check_tool_enabled(category="image_tools")
 def web_image_search_tool(query: str) -> str:
     """
-    Search the web for an image of a person, place, or thing using Google Images (via Serper).
+    Search the web for images of a person, place, or thing using Google Images (via Serper).
 
     Use this when the user asks to "show me a picture of X", "what does X look like",
     or any request for a web image of a real-world entity that is NOT in Shashin.
+    Returns a numbered list of results with title, source, link and image URL.
 
     Args:
         query (str): The entity to search for, e.g. "Jorma Tommila", "Eiffel Tower"
 
     Returns:
-        JSON string with:
-        - success (bool)
-        - query (str)         — echoed search term
-        - image_url (str)     — direct URL to best image (empty string if not found)
-        - title (str)         — title of the image result
-        - abstract (str)      — source domain
-        - source (str)        — "Google Images (Serper)"
-        - error (str)         — present only on failure
+        Formatted numbered list of image results, each with title, source, link,
+        image URL, and dimensions.
     """
     logger.info(f"🛠 [server] web_image_search_tool called — query={query!r}")
 
@@ -486,59 +481,44 @@ def web_image_search_tool(query: str) -> str:
 
     images = data.get("images", [])
     if not images:
-        return json.dumps({"success": True, "query": query, "image_url": "",
-                           "title": "", "abstract": "", "source": "Google Images (Serper)"})
+        return f'No images found for "{query}".'
 
-    # Max dimensions that fit comfortably in the chat bubble
+    # Use thumbnailUrl when full image exceeds chat-bubble-safe dimensions
     MAX_W, MAX_H = 1200, 900
 
-    # Score each image: prefer larger area, but discard anything wildly oversized
-    # Use thumbnailUrl as the delivery URL when the full image exceeds max dims,
-    # since thumbnails are already sized for display.
-    best = None
-    best_score = -1
+    results = []
     for img in images:
         w = img.get("imageWidth", 0)
         h = img.get("imageHeight", 0)
-        if w <= 0 or h <= 0:
-            continue
-        # Skip portrait-only tiny thumbnails
-        area = w * h
-        # Prefer images that fit within max dims; still allow larger ones (browser will scale)
-        score = area
-        if score > best_score:
-            best_score = score
-            best = img
+        image_url = (
+            img.get("imageUrl", "")
+            if w <= MAX_W and h <= MAX_H
+            else img.get("thumbnailUrl", "") or img.get("imageUrl", "")
+        )
+        results.append({
+            "title":     img.get("title", ""),
+            "source":    img.get("source", "") or img.get("domain", ""),
+            "link":      img.get("link", ""),
+            "image_url": image_url,
+            "width":     w,
+            "height":    h,
+        })
 
-    if not best:
-        best = images[0]
+    lines = [f'Found {len(results)} image(s) for "{query}":\n']
+    for i, r in enumerate(results, 1):
+        lines.append(f"{i}. {r['title']}")
 
-    w = best.get("imageWidth", 0)
-    h = best.get("imageHeight", 0)
+        if r.get("image_url"):
+            # Inline markdown image — formatMessage renders this as an <img> tag
+            lines.append(f"   ![{r['title']}]({r['image_url']})")
+        if r.get("link"):
+            lines.append(f"   🔗 {r['link']}")
+        if r.get("source"):
+            lines.append(f"   📰 {r['source']}")
+        lines.append("")
 
-    # If the full image is within reasonable bounds use it directly;
-    # otherwise fall back to the thumbnail which is pre-scaled for display.
-    if w <= MAX_W and h <= MAX_H:
-        image_url = best.get("imageUrl", "")
-    else:
-        # thumbnailUrl is encrypted-tbn0.gstatic.com — always display-safe
-        image_url = best.get("thumbnailUrl", "") or best.get("imageUrl", "")
-
-    title    = best.get("title", "")
-    abstract = best.get("source", "") or best.get("domain", "")
-    link     = best.get("link", "")
-
-    logger.info(f"[web_image_search_tool] image_url={image_url!r}, title={title!r}, dims={w}x{h}")
-
-    return json.dumps({
-        "success": True,
-        "query": query,
-        "image_url": image_url,
-        "title": title,
-        "abstract": abstract,
-        "link": link,
-        "source": "Google Images (Serper)",
-    }, indent=2)
+    logger.info(f"[web_image_search_tool] returning {len(results)} results for {query!r}")
+    return "\n".join(lines)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

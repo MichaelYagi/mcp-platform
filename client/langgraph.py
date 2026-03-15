@@ -1695,7 +1695,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             # ToolMessage and send it to the frontend for inline rendering.
             if last_tool_name == "web_image_search_tool":
                 raw_content = last_message.content if isinstance(last_message.content, str) else ""
-                # Unwrap MCP TextContent repr if needed (same pattern as vision block)
+                # Unwrap MCP TextContent repr if needed
                 if "TextContent" in raw_content:
                     idx = raw_content.find("text='")
                     if idx != -1:
@@ -1704,36 +1704,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                         if end != -1:
                             raw_content = raw_content[:end]
                         raw_content = raw_content.replace("\\n", "\n").replace("\\'", "'")
-                try:
-                    web_img_data = json.loads(raw_content)
-                except (json.JSONDecodeError, TypeError):
-                    web_img_data = {}
 
-                img_url  = web_img_data.get("image_url", "")
-                title    = web_img_data.get("title", "")
-                abstract = web_img_data.get("abstract", "")
-                link     = web_img_data.get("link", "")
-
-                if img_url:
-                    parts = []
-                    if title:
-                        parts.append(f"**{title}**")
-                    meta = []
-                    if abstract:
-                        meta.append(abstract)
-                    if link:
-                        meta.append(f"[{link}]({link})")
-                    if meta:
-                        parts.append(" · ".join(meta))
-                    reply_text = "\n\n".join(parts) if parts else f"Here is an image for: {web_img_data.get('query', '')}"
-                    # Embed image_url as a scannable tag so websocket.py can
-                    # extract and broadcast it to the UI without a server fetch.
-                    reply_text += f"\n<!-- web_image_url: {img_url} -->"
+                # Images are now inline markdown ![title](url) in the list —
+                # formatMessage in index.js renders them as <img> tags.
+                # Just pass the text through directly.
+                if raw_content and not raw_content.startswith("{"):
+                    reply_text = raw_content
                 else:
-                    reply_text = (
-                        f"I couldn't find an image for **{web_img_data.get('query', 'that')}**. "
-                        f"Try rephrasing or using a more specific name."
-                    )
+                    reply_text = "No images found. Try rephrasing or using a more specific name."
 
                 return {
                     "messages": [AIMessage(content=reply_text)],
