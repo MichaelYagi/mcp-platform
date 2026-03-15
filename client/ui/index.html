@@ -22,7 +22,7 @@
             <select id="modelSelect">
                 <option value="llama3.1:8b">Llama 3.1 8B</option>
             </select>
-            <button id="toolsToggle" onclick="toggleToolsPanel()">🔧 Tools</button>
+            <button id="toolsToggle">🔧 Tools</button>
             <button id="monitorToggle" onclick="toggleSystemMonitor()">📊 System</button>
             <button id="logToggle" onclick="toggleLogPanel()">📋 Logs</button>
             <a href="./dashboard.html" id="dashboardBtn">📈 Dashboard</a>
@@ -68,7 +68,7 @@
             <div id="toolsHeader">
                 <h2>🔧 Tools</h2>
                 <div class="tools-controls">
-                    <button class="tools-btn mobile-close" onclick="toggleToolsPanel()">✖ Close</button>
+                    <button class="tools-btn mobile-close" id="toolsCloseBtn">✖ Close</button>
                 </div>
             </div>
             <div id="toolsBody"></div>

@@ -532,6 +532,7 @@ ws.onopen = () => {
     sendBtn.disabled = false;
     updateStatusWithMode();
     ws.send(JSON.stringify({ type:"list_models" }));
+    ws.send(JSON.stringify({ type:"list_tools" }));
     ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
     connectLogWebSocket();
     if (!_wsHasConnected) {
@@ -621,6 +622,12 @@ ws.onmessage = (event) => {
         if (ollamaModels.length>0&&ggufModels.length>0) { const sep=document.createElement("option"); sep.disabled=true; sep.value=""; sep.textContent=separatorText; sep.style.color="#888"; sep.style.fontStyle="italic"; select.appendChild(sep); }
         ggufModels.forEach(m => { const o=document.createElement("option"); o.value=m.name; o.textContent=`${m.name} [GGUF ${(m.size_mb/1024).toFixed(1)} GB]`; select.appendChild(o); });
         if (data.last_used&&data.all_models.some(m=>m.name===data.last_used)) { select.value=data.last_used; if(!isProcessing) updateStatusWithMode(); }
+    }
+
+    if (data.type==="tools_list") {
+        buildToolPrompts(data.tools);
+        renderToolsPanel(data.tools);
+        return;
     }
 };
 
@@ -847,8 +854,89 @@ function send() {
     ws.send(JSON.stringify({type:"user",text,session_id:currentSessionId}));
 }
 
+// ============================================================
+// TOOLS PANEL
+// ============================================================
+let toolsPanelOpen = false;
+
+function toggleToolsPanel() {
+    toolsPanelOpen = !toolsPanelOpen;
+    const panel  = document.getElementById('toolsPanel');
+    const button = document.getElementById('toolsToggle');
+    if (toolsPanelOpen) { panel.classList.add('open'); button.textContent = '✖ Tools'; }
+    else                { panel.classList.remove('open'); button.textContent = '🔧 Tools'; }
+}
+
+function renderToolsPanel(tools) {
+    const body = document.getElementById('toolsBody');
+    if (!body) return;
+
+    const groups = {};
+    tools.forEach(t => {
+        const server = t.source_server || 'unknown';
+        if (!groups[server]) groups[server] = [];
+        groups[server].push(t);
+    });
+
+    body.innerHTML = '';
+
+    Object.keys(groups).sort().forEach(serverName => {
+        const items = groups[serverName];
+        const cat = document.createElement('div');
+        cat.className = 'tools-category';
+
+        const isExternal = items.some(t => t.external);
+        const header = document.createElement('div');
+        header.className = 'tools-category-header';
+        header.innerHTML = `<span>${serverName}${isExternal ? ' <span style="color:#858585;font-size:0.7rem;font-weight:normal;">[external]</span>' : ''} <span style="color:#858585;font-weight:normal;">(${items.length})</span></span><span class="tools-category-arrow">▶</span>`;
+        header.onclick = () => {
+            body.querySelectorAll('.tools-category').forEach(c => { if (c !== cat) c.classList.remove('open'); });
+            cat.classList.toggle('open');
+        };
+
+        const itemsDiv = document.createElement('div');
+        itemsDiv.className = 'tools-category-items';
+
+        items.sort((a, b) => a.name.localeCompare(b.name)).forEach(tool => {
+            const item = document.createElement('div');
+            item.className = 'tool-item';
+            const fullDesc = tool.description || '';
+            const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
+            const params = tool.required_params || [];
+            const paramsHtml = params.length
+                ? `<div class="tool-item-params">${params.map(p => `<span class="tool-param">${p.name}</span>`).join('')}</div>`
+                : '';
+            item.innerHTML = `<div class="tool-item-name">${tool.name}</div><div class="tool-item-desc">${previewDesc || 'No description available.'}</div>${paramsHtml}`;
+            item.onclick = () => {
+                const inputEl = document.getElementById('input');
+                inputEl.value = getToolPrompt(tool.name);
+                inputEl.focus();
+                inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+                if (window.innerWidth <= 768) toggleToolsPanel();
+            };
+            itemsDiv.appendChild(item);
+        });
+
+        cat.appendChild(header);
+        cat.appendChild(itemsDiv);
+        body.appendChild(cat);
+    });
+}
+
+let _toolPrompts = {};
+function buildToolPrompts(tools) {
+    _toolPrompts = {};
+    tools.forEach(t => { if (t.example) _toolPrompts[t.name] = t.example; });
+}
+function getToolPrompt(toolName) {
+    return _toolPrompts[toolName] || `${toolName}: `;
+}
+
 sendBtn.addEventListener('click', send);
 input.addEventListener("keydown", (e) => { if (e.key==="Enter"&&!e.shiftKey) { e.preventDefault(); send(); } });
+document.getElementById('toolsToggle').addEventListener('click', toggleToolsPanel);
+const _toolsCloseBtn = document.getElementById('toolsCloseBtn');
+if (_toolsCloseBtn) _toolsCloseBtn.addEventListener('click', toggleToolsPanel);
 // ============================================================
 // CHAT CONTAINER RESIZE OBSERVER
 // Adds .narrow class when chatContainer width <= 768px so
