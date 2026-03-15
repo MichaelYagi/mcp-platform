@@ -447,7 +447,7 @@ def shashin_analyze_tool(
 @check_tool_enabled(category="image_tools")
 def web_image_search_tool(query: str) -> str:
     """
-    Search the web for an image of a person, place, or thing using DuckDuckGo.
+    Search the web for an image of a person, place, or thing using Google Images (via Serper).
 
     Use this when the user asks to "show me a picture of X", "what does X look like",
     or any request for a web image of a real-world entity that is NOT in Shashin.
@@ -459,21 +459,24 @@ def web_image_search_tool(query: str) -> str:
         JSON string with:
         - success (bool)
         - query (str)         — echoed search term
-        - image_url (str)     — direct URL to image (empty string if not found)
-        - title (str)         — entity title from DuckDuckGo
-        - abstract (str)      — short description of the entity
-        - source (str)        — "DuckDuckGo Instant Answer"
+        - image_url (str)     — direct URL to best image (empty string if not found)
+        - title (str)         — title of the image result
+        - abstract (str)      — source domain
+        - source (str)        — "Google Images (Serper)"
         - error (str)         — present only on failure
     """
     logger.info(f"🛠 [server] web_image_search_tool called — query={query!r}")
 
-    DDG_URL = "https://api.duckduckgo.com/"
+    serper_key = os.getenv("SERPER_API_KEY", "")
+    if not serper_key:
+        logger.error("[web_image_search_tool] SERPER_API_KEY not set")
+        return json.dumps({"success": False, "error": "SERPER_API_KEY not configured"})
+
     try:
         resp = requests.get(
-            DDG_URL,
-            params={"q": query, "format": "json", "no_redirect": "1", "no_html": "1"},
+            "https://google.serper.dev/images",
+            params={"q": query, "apiKey": serper_key, "num": 10},
             timeout=10,
-            headers={"User-Agent": "Mozilla/5.0"},
         )
         resp.raise_for_status()
         data = resp.json()
@@ -481,19 +484,50 @@ def web_image_search_tool(query: str) -> str:
         logger.error(f"[web_image_search_tool] Request failed: {exc}")
         return json.dumps({"success": False, "error": str(exc)})
 
-    raw_image = data.get("Image", "")
-    image_url = ""
-    if raw_image:
-        # DDG returns a relative path like /i/abc123.jpg — make it absolute
-        if raw_image.startswith("/"):
-            image_url = f"https://duckduckgo.com{raw_image}"
-        elif raw_image.startswith("http"):
-            image_url = raw_image
+    images = data.get("images", [])
+    if not images:
+        return json.dumps({"success": True, "query": query, "image_url": "",
+                           "title": "", "abstract": "", "source": "Google Images (Serper)"})
 
-    title    = data.get("Heading", "") or data.get("AbstractSource", "")
-    abstract = data.get("AbstractText", "") or data.get("Abstract", "")
+    # Max dimensions that fit comfortably in the chat bubble
+    MAX_W, MAX_H = 1200, 900
 
-    logger.info(f"[web_image_search_tool] image_url={image_url!r}, title={title!r}")
+    # Score each image: prefer larger area, but discard anything wildly oversized
+    # Use thumbnailUrl as the delivery URL when the full image exceeds max dims,
+    # since thumbnails are already sized for display.
+    best = None
+    best_score = -1
+    for img in images:
+        w = img.get("imageWidth", 0)
+        h = img.get("imageHeight", 0)
+        if w <= 0 or h <= 0:
+            continue
+        # Skip portrait-only tiny thumbnails
+        area = w * h
+        # Prefer images that fit within max dims; still allow larger ones (browser will scale)
+        score = area
+        if score > best_score:
+            best_score = score
+            best = img
+
+    if not best:
+        best = images[0]
+
+    w = best.get("imageWidth", 0)
+    h = best.get("imageHeight", 0)
+
+    # If the full image is within reasonable bounds use it directly;
+    # otherwise fall back to the thumbnail which is pre-scaled for display.
+    if w <= MAX_W and h <= MAX_H:
+        image_url = best.get("imageUrl", "")
+    else:
+        # thumbnailUrl is encrypted-tbn0.gstatic.com — always display-safe
+        image_url = best.get("thumbnailUrl", "") or best.get("imageUrl", "")
+
+    title    = best.get("title", "")
+    abstract = best.get("source", "") or best.get("domain", "")
+
+    logger.info(f"[web_image_search_tool] image_url={image_url!r}, title={title!r}, dims={w}x{h}")
 
     return json.dumps({
         "success": True,
@@ -501,7 +535,7 @@ def web_image_search_tool(query: str) -> str:
         "image_url": image_url,
         "title": title,
         "abstract": abstract,
-        "source": "DuckDuckGo Instant Answer",
+        "source": "Google Images (Serper)",
     }, indent=2)
 
 
