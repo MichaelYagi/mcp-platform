@@ -1,5 +1,5 @@
 """
-Image Review MCP Server
+Image Tools MCP Server
 Runs over stdio transport
 """
 import sys
@@ -45,12 +45,12 @@ root_logger.addHandler(file_handler)
 root_logger.addHandler(console_handler)
 
 logging.getLogger("mcp").setLevel(logging.DEBUG)
-logging.getLogger("mcp_image_review_server").setLevel(logging.INFO)
+logging.getLogger("mcp_image_tools_server").setLevel(logging.INFO)
 
-logger = logging.getLogger("mcp_image_review_server")
-logger.info("🚀 Image Review Server logging initialized - writing to logs/mcp-server.log")
+logger = logging.getLogger("mcp_image_tools_server")
+logger.info("🚀 Image Tools Server logging initialized - writing to logs/mcp-server.log")
 
-mcp = FastMCP("image-review-server")
+mcp = FastMCP("image-tools-server")
 
 SHASHIN_BASE_URL = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
 SHASHIN_API_KEY  = os.getenv("SHASHIN_API_KEY", "")
@@ -534,12 +534,12 @@ def list_skills() -> str:
     logger.info("🛠  list_skills called")
     if skill_registry is None:
         return json.dumps({
-            "server": "image-review-server",
+            "server": "image-tools-server",
             "skills": [],
             "message": "Skills not loaded"
         }, indent=2)
     return json.dumps({
-        "server": "image-review-server",
+        "server": "image-tools-server",
         "skills": skill_registry.list()
     }, indent=2)
 
