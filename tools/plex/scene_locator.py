@@ -7,11 +7,6 @@ from collections import Counter
 from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
-PLEX_URL = os.getenv("PLEX_URL")
-PLEX_TOKEN = os.getenv("PLEX_TOKEN")
-
-if not PLEX_URL or not PLEX_TOKEN:
-    raise RuntimeError("PLEX_URL and PLEX_TOKEN must be set in environment variables.")
 
 
 # ------------------------------------------------------------
@@ -21,10 +16,15 @@ def _plex_get(path: str) -> Dict[str, Any]:
     """
     Fetch JSON from Plex, forcing JSON output and pagination.
     """
-    url = f"{PLEX_URL}{path}"
+    plex_url   = os.getenv("PLEX_URL")
+    plex_token = os.getenv("PLEX_TOKEN")
+    if not plex_url or not plex_token:
+        raise RuntimeError("PLEX_URL and PLEX_TOKEN must be set in environment variables.")
+
+    url = f"{plex_url}{path}"
 
     params = {
-        "X-Plex-Token": PLEX_TOKEN,
+        "X-Plex-Token": plex_token,
         "X-Plex-Container-Start": 0,
         "X-Plex-Container-Size": 500
     }
@@ -42,14 +42,18 @@ def _plex_download(path: str) -> str:
     """
     Download subtitle file or stream as raw text.
     """
-    # Normalize path
+    plex_url   = os.getenv("PLEX_URL")
+    plex_token = os.getenv("PLEX_TOKEN")
+    if not plex_url or not plex_token:
+        raise RuntimeError("PLEX_URL and PLEX_TOKEN must be set in environment variables.")
+
     if not path.startswith("/"):
         path = "/" + path
 
-    url = f"{PLEX_URL}{path}"
+    url = f"{plex_url}{path}"
 
     params = {
-        "X-Plex-Token": PLEX_TOKEN
+        "X-Plex-Token": plex_token
     }
 
     # IMPORTANT: No Accept: application/json here
