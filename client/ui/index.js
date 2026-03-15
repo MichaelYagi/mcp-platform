@@ -394,109 +394,6 @@ function resetControlButtons() {
 // ============================================================
 // LOG PANEL
 // ============================================================
-let toolsPanelOpen = false;
-
-function toggleToolsPanel() {
-    toolsPanelOpen = !toolsPanelOpen;
-    const panel  = document.getElementById('toolsPanel');
-    const button = document.getElementById('toolsToggle');
-    if (toolsPanelOpen) { panel.classList.add('open'); button.textContent = '✖ Tools'; }
-    else                { panel.classList.remove('open'); button.textContent = '🔧 Tools'; }
-}
-
-// Per-tool prompt templates derived from intent patterns.
-// Format: "Use <tool_name> to <what it does> <slot>"
-// Slots: [] = cursor goes at end, [QUERY] = user fills in search term, etc.
-// Tool prompt map — built dynamically from intent catalog examples
-// sent by the backend in the tools_list websocket message.
-// Falls back to a generic stub for any tool not in the catalog.
-let _toolPrompts = {};
-
-function buildToolPrompts(tools) {
-    _toolPrompts = {};
-    tools.forEach(t => {
-        if (t.example) _toolPrompts[t.name] = t.example;
-    });
-}
-
-function getToolPrompt(toolName) {
-    return _toolPrompts[toolName] || `${toolName}: `;
-}
-
-
-function renderToolsPanel(tools) {
-    const body = document.getElementById('toolsBody');
-    if (!body) return;
-
-    // Group by source_server (FastMCP name), fall back to "unknown"
-    const groups = {};
-    tools.forEach(t => {
-        const server = (t.source_server || 'unknown');
-        if (!groups[server]) groups[server] = [];
-        groups[server].push(t);
-    });
-
-    body.innerHTML = '';
-
-    // Sort server names alphabetically
-    Object.keys(groups).sort().forEach(serverName => {
-        const items = groups[serverName];
-
-        const cat = document.createElement('div');
-        cat.className = 'tools-category';
-
-        const isExternal = items.some(t => t.external);
-        const header = document.createElement('div');
-        header.className = 'tools-category-header';
-        header.innerHTML = `<span>${serverName}${isExternal ? ' <span style="color:#858585;font-size:0.7rem;font-weight:normal;">[external]</span>' : ''} <span style="color:#858585;font-weight:normal;">(${items.length})</span></span><span class="tools-category-arrow">▶</span>`;
-        header.onclick = () => {
-            // Collapse all others, expand this one (accordion — one open at a time)
-            const allCats = body.querySelectorAll('.tools-category');
-            allCats.forEach(c => {
-                if (c !== cat) c.classList.remove('open');
-            });
-            cat.classList.toggle('open');
-        };
-
-        const itemsDiv = document.createElement('div');
-        itemsDiv.className = 'tools-category-items';
-
-        // Sort tools alphabetically within category
-        items.sort((a, b) => a.name.localeCompare(b.name)).forEach(tool => {
-            const item = document.createElement('div');
-            item.className = 'tool-item';
-
-            // First sentence of description only for the preview
-            const fullDesc = tool.description || '';
-            const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
-            const params = (tool.required_params || []);
-            const paramsHtml = params.length
-                ? `<div class="tool-item-params">${params.map(p => `<span class="tool-param">${p.name}</span>`).join('')}</div>`
-                : '';
-
-            item.innerHTML = `
-                <div class="tool-item-name">${tool.name}</div>
-                <div class="tool-item-desc">${previewDesc || 'No description available.'}</div>
-                ${paramsHtml}`;
-
-            item.onclick = () => {
-                const inputEl = document.getElementById('input');
-                const prompt = getToolPrompt(tool.name);
-                inputEl.value = prompt;
-                inputEl.focus();
-                inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
-                if (window.innerWidth <= 768) toggleToolsPanel();
-            };
-
-            itemsDiv.appendChild(item);
-        });
-
-        cat.appendChild(header);
-        cat.appendChild(itemsDiv);
-        body.appendChild(cat);
-    });
-}
-
 function toggleLogPanel() {
     logPanelOpen = !logPanelOpen;
     const panel  = document.getElementById('logPanel');
@@ -635,7 +532,6 @@ ws.onopen = () => {
     sendBtn.disabled = false;
     updateStatusWithMode();
     ws.send(JSON.stringify({ type:"list_models" }));
-    ws.send(JSON.stringify({ type:"list_tools" }));
     ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
     connectLogWebSocket();
     if (!_wsHasConnected) {
@@ -726,12 +622,6 @@ ws.onmessage = (event) => {
         ggufModels.forEach(m => { const o=document.createElement("option"); o.value=m.name; o.textContent=`${m.name} [GGUF ${(m.size_mb/1024).toFixed(1)} GB]`; select.appendChild(o); });
         if (data.last_used&&data.all_models.some(m=>m.name===data.last_used)) { select.value=data.last_used; if(!isProcessing) updateStatusWithMode(); }
     }
-
-    if (data.type==="tools_list") {
-        buildToolPrompts(data.tools);
-        renderToolsPanel(data.tools);
-        return;
-    }
 };
 
 modelSelect.addEventListener("change", (e) => {
@@ -757,7 +647,28 @@ function formatMessage(text) {
     const images=[];
     text=text.replace(/!\[([^\]]*)\]\((https?:\/\/[^\)]+)\)/g,(m,alt,url)=>{const i=images.length;images.push({alt,url});return`@@IMAGE_${i}@@`;});
     text=text.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,(m,label,url)=>{const i=links.length;links.push({label,url});return`@@LINK_${i}@@`;});
-    text=text.replace(/(?<!\]\()(?<!")https?:\/\/[^\s<>"]+/g,(url)=>{const trailing=url.match(/[.,;:!?'")\]]+$/)?.[0]||'';const cleanUrl=url.slice(0,url.length-trailing.length);const i=links.length;links.push({label:cleanUrl,url:cleanUrl});return`@@LINK_${i}@@${trailing}`;});
+    text=text.replace(/(?<!\]\()(?<!")https?:\/\/[^\s<>"]+/g,(url)=>{
+        // Strip trailing punctuation, but only strip ) if it's unbalanced
+        // e.g. https://en.wikipedia.org/wiki/Foo_(bar) — keep the )
+        //      "see https://example.com)" — strip the )
+        let trailing = url.match(/[.,;:!?'"]+$/)?.[0] || '';
+        let cleanUrl = url.slice(0, url.length - trailing.length);
+        // Strip only unbalanced closing parens
+        const openCount  = (cleanUrl.match(/\(/g) || []).length;
+        const closeCount = (cleanUrl.match(/\)/g) || []).length;
+        if (closeCount > openCount) {
+            const extra = closeCount - openCount;
+            const stripped = ')'.repeat(extra);
+            cleanUrl = cleanUrl.slice(0, cleanUrl.length - extra);
+            trailing = stripped + trailing;
+        }
+        // Strip trailing ] if unbalanced
+        if (cleanUrl.endsWith(']') && !cleanUrl.includes('[')) {
+            trailing = ']' + trailing;
+            cleanUrl = cleanUrl.slice(0, -1);
+        }
+        const i=links.length;links.push({label:cleanUrl,url:cleanUrl});return`@@LINK_${i}@@${trailing}`;
+    });
     text=text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     text=text.replace(/^######\s+(.+)$/gm,"<h6>$1</h6>").replace(/^#####\s+(.+)$/gm,"<h5>$1</h5>").replace(/^####\s+(.+)$/gm,"<h4>$1</h4>").replace(/^###\s+(.+)$/gm,"<h3>$1</h3>").replace(/^##\s+(.+)$/gm,"<h2>$1</h2>").replace(/^#\s+(.+)$/gm,"<h1>$1</h1>");
     text=text.replace(/\*\*\*(.+?)\*\*\*/g,"<strong><em>$1</em></strong>").replace(/\*\*(.+?)\*\*/g,"<strong>$1</strong>").replace(/\*(.+?)\*/g,"<em>$1</em>").replace(/~~(.+?)~~/g,"<del>$1</del>");
