@@ -164,7 +164,7 @@ PLEX_URL=http://localhost:32400  # Plex server URL
 PLEX_TOKEN=your_token_here       # Get from Plex account settings
 SHASHIN_BASE_URL=http://localhost:6624/
 SHASHIN_API_KEY=your_key_here
-SERPER_API_KEY=your_key_here
+SERPER_API_KEY=your_key_here     # Serper image search (https://serper.dev/api-keys)
 OLLAMA_TOKEN=your_token_here     # Ollama API key (https://ollama.com/settings/keys)
 
 # === A2A Protocol (optional distributed mode) ===
