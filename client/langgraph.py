@@ -1712,21 +1712,27 @@ def create_langgraph_agent(llm_with_tools, tools):
                 img_url  = web_img_data.get("image_url", "")
                 title    = web_img_data.get("title", "")
                 abstract = web_img_data.get("abstract", "")
+                link     = web_img_data.get("link", "")
 
                 if img_url:
                     parts = []
                     if title:
                         parts.append(f"**{title}**")
+                    meta = []
                     if abstract:
-                        parts.append(abstract)
+                        meta.append(abstract)
+                    if link:
+                        meta.append(f"[{link}]({link})")
+                    if meta:
+                        parts.append(" · ".join(meta))
                     reply_text = "\n\n".join(parts) if parts else f"Here is an image for: {web_img_data.get('query', '')}"
                     # Embed image_url as a scannable tag so websocket.py can
                     # extract and broadcast it to the UI without a server fetch.
                     reply_text += f"\n<!-- web_image_url: {img_url} -->"
                 else:
                     reply_text = (
-                        f"I couldn't find an image for **{web_img_data.get('query', 'that')}** "
-                        f"via DuckDuckGo. Try rephrasing or using a more specific name."
+                        f"I couldn't find an image for **{web_img_data.get('query', 'that')}**. "
+                        f"Try rephrasing or using a more specific name."
                     )
 
                 return {

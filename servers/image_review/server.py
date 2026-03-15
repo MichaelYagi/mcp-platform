@@ -526,6 +526,7 @@ def web_image_search_tool(query: str) -> str:
 
     title    = best.get("title", "")
     abstract = best.get("source", "") or best.get("domain", "")
+    link     = best.get("link", "")
 
     logger.info(f"[web_image_search_tool] image_url={image_url!r}, title={title!r}, dims={w}x{h}")
 
@@ -535,6 +536,7 @@ def web_image_search_tool(query: str) -> str:
         "image_url": image_url,
         "title": title,
         "abstract": abstract,
+        "link": link,
         "source": "Google Images (Serper)",
     }, indent=2)
 
