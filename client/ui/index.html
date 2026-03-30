@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MCP Client</title>
+    <link rel="stylesheet" href="shared.css">
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div id="header">
+        <div id="headerLeft">
+            <button id="hamburgerBtn" onclick="toggleSessionsSidebar()" title="Chats" aria-label="Toggle chat sessions">
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            </button>
+            <h1>MCP Client</h1>
+        </div>
+        <div id="topBar">
+            <label for="modelSelect" id="modelSelectLabel" style="color: white;">Model:</label>
+            <select id="modelSelect">
+                <option value="llama3.1:8b">Llama 3.1 8B</option>
+            </select>
+            <button id="toolsToggle">🔧 Tools</button>
+            <button id="monitorToggle" onclick="toggleSystemMonitor()">📊 System</button>
+            <button id="logToggle" onclick="toggleLogPanel()">📋 Logs</button>
+            <a href="./dashboard.html" id="dashboardBtn">📈 Dashboard</a>
+        </div>
+    </div>
+
+    <div id="mainContainer">
+        <div id="sessionsSidebar">
+            <div class="sessions-header">
+                <h2>Chats</h2>
+                <button class="session-close-btn" onclick="toggleSessionsSidebar()">✖ Close</button>
+            </div>
+            <div class="sessions-search-container">
+                <button class="new-session-btn" onclick="startNewSession()" title="New Chat">+</button>
+                <input type="text" id="sessionSearch" placeholder="Search chats..." oninput="filterSessions()">
+            </div>
+            <div class="sessions-list" id="sessionsList"></div>
+        </div>
+
+        <div id="chatContainer">
+            <div id="chat"></div>
+            <div id="inputArea">
+            <div id="inputRow">
+                <textarea id="input" placeholder="Type your message..."></textarea>
+                <div id="matrixCursor" aria-hidden="true"><span id="matrixCursorText"></span><span id="matrixCursorBlock">█</span></div>
+                <button id="sendBtn">Send</button>
+                <button id="stopBtn" onclick="stopProcessing()">Stop</button>
+            </div>
+            <div id="statusRow">
+                <div id="status"></div>
+            </div>
+            <div id="themeWrapper">
+                    <button id="themeBtn" onclick="toggleThemeDropdown(event)" title="Change theme" aria-label="Change theme">
+                        <span class="theme-swatch"></span>
+                        <span class="theme-swatch"></span>
+                        <span class="theme-swatch"></span>
+                    </button>
+                    <div id="themeDropdown"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="toolsPanel">
+            <div id="toolsHeader">
+                <h2>🔧 Tools</h2>
+                <div class="tools-controls">
+                    <button class="tools-btn mobile-close" id="toolsCloseBtn">✖ Close</button>
+                </div>
+            </div>
+            <div id="toolsBody"></div>
+        </div>
+
+        <div id="logPanel">
+            <div id="logHeader">
+                <h2>📋 Live Logs</h2>
+                <div class="log-controls">
+                    <button class="log-btn danger" onclick="clearLogs()">Clear</button>
+                    <button class="log-btn" onclick="toggleAutoscroll()" title="Automatically scroll to newest logs">
+                        <span id="autoscrollText">Auto-scroll: On</span>
+                    </button>
+                    <button class="log-btn mobile-close" onclick="toggleLogPanel()" style="display:none;">✖ Close</button>
+                </div>
+            </div>
+            <div id="logFilters">
+                <button class="filter-btn USER active"      data-level="USER"      onclick="toggleLogFilter('USER')">USER</button>
+                <button class="filter-btn ASSISTANT active" data-level="ASSISTANT" onclick="toggleLogFilter('ASSISTANT')">ASSISTANT</button>
+                <button class="filter-btn DEBUG active"     data-level="DEBUG"     onclick="toggleLogFilter('DEBUG')">DEBUG</button>
+                <button class="filter-btn INFO active"      data-level="INFO"      onclick="toggleLogFilter('INFO')">INFO</button>
+                <button class="filter-btn WARNING active"   data-level="WARNING"   onclick="toggleLogFilter('WARNING')">WARNING</button>
+                <button class="filter-btn ERROR active"     data-level="ERROR"     onclick="toggleLogFilter('ERROR')">ERROR</button>
+                <div class="log-status">
+                    <div class="log-status-indicator" id="logStatusIndicator"></div>
+                    <span id="logStatusText" style="color:#858585;">Disconnected</span>
+                </div>
+            </div>
+            <div id="logContainer"></div>
+        </div>
+
+        <div id="systemMonitor">
+            <div class="monitor-header">
+                <h2>📊 System Monitor</h2>
+                <div class="monitor-controls">
+                    <button class="monitor-btn mobile-close" onclick="toggleSystemMonitor()">✖ Close</button>
+                </div>
+            </div>
+            <div class="monitor-content">
+                <div class="stat-group">
+                    <div class="stat-label">🖥️ CPU</div>
+                    <div class="stat-value"><span id="cpuPercent">0</span><span class="stat-unit">%</span></div>
+                    <div class="progress-bar"><div id="cpuBar" class="progress-fill" style="width:0%"></div></div>
+                    <div class="stat-secondary"><span id="cpuFreq">0.00</span> GHz</div>
+                </div>
+                <div id="gpuStats" class="stat-group" style="display:none;">
+                    <div class="stat-label">🎮 GPU</div>
+                    <div class="stat-value"><span id="gpuPercent">0</span><span class="stat-unit">%</span></div>
+                    <div class="progress-bar"><div id="gpuBar" class="progress-fill" style="width:0%"></div></div>
+                    <div class="stat-secondary"><span id="gpuTemp">0</span>°C • <span id="gpuMemory">0/0</span> MB</div>
+                </div>
+                <div class="stat-group">
+                    <div class="stat-label">💾 Memory</div>
+                    <div class="stat-value"><span id="memPercent">0</span><span class="stat-unit">%</span></div>
+                    <div class="progress-bar"><div id="memBar" class="progress-fill" style="width:0%"></div></div>
+                    <div class="stat-secondary"><span id="memUsed">0.0</span> / <span id="memTotal">0.0</span> GB</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+/* ============================================================
+   DASHBOARD-SPECIFIC STYLES
+   (Theme variables are in shared.css)
+   ============================================================ */
+
+/* ── Top Bar ── */
+#topBar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+#backBtn {
+    padding: 0.5rem 1rem;
+    background: var(--btn-back);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    line-height: 1;
+}
+#backBtn:hover {
+    background: var(--btn-back-hover);
+}
+
+/* ── Main Container ── */
+#mainContainer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    padding-bottom: max(3rem, calc(3rem + env(safe-area-inset-bottom)));
+}
+
+/* ── Status Bar ── */
+.status-bar {
+    background: var(--status-bg);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 3px var(--card-shadow);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--card-border);
+    transition: background 0.3s ease, border 0.3s ease;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #f44336;
+}
+.status-indicator.connected {
+    background: #4caf50;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%,100% { opacity:1; }
+    50% { opacity:0.5; }
+}
+
+.status-text {
+    font-size: 0.9rem;
+    color: var(--label-color);
+    transition: color 0.3s ease;
+}
+
+.status-note {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--subtitle-color);
+    font-style: italic;
+    transition: color 0.3s ease;
+}
+
+/* ── Metrics Grid ── */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.metric-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px var(--card-shadow);
+    transition: transform 0.2s, box-shadow 0.2s, background 0.3s ease, border 0.3s ease;
+}
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--card-shadow-hover);
+}
+
+.metric-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+.metric-icon   {
+    font-size: 1.5rem;
+}
+.metric-title  {
+    font-size: 0.9rem;
+    color: var(--label-color);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.3s ease;
+}
+.metric-value  {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--metric-color);
+    margin-bottom: 0.5rem;
+    transition: color 0.3s ease;
+}
+.metric-subtitle {
+    font-size: 0.85rem;
+    color: var(--subtitle-color);
+    transition: color 0.3s ease;
+}
+.metric-error  {
+    color: #f44336;
+    font-weight: 600;
+}
+
+/* ── Chart Container ── */
+.chart-container {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px var(--card-shadow);
+    margin-bottom: 2rem;
+    transition: background 0.3s ease, border 0.3s ease;
+}
+.chart-header  {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+.chart-title   {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--title-color);
+    transition: color 0.3s ease;
+}
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* ── Tools Grid ── */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.tool-card {
+    background: var(--tool-bg);
+    border-radius: 6px;
+    padding: 1rem;
+    border-left: 4px solid var(--tool-border);
+    transition: background 0.3s ease, border 0.3s ease;
+}
+.tool-name  {
+    font-weight: 600;
+    color: var(--title-color);
+    margin-bottom: 0.5rem;
+    transition: color 0.3s ease;
+}
+.tool-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--label-color);
+    transition: color 0.3s ease;
+}
+.tool-stat  {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.tool-stat-label {
+    font-size: 0.75rem;
+    color: var(--subtitle-color);
+    text-transform: uppercase;
+    transition: color 0.3s ease;
+}
+.tool-stat-value {
+    font-weight: 600;
+    color: var(--title-color);
+    transition: color 0.3s ease;
+}
+.error-badge {
+    background: #ffebee;
+    color: #c62828;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.no-data {
+    text-align: center;
+    padding: 3rem;
+    color: var(--subtitle-color);
+    font-style: italic;
+    transition: color 0.3s ease;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    #backBtn {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.85rem;
+        height: 38px;
+        min-height: 38px;
+    }
+    #mainContainer {
+        padding: 1rem;
+        padding-bottom: max(4rem, calc(4rem + env(safe-area-inset-bottom) + 30px));
+    }
+    .metrics-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .metric-card  {
+        padding: 1rem;
+    }
+    .metric-value {
+        font-size: 2rem;
+    }
+    .chart-container {
+        padding: 1rem;
+    }
+    .chart-wrapper   {
+        height: 200px;
+    }
+    .tools-grid      {
+        grid-template-columns: 1fr;
+    }
+    .status-note {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    #backBtn     {
+        padding: 0.4rem 0.7rem;
+        font-size: 0.8rem;
+        height: 36px;
+        min-height: 36px;
+    }
+    .metric-value{
+        font-size: 1.75rem;
+    }
+}
+/* ============================================================
+   RESET BUTTON
+   ============================================================ */
+.reset-btn {
+    margin-left: auto;
+    padding: 0.35rem 0.9rem;
+    background: rgba(255,255,255,0.07);
+    color: var(--label-color);
+    border: 1px solid var(--card-border);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.reset-btn:hover    { background: rgba(255,255,255,0.13); }
+.reset-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* ============================================================
+   LATENCY HISTOGRAM  (agent + LLM, full-size)
+   ============================================================ */
+.histogram-container {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.histogram-title {
+    font-size: 0.75rem;
+    color: var(--subtitle-color);
+    margin-bottom: 0.75rem;
+    font-style: italic;
+    transition: color 0.3s ease;
+}
+
+.histogram-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 80px;
+}
+
+.histogram-bar-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.histogram-bar-wrap {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    height: 60px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 3px 3px 0 0;
+}
+
+.histogram-bar {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.4s ease;
+    min-height: 2px;
+}
+
+.histogram-bar-label {
+    font-size: 0.62rem;
+    color: var(--subtitle-color);
+    text-align: center;
+    white-space: nowrap;
+    transition: color 0.3s ease;
+}
+
+.histogram-bar-count {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--label-color);
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+/* ============================================================
+   MINI HISTOGRAM  (per-tool cards)
+   ============================================================ */
+.mini-histogram {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 32px;
+    margin-top: 0.6rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--card-border);
+}
+
+.mini-bar-group {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+}
+
+.mini-bar-wrap {
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    height: 100%;
+    background: rgba(255,255,255,0.04);
+    border-radius: 2px 2px 0 0;
+}
+
+.mini-bar {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    transition: height 0.4s ease;
+    min-height: 2px;
+}
+
+/* ============================================================
+   FAILURE KINDS BREAKDOWN
+   ============================================================ */
+.failure-kinds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.failure-kind-card {
+    background: var(--tool-bg);
+    border-radius: 6px;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    transition: background 0.3s ease, border 0.3s ease;
+}
+
+.failure-kind-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--label-color);
+    transition: color 0.3s ease;
+}
+
+.failure-kind-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.failure-kind-bar-wrap {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.failure-kind-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease;
+}
+
+.failure-kind-pct {
+    font-size: 0.72rem;
+    color: var(--subtitle-color);
+    transition: color 0.3s ease;
+}
+
+/* ── Tool stats: expand to fit p50/p95/p99 ── */
+.tool-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.4rem 0;
+}
+
+/* ── Responsive additions ── */
+@media (max-width: 768px) {
+    .histogram-bars  { height: 60px; }
+    .histogram-bar-wrap { height: 44px; }
+    .failure-kinds-grid { grid-template-columns: 1fr 1fr; }
+    .reset-btn { padding: 0.3rem 0.7rem; font-size: 0.75rem; }
+}
+
+@media (max-width: 480px) {
+    .failure-kinds-grid { grid-template-columns: 1fr; }
+    .status-note { display: none; }
+}

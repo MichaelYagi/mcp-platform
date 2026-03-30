@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MCP Dashboard - Performance Metrics</title>
+    <link rel="stylesheet" href="shared.css">
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <div id="header">
+        <h1>MCP Dashboard</h1>
+        <div id="topBar">
+            <a href="./index.html" id="backBtn">← Back to Chat</a>
+        </div>
+    </div>
+
+    <div id="mainContainer">
+        <div class="status-bar">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <div class="status-text" id="statusText">Connecting to metrics stream...</div>
+            <div class="status-note">ℹ️ Metrics reset on server restart</div>
+            <button id="resetMetricsBtn" class="reset-btn" title="Clear all metrics">↺ Reset</button>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-header"><div class="metric-icon">🤖</div><div class="metric-title">LLM Calls</div></div>
+                <div class="metric-value" id="llmCallsValue">0</div>
+                <div class="metric-subtitle">Total requests</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-header"><div class="metric-icon">🔧</div><div class="metric-title">Tool Usage</div></div>
+                <div class="metric-value" id="toolCallsValue">0</div>
+                <div class="metric-subtitle">Total executions</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-header"><div class="metric-icon">⚡</div><div class="metric-title">Agent Execution</div></div>
+                <div class="metric-value" id="agentRunsValue">0</div>
+                <div class="metric-subtitle">Total executions</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-header"><div class="metric-icon">⚠️</div><div class="metric-title">Error Rate</div></div>
+                <div class="metric-value metric-error" id="errorRateValue">0%</div>
+                <div class="metric-subtitle"><span id="totalErrorsValue">0</span> overall errors</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-header"><div class="metric-icon">📊</div><div class="metric-title">Agent p50 / p95</div></div>
+                <div class="metric-value" id="agentP50Value">—</div>
+                <div class="metric-subtitle">p95: <span id="agentP95Value">—</span> &nbsp;p99: <span id="agentP99Value">—</span></div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-header"><div class="metric-icon">📊</div><div class="metric-title">LLM p50 / p95</div></div>
+                <div class="metric-value" id="llmP50Value">—</div>
+                <div class="metric-subtitle">p95: <span id="llmP95Value">—</span> &nbsp;p99: <span id="llmP99Value">—</span></div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-header"><div class="chart-icon">📈</div><div class="chart-title">Agent Performance Over Time</div></div>
+            <div class="chart-wrapper"><canvas id="agentChart"></canvas></div>
+            <div class="histogram-container" id="agentHistogram"></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header"><div class="chart-icon">🧠</div><div class="chart-title">LLM Response Times</div></div>
+            <div class="chart-wrapper"><canvas id="llmChart"></canvas></div>
+            <div class="histogram-container" id="llmHistogram"></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header"><div class="chart-icon">⚠️</div><div class="chart-title">Failure Breakdown</div></div>
+            <div id="failureKindsContainer" class="failure-kinds-grid"><div class="no-data">No failure data yet</div></div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header"><div class="chart-icon">🛠️</div><div class="chart-title">Tool Performance</div></div>
+            <div id="toolsContainer" class="tools-grid"><div class="no-data">No tool data available yet</div></div>
+        </div>
+    </div>
+
+    <script src="chart.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

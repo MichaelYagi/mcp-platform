@@ -1,0 +1,2501 @@
+/* Matrix theme fonts */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap');
+
+/* ============================================================
+   UNIFIED THEME VARIABLES
+   All themes defined with complete variable sets for both
+   index.html (chat interface) and dashboard.html
+   ============================================================ */
+
+/* ============================================================
+   BASE RESET
+============================================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ============================================================
+   BODY
+============================================================ */
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--page-bg);
+    overflow: hidden;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    transition: background 0.3s ease;
+}
+
+/* ============================================================
+   HEADER
+============================================================ */
+
+#header {
+    background: var(--header-bg);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: background 0.3s ease;
+}
+
+#header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* ============================================================
+   SCROLLBARS
+============================================================ */
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-hover);
+}
+
+/* ============================================================
+   RESPONSIVE BREAKPOINTS
+============================================================ */
+
+@media (max-width: 768px) {
+    #header {
+        padding: 0.75rem 1rem;
+    }
+    #header h1 {
+        font-size: 1.1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #header h1 {
+        font-size: 1rem;
+    }
+}
+
+/* ============================================================
+   INDEX & DASHBOARD THEMES
+============================================================ */
+
+/* DATA THEMES */
+/* Default – steel blue (existing look) */
+:root,
+[data-theme="default"] {
+    /* Header */
+    --header-bg:        #2c3e50;
+    --header-border:    #1a252f;
+
+    /* Sidebar (chat interface) */
+    --sidebar-bg:       #34495e;
+    --sidebar-header:   #2c3e50;
+    --sidebar-item:     #2c3e50;
+    --sidebar-hover:    #3d5a80;
+    --sidebar-active:   #153d58;
+    --sidebar-border:   #4a5f7f;
+    --sidebar-search:   #2c3e50;
+
+    /* Page & Chat */
+    --page-bg:          #f5f7fa;
+    --chat-bg:          #ffffff;
+    --chat-border:      #d0d7de;
+    --chat-assistant:   #f0f2f5;
+    --chat-asst-border: #d9d9d9;
+    --chat-asst-color:  #333;
+    --input-bg:         #ffffff;
+    --input-border:     #cbd5e1;
+    --status-color:     #555;
+
+    /* User bubbles & buttons */
+    --user-bubble:      linear-gradient(135deg, #4da3ff, #1c7dff);
+    --send-btn:         #1c7dff;
+    --send-btn-hover:   #0066e6;
+    --send-btn-focus:   rgba(77,163,255,0.3);
+
+    --btn-logs:         #3498db;
+    --btn-logs-hover:   #2980b9;
+    --btn-monitor:      #9b59b6;
+    --btn-monitor-hover:#8e44ad;
+    --btn-dashboard:    #27ae60;
+    --btn-dashboard-hover:#229954;
+    --btn-newsession:   #27ae60;
+    --btn-newsession-hover:#229954;
+
+    /* Log panel */
+    --log-bg:           #1e1e1e;
+    --log-header:       #2d2d2d;
+    --log-border:       #3e3e3e;
+    --log-filter-bg:    #252525;
+    --log-filter-btn:   #424242;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --monitor-header:   rgba(0,0,0,0.2);
+
+    /* Dashboard specific */
+    --btn-back:         #3498db;
+    --btn-back-hover:   #2980b9;
+    --btn-tools:        #e67e22;
+    --btn-tools-hover:  #c96a18;
+    --card-bg:          #ffffff;
+    --card-border:      #d0d7de;
+    --card-shadow:      rgba(0,0,0,0.08);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #2c3e50;
+    --metric-color:     #2c3e50;
+    --subtitle-color:   #999;
+    --label-color:      #666;
+    --chart-blue:       #3498db;
+    --chart-purple:     #9b59b6;
+    --tool-border:      #3498db;
+    --tool-bg:          #f8f9fa;
+    --status-bg:        #ffffff;
+
+    /* Scrollbars */
+    --scrollbar-track:  #f5f7fa;
+    --scrollbar-thumb:  #cbd5e1;
+    --scrollbar-hover:  #94a3b8;
+
+    /* Session date */
+    --session-date-color:       #8faab8;
+    --session-date-hover:       #b0c8d8;
+    --session-date-active:      rgba(255,255,255,0.7);
+
+    /* Swatch colors */
+    --swatch1:          #2c3e50;
+    --swatch2:          #3498db;
+    --swatch3:          #27ae60;
+}
+
+/* Neon – cyberpunk dark with cyan/magenta */
+[data-theme="neon"] {
+    --header-bg:        #1a1a2e;
+    --header-border:    #0f0f1e;
+
+    --sidebar-bg:       #16213e;
+    --sidebar-header:   #1a1a2e;
+    --sidebar-item:     #1a1a2e;
+    --sidebar-hover:    #2a2a4e;
+    --sidebar-active:   #0f1f3e;
+    --sidebar-border:   #3a4f6f;
+    --sidebar-search:   #1a1a2e;
+
+    --page-bg:          #0f0f1e;
+    --chat-bg:          #16213e;
+    --chat-border:      #3a4f6f;
+    --chat-assistant:   #1a2332;
+    --chat-asst-border: #3a4f6f;
+    --chat-asst-color:  #8ecae6;
+    --input-bg:         #16213e;
+    --input-border:     #3a4f6f;
+    --status-color:     #8ecae6;
+
+    --user-bubble:      linear-gradient(135deg, #ff006e, #d90058);
+    --send-btn:         #ff006e;
+    --send-btn-hover:   #d90058;
+    --send-btn-focus:   rgba(255,0,110,0.3);
+
+    --btn-logs:         #8ecae6;
+    --btn-logs-hover:   #4a6f8f;
+    --btn-monitor:      #ff006e;
+    --btn-monitor-hover: #d90058;
+    --btn-dashboard:    #009bb0;
+    --btn-dashboard-hover: #007f92;
+    --btn-newsession:   #009bb0;
+    --btn-newsession-hover: #007f92;
+
+    --log-bg:           #0a0a1e;
+    --log-header:       #0f0f1e;
+    --log-border:       #1a1a2e;
+    --log-filter-bg:    #0f0f1e;
+    --log-filter-btn:   #16213e;
+
+    --monitor-gradient: linear-gradient(135deg, #00f5ff 0%, #ff006e 100%);
+    --monitor-header:   rgba(0,0,0,0.4);
+
+    --btn-back:         #00f5ff;
+    --btn-back-hover:   #00d4e6;
+    --btn-tools:        #00d4e6;
+    --btn-tools-hover:  #00afc0;
+    --card-bg:          #16213e;
+    --card-border:      #3a4f6f;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #8ecae6;
+    --metric-color:     #00f5ff;
+    --subtitle-color:   #8ecae6;
+    --label-color:      #8ecae6;
+    --chart-blue:       #00f5ff;
+    --chart-purple:     #ff006e;
+    --tool-border:      #ff006e;
+    --tool-bg:          #1a2332;
+    --status-bg:        #16213e;
+
+    --scrollbar-track:  #0f0f1e;
+    --scrollbar-thumb:  #3a4f6f;
+    --scrollbar-hover:  #4a6f8f;
+
+    --swatch1:          #1a1a2e;
+    --swatch2:          #00f5ff;
+    --swatch3:          #ff006e;
+
+    /* Session date */
+    --session-date-color:       #4a7a9a;
+    --session-date-hover:       #7aaccc;
+    --session-date-active:      rgba(0,245,255,0.6);
+}
+
+/* Dracula – purple and pink on charcoal */
+[data-theme="dracula"] {
+    --header-bg:        #282a36;
+    --header-border:    #21222c;
+
+    --sidebar-bg:       #33353f;
+    --sidebar-header:   #282a36;
+    --sidebar-item:     #282a36;
+    --sidebar-hover:    #44475a;
+    --sidebar-active:   #6272a4;
+    --sidebar-border:   #44475a;
+    --sidebar-search:   #282a36;
+
+    --page-bg:          #1e1f28;
+    --chat-bg:          #282a36;
+    --chat-border:      #44475a;
+    --chat-assistant:   #33353f;
+    --chat-asst-border: #44475a;
+    --chat-asst-color:  #f8f8f2;
+    --input-bg:         #282a36;
+    --input-border:     #44475a;
+    --status-color:     #a0a0a0;
+
+    --user-bubble:      linear-gradient(135deg, #bd93f9, #9d73d9);
+    --send-btn:         #bd93f9;
+    --send-btn-hover:   #9d73d9;
+    --send-btn-focus:   rgba(189,147,249,0.3);
+
+    --btn-logs:         #8be9fd;
+    --btn-logs-hover:   #6bd9ed;
+    --btn-monitor:      #ff79c6;
+    --btn-monitor-hover:#df59a6;
+    --btn-dashboard:    #50fa7b;
+    --btn-dashboard-hover:#30da5b;
+    --btn-newsession:   #50fa7b;
+    --btn-newsession-hover:#30da5b;
+
+    --log-bg:           #1e1f28;
+    --log-header:       #21222c;
+    --log-border:       #282a36;
+    --log-filter-bg:    #21222c;
+    --log-filter-btn:   #282a36;
+
+    --monitor-gradient: linear-gradient(135deg, #8be9fd 0%, #ff79c6 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    --btn-back:         #bd93f9;
+    --btn-back-hover:   #9d73d9;
+    --btn-tools:        #ff5555;
+    --btn-tools-hover:  #cc3333;
+    --card-bg:          #282a36;
+    --card-border:      #44475a;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #f8f8f2;
+    --metric-color:     #50fa7b;
+    --subtitle-color:   #6272a4;
+    --label-color:      #a0a0a0;
+    --chart-blue:       #8be9fd;
+    --chart-purple:     #ff79c6;
+    --tool-border:      #bd93f9;
+    --tool-bg:          #33353f;
+    --status-bg:        #282a36;
+
+    --scrollbar-track:  #1e1f28;
+    --scrollbar-thumb:  #44475a;
+    --scrollbar-hover:  #6272a4;
+
+    --swatch1:          #282a36;
+    --swatch2:          #bd93f9;
+    --swatch3:          #50fa7b;
+
+    /* Session date */
+    --session-date-color:       #6272a4;
+    --session-date-hover:       #8899cc;
+    --session-date-active:      rgba(248,248,242,0.6);
+}
+
+/* Midnight – deep dark blue-black */
+[data-theme="midnight"] {
+    --header-bg:        #0d1117;
+    --header-border:    #010409;
+
+    --sidebar-bg:       #161b22;
+    --sidebar-header:   #0d1117;
+    --sidebar-item:     #0d1117;
+    --sidebar-hover:    #21262d;
+    --sidebar-active:   #00b4d8;
+    --sidebar-border:   #30363d;
+    --sidebar-search:   #0d1117;
+
+    --page-bg:          #090c10;
+    --chat-bg:          #0d1117;
+    --chat-border:      #30363d;
+    --chat-assistant:   #161b22;
+    --chat-asst-border: #30363d;
+    --chat-asst-color:  #c9d1d9;
+    --input-bg:         #0d1117;
+    --input-border:     #30363d;
+    --status-color:     #8b949e;
+
+    --user-bubble:      linear-gradient(135deg, #00b4d8, #0096b7);
+    --send-btn:         #00b4d8;
+    --send-btn-hover:   #0096b7;
+    --send-btn-focus:   rgba(0,180,216,0.3);
+
+    --btn-logs:         #00b4d8;
+    --btn-logs-hover:   #0096b7;
+    --btn-monitor:      #7b2d8b;
+    --btn-monitor-hover:#6b1d7b;
+    --btn-dashboard:    #0f7a4e;
+    --btn-dashboard-hover:#0a5c39;
+    --btn-newsession:   #0f7a4e;
+    --btn-newsession-hover:#0a5c39;
+
+    --log-bg:           #010409;
+    --log-header:       #0d1117;
+    --log-border:       #161b22;
+    --log-filter-bg:    #0d1117;
+    --log-filter-btn:   #161b22;
+
+    --monitor-gradient: linear-gradient(135deg, #00b4d8 0%, #7b2d8b 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    --btn-back:         #00b4d8;
+    --btn-back-hover:   #0096b7;
+    --btn-tools:        #9b59b6;
+    --btn-tools-hover:  #7d3f98;
+    --card-bg:          #0d1117;
+    --card-border:      #30363d;
+    --card-shadow:      rgba(0,0,0,0.3);
+    --card-shadow-hover:rgba(0,0,0,0.5);
+    --title-color:      #c9d1d9;
+    --metric-color:     #e6edf3;
+    --subtitle-color:   #8b949e;
+    --label-color:      #8b949e;
+    --chart-blue:       #00b4d8;
+    --chart-purple:     #7b2d8b;
+    --tool-border:      #00b4d8;
+    --tool-bg:          #161b22;
+    --status-bg:        #0d1117;
+
+    --scrollbar-track:  #090c10;
+    --scrollbar-thumb:  #30363d;
+    --scrollbar-hover:  #484f58;
+
+    --swatch1:          #0d1117;
+    --swatch2:          #00b4d8;
+    --swatch3:          #7b2d8b;
+
+    /* Session date */
+    --session-date-color:       #484f58;
+    --session-date-hover:       #6e7a86;
+    --session-date-active:      rgba(255,255,255,0.65);
+}
+
+/* Forest – green nature tones */
+[data-theme="forest"] {
+    --header-bg:        #1a2e1a;
+    --header-border:    #0f1f0f;
+
+    --sidebar-bg:       #2a4a2a;
+    --sidebar-header:   #1a2e1a;
+    --sidebar-item:     #1a2e1a;
+    --sidebar-hover:    #3a5a3a;
+    --sidebar-active:   #52b788;
+    --sidebar-border:   #4a6a4a;
+    --sidebar-search:   #1a2e1a;
+
+    --page-bg:          #f0f4f0;
+    --chat-bg:          #fafcfa;
+    --chat-border:      #c8d8c8;
+    --chat-assistant:   #edf3ed;
+    --chat-asst-border: #c8d8c8;
+    --chat-asst-color:  #1a2e1a;
+    --input-bg:         #fafcfa;
+    --input-border:     #c8d8c8;
+    --status-color:     #4a6a4a;
+
+    --user-bubble:      linear-gradient(135deg, #52b788, #40916c);
+    --send-btn:         #52b788;
+    --send-btn-hover:   #40916c;
+    --send-btn-focus:   rgba(82,183,136,0.3);
+
+    --btn-logs:         #52b788;
+    --btn-logs-hover:   #40916c;
+    --btn-monitor:      #00693E;
+    --btn-monitor-hover:#00592E;
+    --btn-dashboard:    #40916c;
+    --btn-dashboard-hover: #2d6a4f;
+    --btn-newsession:   #40916c;
+    --btn-newsession-hover: #2d6a4f;
+
+    --log-bg:           #1a2e1a;
+    --log-header:       #2a4a2a;
+    --log-border:       #3a5a3a;
+    --log-filter-bg:    #1a2e1a;
+    --log-filter-btn:   #2a4a2a;
+
+    --monitor-gradient: linear-gradient(135deg, #52b788 0%, #00693E 100%);
+    --monitor-header:   rgba(0,0,0,0.2);
+
+    --btn-back:         #52b788;
+    --btn-back-hover:   #40916c;
+    --btn-tools:        #74c69d;
+    --btn-tools-hover:  #52b788;
+    --card-bg:          #fafcfa;
+    --card-border:      #c8d8c8;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #1a2e1a;
+    --metric-color:     #1a2e1a;
+    --subtitle-color:   #4a6a4a;
+    --label-color:      #4a6a4a;
+    --chart-blue:       #52b788;
+    --chart-purple:     #00693E;
+    --tool-border:      #52b788;
+    --tool-bg:          #edf3ed;
+    --status-bg:        #fafcfa;
+
+    --scrollbar-track:  #f0f4f0;
+    --scrollbar-thumb:  #c8d8c8;
+    --scrollbar-hover:  #a8c8a8;
+
+    --swatch1:          #1a2e1a;
+    --swatch2:          #52b788;
+    --swatch3:          #00693E;
+
+    /* Session date */
+    --session-date-color:       #7aaa8a;
+    --session-date-hover:       #aad4ba;
+    --session-date-active:      rgba(255,255,255,0.75);
+}
+
+/* Optimus Prime – blue and red heroic */
+[data-theme="optimus"] {
+    --header-bg:        #0047AB;
+    --header-border:    #003080;
+
+    --sidebar-bg:       #1a3a6a;
+    --sidebar-header:   #0047AB;
+    --sidebar-item:     #0047AB;
+    --sidebar-hover:    #2a5a8a;
+    --sidebar-active:   #D92121;
+    --sidebar-border:   #4682BF;
+    --sidebar-search:   #0047AB;
+
+    --page-bg:          #111111;
+    --chat-bg:          #1a1a1a;
+    --chat-border:      #4682BF;
+    --chat-assistant:   #1e2a3a;
+    --chat-asst-border: #4682BF;
+    --chat-asst-color:  #D3D3D3;
+    --input-bg:         #1a1a1a;
+    --input-border:     #4682BF;
+    --status-color:     #D3D3D3;
+
+    --user-bubble:      linear-gradient(135deg, #D92121, #a01515);
+    --send-btn:         #D92121;
+    --send-btn-hover:   #a01515;
+    --send-btn-focus:   rgba(217,33,33,0.3);
+
+    --btn-logs:         #4682BF;
+    --btn-logs-hover:   #3672AF;
+    --btn-monitor:      #ffcc00;
+    --btn-monitor-hover:#e6b800;
+    --btn-dashboard:    #D92121;
+    --btn-dashboard-hover:#a01515;
+    --btn-newsession:   #4682BF;
+    --btn-newsession-hover:#3672AF;
+
+    --log-bg:           #0a0a0a;
+    --log-header:       #111111;
+    --log-border:       #1a1a1a;
+    --log-filter-bg:    #111111;
+    --log-filter-btn:   #1a1a1a;
+
+    --monitor-gradient: linear-gradient(135deg, #4682BF 0%, #D92121 100%);
+    --monitor-header:   rgba(0,0,0,0.4);
+
+    --btn-back:         #D92121;
+    --btn-back-hover:   #a01515;
+    --btn-tools:        #e67e22;
+    --btn-tools-hover:  #c96a18;
+    --card-bg:          #1a1a1a;
+    --card-border:      #4682BF;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.6);
+    --title-color:      #D3D3D3;
+    --metric-color:     #ffcc00;
+    --subtitle-color:   #D3D3D3;
+    --label-color:      #D3D3D3;
+    --chart-blue:       #4682BF;
+    --chart-purple:     #D92121;
+    --tool-border:      #D92121;
+    --tool-bg:          #1e2a3a;
+    --status-bg:        #1a1a1a;
+
+    --scrollbar-track:  #111111;
+    --scrollbar-thumb:  #0047AB;
+    --scrollbar-hover:  #4682BF;
+
+    --swatch1:          #0047AB;
+    --swatch2:          #D92121;
+    --swatch3:          #ffcc00;
+
+    /* Session date */
+    --session-date-color:       #6090c0;
+    --session-date-hover:       #90b8e0;
+    --session-date-active:      rgba(255,204,0,0.65);
+}
+
+/* DBZ – orange and blue */
+[data-theme="dragonball"] {
+    /* Header — primary orange (unchanged) */
+    --header-bg:        #e76a24;
+    --header-border:    #c85a1f;
+
+    /* Sidebar — unchanged */
+    --sidebar-bg:       #01080a;
+    --sidebar-header:   #1c4595;
+    --sidebar-item:     #0f2a57;
+    --sidebar-hover:    #1c4595;
+    --sidebar-active:   #e76a24;
+    --sidebar-border:   #1c4595;
+    --sidebar-search:   #0f2a57;
+
+    /* Page & Chat — orange tint for window, blue tint for assistant bubbles */
+    --page-bg:          #f5e0cc;   /* warm gi orange */
+    --chat-bg:          #faebd7;   /* soft orange parchment */
+    --chat-border:      #e0aa80;
+    --chat-assistant:   #ccd6f0;   /* Capsule Corp blue for assistant bubbles */
+    --chat-asst-border: #8fa8d8;
+    --chat-asst-color:  #0f1f4a;   /* dark navy — readable on blue */
+    --input-bg:         #faebd7;
+    --input-border:     #e0aa80;
+    --status-color:     #1c4595;
+
+    /* User bubbles & buttons — unchanged */
+    --user-bubble:      linear-gradient(135deg, #1c4595, #fbbc42);
+    --send-btn:         #1c4595;
+    --send-btn-hover:   #16356f;
+    --send-btn-focus:   rgba(28,69,149,0.35);
+
+    --btn-logs:         #1c4595;
+    --btn-logs-hover:   #16356f;
+    --btn-monitor:      #fbbc42;
+    --btn-monitor-hover:#e0a637;
+    --btn-dashboard:    #1c4595;
+    --btn-dashboard-hover:#16356f;
+    --btn-newsession:   #e76a24;
+    --btn-newsession-hover:#c85a1f;
+
+    /* Log panel — unchanged */
+    --log-bg:           #01080a;
+    --log-header:       #1c4595;
+    --log-border:       #1c4595;
+    --log-filter-bg:    #0b0f14;
+    --log-filter-btn:   #e76a24;
+
+    /* System monitor — unchanged */
+    --monitor-gradient: linear-gradient(135deg, #fbbc42 0%, #e76a24 100%);
+    --monitor-header:   rgba(0,0,0,0.25);
+
+    /* Dashboard */
+    --btn-back:         #1c4595;
+    --btn-back-hover:   #16356f;
+    --btn-tools:        #c1121f;
+    --btn-tools-hover:  #9d0208;
+    --card-bg:          #faebd7;   /* orange tint on cards */
+    --card-border:      #e0aa80;
+    --card-shadow:      rgba(0,0,0,0.10);
+    --card-shadow-hover:rgba(0,0,0,0.15);
+    --title-color:      #1c4595;
+    --metric-color:     #e76a24;
+    --subtitle-color:   #6b3a1f;
+    --label-color:      #7a4a2a;
+    --chart-blue:       #1c4595;
+    --chart-purple:     #9b59b6;
+    --tool-border:      #1c4595;
+    --tool-bg:          #f5e0cc;
+    --status-bg:        #faebd7;
+
+    /* Scrollbars — orange track, blue thumb */
+    --scrollbar-track:  #f5e0cc;
+    --scrollbar-thumb:  #1c4595;
+    --scrollbar-hover:  #16356f;
+
+    /* Swatches */
+    --swatch1:          #e76a24;
+    --swatch2:          #1c4595;
+    --swatch3:          #01080a;
+
+    /* Session date */
+    --session-date-color:       #5a7abf;
+    --session-date-hover:       #8aacef;
+    --session-date-active:      rgba(251,188,66,0.75);
+}
+
+[data-theme="TMNT"] {
+    /* Header — Turtle Green */
+    --header-bg:        #3c8d0d;
+    --header-border:    #2e6c0a;
+
+    /* Sidebar — unchanged */
+    --sidebar-bg:       #01080a;
+    --sidebar-header:   #3c8d0d;
+    --sidebar-item:     #0f2a57;
+    --sidebar-hover:    #1c4595;
+    --sidebar-active:   #e76a24;
+    --sidebar-border:   #4a4a4a;
+    --sidebar-search:   #2e6c0a;
+
+    /* Page & Chat — ooze-tinted greens */
+    --page-bg:          #d8ecd0;   /* soft sage green */
+    --chat-bg:          #edf7e6;   /* light ooze green */
+    --chat-border:      #a8cc90;
+    --chat-assistant:   #d0eac4;   /* muted turtle green for assistant bubbles */
+    --chat-asst-border: #9bbe85;
+    --chat-asst-color:  #0f2a0a;   /* dark green text — readable */
+    --input-bg:         #edf7e6;
+    --input-border:     #9bbe85;
+    --status-color:     #3c8d0d;
+
+    /* User bubbles & buttons — unchanged */
+    --user-bubble:      linear-gradient(135deg, #1c4595, #6a2ca0);
+    --send-btn:         #3c8d0d;
+    --send-btn-hover:   #2e6c0a;
+    --send-btn-focus:   rgba(60,141,13,0.35);
+
+    --btn-logs:         #1c4595;
+    --btn-logs-hover:   #16356f;
+    --btn-monitor:      #6a2ca0;
+    --btn-monitor-hover:#572383;
+    --btn-dashboard:    #e76a24;
+    --btn-dashboard-hover:#c85a1f;
+    --btn-newsession:   #ff0000;
+    --btn-newsession-hover:#cc0000;
+
+    /* Log panel — unchanged */
+    --log-bg:           #01080a;
+    --log-header:       #4a4a4a;
+    --log-border:       #3c8d0d;
+    --log-filter-bg:    #0b0f14;
+    --log-filter-btn:   #3c8d0d;
+
+    /* System monitor — ooze green */
+    --monitor-gradient: linear-gradient(135deg, #c4b000 0%, #3c8d0d 100%);
+    --monitor-header:   rgba(0,0,0,0.25);
+
+    /* Dashboard */
+    --btn-back:         #3c8d0d;
+    --btn-back-hover:   #2e6c0a;
+    --btn-tools:        #e76a24;
+    --btn-tools-hover:  #c85a1f;
+    --card-bg:          #edf7e6;   /* green tint on cards too */
+    --card-border:      #a8cc90;
+    --card-shadow:      rgba(0,0,0,0.08);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #3c8d0d;
+    --metric-color:     #e76a24;
+    --subtitle-color:   #3a5c2a;
+    --label-color:      #4a6e38;
+    --chart-blue:       #1c4595;
+    --chart-purple:     #6a2ca0;
+    --tool-border:      #3c8d0d;
+    --tool-bg:          #d8ecd0;
+    --status-bg:        #edf7e6;
+
+    /* Scrollbars */
+    --scrollbar-track:  #d8ecd0;
+    --scrollbar-thumb:  #3c8d0d;
+    --scrollbar-hover:  #2e6c0a;
+
+    /* Swatches */
+    --swatch1:          #3c8d0d;
+    --swatch2:          #1c4595;
+    --swatch3:          #e76a24;
+
+    /* Session date */
+    --session-date-color:       #5a7a80;
+    --session-date-hover:       #8aaab0;
+    --session-date-active:      rgba(255,255,255,0.65);
+}
+
+[data-theme="superman"] {
+    /* Header — Superman blue (unchanged) */
+    --header-bg:        #2b4fa8;
+    --header-border:    #1c2f63;
+
+    /* Sidebar — red base (unchanged) */
+    --sidebar-bg:       #7a1518;
+    --sidebar-header:   #b02025;
+    --sidebar-item:     #b02025;
+    --sidebar-hover:    #d42a30;
+    --sidebar-active:   #f2c200;
+    --sidebar-border:   #5a0f12;
+    --sidebar-search:   #8f1a1f;
+
+    /* Page & Chat — blue-tinted */
+    --page-bg:          #d8e0f5;   /* soft cape blue */
+    --chat-bg:          #eaeffa;   /* light sky blue */
+    --chat-border:      #9ab0e0;
+    --chat-assistant:   #ccd6f0;   /* muted suit blue for assistant bubbles */
+    --chat-asst-border: #8fa8d8;
+    --chat-asst-color:  #0f1f4a;   /* dark navy — readable on blue */
+    --input-bg:         #eaeffa;
+    --input-border:     #8fa8d8;
+    --status-color:     #b02025;
+
+    /* User bubbles & buttons — unchanged */
+    --user-bubble:      linear-gradient(135deg, #b02025, #7a1518);
+    --send-btn:         #b02025;
+    --send-btn-hover:   #8f1a1f;
+    --send-btn-focus:   rgba(176,32,37,0.35);
+
+    --btn-logs:         #b02025;
+    --btn-logs-hover:   #8f1a1f;
+    --btn-monitor:      #b02025;
+    --btn-monitor-hover:#8f1a1f;
+    --btn-dashboard:    #2b4fa8;
+    --btn-dashboard-hover:#1c2f63;
+    --btn-newsession:   #b02025;
+    --btn-newsession-hover:#8f1a1f;
+
+    /* Log panel — unchanged */
+    --log-bg:           #01080a;
+    --log-header:       #b02025;
+    --log-border:       #5a0f12;
+    --log-filter-bg:    #0b0f14;
+    --log-filter-btn:   #b02025;
+
+    /* System monitor — unchanged */
+    --monitor-gradient: linear-gradient(135deg, #b02025 0%, #7a1518 100%);
+    --monitor-header:   rgba(0,0,0,0.25);
+
+    /* Dashboard */
+    --btn-back:         #b02025;
+    --btn-back-hover:   #8f1a1f;
+    --btn-tools:        #f2c200;
+    --btn-tools-hover:  #d4a900;
+    --card-bg:          #eaeffa;   /* blue tint on cards */
+    --card-border:      #9ab0e0;
+    --card-shadow:      rgba(0,0,0,0.10);
+    --card-shadow-hover:rgba(0,0,0,0.15);
+    --title-color:      #b02025;
+    --metric-color:     #2b4fa8;
+    --subtitle-color:   #2a3a6a;
+    --label-color:      #3a4e80;
+    --chart-blue:       #2b4fa8;
+    --chart-purple:     #6a2ca0;
+    --tool-border:      #b02025;
+    --tool-bg:          #d8e0f5;
+    --status-bg:        #eaeffa;
+
+    /* Scrollbars — blue */
+    --scrollbar-track:  #d8e0f5;
+    --scrollbar-thumb:  #2b4fa8;
+    --scrollbar-hover:  #1c2f63;
+
+    /* Swatches */
+    --swatch1:          #2b4fa8;
+    --swatch2:          #b02025;
+    --swatch3:          #f2c200;
+
+    /* Session date */
+    --session-date-color:       #c07070;
+    --session-date-hover:       #e0a0a0;
+    --session-date-active:      rgba(30,20,0,0.65);
+}
+
+[data-theme="batman"] {
+    /* Header — dark, noir */
+    --header-bg:        #0a0a0a;   /* shadow black */
+    --header-border:    #1a1a1a;   /* soft charcoal */
+
+    /* Sidebar — blue‑black with muted gold accents */
+    --sidebar-bg:       #0a0a0a;
+    --sidebar-header:   #0d1a2b;   /* cape/cowl blue-black */
+    --sidebar-item:     #2a3f5f;   /* cool highlight blue */
+    --sidebar-hover:    #3a5578;
+    --sidebar-active:   #d6b100;   /* belt yellow */
+    --sidebar-border:   #1f1f1f;
+    --sidebar-search:   #2a3f5f;
+
+    /* Page & Chat — suit greys */
+    --page-bg:          #1a1a1a;
+    --chat-bg:          #222222;
+    --chat-border:      #3a3a3a;
+    --chat-assistant:   #2c2c2c;
+    --chat-asst-border: #3d3d3d;
+    --chat-asst-color:  #e0e0e0;
+    --input-bg:         #2a2a2a;
+    --input-border:     #444444;
+    --status-color:     #d6b100;   /* muted gold */
+
+    /* User bubbles & buttons — blue-black + gold */
+    --user-bubble:      linear-gradient(135deg, #0d1a2b, #2a3f5f);
+    --send-btn:         #d6b100;
+    --send-btn-hover:   #b89600;
+    --send-btn-focus:   rgba(214,177,0,0.35);
+
+    --btn-logs:         #2a3f5f;
+    --btn-logs-hover:   #3a5578;
+    --btn-monitor:      #d6b100;
+    --btn-monitor-hover:#b89600;
+    --btn-dashboard:    #2a3f5f;
+    --btn-dashboard-hover:#0d1a2b;
+    --btn-newsession:   #d6b100;
+    --btn-newsession-hover:#b89600;
+
+    /* Log panel — Gotham night */
+    --log-bg:           #0a0a0a;
+    --log-header:       #0d1a2b;
+    --log-border:       #2a3f5f;
+    --log-filter-bg:    #111111;
+    --log-filter-btn:   #d6b100;
+
+    /* System monitor — Bat-signal gold glow */
+    --monitor-gradient: linear-gradient(135deg, #d6b100 0%, #0a0a0a 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    /* Dashboard — noir panels with gold + blue */
+    --btn-back:         #2a3f5f;
+    --btn-back-hover:   #3a5578;
+    --btn-tools:        #4a6fa5;
+    --btn-tools-hover:  #3a5585;
+    --card-bg:          #222222;
+    --card-border:      #3a3a3a;
+    --card-shadow:      rgba(0,0,0,0.4);
+    --card-shadow-hover:rgba(0,0,0,0.55);
+    --title-color:      #d6b100;
+    --metric-color:     #2a3f5f;
+    --subtitle-color:   #aaaaaa;
+    --label-color:      #888888;
+    --chart-blue:       #2a3f5f;
+    --chart-purple:     #6a2ca0;
+    --tool-border:      #0d1a2b;
+    --tool-bg:          #2a2a2a;
+    --status-bg:        #222222;
+
+    /* Scrollbars — Gotham steel */
+    --scrollbar-track:  #1a1a1a;
+    --scrollbar-thumb:  #2a3f5f;
+    --scrollbar-hover:  #0d1a2b;
+
+    /* Swatch colors */
+    --swatch1:          #0d1a2b; /* cape/cowl blue-black */
+    --swatch2:          #6b6f78; /* suit grey */
+    --swatch3:          #d6b100; /* belt yellow */
+
+    /* Session date */
+    --session-date-color:       #4a5870;
+    --session-date-hover:       #7a90a8;
+    --session-date-active:      rgba(15,10,0,0.6);
+}
+
+[data-theme="tron"] {
+    /* Header — deep black with cyan glow */
+    --header-bg:        #0a0e1a;
+    --header-border:    #00d4ff;
+
+    /* Sidebar — black grid with cyan accents */
+    --sidebar-bg:       #050810;
+    --sidebar-header:   #0a0e1a;
+    --sidebar-item:     #0d1525;
+    --sidebar-hover:    #00d4ff22;
+    --sidebar-active:   #00d4ff;
+    --sidebar-border:   #00d4ff44;
+    --sidebar-search:   #0d1525;
+
+    /* Page & Chat — dark grid with cyan tint */
+    --page-bg:          #080c18;
+    --chat-bg:          #0a0f1e;
+    --chat-border:      #00d4ff44;
+    --chat-assistant:   #0d1a2e;   /* slightly lighter dark blue panel */
+    --chat-asst-border: #00d4ff66;
+    --chat-asst-color:  #00d4ff;   /* cyan text — classic Tron */
+    --input-bg:         #0a0f1e;
+    --input-border:     #00d4ff66;
+    --status-color:     #00d4ff;
+
+    /* User bubbles — cyan to purple light cycle */
+    --user-bubble:      linear-gradient(135deg, #00d4ff, #9d00ff);
+    --send-btn:         #00d4ff;
+    --send-btn-hover:   #00a8cc;
+    --send-btn-focus:   rgba(0,212,255,0.35);
+
+    --btn-logs:         #00d4ff;
+    --btn-logs-hover:   #00a8cc;
+    --btn-monitor:      #9d00ff;
+    --btn-monitor-hover:#7a00cc;
+    --btn-dashboard:    #00d4ff;
+    --btn-dashboard-hover:#00a8cc;
+    --btn-newsession:   #9d00ff;
+    --btn-newsession-hover:#7a00cc;
+
+    /* Log panel — matrix black */
+    --log-bg:           #020408;
+    --log-header:       #0a0e1a;
+    --log-border:       #00d4ff44;
+    --log-filter-bg:    #050810;
+    --log-filter-btn:   #00d4ff;
+
+    /* System monitor — cyan to purple */
+    --monitor-gradient: linear-gradient(135deg, #00d4ff 0%, #9d00ff 100%);
+    --monitor-header:   rgba(0,0,0,0.5);
+
+    /* Dashboard */
+    --btn-back:         #00d4ff;
+    --btn-back-hover:   #00a8cc;
+    --btn-tools:        #e040fb;
+    --btn-tools-hover:  #b800d4;
+    --card-bg:          #0d1525;
+    --card-border:      #00d4ff44;
+    --card-shadow:      rgba(0,212,255,0.10);
+    --card-shadow-hover:rgba(0,212,255,0.20);
+    --title-color:      #00d4ff;
+    --metric-color:     #9d00ff;
+    --subtitle-color:   #00d4ff99;
+    --label-color:      #00d4ff77;
+    --chart-blue:       #00d4ff;
+    --chart-purple:     #9d00ff;
+    --tool-border:      #00d4ff44;
+    --tool-bg:          #0d1525;
+    --status-bg:        #0a0f1e;
+
+    /* Scrollbars — cyan on black */
+    --scrollbar-track:  #050810;
+    --scrollbar-thumb:  #00d4ff;
+    --scrollbar-hover:  #9d00ff;
+
+    /* Swatches */
+    --swatch1:          #00d4ff;   /* cyan */
+    --swatch2:          #9d00ff;   /* purple */
+    --swatch3:          #0a0e1a;   /* grid black */
+
+    /* Session date */
+    --session-date-color:       #007a99;
+    --session-date-hover:       #00b0cc;
+    --session-date-active:      rgba(0,20,30,0.7);
+}
+
+/* Crimson – deep red accents */
+[data-theme="crimson"] {
+    --header-bg:        #1c1c1e;
+    --header-border:    #0a0a0b;
+
+    --sidebar-bg:       #2a1a1a;
+    --sidebar-header:   #1c1c1e;
+    --sidebar-item:     #1c1c1e;
+    --sidebar-hover:    #3a2a2a;
+    --sidebar-active:   #e63946;
+    --sidebar-border:   #4a3a3a;
+    --sidebar-search:   #1c1c1e;
+
+    --page-bg:          #f7f0f0;
+    --chat-bg:          #ffffff;
+    --chat-border:      #e0c8c8;
+    --chat-assistant:   #fdf0f0;
+    --chat-asst-border: #e0c8c8;
+    --chat-asst-color:  #2a1a1a;
+    --input-bg:         #ffffff;
+    --input-border:     #e0c8c8;
+    --status-color:     #6a3a3a;
+
+    --user-bubble:      linear-gradient(135deg, #e63946, #c1121f);
+    --send-btn:         #e63946;
+    --send-btn-hover:   #c1121f;
+    --send-btn-focus:   rgba(230,57,70,0.3);
+
+    --btn-logs:         #e63946;
+    --btn-logs-hover:   #c1121f;
+    --btn-monitor:      #6a0572;
+    --btn-monitor-hover:#5a0562;
+    --btn-dashboard:    #8b1a1a;
+    --btn-dashboard-hover: #6e1515;
+    --btn-newsession:   #8b1a1a;
+    --btn-newsession-hover: #6e1515;
+
+    --log-bg:           #1a1a1a;
+    --log-header:       #1c1c1e;
+    --log-border:       #2a1a1a;
+    --log-filter-bg:    #1c1c1e;
+    --log-filter-btn:   #2a1a1a;
+
+    --monitor-gradient: linear-gradient(135deg, #e63946 0%, #6a0572 100%);
+    --monitor-header:   rgba(0,0,0,0.2);
+
+    --btn-back:         #e63946;
+    --btn-back-hover:   #c1121f;
+    --btn-tools:        #9b1c31;
+    --btn-tools-hover:  #7a1526;
+    --card-bg:          #ffffff;
+    --card-border:      #e0c8c8;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #2a1a1a;
+    --metric-color:     #2a1a1a;
+    --subtitle-color:   #6a3a3a;
+    --label-color:      #6a3a3a;
+    --chart-blue:       #e63946;
+    --chart-purple:     #6a0572;
+    --tool-border:      #e63946;
+    --tool-bg:          #fdf0f0;
+    --status-bg:        #ffffff;
+
+    --scrollbar-track:  #f7f0f0;
+    --scrollbar-thumb:  #e0c8c8;
+    --scrollbar-hover:  #c8a8a8;
+
+    --swatch1:          #1c1c1e;
+    --swatch2:          #e63946;
+    --swatch3:          #6a0572;
+
+    /* Session date */
+    --session-date-color:       #8a5a5a;
+    --session-date-hover:       #b08080;
+    --session-date-active:      rgba(255,255,255,0.65);
+}
+
+/* Tokyo Night – deep navy with electric blue & soft purple */
+[data-theme="tokyo"] {
+    /* Header */
+    --header-bg:        #1a1b26;
+    --header-border:    #16161e;
+
+    /* Sidebar */
+    --sidebar-bg:       #1f2335;
+    --sidebar-header:   #1a1b26;
+    --sidebar-item:     #1a1b26;
+    --sidebar-hover:    #2a2f45;
+    --sidebar-active:   #7aa2f7;
+    --sidebar-border:   #3b4261;
+    --sidebar-search:   #1a1b26;
+
+    /* Page & Chat */
+    --page-bg:          #1a1b26;
+    --chat-bg:          #1f2335;
+    --chat-border:      #3b4261;
+    --chat-assistant:   #24283b;
+    --chat-asst-border: #3b4261;
+    --chat-asst-color:  #c0caf5;
+    --input-bg:         #1f2335;
+    --input-border:     #3b4261;
+    --status-color:     #7aa2f7;
+
+    /* User bubbles & send button */
+    --user-bubble:      linear-gradient(135deg, #7aa2f7, #5680c2);
+    --send-btn:         #7aa2f7;
+    --send-btn-hover:   #5680c2;
+    --send-btn-focus:   rgba(122,162,247,0.3);
+
+    /* Buttons */
+    --btn-logs:             #7aa2f7;  /* electric blue */
+    --btn-logs-hover:       #5680c2;
+    --btn-monitor:          #bb9af7;  /* soft purple */
+    --btn-monitor-hover:    #9f7ce0;
+    --btn-dashboard:        #2ac3de;  /* muted teal */
+    --btn-dashboard-hover:  #1e9eb8;
+    --btn-newsession:       #2ac3de;
+    --btn-newsession-hover: #1e9eb8;
+
+    /* Log panel */
+    --log-bg:           #16161e;
+    --log-header:       #1a1b26;
+    --log-border:       #24283b;
+    --log-filter-bg:    #1a1b26;
+    --log-filter-btn:   #24283b;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #7aa2f7 0%, #bb9af7 100%);
+    --monitor-header:   rgba(0,0,0,0.35);
+
+    /* Dashboard */
+    --btn-back:         #7aa2f7;
+    --btn-back-hover:   #5680c2;
+    --btn-tools:        #f7768e;
+    --btn-tools-hover:  #d45570;
+    --card-bg:          #1f2335;
+    --card-border:      #3b4261;
+    --card-shadow:      rgba(0,0,0,0.35);
+    --card-shadow-hover:rgba(0,0,0,0.55);
+    --title-color:      #c0caf5;
+    --metric-color:     #7aa2f7;
+    --subtitle-color:   #9aa5ce;
+    --label-color:      #9aa5ce;
+    --chart-blue:       #7aa2f7;
+    --chart-purple:     #bb9af7;
+    --tool-border:      #7aa2f7;
+    --tool-bg:          #24283b;
+    --status-bg:        #1f2335;
+
+    /* Scrollbars */
+    --scrollbar-track:  #1a1b26;
+    --scrollbar-thumb:  #3b4261;
+    --scrollbar-hover:  #4c5a7a;
+
+    /* Swatches (header, logs, monitor) */
+    --swatch1:          #1a1b26;
+    --swatch2:          #7aa2f7;
+    --swatch3:          #bb9af7;
+
+    /* Session date */
+    --session-date-color:       #4a5580;
+    --session-date-hover:       #7a8ab0;
+    --session-date-active:      rgba(255,255,255,0.6);
+}
+
+/* Nimbus – ultra-soft, airy, readable */
+[data-theme="nimbus"] {
+    /* Backgrounds */
+    --page-bg:          #e4ebf5;
+    --header-bg:        #e4ebf5;
+    --header-border:    #cfd4dd;
+
+    --sidebar-bg:       #e4ebf5;
+    --sidebar-header:   #d2ddee;
+    --sidebar-item:     #e4ebf5;
+    --sidebar-hover:    #d9e1ee;
+    --sidebar-active:   #c7d3e8;
+    --sidebar-border:   #c7cfdb;
+    --sidebar-search:   #d2ddee;
+
+    /* TEXT — very soft slate (barely darker than background) */
+    --text-strong:      #7c8290;   /* primary */
+    --text-medium:      #868c99;   /* secondary */
+    --text-light:       #959ba6;   /* meta */
+
+    --chat-asst-color:  var(--text-strong);
+    --status-color:     var(--text-light);
+    --title-color:      var(--text-strong);
+    --subtitle-color:   var(--text-medium);
+    --label-color:      var(--text-medium);
+    --metric-color:     var(--text-strong);
+
+    /* Chat + Input */
+    --chat-bg:          #ffffff;
+    --chat-border:      #cfd4dd;
+    --chat-assistant:   #f2f4f7;
+    --chat-asst-border: #d0d5dd;
+
+    --input-bg:         #ffffff;
+    --input-border:     #cfd4dd;
+
+    /* Buttons */
+    --user-bubble:      linear-gradient(135deg, #4a90e2, #357acb);
+    --send-btn:         #4a90e2;
+    --send-btn-hover:   #357acb;
+    --send-btn-focus:   rgba(74,144,226,0.25);
+
+    --btn-logs:             #4a90e2;
+    --btn-logs-hover:       #357acb;
+    --btn-monitor:          #7b61ff;
+    --btn-monitor-hover:    #6a52e6;
+    --btn-dashboard:        #3bb273;
+    --btn-dashboard-hover:  #2f8f5c;
+    --btn-newsession:       #3bb273;
+    --btn-newsession-hover: #2f8f5c;
+
+    /* Log panel */
+    --log-bg:           #e6e9ef;
+    --log-header:       #f2f4f7;
+    --log-border:       #cfd4dd;
+    --log-filter-bg:    #e6e9ef;
+    --log-filter-btn:   #dce1ea;
+
+    /* System monitor */
+    --monitor-gradient: var(--sidebar-bg);
+    --monitor-header:   var(--sidebar-header);
+
+    /* Dashboard */
+    --btn-back:         #4a90e2;
+    --btn-back-hover:   #357acb;
+    --btn-tools:        #5b7ec5;
+    --btn-tools-hover:  #4a6db5;
+    --card-bg:          #ffffff;
+    --card-border:      #d0d5dd;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+
+    --chart-blue:       #4a90e2;
+    --chart-purple:     #7b61ff;
+    --tool-border:      #4a90e2;
+    --tool-bg:          #f2f4f7;
+    --status-bg:        #ffffff;
+
+    /* Scrollbars */
+    --scrollbar-track:  #e4ebf5;
+    --scrollbar-thumb:  #cfd4dd;
+    --scrollbar-hover:  #b7bcc7;
+
+    /* Swatches */
+    --swatch1:          #d2ddee;
+    --swatch2:          #4a90e2;
+    --swatch3:          #7b61ff;
+
+    /* Session date */
+    --session-date-color:       #9aa5b4;
+    --session-date-hover:       #7c8899;
+    --session-date-active:      #5a6675;
+}
+
+/* Nimbus UI text overrides */
+[data-theme="nimbus"] #header,
+[data-theme="nimbus"] #headerLeft,
+[data-theme="nimbus"] .sessions-header,
+[data-theme="nimbus"] #topBar,
+[data-theme="nimbus"] #themeWrapper,
+[data-theme="nimbus"] #modelSelectLabel,
+[data-theme="nimbus"] #topBar button,
+[data-theme="nimbus"] #topBar select {
+    color: var(--text-strong) !important;
+    background: #e4ebf5 !important;
+}
+
+/* Fix "Chats" label */
+[data-theme="nimbus"] .sessions-header h2 {
+    color: var(--text-strong) !important;
+}
+
+/* Session list text */
+[data-theme="nimbus"] .session-item-text {
+    color: var(--text-medium) !important;
+}
+
+[data-theme="nimbus"] .session-item:hover .session-item-text {
+    color: var(--text-strong) !important;
+}
+
+[data-theme="nimbus"] .session-item.active .session-item-text {
+    color: white !important;
+}
+
+[data-theme="nimbus"] .session-item-date { color: var(--session-date-color) !important; opacity: 0.9; }
+[data-theme="nimbus"] .session-item:hover .session-item-date { color: var(--session-date-hover) !important; opacity: 1; }
+[data-theme="nimbus"] .session-item.active .session-item-date { color: var(--session-date-active) !important; opacity: 1; }
+
+[data-theme="nimbus"] .filter-btn:not(.active) {
+    color: var(--text-strong) !important;
+}
+
+/* Hamburger icon — soft slate */
+[data-theme="nimbus"] #hamburgerBtn .bar {
+    background: var(--text-medium) !important;
+}
+
+/* Nimbus – theme dropdown text + background fix */
+[data-theme="nimbus"] #themeDropdown,
+[data-theme="nimbus"] .theme-option {
+    background: #e4ebf5 !important;
+    color: var(--text-strong) !important;
+}
+
+[data-theme="nimbus"] .theme-option:hover {
+    background: #d9e1ee !important;
+    color: var(--text-strong) !important;
+}
+
+[data-theme="nimbus"] .theme-option.active {
+    background: #c7d3e8 !important;
+    color: var(--text-strong) !important;
+}
+
+/* Swatches inside dropdown stay visible */
+[data-theme="nimbus"] .theme-opt-swatch {
+    border: none !important;
+}
+
+/* Checkmark color */
+[data-theme="nimbus"] .theme-option .check {
+    color: var(--text-strong) !important;
+}
+
+/* Nimbus – soften search input + wrapper */
+[data-theme="nimbus"] #sessionSearch {
+    background: #ffffff !important;   /* very light cloud */
+    border: 1px solid #d4d9e2 !important;
+    color: #7c8290 !important;        /* soft slate */
+}
+
+[data-theme="nimbus"] .sessions-search-container {
+    background: #e4ebf5 !important;
+    border-bottom: 1px solid #d4d9e2 !important;
+}
+
+/* Placeholder text */
+[data-theme="nimbus"] #sessionSearch::placeholder {
+    color: #9aa1ac !important;        /* softest readable slate */
+}
+
+/* Nimbus – New Chat button (remove green) */
+[data-theme="nimbus"] .new-session-btn {
+    background: #e4ebf5 !important;   /* soft pastel teal */
+    color: #5a5f68 !important;        /* soft slate text */
+}
+
+[data-theme="nimbus"] .new-session-btn:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+}
+
+[data-theme="nimbus"] #dashboardBtn {
+    background: #e4ebf5 !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #dashboardBtn:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #logToggle:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #monitorToggle:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #backBtn {
+    background: #e4ebf5 !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] #backBtn:hover {
+    background: #d9e1ee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+/* Nimbus – System Monitor overrides */
+[data-theme="nimbus"] #systemMonitor {
+    background: var(--sidebar-bg);
+    border-left: 1px solid var(--sidebar-border);
+}
+
+[data-theme="nimbus"] .monitor-header {
+    background: var(--sidebar-header);
+    border-bottom: 2px solid var(--sidebar-border);
+}
+[data-theme="nimbus"] .monitor-header h2 { color: var(--text-strong); }
+
+[data-theme="nimbus"] .monitor-btn {
+    background: var(--sidebar-hover);
+    color: var(--text-strong);
+}
+[data-theme="nimbus"] .monitor-btn:hover { background: var(--sidebar-active); }
+
+[data-theme="nimbus"] .stat-group {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 3px var(--card-shadow);
+}
+[data-theme="nimbus"] .stat-label    { color: var(--text-light); }
+[data-theme="nimbus"] .stat-value    { color: var(--text-strong); }
+[data-theme="nimbus"] .stat-secondary { color: var(--text-medium); }
+
+[data-theme="nimbus"] .progress-bar  { background: var(--sidebar-hover); }
+[data-theme="nimbus"] .progress-fill { background: linear-gradient(90deg, #4a90e2, #7b61ff); }
+
+/* Nimbus – Log Panel overrides */
+[data-theme="nimbus"] #logPanel {
+    background: var(--log-bg);
+    border-left: 1px solid var(--sidebar-border);
+}
+
+[data-theme="nimbus"] #logHeader {
+    background: var(--sidebar-header);
+    border-bottom: 2px solid var(--sidebar-border);
+}
+[data-theme="nimbus"] #logHeader h2 { color: var(--text-strong); }
+
+[data-theme="nimbus"] #logFilters {
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--sidebar-border);
+}
+
+[data-theme="nimbus"] #logContainer {
+    background: var(--log-bg);
+}
+
+[data-theme="nimbus"] .log-message   { color: var(--text-medium); }
+[data-theme="nimbus"] .log-timestamp { color: var(--text-light); }
+[data-theme="nimbus"] .log-entry:hover { background: var(--sidebar-hover); }
+
+[data-theme="nimbus"] .log-btn  {
+    background: #d2ddee !important;   /* slightly darker pastel */
+    color: var(--text-strong)
+}
+
+[data-theme="nimbus"] .log-btn:hover {
+    background: #c8d4e6 !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+}
+
+[data-theme="nimbus"] .mobile-close {
+    background: #d2ddee !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+    display: none;
+}
+
+[data-theme="nimbus"] .mobile-close:hover {
+    background: #c8d4e6 !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+}
+
+[data-theme="nimbus"] .session-close-btn {
+    background: #e4ebf5 !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+}
+
+[data-theme="nimbus"] .session-close-btn:hover {
+    background: #d2ddee !important;   /* slightly darker pastel */
+    color: var(--text-strong);
+}
+
+/* Garbagefire – intentionally hideous, chaotic, and painful */
+[data-theme="garbagefire"] {
+    /* Header */
+    --header-bg:        #ffea00;   /* blinding yellow */
+    --header-border:    #7f00ff;   /* neon purple clash */
+
+    /* Sidebar */
+    --sidebar-bg:       #8b4513;   /* muddy brown */
+    --sidebar-header:   #ff69b4;   /* hot pink */
+    --sidebar-item:     #39ff14;   /* toxic green */
+    --sidebar-hover:    #ff0000;   /* pure red */
+    --sidebar-active:   #00ffff;   /* cyan */
+    --sidebar-border:   #ff7f00;   /* orange */
+    --sidebar-search:   #d2691e;   /* burnt orange */
+
+    /* Page & Chat */
+    --page-bg:          #ffe4e1;   /* sickly pastel pink */
+    --chat-bg:          #fafad2;   /* pale yellow */
+    --chat-border:      #ff00ff;   /* magenta */
+    --chat-assistant:   #adff2f;   /* vomit green */
+    --chat-asst-border: #0000ff;   /* blue */
+    --chat-asst-color:  #ff1493;   /* deep pink */
+    --input-bg:         #ffdead;   /* weird beige */
+    --input-border:     #ff4500;   /* orange-red */
+    --status-color:     #9400d3;   /* violent purple */
+
+    /* User bubble & send button */
+    --user-bubble:      linear-gradient(135deg, #ff0000, #00ff00); /* red→green nightmare */
+    --send-btn:         #00ff00;   /* neon green */
+    --send-btn-hover:   #ff0000;   /* red */
+    --send-btn-focus:   rgba(255,0,0,0.4);
+
+    /* Buttons */
+    --btn-logs:             #ff00ff; /* magenta */
+    --btn-logs-hover:       #ff69b4; /* hot pink */
+
+    --btn-monitor:          #00ff00; /* neon green */
+    --btn-monitor-hover:    #008000; /* muddy green */
+
+    --btn-dashboard:        #ff7f00; /* orange */
+    --btn-dashboard-hover:  #ff4500; /* red-orange */
+
+    --btn-newsession:       #0000ff; /* blue */
+    --btn-newsession-hover: #00008b; /* dark blue */
+
+    /* Log panel */
+    --log-bg:           #7f7f7f;   /* depressing gray */
+    --log-header:       #ff00ff;   /* magenta */
+    --log-border:       #00ffff;   /* cyan */
+    --log-filter-bg:    #ff69b4;   /* hot pink */
+    --log-filter-btn:   #8b4513;   /* brown */
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #ff0000 0%, #00ffff 100%);
+    --monitor-header:   rgba(255,255,0,0.4);
+
+    /* Dashboard */
+    --btn-back:         #ff0000;
+    --btn-back-hover:   #00ff00;
+    --btn-tools:        #00ffff;
+    --btn-tools-hover:  #00cccc;
+    --card-bg:          #ffefd5;   /* pale peach */
+    --card-border:      #ff00ff;
+    --card-shadow:      rgba(0,255,0,0.4);
+    --card-shadow-hover:rgba(255,0,0,0.6);
+    --title-color:      #0000ff;
+    --metric-color:     #ff7f00;
+    --subtitle-color:   #ff1493;
+    --label-color:      #8b4513;
+    --chart-blue:       #0000ff;
+    --chart-purple:     #ff00ff;
+    --tool-border:      #ff0000;
+    --tool-bg:          #ffff00;
+    --status-bg:        #ffe4e1;
+
+    /* Scrollbars */
+    --scrollbar-track:  #ffdead;
+    --scrollbar-thumb:  #ff00ff;
+    --scrollbar-hover:  #00ff00;
+
+    /* Swatches (header, logs, monitor) */
+    --swatch1:          #ffea00;
+    --swatch2:          #ff00ff;
+    --swatch3:          #00ff00;
+
+    /* Session date */
+    --session-date-color:       #5a3a00;
+    --session-date-hover:       #ffe0a0;
+    --session-date-active:      #001a33;
+}
+
+/* Matrix – phosphor green CRT */
+[data-theme="matrix"] {
+    /* Header */
+    --header-bg:        #0a0a0a;
+    --header-border:    #00ff41;
+
+    /* Sidebar */
+    --sidebar-bg:       #050505;
+    --sidebar-header:   #0a0a0a;
+    --sidebar-item:     #0d0d0d;
+    --sidebar-hover:    #001a00;
+    --sidebar-active:   #0d0d0d;
+    --sidebar-border:   #00ff4133;
+    --sidebar-search:   #0d0d0d;
+
+    /* Page & Chat */
+    --page-bg:          #030303;
+    --chat-bg:          #050505;
+    --chat-border:      #00ff4133;
+    --chat-assistant:   #080808;
+    --chat-asst-border: #00ff4144;
+    --chat-asst-color:  #00ff41;
+    --input-bg:         #0a0a0a;
+    --input-border:     #00ff4155;
+    --status-color:     #00cc33;
+
+    /* User bubbles & buttons */
+    --user-bubble:      linear-gradient(135deg, #003300, #005500);
+    --send-btn:         #00aa2a;
+    --send-btn-hover:   #00cc33;
+    --send-btn-focus:   rgba(0,255,65,0.2);
+
+    --btn-logs:         #006600;
+    --btn-logs-hover:   #008800;
+    --btn-monitor:      #004400;
+    --btn-monitor-hover:#006600;
+    --btn-dashboard:    #005500;
+    --btn-dashboard-hover:#007700;
+    --btn-newsession:   #006600;
+    --btn-newsession-hover:#008800;
+
+    /* Log panel */
+    --log-bg:           #020202;
+    --log-header:       #0a0a0a;
+    --log-border:       #00ff4122;
+    --log-filter-bg:    #050505;
+    --log-filter-btn:   #0d0d0d;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #001a00 0%, #003300 100%);
+    --monitor-header:   rgba(0,0,0,0.5);
+
+    /* Dashboard */
+    --btn-back:         #001a00;
+    --btn-back-hover:   #003300;
+    --btn-tools:        #005500;
+    --btn-tools-hover:  #007700;
+    --card-bg:          #080808;
+    --card-border:      #00ff4133;
+    --card-shadow:      rgba(0,255,65,0.05);
+    --card-shadow-hover:rgba(0,255,65,0.12);
+    --title-color:      #00ff41;
+    --metric-color:     #00ff41;
+    --subtitle-color:   #00aa2a;
+    --label-color:      #008822;
+    --chart-blue:       #00ff41;
+    --chart-purple:     #00cc33;
+    --tool-border:      #00ff4144;
+    --tool-bg:          #080808;
+    --status-bg:        #050505;
+
+    /* Scrollbars */
+    --scrollbar-track:  #030303;
+    --scrollbar-thumb:  #00ff4133;
+    --scrollbar-hover:  #00ff4166;
+
+    /* Swatches */
+    --swatch1:          #050505;
+    --swatch2:          #00ff41;
+    --swatch3:          #003300;
+
+    /* Session date */
+    --session-date-color:       #006622;
+    --session-date-hover:       #00aa33;
+    --session-date-active:      #00cc44;
+}
+
+/* Matrix – square corners everywhere */
+[data-theme="matrix"] #chat,
+[data-theme="matrix"] #input,
+[data-theme="matrix"] #sendBtn,
+[data-theme="matrix"] #stopBtn,
+[data-theme="matrix"] #themeBtn,
+[data-theme="matrix"] #themeDropdown,
+[data-theme="matrix"] .theme-option,
+[data-theme="matrix"] #logToggle,
+[data-theme="matrix"] #monitorToggle,
+[data-theme="matrix"] #toolsToggle,
+[data-theme="matrix"] #dashboardBtn,
+[data-theme="matrix"] #modelSelect,
+[data-theme="matrix"] #sessionSearch,
+[data-theme="matrix"] .session-item,
+[data-theme="matrix"] .session-submenu,
+[data-theme="matrix"] .session-submenu-item,
+[data-theme="matrix"] .session-submenu-item:first-child,
+[data-theme="matrix"] .session-submenu-item:last-child,
+[data-theme="matrix"] .session-edit-input,
+[data-theme="matrix"] .session-edit-btn,
+[data-theme="matrix"] .session-edit-cancel,
+[data-theme="matrix"] .session-close-btn,
+[data-theme="matrix"] .session-menu-btn,
+[data-theme="matrix"] .new-session-btn,
+[data-theme="matrix"] .msg,
+[data-theme="matrix"] .thinking,
+[data-theme="matrix"] pre,
+[data-theme="matrix"] .code-inline,
+[data-theme="matrix"] .filter-btn,
+[data-theme="matrix"] .log-btn,
+[data-theme="matrix"] .monitor-btn,
+[data-theme="matrix"] .tools-btn,
+[data-theme="matrix"] .stat-group,
+[data-theme="matrix"] .progress-bar,
+[data-theme="matrix"] .progress-fill,
+[data-theme="matrix"] #toolsPanel,
+[data-theme="matrix"] #logPanel,
+[data-theme="matrix"] #systemMonitor,
+[data-theme="matrix"] .mcp-modal-dialog,
+[data-theme="matrix"] .mcp-modal-btn,
+[data-theme="matrix"] #hamburgerBtn,
+[data-theme="matrix"] .log-status-indicator,
+[data-theme="matrix"] .tool-item,
+[data-theme="matrix"] .msg-wrapper,
+[data-theme="matrix"] #inputRow,
+[data-theme="matrix"] .toggle-slider,
+[data-theme="matrix"] .theme-opt-swatch,
+[data-theme="matrix"] .theme-swatch,
+[data-theme="matrix"] #hamburgerBtn .bar {
+    border-radius: 0 !important;
+}
+
+/* Matrix – font overrides (scoped to theme only) */
+[data-theme="matrix"],
+[data-theme="matrix"] body,
+[data-theme="matrix"] #header h1,
+[data-theme="matrix"] #chat,
+[data-theme="matrix"] .msg,
+[data-theme="matrix"] #input,
+[data-theme="matrix"] .session-item,
+[data-theme="matrix"] .sessions-header h2,
+[data-theme="matrix"] #sessionSearch,
+[data-theme="matrix"] #logToggle,
+[data-theme="matrix"] #monitorToggle,
+[data-theme="matrix"] #toolsToggle,
+[data-theme="matrix"] #dashboardBtn,
+[data-theme="matrix"] #status,
+[data-theme="matrix"] .log-message,
+[data-theme="matrix"] .log-timestamp,
+[data-theme="matrix"] .log-level,
+[data-theme="matrix"] #toolsBody,
+[data-theme="matrix"] .stat-label,
+[data-theme="matrix"] .stat-value,
+[data-theme="matrix"] .stat-secondary,
+[data-theme="matrix"] .session-item-date,
+[data-theme="matrix"] .msg-timestamp,
+[data-theme="matrix"] .msg-model,
+[data-theme="matrix"] #sendBtn,
+[data-theme="matrix"] #stopBtn,
+[data-theme="matrix"] .new-session-btn,
+[data-theme="matrix"] .session-close-btn,
+[data-theme="matrix"] .filter-btn {
+    font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+    letter-spacing: 0.03em;
+}
+
+/* VT323 for large display elements */
+[data-theme="matrix"] #header h1,
+[data-theme="matrix"] .sessions-header h2 {
+    font-family: 'VT323', 'Courier New', monospace !important;
+    font-size: 1.8rem !important;
+    letter-spacing: 0.08em;
+}
+
+/* matrix – CRT boot effect: scanlines sweep + fade on theme activation */
+@keyframes matrix-boot-sweep {
+    0%   { opacity: 1; background-position: 0 0; }
+    60%  { opacity: 1; background-position: 0 100%; }
+    100% { opacity: 0; background-position: 0 100%; }
+}
+[data-theme="matrix"].matrix-booting::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(0,0,0,0.55) 0px,
+            rgba(0,0,0,0.55) 2px,
+            transparent      2px,
+            transparent      4px
+        );
+    animation: matrix-boot-sweep 1.6s ease-out forwards;
+}
+
+/* matrix – phosphor glow on key text */
+[data-theme="matrix"] .assistant,
+[data-theme="matrix"] #header h1 {
+    text-shadow: 0 0 8px rgba(0,255,65,0.6), 0 0 2px rgba(0,255,65,0.9);
+}
+
+/* matrix – links sharp, no glow blur */
+[data-theme="matrix"] a,
+[data-theme="matrix"] .assistant a,
+[data-theme="matrix"] .msg a {
+    text-shadow: none !important;
+    color: #00ff41 !important;
+    text-decoration: underline;
+}
+
+/* matrix – links: sharp, no glow blur */
+[data-theme="matrix"] a,
+[data-theme="matrix"] .assistant a,
+[data-theme="matrix"] .msg a {
+    text-shadow: none !important;
+    color: #00ff41 !important;
+    text-decoration: underline;
+}
+
+/* matrix – scanline overlay on chat area */
+[data-theme="matrix"] #chat {
+    position: relative;
+    background-image:
+        repeating-linear-gradient(
+            to bottom,
+            transparent 0px,
+            transparent 3px,
+            rgba(0,0,0,0.18) 3px,
+            rgba(0,0,0,0.18) 4px
+        );
+}
+
+/* matrix – blinking cursor on input */
+[data-theme="matrix"] #input {
+    caret-color: transparent;
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+    font-size: 1rem !important;
+    line-height: normal !important;
+}
+[data-theme="matrix"] #input::placeholder {
+    color: transparent;
+}
+
+/* matrix – border glow */
+[data-theme="matrix"] #chat,
+[data-theme="matrix"] #input {
+    border-color: #00ff4155 !important;
+    box-shadow: 0 0 6px rgba(0,255,65,0.08), inset 0 0 12px rgba(0,255,65,0.03);
+}
+
+/* matrix – active session glow */
+[data-theme="matrix"] .session-item.active {
+    box-shadow: inset 2px 0 0 #00ff41;
+}
+[data-theme="matrix"] .session-item.active:hover {
+    background: #001a00 !important;
+}
+
+/* matrix – send button */
+[data-theme="matrix"] #sendBtn {
+    background: #003300 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4166 !important;
+    box-shadow: 0 0 6px rgba(0,255,65,0.15);
+}
+[data-theme="matrix"] #sendBtn:hover {
+    background: #004400 !important;
+    box-shadow: 0 0 10px rgba(0,255,65,0.3);
+}
+
+/* matrix – top bar buttons */
+[data-theme="matrix"] #logToggle,
+[data-theme="matrix"] #monitorToggle,
+[data-theme="matrix"] #toolsToggle,
+[data-theme="matrix"] #dashboardBtn {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4144 !important;
+}
+[data-theme="matrix"] #logToggle:hover,
+[data-theme="matrix"] #monitorToggle:hover,
+[data-theme="matrix"] #toolsToggle:hover,
+[data-theme="matrix"] #dashboardBtn:hover {
+    background: #002200 !important;
+    box-shadow: 0 0 8px rgba(0,255,65,0.2);
+}
+
+/* matrix – new chat button */
+[data-theme="matrix"] .new-session-btn {
+    background: #002200 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4144 !important;
+}
+[data-theme="matrix"] .new-session-btn:hover {
+    background: #003300 !important;
+}
+
+/* matrix – model select */
+[data-theme="matrix"] #modelSelect {
+    background: #0a0a0a !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4144 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+
+/* matrix – search input */
+[data-theme="matrix"] #sessionSearch {
+    color: #00ff41 !important;
+    background: #0d0d0d !important;
+    border-color: #00ff4133 !important;
+}
+[data-theme="matrix"] #sessionSearch::placeholder {
+    color: #005522 !important;
+}
+
+/* matrix – scrollbar phosphor */
+[data-theme="matrix"] ::-webkit-scrollbar-thumb {
+    background: #00ff4133 !important;
+    box-shadow: 0 0 4px rgba(0,255,65,0.3);
+}
+[data-theme="matrix"] ::-webkit-scrollbar-thumb:hover {
+    background: #00ff4166 !important;
+}
+
+/* matrix – green-tinted scrollbar track */
+[data-theme="matrix"] ::-webkit-scrollbar-track {
+    background: #001a00 !important;
+}
+
+/* matrix – CRT flicker */
+@keyframes crt-flicker {
+    0%   { opacity: 1; }
+    92%  { opacity: 1; }
+    93%  { opacity: 0.96; }
+    94%  { opacity: 1; }
+    96%  { opacity: 0.98; }
+    100% { opacity: 1; }
+}
+[data-theme="matrix"] #chat {
+    animation: crt-flicker 8s infinite;
+}
+
+/* matrix – user message as left-bar indent, no bubble */
+[data-theme="matrix"] .user {
+    background: transparent !important;
+    border: none !important;
+    border-left: 2px solid #00ff41 !important;
+    border-radius: 0 !important;
+    color: #00ff41 !important;
+    padding-left: 1rem !important;
+    box-shadow: none !important;
+    align-self: flex-start !important;
+}
+
+/* matrix – uppercase buttons and labels */
+[data-theme="matrix"] #sendBtn,
+[data-theme="matrix"] #stopBtn,
+[data-theme="matrix"] #logToggle,
+[data-theme="matrix"] #monitorToggle,
+[data-theme="matrix"] #toolsToggle,
+[data-theme="matrix"] #dashboardBtn,
+[data-theme="matrix"] .new-session-btn,
+[data-theme="matrix"] .session-close-btn,
+[data-theme="matrix"] .filter-btn,
+[data-theme="matrix"] .log-btn,
+[data-theme="matrix"] .monitor-btn,
+[data-theme="matrix"] .tools-btn,
+[data-theme="matrix"] .mobile-close,
+[data-theme="matrix"] .stat-label,
+[data-theme="matrix"] .session-submenu-item,
+[data-theme="matrix"] #modelSelectLabel {
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+
+/* matrix – native green caret on textarea */
+#matrixCursor { display: none; }
+[data-theme="matrix"] #input { caret-color: #00ff41; }
+
+/* matrix – panel headers (Tools, Live Logs, System Monitor titles) */
+[data-theme="matrix"] #toolsHeader h2,
+[data-theme="matrix"] #logHeader h2,
+[data-theme="matrix"] .monitor-header h2 {
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.5);
+}
+
+/* matrix – system monitor */
+[data-theme="matrix"] #systemMonitor {
+    background: #030303 !important;
+    border-left: 1px solid #00ff4133 !important;
+}
+[data-theme="matrix"] .monitor-header {
+    background: #0a0a0a !important;
+    border-bottom: 1px solid #00ff4133 !important;
+}
+[data-theme="matrix"] .stat-group {
+    background: #080808 !important;
+    border: 1px solid #00ff4122 !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .stat-label {
+    color: #008833 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .stat-value {
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .stat-secondary {
+    color: #006622 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .stat-unit {
+    color: #006622 !important;
+}
+[data-theme="matrix"] .progress-bar {
+    background: #001a00 !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .progress-fill {
+    background: linear-gradient(90deg, #00aa2a, #00ff41) !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .progress-fill.high {
+    background: linear-gradient(90deg, #aaff00, #ffcc00) !important;
+}
+[data-theme="matrix"] .progress-fill.critical {
+    background: linear-gradient(90deg, #ff3333, #ff0000) !important;
+}
+
+/* matrix – override hardcoded #569cd6 blues from index.css */
+[data-theme="matrix"] .tool-item:hover {
+    background: rgba(0,255,65,0.06) !important;
+    border-left-color: #00ff41 !important;
+}
+
+/* matrix – tools panel */
+[data-theme="matrix"] .tools-category-header {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #00ff41 !important;
+    background: #0a0a0a !important;
+    border-bottom: 1px solid #00ff4122 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="matrix"] .tools-category-header:hover {
+    background: #001a00 !important;
+}
+[data-theme="matrix"] .tool-item {
+    background: #050505 !important;
+    border-bottom: 1px solid #00ff4111 !important;
+}
+[data-theme="matrix"] .tool-item:hover {
+    background: #001a00 !important;
+    border-left: 2px solid #00ff41;
+}
+[data-theme="matrix"] .tool-item-name {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #ffffff !important;
+}
+[data-theme="matrix"] .tool-item-desc {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #cccccc !important;
+}
+[data-theme="matrix"] .tool-param {
+    font-family: 'Share Tech Mono', monospace !important;
+    background: #001a00 !important;
+    color: #00cc33 !important;
+    border: 1px solid #00ff4133 !important;
+    border-radius: 0 !important;
+}
+
+/* matrix – log panel */
+[data-theme="matrix"] #logContainer {
+    font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+    font-size: 0.8rem;
+    background: #020202;
+}
+[data-theme="matrix"] .log-entry:hover {
+    background: #001a00 !important;
+}
+[data-theme="matrix"] .log-entry.USER     { border-left-color: #00ff41; background: rgba(0,255,65,0.05) !important; }
+[data-theme="matrix"] .log-entry.ASSISTANT{ border-left-color: #00cc33; background: rgba(0,204,51,0.05) !important; }
+[data-theme="matrix"] .log-entry.INFO     { border-left-color: #00aa44 !important; }
+[data-theme="matrix"] .log-entry.WARNING  { border-left-color: #aaff00; background: rgba(170,255,0,0.04) !important; }
+[data-theme="matrix"] .log-entry.ERROR    { border-left-color: #ff3333; background: rgba(255,51,51,0.05) !important; }
+[data-theme="matrix"] .log-entry.DEBUG    { border-left-color: #005511; opacity: 0.7; }
+
+[data-theme="matrix"] .log-timestamp { color: #005522 !important; }
+[data-theme="matrix"] .log-message   { color: #ffffff !important; }
+
+[data-theme="matrix"] .log-level.USER      { color: #00ff41 !important; }
+[data-theme="matrix"] .log-level.ASSISTANT { color: #00ff41 !important; }
+[data-theme="matrix"] .log-level.INFO      { color: #00aa44 !important; }
+[data-theme="matrix"] .log-level.WARNING   { color: #aaff00 !important; }
+[data-theme="matrix"] .log-level.ERROR     { color: #ff3333 !important; }
+[data-theme="matrix"] .log-level.DEBUG     { color: #005511 !important; }
+
+/* matrix – filter buttons */
+[data-theme="matrix"] .filter-btn               { background: #0d0d0d !important; color: #005522 !important; border: 1px solid #00ff4122 !important; }
+[data-theme="matrix"] .filter-btn.active        { color: #00ff41 !important; border-color: #00ff4155 !important; }
+[data-theme="matrix"] .filter-btn.USER.active   { background: #001a00 !important; color: #00ff41 !important; }
+[data-theme="matrix"] .filter-btn.ASSISTANT.active { background: #001a00 !important; color: #00ff41 !important; }
+[data-theme="matrix"] .filter-btn.INFO.active   { background: #001a00 !important; color: #00aa22 !important; }
+[data-theme="matrix"] .filter-btn.WARNING.active{ background: #001a00 !important; color: #aaff00 !important; }
+[data-theme="matrix"] .filter-btn.ERROR.active  { background: #1a0000 !important; color: #ff3333 !important; }
+[data-theme="matrix"] .filter-btn.DEBUG.active  { background: #001a00 !important; color: #005522 !important; }
+
+/* matrix – log status indicator */
+[data-theme="matrix"] .log-status-indicator { background: #ff3333; }
+[data-theme="matrix"] .log-status-indicator.connected { background: #00ff41; box-shadow: 0 0 6px rgba(0,255,65,0.6); }
+
+/* ============================================================
+   MATRIX THEME ADDITIONS
+   ============================================================ */
+
+/* matrix – modal dialog */
+[data-theme="matrix"] .mcp-modal-backdrop {
+    background: rgba(0,0,0,0.8) !important;
+}
+[data-theme="matrix"] .mcp-modal-dialog {
+    background: #0a0a0a !important;
+    border: 1px solid #00ff4155 !important;
+    border-radius: 0 !important;
+    box-shadow: 0 0 20px rgba(0,255,65,0.15), 0 0 60px rgba(0,0,0,0.8) !important;
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .mcp-modal-header {
+    border-bottom: 1px solid #00ff4133 !important;
+    background: #050505 !important;
+}
+[data-theme="matrix"] .mcp-modal-title {
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.5);
+}
+[data-theme="matrix"] .mcp-modal-body {
+    color: #cccccc !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .mcp-modal-footer {
+    border-top: 1px solid #00ff4133 !important;
+    background: #050505 !important;
+}
+[data-theme="matrix"] .mcp-modal-btn {
+    border-radius: 0 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="matrix"] .mcp-modal-btn-primary {
+    background: #003300 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4166 !important;
+}
+[data-theme="matrix"] .mcp-modal-btn-primary:hover {
+    background: #004400 !important;
+    box-shadow: 0 0 8px rgba(0,255,65,0.3);
+}
+[data-theme="matrix"] .mcp-modal-btn-secondary {
+    background: #0a0a0a !important;
+    color: #008833 !important;
+    border: 1px solid #00ff4133 !important;
+}
+[data-theme="matrix"] .mcp-modal-btn-secondary:hover {
+    background: #001a00 !important;
+}
+[data-theme="matrix"] .mcp-modal-btn-danger {
+    background: #1a0000 !important;
+    color: #ff3333 !important;
+    border: 1px solid #ff333355 !important;
+}
+[data-theme="matrix"] .mcp-modal-btn-danger:hover {
+    background: #2a0000 !important;
+    box-shadow: 0 0 8px rgba(255,51,51,0.3);
+}
+
+/* matrix – back button styled like other matrix buttons */
+[data-theme="matrix"] #backBtn {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4144 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="matrix"] #backBtn:hover {
+    background: #003300 !important;
+    box-shadow: 0 0 8px rgba(0,255,65,0.2);
+}
+
+/* matrix – dashboard: square corners */
+[data-theme="matrix"] .metric-card,
+[data-theme="matrix"] .chart-container,
+[data-theme="matrix"] .tool-card,
+[data-theme="matrix"] .status-bar,
+[data-theme="matrix"] #backBtn,
+[data-theme="matrix"] .error-badge,
+[data-theme="matrix"] .status-indicator {
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .metric-card:hover {
+    transform: none !important;
+}
+
+/* matrix – system monitor */
+[data-theme="matrix"] #systemMonitor {
+    background: #030303 !important;
+    border-left: 1px solid #00ff4133 !important;
+}
+[data-theme="matrix"] .monitor-header {
+    background: #0a0a0a !important;
+    border-bottom: 1px solid #00ff4133 !important;
+}
+[data-theme="matrix"] .stat-group {
+    background: #080808 !important;
+    border: 1px solid #00ff4122 !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .stat-label {
+    color: #008833 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .stat-value {
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .stat-secondary {
+    color: #006622 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .stat-unit { color: #006622 !important; }
+[data-theme="matrix"] .progress-bar {
+    background: #001a00 !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .progress-fill {
+    background: linear-gradient(90deg, #00aa2a, #00ff41) !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .progress-fill.high {
+    background: linear-gradient(90deg, #aaff00, #ffcc00) !important;
+}
+[data-theme="matrix"] .progress-fill.critical {
+    background: linear-gradient(90deg, #ff3333, #ff0000) !important;
+}
+
+/* matrix – override #569cd6 blues from index.css */
+[data-theme="matrix"] #toolsHeader h2,
+[data-theme="matrix"] #logHeader h2,
+[data-theme="matrix"] .monitor-header h2 {
+    color: #00ff41 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.5);
+}
+[data-theme="matrix"] .tool-item:hover {
+    background: rgba(0,255,65,0.06) !important;
+    border-left-color: #00ff41 !important;
+}
+[data-theme="matrix"] .tool-item-name {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #ffffff !important;
+}
+[data-theme="matrix"] .tool-item-desc {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #cccccc !important;
+}
+[data-theme="matrix"] .tool-param {
+    font-family: 'Share Tech Mono', monospace !important;
+    background: #001a00 !important;
+    color: #00cc33 !important;
+    border: 1px solid #00ff4133 !important;
+    border-radius: 0 !important;
+}
+[data-theme="matrix"] .tools-category-header {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #00ff41 !important;
+    background: #0a0a0a !important;
+    border-bottom: 1px solid #00ff4122 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="matrix"] .tools-category-header:hover {
+    background: #001a00 !important;
+}
+
+/* matrix – log panel */
+[data-theme="matrix"] #logContainer {
+    font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+    font-size: 0.8rem;
+    background: #020202;
+}
+[data-theme="matrix"] .log-entry:hover        { background: #001a00 !important; }
+[data-theme="matrix"] .log-entry.USER         { border-left-color: #00ff41;  background: rgba(0,255,65,0.05) !important; }
+[data-theme="matrix"] .log-entry.ASSISTANT    { border-left-color: #00cc33;  background: rgba(0,204,51,0.05) !important; }
+[data-theme="matrix"] .log-entry.INFO         { border-left-color: #00aa44 !important; }
+[data-theme="matrix"] .log-entry.WARNING      { border-left-color: #aaff00;  background: rgba(170,255,0,0.04) !important; }
+[data-theme="matrix"] .log-entry.ERROR        { border-left-color: #ff3333;  background: rgba(255,51,51,0.05) !important; }
+[data-theme="matrix"] .log-entry.DEBUG        { border-left-color: #005511;  opacity: 0.7; }
+[data-theme="matrix"] .log-timestamp          { color: #005522 !important; }
+[data-theme="matrix"] .log-message            { color: #ffffff !important; }
+[data-theme="matrix"] .log-level.USER         { color: #00ff41 !important; }
+[data-theme="matrix"] .log-level.ASSISTANT    { color: #00ff41 !important; }
+[data-theme="matrix"] .log-level.INFO         { color: #00aa44 !important; }
+[data-theme="matrix"] .log-level.WARNING      { color: #aaff00 !important; }
+[data-theme="matrix"] .log-level.ERROR        { color: #ff3333 !important; }
+[data-theme="matrix"] .log-level.DEBUG        { color: #005511 !important; }
+
+/* matrix – filter buttons */
+[data-theme="matrix"] .filter-btn                  { background: #0d0d0d !important; color: #005522 !important; border: 1px solid #00ff4122 !important; }
+[data-theme="matrix"] .filter-btn.active           { color: #00ff41 !important; border-color: #00ff4155 !important; }
+[data-theme="matrix"] .filter-btn.USER.active      { background: #001a00 !important; color: #00ff41 !important; }
+[data-theme="matrix"] .filter-btn.ASSISTANT.active { background: #001a00 !important; color: #00ff41 !important; }
+[data-theme="matrix"] .filter-btn.INFO.active      { background: #001a00 !important; color: #00aa44 !important; }
+[data-theme="matrix"] .filter-btn.WARNING.active   { background: #001a00 !important; color: #aaff00 !important; }
+[data-theme="matrix"] .filter-btn.ERROR.active     { background: #1a0000 !important; color: #ff3333 !important; }
+[data-theme="matrix"] .filter-btn.DEBUG.active     { background: #001a00 !important; color: #005522 !important; }
+
+/* matrix – log status indicator */
+[data-theme="matrix"] .log-status-indicator                { background: #ff3333; }
+[data-theme="matrix"] .log-status-indicator.connected      { background: #00ff41; box-shadow: 0 0 6px rgba(0,255,65,0.6); }
+
+/* matrix – links sharp, no glow blur */
+[data-theme="matrix"] a,
+[data-theme="matrix"] .assistant a,
+[data-theme="matrix"] .msg a {
+    text-shadow: none !important;
+    color: #00ff41 !important;
+    text-decoration: underline;
+}
+
+/* Theme registry — readable by JS without file I/O */
+/*
+* Add the data-theme eg. [data-theme="tokyo"]
+* Update the theme-list below
+ */
+:root {
+    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,matrix,tron,dragonball,neon,dracula,nimbus,tokyo,garbagefire";
+}
+/* ============================================================
+   MATRIX THEME — new elements from capability registry,
+   latency histograms, and tool tag updates
+   ============================================================ */
+
+/* ── Hard corners on all new boxes ── */
+[data-theme="matrix"] .failure-kind-card,
+[data-theme="matrix"] .histogram-container,
+[data-theme="matrix"] .histogram-bar-wrap,
+[data-theme="matrix"] .histogram-bar,
+[data-theme="matrix"] .mini-bar-wrap,
+[data-theme="matrix"] .mini-bar,
+[data-theme="matrix"] .failure-kind-bar-wrap,
+[data-theme="matrix"] .failure-kind-bar,
+[data-theme="matrix"] .reset-btn,
+[data-theme="matrix"] .tool-tag,
+[data-theme="matrix"] .tool-disabled-badge {
+    border-radius: 0 !important;
+}
+
+/* ── Reset button ── */
+[data-theme="matrix"] .reset-btn {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4144 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="matrix"] .reset-btn:hover {
+    background: #003300 !important;
+    border-color: #00ff4188 !important;
+    box-shadow: 0 0 6px rgba(0,255,65,0.2);
+}
+[data-theme="matrix"] .reset-btn:disabled {
+    color: #00cc33 !important;
+    opacity: 0.7;
+}
+
+/* ── Histogram (agent + LLM, full-size) ── */
+[data-theme="matrix"] .histogram-container {
+    border-top: 1px solid #00ff4122 !important;
+}
+[data-theme="matrix"] .histogram-title {
+    color: #008833 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-style: normal !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.7rem !important;
+}
+[data-theme="matrix"] .histogram-bar-wrap {
+    background: #001a00 !important;
+    border: 1px solid #00ff4111 !important;
+}
+/* Override JS-injected bar colours with phosphor green gradient by position */
+[data-theme="matrix"] .histogram-bar {
+    background: #00aa2a !important;
+    box-shadow: 0 0 4px rgba(0,255,65,0.3);
+}
+/* Darken bars by bucket — slow buckets get dimmer green, not warm colours */
+[data-theme="matrix"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #00ff41 !important; box-shadow: 0 0 6px rgba(0,255,65,0.5); }
+[data-theme="matrix"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #00cc33 !important; }
+[data-theme="matrix"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #00882b !important; }
+[data-theme="matrix"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #005522 !important; }
+[data-theme="matrix"] .histogram-bar-group:nth-child(5) .histogram-bar { background: #003315 !important; box-shadow: none; }
+[data-theme="matrix"] .histogram-bar-label {
+    color: #006622 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.58rem !important;
+}
+[data-theme="matrix"] .histogram-bar-count {
+    color: #00aa33 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+
+/* ── Mini histogram (per-tool cards) ── */
+[data-theme="matrix"] .mini-histogram {
+    border-top: 1px solid #00ff4111 !important;
+}
+[data-theme="matrix"] .mini-bar-wrap {
+    background: #001200 !important;
+}
+[data-theme="matrix"] .mini-bar-group:nth-child(1) .mini-bar { background: #00ff41 !important; }
+[data-theme="matrix"] .mini-bar-group:nth-child(2) .mini-bar { background: #00cc33 !important; }
+[data-theme="matrix"] .mini-bar-group:nth-child(3) .mini-bar { background: #00882b !important; }
+[data-theme="matrix"] .mini-bar-group:nth-child(4) .mini-bar { background: #005522 !important; }
+[data-theme="matrix"] .mini-bar-group:nth-child(5) .mini-bar { background: #003315 !important; }
+
+/* ── Failure kinds ── */
+[data-theme="matrix"] .failure-kind-card {
+    background: #080808 !important;
+    border: 1px solid #00ff4122 !important;
+}
+[data-theme="matrix"] .failure-kind-label {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #008833 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="matrix"] .failure-kind-value {
+    font-family: 'Share Tech Mono', monospace !important;
+    /* keep JS-injected colour for semantic meaning — only override if generic */
+}
+[data-theme="matrix"] .failure-kind-bar-wrap {
+    background: #001a00 !important;
+}
+[data-theme="matrix"] .failure-kind-pct {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #006622 !important;
+}
+
+/* ── Percentile stat cards ── */
+[data-theme="matrix"] #agentP50Value,
+[data-theme="matrix"] #llmP50Value {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #00ff41 !important;
+    text-shadow: 0 0 8px rgba(0,255,65,0.4);
+}
+
+/* ── Tool tags ── */
+[data-theme="matrix"] .tool-item-tags {
+    gap: 3px;
+}
+[data-theme="matrix"] .tool-tag {
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 0.6rem !important;
+    opacity: 1 !important;
+    letter-spacing: 0.05em;
+    /* Override JS colour: all tags phosphor green, darkness by semantic weight */
+}
+/* read = dim, write = mid, destructive = bright red, external = purple→green */
+[data-theme="matrix"] .tool-tag[style*="#555"]     { background: #001a00 !important; color: #006622 !important; border: 1px solid #00ff4122; }
+[data-theme="matrix"] .tool-tag[style*="#e67e22"]  { background: #1a0a00 !important; color: #aaff00 !important; border: 1px solid #aaff0044; }
+[data-theme="matrix"] .tool-tag[style*="#e74c3c"]  { background: #1a0000 !important; color: #ff3333 !important; border: 1px solid #ff333344; }
+[data-theme="matrix"] .tool-tag[style*="#8e44ad"]  { background: #001a00 !important; color: #00cc33 !important; border: 1px solid #00cc3333; }
+[data-theme="matrix"] .tool-tag[style*="#2980b9"]  { background: #001a00 !important; color: #00ff41 !important; border: 1px solid #00ff4133; }
+[data-theme="matrix"] .tool-tag[style*="#27ae60"]  { background: #001a00 !important; color: #00cc44 !important; border: 1px solid #00cc4433; }
+[data-theme="matrix"] .tool-tag[style*="#16a085"]  { background: #001a00 !important; color: #00bb55 !important; border: 1px solid #00bb5533; }
+[data-theme="matrix"] .tool-tag[style*="#1a5276"]  { background: #001a00 !important; color: #00ff41 !important; border: 1px solid #00ff4133; }
+[data-theme="matrix"] .tool-tag[style*="#6c3483"]  { background: #001a00 !important; color: #00cc33 !important; border: 1px solid #00cc3333; }
+[data-theme="matrix"] .tool-tag[style*="#117a65"]  { background: #001a00 !important; color: #00aa44 !important; border: 1px solid #00aa4433; }
+[data-theme="matrix"] .tool-tag[style*="#922b21"]  { background: #1a0000 !important; color: #ff5533 !important; border: 1px solid #ff553344; }
+[data-theme="matrix"] .tool-tag[style*="#2471a3"]  { background: #001a00 !important; color: #00ff41 !important; border: 1px solid #00ff4133; }
+[data-theme="matrix"] .tool-tag[style*="#7d6608"]  { background: #001a00 !important; color: #aacc00 !important; border: 1px solid #aacc0033; }
+
+/* ── Rate limit annotation ── */
+[data-theme="matrix"] .tool-rate-limit {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #005522 !important;
+}
+
+/* ── Disabled tools ── */
+[data-theme="matrix"] .tool-item.tool-disabled {
+    opacity: 0.3 !important;
+}
+[data-theme="matrix"] .tool-disabled-badge {
+    font-family: 'Share Tech Mono', monospace !important;
+    background: #1a0000 !important;
+    color: #ff3333 !important;
+    border: 1px solid #ff333333 !important;
+    text-shadow: 0 0 4px rgba(255,51,51,0.4);
+}
+
+/* ── Tool stat labels in dashboard tool cards (p50/p95/p99) ── */
+[data-theme="matrix"] .tool-stat-label {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #006622 !important;
+    text-transform: uppercase;
+}
+[data-theme="matrix"] .tool-stat-value {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #00ff41 !important;
+}
