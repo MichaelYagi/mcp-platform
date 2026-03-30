@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.venv
+
+# Project Specific
+data/
+knowledge/
+*.log
+.env
+
+# IDEs
+.vscode/
+.idea/
+test.py
+*.sqlite
+/tools/knowledge_base/entries/
+/logs/
+/.venv-wsl/
+/.vscode
+/rag_db/
+/test_plex_subtitles.py
+/tools/rag/ingested_items.json
+/gguf_models.json
+/models/
+/sessions/
+/client/last_model.txt
+/tests/results/results/coverage.xml
+/tests/results/results/junit.xml
+/tests/.coverage
+/tests/results/test-report.html
+/tests/results/junit.xml
+/tests/results/coverage-report.html
+/tests/results/coverage.xml
+/external_servers.json
+/servers/google/credentials.json
+/servers/google/token.json
