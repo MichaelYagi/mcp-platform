@@ -198,6 +198,11 @@ DB_FLUSH_BATCH_SIZE=50          # DB inserts per batch (default: 30)
 
 # === Tool Control (optional) ===
 DISABLED_TOOLS=plex:*  # Disable specific tools/categories
+
+# === Location Default - uses your IP location otherwise (optional) ===
+DEFAULT_CITY=Vancouver
+DEFAULT_STATE=BC
+DEFAULT_COUNTRY=Canada
 ```
 
 ### Recommended Setup
