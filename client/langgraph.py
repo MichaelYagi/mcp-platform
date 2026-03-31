@@ -1896,13 +1896,53 @@ def create_langgraph_agent(llm_with_tools, tools):
                 if search_client.is_available():
                     query = user_message
                     query = WEB_SEARCH_EXPLICIT_PATTERN.sub('', query).strip()
-                    query = query.strip()
-
                     query = re.sub(r'^,?\s*(who|what|where|when|why|how)\s+', r'\1 ', query, flags=re.IGNORECASE)
                     query = query.strip()
 
                     if not query:
                         query = user_message
+
+                    # ── Option 2: LLM-rewritten query with conversation context ──
+                    # If there are prior messages, ask the LLM to rewrite the query
+                    # incorporating context (resolves pronouns, implicit subjects, etc.)
+                    prior_messages = [m for m in messages if isinstance(m, (HumanMessage, AIMessage))]
+                    if len(prior_messages) >= 2:
+                        try:
+                            import os as _os
+                            import httpx as _httpx
+                            _ollama_url = _os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+                            _model_file = __import__("pathlib").Path(__file__).parent / "last_model.txt"
+                            _model = _model_file.read_text().strip() if _model_file.exists() else "qwen2.5:14b-instruct-q4_K_M"
+
+                            # Build a short conversation summary for context
+                            _ctx_lines = []
+                            for _m in prior_messages[-6:]:
+                                if isinstance(_m, HumanMessage) and len(_m.content) < 500:
+                                    _ctx_lines.append(f"User: {_m.content[:300]}")
+                                elif isinstance(_m, AIMessage) and len(_m.content) < 500:
+                                    _ctx_lines.append(f"Assistant: {_m.content[:300]}")
+                            _ctx = "\n".join(_ctx_lines)
+
+                            _rewrite_prompt = (
+                                f"Given this conversation:\n{_ctx}\n\n"
+                                f"Rewrite this search query to be self-contained and specific, "
+                                f"resolving any pronouns or implicit references using the conversation context.\n"
+                                f"Query: {query}\n\n"
+                                f"Return ONLY the rewritten search query, nothing else. No quotes, no explanation."
+                            )
+
+                            _resp = _httpx.post(
+                                f"{_ollama_url}/api/generate",
+                                json={"model": _model, "prompt": _rewrite_prompt, "stream": False},
+                                timeout=30.0,
+                            )
+                            _resp.raise_for_status()
+                            _rewritten = _resp.json().get("response", "").strip().strip('"\'\n')
+                            if _rewritten and len(_rewritten) > 5:
+                                logger.info(f"🔍 Query rewritten: '{query}' → '{_rewritten}'")
+                                query = _rewritten
+                        except Exception as _e:
+                            logger.warning(f"⚠️ Query rewrite failed, using original: {_e}")
 
                     logger.info(f"🔍 Performing web search: '{query}'")
 
@@ -1922,7 +1962,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                             response = await base_llm.ainvoke(augmented_messages)
 
                             return {
-                                "messages": [response],
+                                "messages": [HumanMessage(content=augmented_prompt), response],
                                 "tools": state.get("tools", {}),
                                 "llm": state.get("llm"),
                                 "ingest_completed": state.get("ingest_completed", False),
