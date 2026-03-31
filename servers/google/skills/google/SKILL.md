@@ -16,9 +16,11 @@ tools:
   - gmail_get_recent
   - gmail_get_email
   - gmail_send_email
+  - gmail_reply_tool
   - calendar_get_today
   - calendar_get_this_week
   - calendar_create_event
+  - get_day_briefing
 ---
 
 # Google (Gmail + Calendar) Skill
@@ -32,11 +34,15 @@ Interact with Gmail and Google Calendar through a single server.
 2. **Recent emails** — top 10 inbox messages (read and unread)
 3. **Read email** — open the full body of a specific message
 4. **Send email** — compose and send a message
+5. **Reply to email** — reply to an existing message by ID
 
 **Calendar capabilities:**
 1. **Today's events** — everything on the calendar for today
 2. **This week's events** — full week view, grouped by day
 3. **Create event** — add a new timed or all-day event
+
+**Briefing:**
+1. **Day briefing** — weather, unread emails, and today's calendar in one call
 
 **Authentication:** OAuth2 via `credentials.json` (downloaded from Google Cloud Console). A `token.json` is written on first authorization and silently refreshed afterwards. See ⚙️ Configuration below.
 
@@ -110,6 +116,22 @@ gmail_send_email(
 )
 ```
 
+### Reply to an email
+
+```python
+gmail_reply_tool(
+    message_id="18f3a...",
+    body="Thanks, I'll review it today."
+)
+
+# With CC
+gmail_reply_tool(
+    message_id="18f3a...",
+    body="See my comments below.",
+    cc="carol@example.com"
+)
+```
+
 ---
 
 ## 📋 Calendar Workflows
@@ -179,6 +201,24 @@ calendar_create_event(
   "html_link": "https://www.google.com/calendar/event?eid=..."
 }
 ```
+
+### Day briefing
+
+```python
+get_day_briefing()                            # today's weather + 10 unread emails + calendar
+get_day_briefing(max_emails=5, forecast_days=2)  # include tomorrow's weather too
+```
+
+**Returns:**
+```json
+{
+  "weather":  { ... },
+  "email":    { "total_unread": 3, "emails": [ ... ] },
+  "calendar": { "date": "2025-06-20", "count": 2, "events": [ ... ] }
+}
+```
+
+Each section fails independently — a Gmail auth issue won't break the weather result.
 
 ---
 
@@ -271,6 +311,8 @@ Subject: 'Updated wireframes' (Tuesday 4:22 PM)"
 | `calendar_get_today` | Today's events | — |
 | `calendar_get_this_week` | This week's events | — |
 | `calendar_create_event` | Create a calendar event | `summary`, `start`, `end`, `attendees`, `all_day` |
+| `gmail_reply_tool` | Reply to an existing email | `message_id`, `body`, `cc` |
+| `get_day_briefing` | Weather + unread email + calendar in one call | `max_emails`, `forecast_days` |
 
 ---
 

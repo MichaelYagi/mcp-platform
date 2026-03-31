@@ -26,6 +26,7 @@ from email.mime.multipart import MIMEMultipart
 from typing import Optional, List
 
 from mcp.server.fastmcp import FastMCP
+from tools.tool_control import check_tool_enabled
 try:
     from client.tool_meta import tool_meta
 except Exception:
@@ -145,7 +146,7 @@ def _get_google_creds() -> Optional["Credentials"]:
                 logger.error(f"credentials.json not found at {CREDENTIALS_FILE}")
                 return None
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_console()
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
@@ -213,6 +214,7 @@ def _extract_body(payload: dict) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["read","search","email","external"],triggers=["unread emails","new emails","check email","do i have mail"],idempotent=False,example="use gmail_get_unread",intent_category="google",text_fields=["preview"])
 def gmail_get_unread(max_results: int = 25) -> str:
     """
@@ -285,6 +287,7 @@ def gmail_get_unread(max_results: int = 25) -> str:
 
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["read","search","email","external"],triggers=["recent emails","my inbox","show emails","latest emails"],idempotent=False,example="use gmail_get_recent",intent_category="google",text_fields=["preview"])
 def gmail_get_recent(max_results: int = 10) -> str:
     """
@@ -360,6 +363,7 @@ def gmail_get_recent(max_results: int = 10) -> str:
 
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["read","email","external"],triggers=["read email","open email","show email"],idempotent=True,example='use gmail_get_email: message_id=""',intent_category="google",text_fields=["body"])
 def gmail_get_email(message_id: str) -> str:
     """
@@ -429,6 +433,7 @@ def gmail_get_email(message_id: str) -> str:
 
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email"],idempotent=False,example='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google")
 def gmail_send_email(
         to: str,
@@ -587,6 +592,7 @@ def _format_event(event: dict, include_id: bool = False) -> dict:
 
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["read","calendar","external"],triggers=["calendar today","schedule today","meetings today","whats on today"],idempotent=False,example="use calendar_get_today",intent_category="google",text_fields=["notes"])
 def calendar_get_today() -> str:
     """
@@ -644,6 +650,7 @@ def calendar_get_today() -> str:
 
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["read","calendar","external"],triggers=["this week calendar","weekly schedule","meetings this week","whats on this week"],idempotent=False,example="use calendar_get_this_week",intent_category="google",text_fields=["notes"])
 def calendar_get_this_week() -> str:
     """
@@ -723,6 +730,7 @@ def calendar_get_this_week() -> str:
 
 
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["write","calendar","external"],triggers=["create event","schedule meeting","add to calendar","book appointment"],idempotent=False,example='use calendar_create_event: summary="" start="" end="" [description=""] [location=""] [attendees=""] [all_day=""]',intent_category="google")
 def calendar_create_event(
         summary: str,
@@ -833,6 +841,7 @@ def calendar_create_event(
 # ══════════════════════════════════════════════════════════════════════════════
 # SKILL MANAGEMENT
 @mcp.tool()
+@check_tool_enabled(category="google")
 @tool_meta(tags=["write","email","external"],triggers=["reply to email","reply to this email","respond to email"],idempotent=False,example='use gmail_reply_tool: message_id="" body="" [cc=""]',intent_category="google")
 def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> str:
     """
@@ -923,8 +932,115 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
         raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail reply error: {e}",
                            {"tool": "gmail_reply_tool", "message_id": message_id})
 
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(tags=["read","email","calendar","external"],triggers=["my day","day briefing","morning briefing","what's on today","today's summary","how's my day"],idempotent=False,example='use get_day_briefing [max_emails=""] [forecast_days=""]',intent_category="google")
+def get_day_briefing(max_emails: int = 10, forecast_days: int = 1) -> str:
+    """
+    Get a combined briefing for today: weather, unread emails, and calendar events.
 
-# ══════════════════════════════════════════════════════════════════════════════
+    Calls get_weather_tool, gmail_get_unread, and calendar_get_today internally
+    and returns all three in a single structured response.
+
+    Args:
+        max_emails (int, optional):    Max unread emails to include (default: 10)
+        forecast_days (int, optional): Days of weather forecast (default: 1 = today only)
+
+    Returns:
+        JSON with:
+        - weather:   Current conditions and forecast (same format as get_weather_tool)
+        - email:     Unread emails (same format as gmail_get_unread)
+        - calendar:  Today's events (same format as calendar_get_today)
+        - errors:    Any per-section errors that occurred
+    """
+    logger.info(f"🛠  get_day_briefing called (max_emails={max_emails}, forecast_days={forecast_days})")
+
+    result = {"weather": None, "email": None, "calendar": None, "errors": {}}
+
+    # ── Weather ───────────────────────────────────────────────────────────────
+    try:
+        from tools.location.geolocate_util import geolocate_ip, CLIENT_IP
+        from tools.location.get_weather import get_weather as get_weather_fn
+
+        city    = os.getenv("DEFAULT_CITY")
+        state   = os.getenv("DEFAULT_STATE")
+        country = os.getenv("DEFAULT_COUNTRY")
+        if not city and CLIENT_IP:
+            loc = geolocate_ip(CLIENT_IP)
+            if loc:
+                city    = loc.get("city")
+                state   = loc.get("region")
+                country = loc.get("country")
+
+        weather_raw = get_weather_fn(city, state, country, forecast_days=forecast_days)
+        result["weather"] = json.loads(weather_raw) if isinstance(weather_raw, str) else weather_raw
+        logger.info("✅ Weather fetched")
+    except Exception as e:
+        logger.warning(f"⚠️  Weather failed: {e}")
+        result["errors"]["weather"] = str(e)
+
+    # ── Unread email ──────────────────────────────────────────────────────────
+    if GOOGLE_AVAILABLE:
+        try:
+            service = _gmail_service()
+            if service:
+                res = service.users().messages().list(
+                    userId="me", labelIds=["INBOX", "UNREAD"], maxResults=max_emails
+                ).execute()
+                messages = res.get("messages", [])
+                emails = []
+                for msg_ref in messages:
+                    msg = service.users().messages().get(
+                        userId="me", id=msg_ref["id"], format="metadata",
+                        metadataHeaders=["From", "Subject", "Date"]
+                    ).execute()
+                    headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
+                    _msg_id = msg["id"]
+                    emails.append({
+                        "from":    headers.get("from", ""),
+                        "subject": headers.get("subject", "(no subject)"),
+                        "date":    headers.get("date", ""),
+                        "preview": msg.get("snippet", ""),
+                        "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
+                        "id":      _msg_id,
+                    })
+                result["email"] = {"total_unread": len(emails), "emails": emails}
+                logger.info(f"✅ {len(emails)} unread emails fetched")
+        except Exception as e:
+            logger.warning(f"⚠️  Gmail failed: {e}")
+            result["errors"]["email"] = str(e)
+
+    # ── Calendar ──────────────────────────────────────────────────────────────
+    if GOOGLE_AVAILABLE:
+        try:
+            service = _calendar_service()
+            if service:
+                now = datetime.now(timezone.utc)
+                start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_of_day = start_of_day + timedelta(days=1)
+                res = service.events().list(
+                    calendarId="primary",
+                    timeMin=start_of_day.isoformat(),
+                    timeMax=end_of_day.isoformat(),
+                    singleEvents=True,
+                    orderBy="startTime"
+                ).execute()
+                events = [_format_event(e) for e in res.get("items", [])]
+                result["calendar"] = {
+                    "date":   start_of_day.strftime("%Y-%m-%d"),
+                    "count":  len(events),
+                    "events": events,
+                }
+                logger.info(f"✅ {len(events)} calendar events fetched")
+        except Exception as e:
+            logger.warning(f"⚠️  Calendar failed: {e}")
+            result["errors"]["calendar"] = str(e)
+
+    if not result["errors"]:
+        del result["errors"]
+
+    return json.dumps(result, indent=2)
+
 
 skill_registry = None
 

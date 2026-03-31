@@ -49,7 +49,6 @@ from prompts.prompts import (
     RESEARCH_SYNTHESIS,
     RESEARCH_CONDENSE,
     RESEARCH_RETRY,
-    TOOL_RESULT_FORMAT_EMOJI,
 )
 
 MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", "20"))
@@ -1716,62 +1715,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     "current_model": get_model_name(base_llm)
                 }
 
-
-            # ── get_weather_tool shortcut ────────────────────────────────────
-            # tool_data is already parsed above — use it directly rather than
-            # re-parsing last_message.content, which avoids JSON decode errors.
-            if last_tool_name == "get_weather_tool" and isinstance(tool_data, dict) and tool_data.get("current"):
-                try:
-                    _cur = tool_data.get("current", {})
-                    _forecast = tool_data.get("forecast", [])
-                    _loc = ", ".join(p for p in [
-                        tool_data.get("city", ""),
-                        tool_data.get("state", ""),
-                        tool_data.get("country", "")
-                    ] if p)
-
-                    _lines = [f"**Current weather in {_loc}:**\n"]
-                    _lines.append(f"- **Condition:** {_cur.get('condition', 'N/A')}")
-                    _lines.append(f"- **Precipitation Chance:** {_cur.get('precipitation_chance', 'N/A')}")
-                    _lines.append(f"- **Temperature:** {_cur.get('temperature_c')}°C ({_cur.get('temperature_f')}°F)")
-                    _lines.append(f"- **Feels Like:** {_cur.get('feelslike_c')}°C ({_cur.get('feelslike_f')}°F)")
-                    _lines.append(f"- **Humidity:** {_cur.get('humidity', 'N/A')}")
-
-                    if _forecast:
-                        _today = _forecast[0]
-                        _lines.append(f"\n**Today's Forecast:**")
-                        _lines.append(f"- **Condition:** {_today.get('condition', 'N/A')}")
-                        _lines.append(f"- **Precipitation Chance:** {_today.get('precipitation_chance', 'N/A')}")
-                        _lines.append(f"- **High:** {_today.get('max_temp_c')}°C ({_today.get('max_temp_f')}°F)")
-                        _lines.append(f"- **Low:** {_today.get('min_temp_c')}°C ({_today.get('min_temp_f')}°F)")
-                        if _today.get('sunrise'):
-                            _sr = _today['sunrise'].split('T')[-1][:5] if 'T' in _today['sunrise'] else _today['sunrise']
-                            _ss = _today.get('sunset', '')
-                            _ss = _ss.split('T')[-1][:5] if 'T' in _ss else _ss
-                            _lines.append(f"- **Sunrise:** {_sr}  **Sunset:** {_ss}")
-
-                        if len(_forecast) > 1:
-                            _lines.append(f"\n**Upcoming:**")
-                            for _day in _forecast[1:]:
-                                _label = _day.get('day_label', _day.get('date', ''))
-                                _lines.append(
-                                    f"- **{_label}:** {_day.get('condition', 'N/A')} "
-                                    f"{_day.get('max_temp_c')}°C / {_day.get('min_temp_c')}°C"
-                                )
-
-                    _weather_text = "\n".join(_lines)
-                    return {
-                        "messages": [AIMessage(content=_weather_text)],
-                        "tools": state.get("tools", {}),
-                        "llm": state.get("llm"),
-                        "ingest_completed": state.get("ingest_completed", False),
-                        "stopped": state.get("stopped", False),
-                        "current_model": get_model_name(base_llm)
-                    }
-                except Exception as _we:
-                    logger.warning(f"[LangGraph] ⚠️ Weather shortcut failed: {_we} — falling through to LLM")
-            # ── End get_weather_tool shortcut ─────────────────────────────────
-# ── web_image_search_tool shortcut ───────────────────────────────
+            # ── web_image_search_tool shortcut ───────────────────────────────
             # Parse the JSON result, extract image_url, and return a plain
             # AIMessage. The websocket scanner will pick up image_url from the
             # ToolMessage and send it to the frontend for inline rendering.
@@ -1805,22 +1749,10 @@ def create_langgraph_agent(llm_with_tools, tools):
                 }
             # ── End web_image_search_tool shortcut ───────────────────────────
 
-            # Inject emoji preservation instruction into the system message
-            # before asking the LLM to format tool results — prevents the model
-            # from substituting its own emojis (e.g. ☂️ for ☁️ in weather).
-            _fmt_messages = list(messages)
-            from langchain_core.messages import SystemMessage as _SM
-            if _fmt_messages and isinstance(_fmt_messages[0], _SM):
-                _sys_content = _fmt_messages[0].content
-                if TOOL_RESULT_FORMAT_EMOJI not in _sys_content:
-                    _fmt_messages[0] = _SM(content=_sys_content + TOOL_RESULT_FORMAT_EMOJI)
-            else:
-                _fmt_messages.insert(0, _SM(content=TOOL_RESULT_FORMAT_EMOJI.strip()))
-
             start_time = time.time()
             try:
                 response = await asyncio.wait_for(
-                    base_llm.ainvoke(_fmt_messages),
+                    base_llm.ainvoke(messages),
                     timeout=300.0
                 )
                 duration = time.time() - start_time
@@ -1896,53 +1828,13 @@ def create_langgraph_agent(llm_with_tools, tools):
                 if search_client.is_available():
                     query = user_message
                     query = WEB_SEARCH_EXPLICIT_PATTERN.sub('', query).strip()
+                    query = query.strip()
+
                     query = re.sub(r'^,?\s*(who|what|where|when|why|how)\s+', r'\1 ', query, flags=re.IGNORECASE)
                     query = query.strip()
 
                     if not query:
                         query = user_message
-
-                    # ── Option 2: LLM-rewritten query with conversation context ──
-                    # If there are prior messages, ask the LLM to rewrite the query
-                    # incorporating context (resolves pronouns, implicit subjects, etc.)
-                    prior_messages = [m for m in messages if isinstance(m, (HumanMessage, AIMessage))]
-                    if len(prior_messages) >= 2:
-                        try:
-                            import os as _os
-                            import httpx as _httpx
-                            _ollama_url = _os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
-                            _model_file = __import__("pathlib").Path(__file__).parent / "last_model.txt"
-                            _model = _model_file.read_text().strip() if _model_file.exists() else "qwen2.5:14b-instruct-q4_K_M"
-
-                            # Build a short conversation summary for context
-                            _ctx_lines = []
-                            for _m in prior_messages[-6:]:
-                                if isinstance(_m, HumanMessage) and len(_m.content) < 500:
-                                    _ctx_lines.append(f"User: {_m.content[:300]}")
-                                elif isinstance(_m, AIMessage) and len(_m.content) < 500:
-                                    _ctx_lines.append(f"Assistant: {_m.content[:300]}")
-                            _ctx = "\n".join(_ctx_lines)
-
-                            _rewrite_prompt = (
-                                f"Given this conversation:\n{_ctx}\n\n"
-                                f"Rewrite this search query to be self-contained and specific, "
-                                f"resolving any pronouns or implicit references using the conversation context.\n"
-                                f"Query: {query}\n\n"
-                                f"Return ONLY the rewritten search query, nothing else. No quotes, no explanation."
-                            )
-
-                            _resp = _httpx.post(
-                                f"{_ollama_url}/api/generate",
-                                json={"model": _model, "prompt": _rewrite_prompt, "stream": False},
-                                timeout=30.0,
-                            )
-                            _resp.raise_for_status()
-                            _rewritten = _resp.json().get("response", "").strip().strip('"\'\n')
-                            if _rewritten and len(_rewritten) > 5:
-                                logger.info(f"🔍 Query rewritten: '{query}' → '{_rewritten}'")
-                                query = _rewritten
-                        except Exception as _e:
-                            logger.warning(f"⚠️ Query rewrite failed, using original: {_e}")
 
                     logger.info(f"🔍 Performing web search: '{query}'")
 
@@ -1962,7 +1854,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                             response = await base_llm.ainvoke(augmented_messages)
 
                             return {
-                                "messages": [HumanMessage(content=augmented_prompt), response],
+                                "messages": [response],
                                 "tools": state.get("tools", {}),
                                 "llm": state.get("llm"),
                                 "ingest_completed": state.get("ingest_completed", False),
@@ -2231,6 +2123,26 @@ def create_langgraph_agent(llm_with_tools, tools):
                 metrics["llm_times"].append((time.time(), duration))
             _record_failure(_classify_error(e))
             logger.error(f"❌ Model call failed: {e}")
+
+            # Catch timeout and cancellation — return a clean message instead of
+            # letting the ugly traceback bubble up to the user
+            if isinstance(e, (TimeoutError, asyncio.TimeoutError, asyncio.CancelledError)):
+                error_response = AIMessage(content=(
+                    f"⏱️ **Model timed out** — `{current_model}` took too long to respond.\n\n"
+                    f"This usually means the model is too large for your hardware on this query.\n\n"
+                    f"**Options:**\n"
+                    f"• Switch to a faster model: `:model llama3.2:3b` or `:model qwen2.5:7b`\n"
+                    f"• Use explicit dispatch to bypass the LLM: `use get_weather_tool`"
+                ))
+                return {
+                    "messages": [error_response],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": current_model
+                }
+
             raise
 
         # FALLBACK CHAIN
@@ -2381,6 +2293,26 @@ def create_langgraph_agent(llm_with_tools, tools):
                 metrics["llm_times"].append((time.time(), duration))
             _record_failure(_classify_error(e))
             logger.error(f"❌ Model call failed: {e}")
+
+            # Catch timeout and cancellation — return a clean message instead of
+            # letting the ugly traceback bubble up to the user
+            if isinstance(e, (TimeoutError, asyncio.TimeoutError, asyncio.CancelledError)):
+                error_response = AIMessage(content=(
+                    f"⏱️ **Model timed out** — `{current_model}` took too long to respond.\n\n"
+                    f"This usually means the model is too large for your hardware on this query.\n\n"
+                    f"**Options:**\n"
+                    f"• Switch to a faster model: `:model llama3.2:3b` or `:model qwen2.5:7b`\n"
+                    f"• Use explicit dispatch to bypass the LLM: `use get_weather_tool`"
+                ))
+                return {
+                    "messages": [error_response],
+                    "tools": state.get("tools", {}),
+                    "llm": state.get("llm"),
+                    "ingest_completed": state.get("ingest_completed", False),
+                    "stopped": state.get("stopped", False),
+                    "current_model": current_model
+                }
+
             raise
 
     async def ingest_node(state: AgentState):
@@ -2533,11 +2465,11 @@ def create_langgraph_agent(llm_with_tools, tools):
 
                 logger.info(f"🔍 Final tool_args: {tool_args}")
 
-            # Coerce args that weak models pass as empty dicts {} or None.
-            # Pydantic rejects {} for int/str fields before the function body runs.
-            # Replace {} with None so Optional fields use their default values.
+            # Coerce args that weak models pass as empty dicts {} or empty strings "".
+            # Pydantic rejects these for int/bool fields before the function body runs.
+            # Replace with None so Optional fields use their default values.
             for k, v in list(tool_args.items()):
-                if isinstance(v, dict) and len(v) == 0:
+                if (isinstance(v, dict) and len(v) == 0) or v == "":
                     tool_args[k] = None
                     tool_call["args"][k] = None
 

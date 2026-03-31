@@ -17,6 +17,7 @@ from servers.skills.skill_loader import SkillLoader
 import inspect
 import json
 import logging
+import os
 from pathlib import Path
 from tools.tool_control import check_tool_enabled
 try:
@@ -109,12 +110,18 @@ def get_location_tool(city: str | None = None, state: str | None = None, country
     """
     logger.info(f"🛠 [server] get_location_tool called with city: {city}, state: {state}, country: {country}")
     try:
-        if not city and CLIENT_IP:
-            loc = geolocate_ip(CLIENT_IP)
-            if loc:
-                city = loc.get("city")
-                state = loc.get("region")
-                country = loc.get("country")
+        if not city:
+            _env_city = os.getenv("DEFAULT_CITY")
+            if _env_city:
+                city    = _env_city
+                state   = state   or os.getenv("DEFAULT_STATE")
+                country = country or os.getenv("DEFAULT_COUNTRY")
+            if not city and CLIENT_IP:
+                loc = geolocate_ip(CLIENT_IP)
+                if loc:
+                    city    = loc.get("city")
+                    state   = loc.get("region")
+                    country = loc.get("country")
         result = get_location_fn(city, state, country)
         if not result:
             raise MCPToolError(FailureKind.USER_ERROR, f"Location not found for: {city}, {state}, {country}",
@@ -157,12 +164,18 @@ def get_time_tool(city: str | None = None, state: str | None = None, country: st
     """
     logger.info(f"🛠 [server] get_time_tool called with city: {city}, state: {state}, country: {country}")
     try:
-        if not city and CLIENT_IP:
-            loc = geolocate_ip(CLIENT_IP)
-            if loc:
-                city = loc.get("city")
-                state = loc.get("region")
-                country = loc.get("country")
+        if not city:
+            _env_city = os.getenv("DEFAULT_CITY")
+            if _env_city:
+                city    = _env_city
+                state   = state   or os.getenv("DEFAULT_STATE")
+                country = country or os.getenv("DEFAULT_COUNTRY")
+            if not city and CLIENT_IP:
+                loc = geolocate_ip(CLIENT_IP)
+                if loc:
+                    city    = loc.get("city")
+                    state   = loc.get("region")
+                    country = loc.get("country")
         result = get_time_fn(city, state, country)
         if not result:
             raise MCPToolError(FailureKind.USER_ERROR, f"Could not determine time for: {city}, {state}, {country}",
@@ -229,15 +242,22 @@ def get_weather_tool(
     logger.info(f"🌤️  CLIENT_IP = {CLIENT_IP}")
 
     try:
-        if not city and CLIENT_IP:
-            logger.info(f"🌤️  No city provided, using IP geolocation...")
-            loc = geolocate_ip(CLIENT_IP)
-            logger.info(f"🌤️  Geolocation result: {loc}")
-            if loc:
-                city = loc.get("city")
-                state = loc.get("region")
-                country = loc.get("country")
-                logger.info(f"🌤️  Resolved to: city={city}, state={state}, country={country}")
+        if not city:
+            _env_city = os.getenv("DEFAULT_CITY")
+            if _env_city:
+                city    = _env_city
+                state   = state   or os.getenv("DEFAULT_STATE")
+                country = country or os.getenv("DEFAULT_COUNTRY")
+                logger.info(f"🌤️  Using env defaults: city={city}, state={state}, country={country}")
+            elif CLIENT_IP:
+                logger.info(f"🌤️  No city provided, using IP geolocation...")
+                loc = geolocate_ip(CLIENT_IP)
+                logger.info(f"🌤️  Geolocation result: {loc}")
+                if loc:
+                    city    = loc.get("city")
+                    state   = loc.get("region")
+                    country = loc.get("country")
+                    logger.info(f"🌤️  Resolved to: city={city}, state={state}, country={country}")
 
         result = get_weather_fn(city, state, country, forecast_days=forecast_days)
         if not result:

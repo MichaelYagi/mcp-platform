@@ -38,7 +38,6 @@ except ImportError:
 from prompts.prompts import (
     VISION_DEFAULT,
     VISION_LOCATION_INSTRUCTION,
-    VISION_QUERY_FORMAT,
     TOOL_RESULT_PRESENT,
     ITEM_SUMMARISE,
     NOTE_SUMMARISE,
@@ -1021,8 +1020,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     # Matches:  "use tool_name: arg value"
     #           "use tool_name"            (no-arg tools)
     _USE_TOOL_RE = _re.compile(
-        r'^\s*use\s+(\w+)\s*(?::\s*(.*))?\s*$',
-        _re.IGNORECASE | _re.DOTALL
+        r'^\s*use\s+(\w+)\s*(?::\s*(.*))?$',
+        _re.IGNORECASE
     )
 
     def parse_explicit_tool(message: str, tools_list: list):
@@ -1070,7 +1069,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         else:
             # Check for key=value syntax: "key1=val1 key2=val2" or "key1=val1, key2=val2"
             # Simple pattern: word=anything-up-to-next-word= or end
-            _kv_re = _re.compile(r'(\w+)=("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\'|[^\s,]+)', _re.DOTALL)
+            _kv_re = _re.compile(r'(\w+)=(".*?"|\'.*?\'|[^\s,]+)')
             kv_matches = _kv_re.findall(arg_str)
             if kv_matches:
                 tool_args = {}
@@ -1320,7 +1319,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
                     if _extra and not _extra.startswith("http") and len(_extra) > 3:
                         # User gave a specific instruction — use it, add place/date context
-                        _vision_prompt = _extra + VISION_QUERY_FORMAT
+                        _vision_prompt = _extra
                         if _meta:
                             _vision_prompt += f" (taken at {_meta})"
                     else:
@@ -1537,9 +1536,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 # Falls back to a single LLM call only for non-list results.
                 list_lines = None
                 try:
-                    # Strip invalid Python-style ' escapes before JSON parsing
-                    _tool_result_clean = tool_result.replace("\\'", "'")
-                    parsed = json.loads(_tool_result_clean)
+                    parsed = json.loads(tool_result)
                     # Find the first array value in the response regardless of key name
                     items = None
                     array_key = None
@@ -1577,7 +1574,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                             sum(1 for k, v in parsed.items()
                                 if not isinstance(v, (list, dict)) and v not in (None, "", 0)
                                 and k not in ("total", "count", "total_count", "summary",
-                                              "message", "status", "error")) >= 3
+                                              "message", "status", "error",
+                                              # location/weather metadata — not content
+                                              "city", "state", "country", "latitude",
+                                              "longitude", "timezone")) >= 3
                         )
                         if _sibling_dicts or _sibling_scalars:
                             items = None  # skip list path → falls through to LLM call
@@ -1625,43 +1625,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                             except Exception as _ce:
                                 logger.warning(f"⚠️ Could not fetch chunk text: {_ce}")
 
-                        # ── Gmail batch summarization ─────────────────────────────────
-                        # If this is an email list, summarize all previews in one LLM call
-                        # rather than one call per email (which takes 90+ seconds).
-                        _email_summaries = {}
-                        _is_email_list = (
-                            items and isinstance(items[0], dict)
-                            and items[0].get("subject") and items[0].get("from")
-                        )
-                        if _is_email_list:
-                            import html as _html_batch, re as _re_batch
-                            _email_texts = []
-                            for _ei, _em in enumerate(items, 1):
-                                _raw = _html_batch.unescape(_em.get("preview", ""))
-                                _raw = _re_batch.sub(r'[͏​-‏­⁠﻿ ]', ' ', _raw)
-                                _raw = _re_batch.sub(r'-{5,}.*?(?:Forwarded|Original) message.*?-{5,}', '', _raw, flags=_re_batch.DOTALL | _re_batch.IGNORECASE)
-                                _raw = _re_batch.sub(r'\s{2,}', ' ', _raw).strip()[:300]
-                                _email_texts.append(f"{_ei}. Subject: {_em.get('subject','')}\nFrom: {_em.get('from','')}\nPreview: {_raw}")
-                            _batch_prompt = (
-                                "Summarize each email in one short sentence (max 15 words). "
-                                "Return ONLY a numbered list matching the input numbers. "
-                                "Be specific — mention names, amounts, actions. No preamble.\n\n"
-                                + "\n\n".join(_email_texts)
-                            )
-                            try:
-                                _batch_resp = await active_llm.ainvoke([
-                                    HumanMessage(content=_batch_prompt)
-                                ])
-                                _batch_text = _batch_resp.content.strip() if hasattr(_batch_resp, "content") else ""
-                                # Parse "N. summary" lines
-                                for _line in _batch_text.splitlines():
-                                    _m = _re_batch.match(r'^(\d+)[.)]\s*(.+)', _line.strip())
-                                    if _m:
-                                        _email_summaries[int(_m.group(1))] = _m.group(2).strip()
-                            except Exception as _be:
-                                logger.warning(f"⚠️ Email batch summarization failed: {_be}")
-                        # ── End Gmail batch summarization ──────────────────────────────
-
                         for i, item in enumerate(items, 1):
                             if not isinstance(item, dict):
                                 list_lines.append(f"{i}. {item}")
@@ -1670,7 +1633,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                             # Build a title from common fields
                             title = (
                                 item.get("title")
-                                or item.get("subject")
                                 or item.get("name")
                                 or item.get("source")
                                 or item.get("date")
@@ -1684,55 +1646,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                             # Score label for search results
                             score = item.get("score")
                             score_label = f" (score: {score:.2f})" if score is not None else ""
-
-                            # ── Gmail item shortcut ───────────────────────────────────────
-                            if item.get("subject") and item.get("from"):
-                                _e_subject  = item.get("subject", "(no subject)")
-                                _e_from     = item.get("from", "")
-                                _e_date     = item.get("date", "")
-                                _e_link     = item.get("link", "")
-                                _e_id       = item.get("id", "")
-                                _e_summary  = _email_summaries.get(i, "")
-                                _e_title_md = f"[{_e_subject}]({_e_link})" if _e_link else _e_subject
-                                list_lines.append(f"{i}. {_e_title_md}")
-                                _e_meta = f"   {_e_from}"
-                                if _e_date:
-                                    _e_meta += f"  •  {_e_date}"
-                                list_lines.append(_e_meta)
-                                if _e_summary:
-                                    list_lines.append(f"   {_e_summary}")
-                                if _e_id:
-                                    list_lines.append(f"   `id: {_e_id}`")
-                                list_lines.append("")
-                                continue
-
-                            # ── Calendar item shortcut ────────────────────────────────────
-                            if item.get("when") or item.get("all_day") is not None:
-                                _ev_when    = item.get("when", "")
-                                _ev_loc     = item.get("location", "")
-                                _ev_notes   = (item.get("notes", "") or "")[:120]
-                                _ev_link    = item.get("calendar_link", "")
-                                _ev_meet    = item.get("meet_link", "")
-                                _ev_attend  = item.get("attendees", "")
-                                _ev_all_day = item.get("all_day", False)
-                                _ev_title_md = f"[{title}]({_ev_link})" if _ev_link else title
-                                _ev_line = f"{i}. {_ev_title_md}"
-                                if _ev_all_day:
-                                    _ev_line += " *(all day)*"
-                                elif _ev_when:
-                                    _ev_line += f" — {_ev_when}"
-                                list_lines.append(_ev_line)
-                                if _ev_loc:
-                                    list_lines.append(f"   📍 {_ev_loc}")
-                                if _ev_notes:
-                                    list_lines.append(f"   📝 {_ev_notes}")
-                                if _ev_attend:
-                                    list_lines.append(f"   👥 {_ev_attend}")
-                                if _ev_meet:
-                                    list_lines.append(f"   🎥 [Join Meet]({_ev_meet})")
-                                list_lines.append("")
-                                continue
-                            # ── End Google item shortcuts ─────────────────────────────────
 
                             # Get content: prefer cached chunk text, then common fields
                             chunk_id = item.get("chunk_id")
@@ -2171,9 +2084,12 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         print("   Add multi_agent.py to client/ directory to enable")
     print()
 
-    # Start HTTP server first, then open browser to private IP
-    _private_ip = utils.start_http_server(port=9000)
-    utils.open_browser_url(f"http://{_private_ip}:9000/client/ui/index.html")
+    # Open browser
+    index_path = PROJECT_ROOT / "client/ui/index.html"
+    utils.open_browser_file(index_path)
+
+    # Start HTTP server
+    utils.start_http_server(port=9000)
 
     # Start WebSocket servers
     websocket_server = await websocket.start_websocket_server(

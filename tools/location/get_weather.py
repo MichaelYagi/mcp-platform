@@ -90,12 +90,50 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
     if not results:
         return None
 
+    # Province/state abbreviation → full name (lowercase for comparison)
+    _ABBREV = {
+        "ab": "alberta", "bc": "british columbia", "mb": "manitoba",
+        "nb": "new brunswick", "nl": "newfoundland and labrador",
+        "ns": "nova scotia", "nt": "northwest territories", "nu": "nunavut",
+        "on": "ontario", "pe": "prince edward island", "qc": "quebec",
+        "sk": "saskatchewan", "yt": "yukon",
+        "al": "alabama", "ak": "alaska", "az": "arizona", "ar": "arkansas",
+        "ca": "california", "co": "colorado", "ct": "connecticut",
+        "de": "delaware", "fl": "florida", "ga": "georgia", "hi": "hawaii",
+        "id": "idaho", "il": "illinois", "in": "indiana", "ia": "iowa",
+        "ks": "kansas", "ky": "kentucky", "la": "louisiana", "me": "maine",
+        "md": "maryland", "ma": "massachusetts", "mi": "michigan",
+        "mn": "minnesota", "ms": "mississippi", "mo": "missouri",
+        "mt": "montana", "ne": "nebraska", "nv": "nevada",
+        "nh": "new hampshire", "nj": "new jersey", "nm": "new mexico",
+        "ny": "new york", "nc": "north carolina", "nd": "north dakota",
+        "oh": "ohio", "ok": "oklahoma", "or": "oregon", "pa": "pennsylvania",
+        "ri": "rhode island", "sc": "south carolina", "sd": "south dakota",
+        "tn": "tennessee", "tx": "texas", "ut": "utah", "vt": "vermont",
+        "va": "virginia", "wa": "washington", "wv": "west virginia",
+        "wi": "wisconsin", "wy": "wyoming", "dc": "district of columbia",
+        "nsw": "new south wales", "vic": "victoria", "qld": "queensland",
+        "sa": "south australia", "tas": "tasmania",
+        "act": "australian capital territory",
+        "by": "bavaria", "be": "berlin", "bb": "brandenburg", "hb": "bremen",
+        "hh": "hamburg", "he": "hesse", "ni": "lower saxony",
+        "nw": "north rhine-westphalia", "rp": "rhineland-palatinate",
+        "sl": "saarland", "sn": "saxony", "st": "saxony-anhalt",
+        "sh": "schleswig-holstein", "th": "thuringia",
+        "eng": "england", "sct": "scotland", "wls": "wales",
+        "nir": "northern ireland",
+    }
+
     # Try to match state/country if provided
     best = None
+    state_lower = state.lower() if state else ""
+    state_expanded = _ABBREV.get(state_lower, state_lower)
+
     for r in results:
         r_country = r.get("country", "").lower()
         r_state = r.get("admin1", "").lower()
         r_cc = r.get("country_code", "").lower()
+        r_state_code = r.get("admin1_code", "").lower()
 
         country_match = (
                 not country or
@@ -105,9 +143,11 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
         )
         state_match = (
                 not state or
-                state.lower() in r_state or
-                r_state in state.lower() or
-                state.lower() == r.get("admin1_code", "").lower()
+                state_lower in r_state or
+                r_state in state_lower or
+                state_lower == r_state_code or
+                state_expanded == r_state or
+                r_state in state_expanded
         )
 
         if country_match and state_match:
@@ -161,11 +201,20 @@ def get_weather(
         state = "BC"
         country = "Canada"
 
-    # Use existing resolve_location for any normalization it provides,
-    # then geocode to get lat/lon
-    loc = resolve_location(city, state, country)
+    # Use resolve_location for normalization, but fall back to raw values
+    # if it returns nothing useful — prevents Surrey/BC being mangled
+    try:
+        loc = resolve_location(city, state, country)
+        resolved_city    = loc.get("city")    or city
+        resolved_state   = loc.get("state")   or state
+        resolved_country = loc.get("country") or country
+    except Exception:
+        resolved_city, resolved_state, resolved_country = city, state, country
 
-    geo = _geocode(loc.get("city") or city, loc.get("state") or state, loc.get("country") or country)
+    geo = _geocode(resolved_city, resolved_state, resolved_country)
+    # If geocode failed with resolved values, retry with raw user-provided values
+    if not geo and (resolved_city != city or resolved_state != state):
+        geo = _geocode(city, state, country)
     if not geo:
         return json.dumps({
             "error": "geocode_failed",
