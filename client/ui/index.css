@@ -545,6 +545,8 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     font-family: 'Consolas', 'Monaco', monospace;
     color: #dcdcaa;
     margin-bottom: 2px;
+    flex: 1;
+    min-width: 0;
 }
 
 .tool-item-desc {
@@ -580,6 +582,50 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     background: rgba(86,156,214,0.06);
     border-style: dashed;
     opacity: 0.8;
+}
+/* ── Tool item actions (star + rate limit) ── */
+.tool-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.tool-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+/* ── Favorite star button ── */
+.tool-fav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #444;
+    padding: 0 2px;
+    line-height: 1;
+    transition: color 0.15s, transform 0.15s;
+    flex-shrink: 0;
+}
+.tool-fav-btn:hover { color: #f0c040; transform: scale(1.2); }
+.tool-fav-btn.active { color: #f0c040; }
+
+/* ── Favorites category ── */
+.tools-favorites-header {
+    color: #f0c040 !important;
+}
+.tools-favorites-header .tools-fav-count {
+    color: #858585;
+    font-weight: normal;
+}
+.tools-fav-empty {
+    padding: 0.5rem 1.5rem;
+    font-size: 0.72rem;
+    color: #555;
+    font-style: italic;
 }
 
 /* ── Log Panel ── */

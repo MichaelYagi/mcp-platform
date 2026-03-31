@@ -2499,3 +2499,34 @@ body {
     font-family: 'Share Tech Mono', monospace !important;
     color: #00ff41 !important;
 }
+/* matrix – favorites section */
+[data-theme="matrix"] .tools-favorites-header {
+    color: #00ff41 !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.5);
+    border-bottom: 1px solid #00ff4122;
+}
+[data-theme="matrix"] .tools-favorites-header .tools-fav-count {
+    color: #006622 !important;
+}
+[data-theme="matrix"] .tools-fav-empty {
+    color: #005522 !important;
+}
+[data-theme="matrix"] .tool-fav-btn {
+    color: #003311 !important;
+    background: none !important;
+    border: none !important;
+}
+[data-theme="matrix"] .tool-fav-btn:hover {
+    color: #00ff41 !important;
+    text-shadow: 0 0 8px rgba(0,255,65,0.8);
+}
+[data-theme="matrix"] .tool-fav-btn.active {
+    color: #00ff41 !important;
+    text-shadow: 0 0 8px rgba(0,255,65,0.6);
+}
+
+/* matrix – override yellow star with green in favorites header */
+[data-theme="matrix"] .tools-favorites-header .tools-fav-count,
+[data-theme="matrix"] .tools-favorites-category .tools-category-arrow {
+    color: #006622 !important;
+}

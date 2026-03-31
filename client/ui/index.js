@@ -888,18 +888,158 @@ function toggleToolsPanel() {
     else                { panel.classList.remove('open'); button.textContent = '🔧 Tools'; }
 }
 
+// ── Favorites ─────────────────────────────────────────────────
+const FAVORITES_KEY = 'mcp_tool_favorites';
+
+function getFavorites() {
+    try { return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || []; }
+    catch { return []; }
+}
+
+function setFavorites(favs) {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+}
+
+function isFavorite(toolName) {
+    return getFavorites().includes(toolName);
+}
+
+function toggleFavorite(toolName) {
+    const favs = getFavorites();
+    const idx = favs.indexOf(toolName);
+    if (idx === -1) favs.push(toolName);
+    else favs.splice(idx, 1);
+    setFavorites(favs);
+    return idx === -1;
+}
+// ──────────────────────────────────────────────────────────────
+
+function buildToolItem(tool, { onFavoriteToggle } = {}) {
+    const item = document.createElement('div');
+    const isDisabled = tool.enabled === false;
+    item.className = 'tool-item' + (isDisabled ? ' tool-disabled' : '');
+
+    const fullDesc = tool.description || '';
+    const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
+    const params = tool.required_params || [];
+    const optionalParams = [];
+    if (tool.example) {
+        const optMatches = tool.example.matchAll(/\[(\w+)=["'][^"']*["']\]/g);
+        for (const m of optMatches) optionalParams.push(m[1]);
+    }
+    const paramsHtml = (params.length || optionalParams.length)
+        ? `<div class="tool-item-params">${
+            params.map(p => `<span class="tool-param">${p.name}</span>`).join('')
+          }${
+            optionalParams.map(p => `<span class="tool-param tool-param-optional">[${p}]</span>`).join('')
+          }</div>`
+        : '';
+
+    const TAG_COLORS = {
+        destructive: '#e74c3c', write: '#e67e22', external: '#8e44ad',
+        ai: '#2980b9', search: '#27ae60', read: '#555', media: '#16a085',
+        calendar: '#2471a3', email: '#2471a3', notes: '#7d6608',
+        code: '#1a5276', system: '#6c3483', rag: '#117a65',
+        vision: '#922b21',
+    };
+    const tags = tool.tags || [];
+    const tagsHtml = tags.length
+        ? `<div class="tool-item-tags">${tags.map(t => {
+            const bg = TAG_COLORS[t] || '#444';
+            return `<span class="tool-tag" style="background:${bg}">${t}</span>`;
+        }).join('')}</div>`
+        : '';
+
+    const rateHtml = tool.rate_limit
+        ? `<span class="tool-rate-limit" title="Rate limit">⏱ ${tool.rate_limit}</span>`
+        : '';
+    const disabledHtml = isDisabled ? `<span class="tool-disabled-badge">disabled</span>` : '';
+
+    const fav = isFavorite(tool.name);
+    item.innerHTML = `
+        <div class="tool-item-header">
+            <div class="tool-item-name">${tool.name}${disabledHtml}</div>
+            <div class="tool-item-actions">
+                ${rateHtml}
+                <button class="tool-fav-btn${fav ? ' active' : ''}" title="${fav ? 'Remove from favorites' : 'Add to favorites'}" aria-label="Toggle favorite">★</button>
+            </div>
+        </div>
+        <div class="tool-item-desc">${previewDesc || 'No description available.'}</div>
+        ${tagsHtml}
+        ${paramsHtml}`;
+
+    const starBtn = item.querySelector('.tool-fav-btn');
+    starBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const added = toggleFavorite(tool.name);
+        starBtn.classList.toggle('active', added);
+        starBtn.title = added ? 'Remove from favorites' : 'Add to favorites';
+        if (onFavoriteToggle) onFavoriteToggle();
+    });
+
+    item.addEventListener('click', (e) => {
+        if (e.target === starBtn) return;
+        const inputEl = document.getElementById('input');
+        inputEl.value = getToolPrompt(tool.name, params);
+        inputEl.focus();
+        const firstQuote = inputEl.value.indexOf('""');
+        if (firstQuote !== -1) {
+            inputEl.selectionStart = inputEl.selectionEnd = firstQuote + 1;
+        } else {
+            inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
+        }
+        if (window.innerWidth <= 768) toggleToolsPanel();
+    });
+
+    return item;
+}
+
+let _allTools = [];
+
 function renderToolsPanel(tools) {
+    _allTools = tools;
     const body = document.getElementById('toolsBody');
     if (!body) return;
 
+    body.innerHTML = '';
+
+    // ── Favorites section ──────────────────────────────────────
+    const favNames = getFavorites();
+    const favTools = favNames.map(n => tools.find(t => t.name === n)).filter(Boolean);
+
+    const favCat = document.createElement('div');
+    favCat.className = 'tools-category tools-favorites-category';
+
+    const favHeader = document.createElement('div');
+    favHeader.className = 'tools-category-header tools-favorites-header';
+    favHeader.innerHTML = `<span>Favorites <span class="tools-fav-count">(${favTools.length})</span></span><span class="tools-category-arrow">▶</span>`;
+    favHeader.onclick = () => favCat.classList.toggle('open');
+
+    const favItemsDiv = document.createElement('div');
+    favItemsDiv.className = 'tools-category-items';
+
+    if (favTools.length === 0) {
+        favItemsDiv.innerHTML = '<div class="tools-fav-empty">Star a tool below to add it here</div>';
+    } else {
+        favTools.forEach(tool => {
+            favItemsDiv.appendChild(buildToolItem(tool, {
+                onFavoriteToggle: () => renderToolsPanel(_allTools)
+            }));
+        });
+    }
+
+    favCat.appendChild(favHeader);
+    favCat.appendChild(favItemsDiv);
+    if (favTools.length > 0) favCat.classList.add('open');
+    body.appendChild(favCat);
+
+    // ── Server groups ──────────────────────────────────────────
     const groups = {};
     tools.forEach(t => {
         const server = t.source_server || 'unknown';
         if (!groups[server]) groups[server] = [];
         groups[server].push(t);
     });
-
-    body.innerHTML = '';
 
     Object.keys(groups).sort().forEach(serverName => {
         const items = groups[serverName];
@@ -911,7 +1051,9 @@ function renderToolsPanel(tools) {
         header.className = 'tools-category-header';
         header.innerHTML = `<span>${serverName}${isExternal ? ' <span style="color:#858585;font-size:0.7rem;font-weight:normal;">[external]</span>' : ''} <span style="color:#858585;font-weight:normal;">(${items.length})</span></span><span class="tools-category-arrow">▶</span>`;
         header.onclick = () => {
-            body.querySelectorAll('.tools-category').forEach(c => { if (c !== cat) c.classList.remove('open'); });
+            body.querySelectorAll('.tools-category:not(.tools-favorites-category)').forEach(c => {
+                if (c !== cat) c.classList.remove('open');
+            });
             cat.classList.toggle('open');
         };
 
@@ -919,74 +1061,9 @@ function renderToolsPanel(tools) {
         itemsDiv.className = 'tools-category-items';
 
         items.sort((a, b) => a.name.localeCompare(b.name)).forEach(tool => {
-            const item = document.createElement('div');
-            const isDisabled = tool.enabled === false;
-            item.className = 'tool-item' + (isDisabled ? ' tool-disabled' : '');
-            const fullDesc = tool.description || '';
-            const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
-            const params = tool.required_params || [];
-            // Parse optional params from example string: [param=""] → optional badge
-            const optionalParams = [];
-            if (tool.example) {
-                const optMatches = tool.example.matchAll(/\[(\w+)=["'][^"']*["']\]/g);
-                for (const m of optMatches) optionalParams.push(m[1]);
-            }
-            const paramsHtml = (params.length || optionalParams.length)
-                ? `<div class="tool-item-params">${
-                    params.map(p => `<span class="tool-param">${p.name}</span>`).join('')
-                  }${
-                    optionalParams.map(p => `<span class="tool-param tool-param-optional">[${p}]</span>`).join('')
-                  }</div>`
-                : '';
-
-            // Tag badges — colour-coded by semantic meaning
-            const TAG_COLORS = {
-                destructive: '#e74c3c', write: '#e67e22', external: '#8e44ad',
-                ai: '#2980b9', search: '#27ae60', read: '#555', media: '#16a085',
-                calendar: '#2471a3', email: '#2471a3', notes: '#7d6608',
-                code: '#1a5276', system: '#6c3483', rag: '#117a65',
-                vision: '#922b21',
-            };
-            const tags = tool.tags || [];
-            const tagsHtml = tags.length
-                ? `<div class="tool-item-tags">${tags.map(t => {
-                    const bg = TAG_COLORS[t] || '#444';
-                    return `<span class="tool-tag" style="background:${bg}">${t}</span>`;
-                }).join('')}</div>`
-                : '';
-
-            // Rate limit note
-            const rateHtml = tool.rate_limit
-                ? `<span class="tool-rate-limit" title="Rate limit">⏱ ${tool.rate_limit}</span>`
-                : '';
-
-            // Disabled overlay
-            const disabledHtml = isDisabled
-                ? `<span class="tool-disabled-badge">disabled</span>`
-                : '';
-
-            item.innerHTML = `
-                <div class="tool-item-header">
-                    <div class="tool-item-name">${tool.name}${disabledHtml}</div>
-                    ${rateHtml}
-                </div>
-                <div class="tool-item-desc">${previewDesc || 'No description available.'}</div>
-                ${tagsHtml}
-                ${paramsHtml}`;
-            item.onclick = () => {
-                const inputEl = document.getElementById('input');
-                inputEl.value = getToolPrompt(tool.name, params);
-                inputEl.focus();
-                // If there are params with placeholders, place cursor inside the first ""
-                const firstQuote = inputEl.value.indexOf('""');
-                if (firstQuote !== -1) {
-                    inputEl.selectionStart = inputEl.selectionEnd = firstQuote + 1;
-                } else {
-                    inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
-                }
-                if (window.innerWidth <= 768) toggleToolsPanel();
-            };
-            itemsDiv.appendChild(item);
+            itemsDiv.appendChild(buildToolItem(tool, {
+                onFavoriteToggle: () => renderToolsPanel(_allTools)
+            }));
         });
 
         cat.appendChild(header);
