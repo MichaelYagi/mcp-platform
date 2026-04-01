@@ -416,9 +416,8 @@ class CapabilityRegistry:
                 example=example,
             )
 
-            if not already_global:
-                # Key by "server:tool_name" so same tool name across servers are all stored.
-                self._tools[f"{source}:{name}"] = cap
+            # Key by "server:tool_name" so same tool name across servers are all stored.
+            self._tools[f"{source}:{name}"] = cap
             server_tools.setdefault(source, []).append(cap)
 
         for server_name, tool_list in server_tools.items():

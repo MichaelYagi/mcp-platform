@@ -1085,9 +1085,7 @@ def should_continue_after_tools(state: AgentState) -> str:
     # No feedback - normal end
     return "end"
 
-def _needs_web_search(message: str) -> bool:
-    """Delegate entirely to classify() — single source of truth in query_patterns.py."""
-    return classify(message).needs_web_search
+
 
 
 def create_langgraph_agent(llm_with_tools, tools):
@@ -1900,27 +1898,30 @@ def create_langgraph_agent(llm_with_tools, tools):
                         break
             return result
 
+        def _get_tool_meta(tool):
+            """Extract __tool_meta__ from a tool, unwrapping decorator layers."""
+            fn = getattr(tool, "func", None) or getattr(tool, "_func", None) or tool
+            meta = getattr(fn, "__tool_meta__", None)
+            if meta is None:
+                inner = getattr(fn, "func", None) or getattr(fn, "_func", None)
+                if inner and inner is not fn:
+                    meta = getattr(inner, "__tool_meta__", None)
+            return meta
+
         def match_intent(user_message: str, all_tools: list, base_llm, logger, conversation_state,
                          capability_registry=None):
             """
-            Route query to the right tool subset using classify() from query_patterns.py.
-            That module is the single source of truth — no pattern matching here.
+            Route query to the right tool subset using @tool_meta triggers.
+            @tool_meta is the single source of truth — query_patterns.py is not used.
 
-            When capability_registry is available:
-            - Uses registry.filter_by_tags() for richer tool selection
-            - Injects registry.to_agent_prompt() into system context for general queries
-              so the LLM sees a live capability map rather than guessing
+            Routing priority:
+            1. Active code project context → bind code-tagged tools
+            2. @tool_meta trigger match — substring match against user message
+            3. General fallback — bind 0 tools, LLM answers from context
             """
-            available_tool_names = [t.name for t in all_tools if hasattr(t, 'name')]
-            intent = classify(user_message, available_tool_names=available_tool_names)
+            msg_lower = user_message.lower()
 
-            # Pure conversational / recall / creative — no tools, keeps context clean
-            if intent.is_conversational:
-                logger.info("🎯 No-tool query → binding 0 tools")
-                return base_llm.bind_tools([]), "no_tools"
-
-            # Project context override: only force code tools when the injected context
-            # contains an "Active Project:" path pointing to actual code.
+            # ── 1. Project context override ───────────────────────────────────
             import re as _re
             _CODE_PATH_RE = _re.compile(
                 r'Active Project:.*\.(py|js|ts|jsx|tsx|go|rs|java|kt|cs|cpp|c|rb|php)'
@@ -1930,85 +1931,63 @@ def create_langgraph_agent(llm_with_tools, tools):
             for msg in reversed(conversation_state.get("messages", [])[-5:]):
                 if isinstance(msg, SystemMessage) and "Active Project:" in msg.content:
                     if _CODE_PATH_RE.search(msg.content):
-                        logger.info("[LangGraph] 🎯 Found code project context → forcing code_assistant tools")
-                        # Registry path: filter by code tags
+                        logger.info("[LangGraph] 🎯 Found code project context → forcing code tools")
                         if capability_registry:
                             filtered = [
                                 t for t in all_tools
-                                if hasattr(t, 'name') and (
+                                if hasattr(t, "name") and (
                                     cap := capability_registry.get_tool(t.name)
                                 ) and "code" in (cap.tags if cap else [])
                             ]
                         else:
-                            filtered = _filter_tools(all_tools, [
-                                "analyze_project", "analyze_code_file", "fix_code_file",
-                                "suggest_improvements", "explain_code", "generate_tests",
-                                "refactor_code", "generate_code", "review_code",
-                                "search_code_in_directory", "scan_code_directory",
-                                "summarize_code", "debug_fix",
-                            ])
+                            filtered = [
+                                t for t in all_tools
+                                if (_get_tool_meta(t) or {}).get("tags") and
+                                "code" in (_get_tool_meta(t) or {}).get("tags", [])
+                            ]
                         if filtered:
-                            logger.info(f"   → {len(filtered)} code tools (context-based routing)")
+                            logger.info(f"   → {len(filtered)} code tools")
                             return base_llm.bind_tools(filtered), "code_assistant"
                     else:
-                        logger.info("[LangGraph] 📁 Project context is not a code path — skipping code tool override")
+                        logger.info("[LangGraph] 📁 Project context not a code path — skipping")
                     break
 
-            # Web-search-only intents: classified but no MCP tools needed
-            if intent.needs_web_search and not intent.tools:
-                logger.info(f"🎯 {intent.category} → web search only, binding 0 tools")
-                return base_llm.bind_tools([]), intent.category
+            # ── 2. @tool_meta trigger matching ────────────────────────────────
+            # Group matched tools by intent_category so related tools are bound together
+            # e.g. "weather" matches get_weather_tool AND get_location_tool
+            category_tools: dict[str, list] = {}
+            for tool in all_tools:
+                meta = _get_tool_meta(tool)
+                if not meta:
+                    continue
+                triggers = meta.get("triggers", [])
+                category = meta.get("intent_category") or (meta.get("tags") or ["general"])[0]
+                for trigger in triggers:
+                    if trigger.lower() in msg_lower:
+                        if category not in category_tools:
+                            category_tools[category] = []
+                        category_tools[category].append(tool)
+                        logger.info(f"🎯 trigger match: '{trigger}' → {tool.name} [{category}]")
+                        break
 
-            # Matched intent with tools
-            if intent.tools:
-                # Registry path: look up what tags the matched tools actually carry,
-                # then filter all live tools by those tags. This is fully automatic —
-                # new tools with matching tags are included without any code change.
-                if capability_registry:
-                    # Collect tags from any intent-matched tool that's in the registry
-                    _intent_tags: set[str] = set()
-                    for _tname in intent.tools:
-                        _cap = capability_registry.get_tool(_tname)
-                        if _cap and _cap.tags:
-                            _intent_tags.update(_cap.tags)
-                    # Remove tags too broad to filter by meaningfully
-                    _intent_tags -= {"read", "write", "ai", "external"}
+            if category_tools:
+                # Pick the category with the most specific (longest) trigger match
+                best_category = max(category_tools, key=lambda c: len(category_tools[c]))
+                matched = category_tools[best_category]
+                # Also include same-category tools that didn't trigger but share the category
+                for tool in all_tools:
+                    if tool in matched:
+                        continue
+                    meta = _get_tool_meta(tool)
+                    if not meta:
+                        continue
+                    cat = meta.get("intent_category") or (meta.get("tags") or ["general"])[0]
+                    if cat == best_category:
+                        matched.append(tool)
+                logger.info(f"🎯 tool_meta → {best_category}: {[t.name for t in matched[:5]]}")
+                return base_llm.bind_tools(matched), best_category
 
-                    if _intent_tags:
-                        reg_tools = capability_registry.filter_by_tags(list(_intent_tags))
-                        reg_names = {t.name for t in reg_tools}
-                        filtered = [t for t in all_tools if hasattr(t, "name") and t.name in reg_names]
-                        if filtered:
-                            logger.info(f"🎯 {intent.category} → registry tag filter {sorted(_intent_tags)}")
-                            logger.info(f"   → {len(filtered)} tools: {[t.name for t in filtered[:5]]}")
-                            return base_llm.bind_tools(filtered), intent.category
-
-                # Fallback: original name-based filter
-                filtered = _filter_tools(all_tools, intent.tools)
-                if filtered:
-                    logger.info(f"🎯 {intent.category} → name filter")
-                    logger.info(f"   → {len(filtered)} tools: {[t.name for t in filtered[:5]]}")
-                    return base_llm.bind_tools(filtered), intent.category
-
-            # General fallback — inject capability prompt so the LLM knows what's available
-            # without binding all tools (which overwhelms weak models)
-            if capability_registry:
-                cap_prompt = capability_registry.to_agent_prompt()
-                if cap_prompt:
-                    # Inject as a ephemeral SystemMessage so the LLM sees live capabilities
-                    # This is NOT stored in conversation history — only in the current LLM call
-                    logger.info("🎯 General query → injecting capability prompt, binding 0 tools")
-                    augmented = list(conversation_state.get("messages", []))
-                    augmented.append(SystemMessage(content=(
-                        "AVAILABLE TOOLS (reference only — do not call unless user explicitly requests):\n"
-                        + cap_prompt
-                    )))
-                    # Temporarily update state messages so call_model uses augmented list
-                    # We mutate a local copy — state is not modified
-                    conversation_state = dict(conversation_state)
-                    conversation_state["messages"] = augmented
-                    return base_llm.bind_tools([]), "general_with_caps"
-
+            # ── 3. General fallback ───────────────────────────────────────────
             logger.info("🎯 General query → binding 0 tools")
             return base_llm.bind_tools([]), "general"
 
@@ -2238,26 +2217,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                             "current_model": current_model
                         }
 
-                needs_current_info = _needs_web_search(user_message)
 
-                if needs_current_info:
-                    logger.info("[LangGraph] 🔍 Trying web search fallback for current info")
-                    search_client = get_search_client()
-
-                    if search_client.is_available():
-                        search_result = await search_client.search(user_message)
-
-                        if search_result["success"] and search_result["results"]:
-                            logger.info("[LangGraph] ✅ Web search successful - augmenting")
-                            search_context = search_result["results"]
-                            augmented_prompt = WEB_SEARCH_UPDATE.format(
-                                previous_answer=response.content,
-                                search_context=search_context,
-                            )
-
-                            retry_messages = messages + [response, HumanMessage(content=augmented_prompt)]
-                            response = await base_llm.ainvoke(retry_messages)
-                            current_model = get_model_name(base_llm)
 
             return {
                 "messages": [response],

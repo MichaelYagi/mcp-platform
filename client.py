@@ -1020,7 +1020,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     # Matches:  "use tool_name: arg value"
     #           "use tool_name"            (no-arg tools)
     _USE_TOOL_RE = _re.compile(
-        r'^\s*use\s+(\w+)\s*(?::\s*(.*))?$',
+        r'^\s*use\s+(\w+)\s*(?:[:\s]\s*(.*))?$',
         _re.IGNORECASE
     )
 
@@ -1079,9 +1079,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         v = v[1:-1]
                     # Drop empty-string values for optional params — user left the
                     # bracket placeholder blank (e.g. [use_thumbnail=""]).
-                    # Passing "" to a bool/int pydantic field causes a validation error.
-                    if v == "" and k not in required_params:
-                        continue
+                     # Passing "" to a bool/int pydantic field causes a validation error.
+                    if v == "":
+                        continue  # always drop empty strings — let pydantic defaults apply
                     tool_args[k] = v
             else:
                 # If arg contains a URL or file path with preceding text, extract it
