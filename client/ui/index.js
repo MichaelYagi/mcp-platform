@@ -1064,7 +1064,7 @@ function renderToolsPanel(tools) {
 
     const favHeader = document.createElement('div');
     favHeader.className = 'tools-category-header tools-favorites-header';
-    favHeader.innerHTML = `<span>⭐ Favorites <span class="tools-fav-count">(${favTools.length})</span></span><span class="tools-category-arrow">▶</span>`;
+    favHeader.innerHTML = `<span>Favorites <span class="tools-fav-count">(${favTools.length})</span></span><span class="tools-category-arrow">▶</span>`;
     favHeader.onclick = () => favCat.classList.toggle('open');
 
     const favItemsDiv = document.createElement('div');

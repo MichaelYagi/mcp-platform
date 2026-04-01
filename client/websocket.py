@@ -938,6 +938,12 @@ async def start_websocket_server(agent, tools, logger, conversation_state, run_a
         except websockets.exceptions.ConnectionClosed:
             pass
 
+    # Suppress noisy "no close frame received or sent" errors from the
+    # websockets library — these are normal when mobile tabs switch/reconnect
+    # and the client drops TCP without sending a WS close frame.
+    import logging as _logging
+    _logging.getLogger("websockets.server").setLevel(_logging.CRITICAL)
+
     # ping_interval keeps the TCP connection alive through sleep/idle.
     # ping_timeout gives the client 60s to respond before dropping.
     server = await websockets.serve(handler, host, port,
