@@ -168,6 +168,16 @@ def _calendar_service():
     return build("calendar", "v3", credentials=creds)
 
 
+def _get_all_calendar_ids(service) -> list[str]:
+    """Return all calendar IDs the user has access to, including shared calendars."""
+    try:
+        result = service.calendarList().list().execute()
+        return [cal["id"] for cal in result.get("items", [])]
+    except Exception as e:
+        logger.warning(f"⚠️  Could not fetch calendar list: {e} — falling back to primary")
+        return ["primary"]
+
+
 def _not_available(tool_name: str) -> str:
     return json.dumps({
         "error": "Google API libraries not installed",
@@ -215,7 +225,7 @@ def _extract_body(payload: dict) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","search","email","external"],triggers=["unread emails","new emails","check email","do i have mail"],idempotent=False,example="use gmail_get_unread",intent_category="google",text_fields=["preview"])
+@tool_meta(tags=["read","search","email","external"],triggers=["unread emails","new emails","check email","do i have mail"],idempotent=False,example="use gmail_get_unread",intent_category="google",text_fields=["text"])
 def gmail_get_unread(max_results: int = 25) -> str:
     """
     Fetch all unread emails from Gmail inbox.
@@ -272,6 +282,20 @@ def gmail_get_unread(max_results: int = 25) -> str:
                 "id":      _msg_id,
             })
 
+        # Add formatted text to each email
+        import html as _html
+        for em in emails:
+            em["from"]    = _html.unescape(em["from"])
+            em["subject"] = _html.unescape(em["subject"])
+            em["preview"] = _html.unescape(em["preview"])
+            em["text"] = (
+                f"From: {em['from']}\n"
+                f"Subject: {em['subject']}\n"
+                f"Date: {em['date']}\n"
+                f"Preview: {em['preview']}\n"
+                f"ID: {em['id']}\n"
+                f"Link: {em['link']}"
+            )
         logger.info(f"✅ Fetched {len(emails)} unread emails")
         return json.dumps({
             "total_unread": len(emails),
@@ -288,7 +312,7 @@ def gmail_get_unread(max_results: int = 25) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","search","email","external"],triggers=["recent emails","my inbox","show emails","latest emails"],idempotent=False,example="use gmail_get_recent",intent_category="google",text_fields=["preview"])
+@tool_meta(tags=["read","search","email","external"],triggers=["recent emails","my inbox","show emails","latest emails"],idempotent=False,example="use gmail_get_recent",intent_category="google",text_fields=["text"])
 def gmail_get_recent(max_results: int = 10) -> str:
     """
     Fetch the most recent emails from Gmail inbox (read and unread).
@@ -348,6 +372,20 @@ def gmail_get_recent(max_results: int = 10) -> str:
                 "id":      _msg_id,
             })
 
+        import html as _html
+        for em in emails:
+            em["from"]    = _html.unescape(em["from"])
+            em["subject"] = _html.unescape(em["subject"])
+            em["preview"] = _html.unescape(em["preview"])
+            em["text"] = (
+                f"From: {em['from']}\n"
+                f"Subject: {em['subject']}\n"
+                f"Date: {em['date']}\n"
+                f"Preview: {em['preview']}\n"
+                f"Read: {'No' if em.get('unread') else 'Yes'}\n"
+                f"ID: {em['id']}\n"
+                f"Link: {em['link']}"
+            )
         logger.info(f"✅ Fetched {len(emails)} recent emails")
         return json.dumps({
             "count": len(emails),
@@ -568,8 +606,9 @@ def _format_event(event: dict, include_id: bool = False) -> dict:
         raw_attendees.append(a.get("displayName") or a.get("email", ""))
     attendees_str = ", ".join(raw_attendees) if raw_attendees else ""
 
+    title = event.get("summary", "(no title)")
     result = {
-        "title":   event.get("summary", "(no title)"),
+        "title":   title,
         "when":    when,
         "all_day": all_day,
     }
@@ -588,12 +627,22 @@ def _format_event(event: dict, include_id: bool = False) -> dict:
     if include_id:
         result["id"] = event.get("id", "")
 
+    # Pre-formatted summary for the list builder
+    summary_parts = [f"📅 {when}"]
+    if clean_desc:
+        summary_parts.append(f"   {clean_desc[:100]}")
+    if attendees_str:
+        summary_parts.append(f"   👥 {attendees_str}")
+    if event.get("hangoutLink"):
+        summary_parts.append(f"   🎥 {event['hangoutLink']}")
+    result["summary"] = "\n".join(summary_parts)
+
     return result
 
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","calendar","external"],triggers=["calendar today","schedule today","meetings today","whats on today"],idempotent=False,example="use calendar_get_today",intent_category="google",text_fields=["notes"])
+@tool_meta(tags=["read","calendar","external"],triggers=["calendar today","schedule today","meetings today","whats on today","what's on today","what do i have today","today's events","what's happening today","anything today"],idempotent=False,example="use calendar_get_today",intent_category="google",text_fields=["text"])
 def calendar_get_today() -> str:
     """
     Get all calendar events for today.
@@ -620,24 +669,69 @@ def calendar_get_today() -> str:
             raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
                                {"tool": "calendar_get_today"})
 
-        now = datetime.now(timezone.utc)
+        try:
+            from zoneinfo import ZoneInfo
+            from tools.location.resolve_timezone import resolve_timezone
+            _city    = os.getenv("DEFAULT_CITY", "")
+            _state   = os.getenv("DEFAULT_STATE", "")
+            _country = os.getenv("DEFAULT_COUNTRY", "")
+            _tz_name = resolve_timezone(_city, _state, _country)
+            _tz = ZoneInfo(_tz_name)
+        except Exception:
+            _tz = timezone.utc
+        now = datetime.now(_tz)
         start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
 
-        result = service.events().list(
-            calendarId="primary",
-            timeMin=start_of_day.isoformat(),
-            timeMax=end_of_day.isoformat(),
-            singleEvents=True,
-            orderBy="startTime"
-        ).execute()
+        calendar_ids = _get_all_calendar_ids(service)
+        events = []
+        seen_ids = set()
+        for cal_id in calendar_ids:
+            try:
+                result = service.events().list(
+                    calendarId=cal_id,
+                    timeMin=start_of_day.isoformat(),
+                    timeMax=end_of_day.isoformat(),
+                    singleEvents=True,
+                    orderBy="startTime"
+                ).execute()
+                for e in result.get("items", []):
+                    if e["id"] not in seen_ids:
+                        seen_ids.add(e["id"])
+                        events.append(_format_event(e))
+            except Exception as _ce:
+                logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
 
-        events = [_format_event(e) for e in result.get("items", [])]
+        events.sort(key=lambda e: e.get("start", ""))
+        logger.info(f"✅ Found {len(events)} events today across {len(calendar_ids)} calendar(s)")
 
-        logger.info(f"✅ Found {len(events)} events today")
+        # Build clean text output
+        date_label = start_of_day.strftime("%A, %B %-d %Y")
+        if not events:
+            text_out = f"No events today ({date_label})."
+        else:
+            lines = []
+            for i, ev in enumerate(events, 1):
+                lines.append(f"{i}. {ev['title']}")
+                lines.append(f"   - When: {ev['when']}")
+                if ev.get("notes"):
+                    lines.append(f"   - Notes: {ev['notes'][:200]}")
+                if ev.get("location"):
+                    lines.append(f"   - Location: {ev['location']}")
+                if ev.get("attendees"):
+                    lines.append(f"   - Attendees: {ev['attendees']}")
+                if ev.get("organizer"):
+                    lines.append(f"   - Organizer: {ev['organizer']}")
+                if ev.get("meet_link"):
+                    lines.append(f"   - Meet: {ev['meet_link']}")
+                if ev.get("calendar_link"):
+                    lines.append(f"   - Calendar Link: {ev['calendar_link']}")
+            text_out = "\n".join(lines)
+
         return json.dumps({
-            "date": start_of_day.strftime("%Y-%m-%d"),
-            "count": len(events),
+            "date":   start_of_day.strftime("%Y-%m-%d"),
+            "count":  len(events),
+            "text":   text_out,
             "events": events
         }, indent=2)
 
@@ -651,7 +745,7 @@ def calendar_get_today() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","calendar","external"],triggers=["this week calendar","weekly schedule","meetings this week","whats on this week"],idempotent=False,example="use calendar_get_this_week",intent_category="google",text_fields=["notes"])
+@tool_meta(tags=["read","calendar","external"],triggers=["this week calendar","weekly schedule","meetings this week","whats on this week"],idempotent=False,example="use calendar_get_this_week",intent_category="google",text_fields=["text"])
 def calendar_get_this_week() -> str:
     """
     Get all calendar events for the current week (Monday–Sunday).
@@ -678,47 +772,91 @@ def calendar_get_this_week() -> str:
             raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
                                {"tool": "calendar_get_this_week"})
 
-        now = datetime.now(timezone.utc)
+        try:
+            from zoneinfo import ZoneInfo
+            from tools.location.resolve_timezone import resolve_timezone
+            _city    = os.getenv("DEFAULT_CITY", "")
+            _state   = os.getenv("DEFAULT_STATE", "")
+            _country = os.getenv("DEFAULT_COUNTRY", "")
+            _tz_name = resolve_timezone(_city, _state, _country)
+            _tz = ZoneInfo(_tz_name)
+        except Exception:
+            _tz = timezone.utc
+        now = datetime.now(_tz)
         days_since_monday = now.weekday()
         monday = (now - timedelta(days=days_since_monday)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
         sunday = monday + timedelta(days=7)
 
-        result = service.events().list(
-            calendarId="primary",
-            timeMin=monday.isoformat(),
-            timeMax=sunday.isoformat(),
-            singleEvents=True,
-            orderBy="startTime"
-        ).execute()
+        calendar_ids = _get_all_calendar_ids(service)
+        raw_events = []
+        seen_ids = set()
+        for cal_id in calendar_ids:
+            try:
+                result = service.events().list(
+                    calendarId=cal_id,
+                    timeMin=monday.isoformat(),
+                    timeMax=sunday.isoformat(),
+                    singleEvents=True,
+                    orderBy="startTime"
+                ).execute()
+                for e in result.get("items", []):
+                    if e["id"] not in seen_ids:
+                        seen_ids.add(e["id"])
+                        raw_events.append(e)
+            except Exception as _ce:
+                logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
 
-        raw_events = result.get("items", [])
+        raw_events.sort(key=lambda e: (e.get("start") or {}).get("dateTime") or (e.get("start") or {}).get("date", ""))
 
-        # Format events, tracking current day to insert day-break headers in titles
-        formatted = []
-        current_day = None
+        # Group events by day
+        from datetime import datetime as _dt
+        by_day = {}  # "YYYY-MM-DD" -> list of formatted events
+        day_labels = {}  # "YYYY-MM-DD" -> "Monday Apr 1"
         for e in raw_events:
             start = e.get("start", {})
             day = (start.get("dateTime") or start.get("date", ""))[:10]
+            if not day:
+                continue
             ev = _format_event(e)
-            # Embed the day label into the title so the list builder shows it
-            if day and day != current_day:
-                current_day = day
+            if day not in by_day:
+                by_day[day] = []
                 try:
-                    from datetime import datetime as _dt
-                    day_label = _dt.fromisoformat(day).strftime("%A %b %-d")
+                    day_labels[day] = _dt.fromisoformat(day).strftime("%A, %B %-d")
                 except Exception:
-                    day_label = day
-                ev["_day_header"] = day_label
-            formatted.append(ev)
+                    day_labels[day] = day
+            by_day[day].append(ev)
 
-        logger.info(f"✅ Found {len(formatted)} events this week")
+        # Build a human-readable text block per day
+        total = sum(len(v) for v in by_day.values())
+        lines = []
+        for day in sorted(by_day.keys()):
+            lines.append(f"{day_labels[day]}")
+            for i, ev in enumerate(by_day[day], 1):
+                lines.append(f"  {i}. {ev['title']}")
+                lines.append(f"     - When: {ev['when']}")
+                if ev.get("notes"):
+                    lines.append(f"     - Notes: {ev['notes'][:200]}")
+                if ev.get("location"):
+                    lines.append(f"     - Location: {ev['location']}")
+                if ev.get("attendees"):
+                    lines.append(f"     - Attendees: {ev['attendees']}")
+                if ev.get("organizer"):
+                    lines.append(f"     - Organizer: {ev['organizer']}")
+                if ev.get("meet_link"):
+                    lines.append(f"     - Meet: {ev['meet_link']}")
+                if ev.get("calendar_link"):
+                    lines.append(f"     - Calendar Link: {ev['calendar_link']}")
+            lines.append("")
+
+        logger.info(f"✅ Found {total} events this week across {len(calendar_ids)} calendar(s)")
         return json.dumps({
             "week_start": monday.strftime("%Y-%m-%d"),
             "week_end":   (sunday - timedelta(days=1)).strftime("%Y-%m-%d"),
-            "count":      len(formatted),
-            "events":     formatted
+            "count":      total,
+            "text":       "\n".join(lines),
+            "by_day":     {day: by_day[day] for day in sorted(by_day.keys())},
         }, indent=2)
 
     except MCPToolError:
@@ -1020,14 +1158,25 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                 now = datetime.now(timezone.utc)
                 start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
                 end_of_day = start_of_day + timedelta(days=1)
-                res = service.events().list(
-                    calendarId="primary",
-                    timeMin=start_of_day.isoformat(),
-                    timeMax=end_of_day.isoformat(),
-                    singleEvents=True,
-                    orderBy="startTime"
-                ).execute()
-                events = [_format_event(e) for e in res.get("items", [])]
+                calendar_ids = _get_all_calendar_ids(service)
+                events = []
+                seen_ids = set()
+                for cal_id in calendar_ids:
+                    try:
+                        res = service.events().list(
+                            calendarId=cal_id,
+                            timeMin=start_of_day.isoformat(),
+                            timeMax=end_of_day.isoformat(),
+                            singleEvents=True,
+                            orderBy="startTime"
+                        ).execute()
+                        for e in res.get("items", []):
+                            if e["id"] not in seen_ids:
+                                seen_ids.add(e["id"])
+                                events.append(_format_event(e))
+                    except Exception as _ce:
+                        logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
+                events.sort(key=lambda e: e.get("start", ""))
                 result["calendar"] = {
                     "date":   start_of_day.strftime("%Y-%m-%d"),
                     "count":  len(events),

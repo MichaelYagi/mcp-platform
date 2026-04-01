@@ -1079,7 +1079,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         v = v[1:-1]
                     # Drop empty-string values for optional params — user left the
                     # bracket placeholder blank (e.g. [use_thumbnail=""]).
-                     # Passing "" to a bool/int pydantic field causes a validation error.
+                    # Passing "" to a bool/int pydantic field causes a validation error.
                     if v == "":
                         continue  # always drop empty strings — let pydantic defaults apply
                     tool_args[k] = v
@@ -1537,28 +1537,34 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 list_lines = None
                 try:
                     parsed = json.loads(tool_result)
-                    # Find the first array value in the response regardless of key name
+
                     items = None
                     array_key = None
-                    if isinstance(parsed, list):
-                        items = parsed
-                        array_key = "results"
+                    # If the result has a top-level "text" field, use it directly — no LLM
+                    if isinstance(parsed, dict) and parsed.get("text") and isinstance(parsed["text"], str):
+                        logger.info(f"📋 Using top-level text field directly")
+                        list_lines = [parsed["text"]]
                     else:
-                        for k, v in parsed.items():
-                            # Only treat as a list if items are dicts (not primitives like strings)
-                            if isinstance(v, list) and v and isinstance(v[0], dict):
-                                items = v
-                                array_key = k
-                                break
-                            # Handle one level of nesting: {scenes: {scenes: [...]}}
-                            elif isinstance(v, dict):
-                                for k2, v2 in v.items():
-                                    if isinstance(v2, list) and v2 and isinstance(v2[0], dict):
-                                        items = v2
-                                        array_key = k2
-                                        break
-                                if items:
+                        # Find the first array value in the response regardless of key name
+                        if isinstance(parsed, list):
+                            items = parsed
+                            array_key = "results"
+                        else:
+                            for k, v in parsed.items():
+                                # Only treat as a list if items are dicts (not primitives like strings)
+                                if isinstance(v, list) and v and isinstance(v[0], dict):
+                                    items = v
+                                    array_key = k
                                     break
+                                # Handle one level of nesting: {scenes: {scenes: [...]}}
+                                elif isinstance(v, dict):
+                                    for k2, v2 in v.items():
+                                        if isinstance(v2, list) and v2 and isinstance(v2[0], dict):
+                                            items = v2
+                                            array_key = k2
+                                            break
+                                    if items:
+                                        break
 
                     if items and isinstance(parsed, dict):
                         _sibling_dicts = (
@@ -1757,18 +1763,22 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                                     elif parts:
                                         summary = ", ".join(parts)
                             elif content_text:
-                                try:
-                                    _item_llm_start = _time.time()
-                                    resp = await active_llm.ainvoke([
-                                        SystemMessage(content=ITEM_SUMMARISE),
-                                        HumanMessage(content=content_text),
-                                    ])
-                                    summary = resp.content.strip() if hasattr(resp, "content") else ""
-                                    if _client_metrics is not None:
-                                        _client_metrics["llm_calls"] += 1
-                                        _client_metrics["llm_times"].append((_time.time(), _time.time() - _item_llm_start))
-                                except Exception:
-                                    summary = content_text[:120] + "..."
+                                # If item has a "text" field, use it directly — no LLM
+                                if item.get("text"):
+                                    summary = item["text"]
+                                else:
+                                    try:
+                                        _item_llm_start = _time.time()
+                                        resp = await active_llm.ainvoke([
+                                            SystemMessage(content=ITEM_SUMMARISE),
+                                            HumanMessage(content=content_text),
+                                        ])
+                                        summary = resp.content.strip() if hasattr(resp, "content") else ""
+                                        if _client_metrics is not None:
+                                            _client_metrics["llm_calls"] += 1
+                                            _client_metrics["llm_times"].append((_time.time(), _time.time() - _item_llm_start))
+                                    except Exception:
+                                        summary = content_text[:120] + "..."
 
                             list_lines.append(f"{i}. {title}{score_label}")
                             if summary:
