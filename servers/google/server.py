@@ -935,7 +935,7 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
 @mcp.tool()
 @check_tool_enabled(category="google")
 @tool_meta(tags=["read","email","calendar","external"],triggers=["my day","day briefing","morning briefing","what's on today","today's summary","how's my day"],idempotent=False,example='use get_day_briefing [max_emails=""] [forecast_days=""]',intent_category="google")
-def get_day_briefing(max_emails: int = 10, forecast_days: int = 1) -> str:
+def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int] = 1) -> str:
     """
     Get a combined briefing for today: weather, unread emails, and calendar events.
 
@@ -953,6 +953,8 @@ def get_day_briefing(max_emails: int = 10, forecast_days: int = 1) -> str:
         - calendar:  Today's events (same format as calendar_get_today)
         - errors:    Any per-section errors that occurred
     """
+    max_emails    = int(max_emails)    if max_emails    is not None else 10
+    forecast_days = int(forecast_days) if forecast_days is not None else 1
     logger.info(f"🛠  get_day_briefing called (max_emails={max_emails}, forecast_days={forecast_days})")
 
     result = {"weather": None, "email": None, "calendar": None, "errors": {}}
