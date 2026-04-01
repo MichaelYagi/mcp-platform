@@ -642,7 +642,7 @@ ws.onmessage = (event) => {
         // Add the new session to the local list so it appears immediately
         const newSession = { id: data.session_id, name: data.name || 'Untitled Session', created_at: new Date().toISOString() };
         allSessions.unshift(newSession);
-        if (sessionsSidebarOpen) renderSessions(allSessions);
+        renderSessions(allSessions);
         return;
     }
     if (data.type==='session_name_updated') { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;if(sessionsSidebarOpen)renderSessions(allSessions);} return; }
