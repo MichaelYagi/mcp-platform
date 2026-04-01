@@ -101,19 +101,22 @@ def tool_meta(
         # Do NOT set __wrapped__ — a self-referential __wrapped__ = fn
         # causes inspect.signature() to loop forever when mcp.run() introspects tools.
 
-        # Encode example into the docstring so it survives the MCP process boundary.
-        # websocket.py extracts and strips this sentinel from tool.description.
+        # Encode example and triggers into the docstring so they survive the MCP
+        # process boundary. capability_registry.py extracts them from tool.description.
+        doc_suffix = ""
         if example:
-            sentinel = f"\n\n__example__: {example}"
+            doc_suffix += f"\n\n__example__: {example}"
+        if triggers:
+            doc_suffix += f"\n\n__triggers__: {','.join(triggers)}"
+        if intent_category:
+            doc_suffix += f"\n\n__intent_category__: {intent_category}"
+        if tags:
+            doc_suffix += f"\n\n__tags__: {','.join(tags)}"
+        if doc_suffix:
             if fn.__doc__:
-                fn.__doc__ = fn.__doc__.rstrip() + sentinel
+                fn.__doc__ = fn.__doc__.rstrip() + doc_suffix
             else:
-                fn.__doc__ = sentinel
-
-        # Registration of routing triggers into query_patterns happens in
-        # CapabilityRegistry.build() in the client process, not here.
-        # Server subprocesses import this decorator but do nothing with triggers
-        # at decoration time — no imports, no side effects, no hangs.
+                fn.__doc__ = doc_suffix.lstrip()
 
         return fn
     return decorator

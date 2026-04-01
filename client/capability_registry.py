@@ -390,18 +390,38 @@ class CapabilityRegistry:
                 if inner and inner is not fn:
                     meta = get_meta(inner)
 
+            # Extract sentinels from tool description — these survive the MCP boundary
+            # injected by @tool_meta into the docstring
+            _desc = (tool.description or "")
+            def _extract_sentinel(desc, key):
+                sentinel = f"\n\n__{key}__: "
+                if sentinel in desc:
+                    return desc.split(sentinel, 1)[1].split("\n\n__")[0].strip()
+                return ""
+
+            _example_from_desc         = _extract_sentinel(_desc, "example")
+            _triggers_from_desc_raw    = _extract_sentinel(_desc, "triggers")
+            _intent_cat_from_desc      = _extract_sentinel(_desc, "intent_category")
+            _tags_from_desc_raw        = _extract_sentinel(_desc, "tags")
+            _triggers_from_desc        = [t.strip() for t in _triggers_from_desc_raw.split(",") if t.strip()] if _triggers_from_desc_raw else []
+            _tags_from_desc            = [t.strip() for t in _tags_from_desc_raw.split(",") if t.strip()] if _tags_from_desc_raw else []
+
             if meta is not None:
-                tags       = meta.get("tags") or _TOOL_TAGS.get(name, [])
-                rate_limit = meta.get("rate_limit") if meta.get("rate_limit") is not None \
-                             else _TOOL_RATE_LIMITS.get(name)
-                idempotent = meta.get("idempotent") if meta.get("idempotent") is not None \
-                             else _TOOL_IDEMPOTENT.get(name, True)
-                example    = meta.get("example") or ""
+                tags            = meta.get("tags") or _tags_from_desc or _TOOL_TAGS.get(name, [])
+                rate_limit      = meta.get("rate_limit") if meta.get("rate_limit") is not None \
+                                  else _TOOL_RATE_LIMITS.get(name)
+                idempotent      = meta.get("idempotent") if meta.get("idempotent") is not None \
+                                  else _TOOL_IDEMPOTENT.get(name, True)
+                example         = meta.get("example") or _example_from_desc or ""
+                triggers        = meta.get("triggers") or _triggers_from_desc or []
+                intent_category = meta.get("intent_category") or _intent_cat_from_desc or None
             else:
-                tags       = _TOOL_TAGS.get(name, [])
-                rate_limit = _TOOL_RATE_LIMITS.get(name)
-                idempotent = _TOOL_IDEMPOTENT.get(name, True)
-                example    = ""
+                tags            = _tags_from_desc or _TOOL_TAGS.get(name, [])
+                rate_limit      = _TOOL_RATE_LIMITS.get(name)
+                idempotent      = _TOOL_IDEMPOTENT.get(name, True)
+                example         = _example_from_desc or ""
+                triggers        = _triggers_from_desc
+                intent_category = _intent_cat_from_desc or None
 
             cap = ToolCapability(
                 name=name,
@@ -415,6 +435,18 @@ class CapabilityRegistry:
                 external=source in external_servers,
                 example=example,
             )
+
+            # Store triggers and intent_category on the live tool's metadata
+            # so langgraph.py can read them without needing __tool_meta__
+            if triggers or intent_category:
+                if tool.metadata is None:
+                    tool.metadata = {}
+                if triggers:
+                    tool.metadata["triggers"] = triggers
+                if intent_category:
+                    tool.metadata["intent_category"] = intent_category
+                if tags:
+                    tool.metadata["tags"] = tags
 
             # Key by "server:tool_name" so same tool name across servers are all stored.
             self._tools[f"{source}:{name}"] = cap

@@ -518,28 +518,6 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     }))
                 continue
 
-            if data.get("type") == "get_setting" and session_manager:
-                key = data.get("key")
-                if key:
-                    value = session_manager.get_setting(key)
-                    await websocket.send(json.dumps({
-                        "type": "setting_value",
-                        "key": key,
-                        "value": value
-                    }))
-                continue
-
-            if data.get("type") == "set_setting" and session_manager:
-                key   = data.get("key")
-                value = data.get("value")
-                if key is not None and value is not None:
-                    session_manager.set_setting(key, str(value))
-                    await websocket.send(json.dumps({
-                        "type": "setting_saved",
-                        "key": key
-                    }))
-                continue
-
             # ═══════════════════════════════════════════════════════════
             # IMMEDIATE STOP HANDLING - Always processed immediately
             # ═══════════════════════════════════════════════════════════
@@ -689,14 +667,16 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         except Exception as _schema_err:
                             logger.debug(f"⚠️ Schema extraction failed for {tool.name}: {_schema_err}")
 
-                        # Extract __example__ sentinel from description (injected by @tool_meta)
+                        # Extract sentinels from description (injected by @tool_meta into docstring)
                         _raw_desc = (tool.description or "").strip()
                         _example_from_meta = ""
-                        _sentinel = "\n\n__example__: "
-                        if _sentinel in _raw_desc:
-                            _parts = _raw_desc.split(_sentinel, 1)
-                            _raw_desc = _parts[0].strip()
-                            _example_from_meta = _parts[1].strip()
+                        # Strip all @tool_meta sentinels, capture example value
+                        import re as _re_ws
+                        _ex_m = _re_ws.search(r'\n\n__example__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
+                        if _ex_m:
+                            _example_from_meta = _ex_m.group(1).strip()
+                        # Remove all sentinels from description shown in UI
+                        _raw_desc = _re_ws.sub(r'\n\n__(?:example|triggers|intent_category|tags)__:.*?(?=\n\n__|$)', '', _raw_desc, flags=_re_ws.DOTALL).strip()
 
                         tools_payload.append({
                             "name": tool.name,
@@ -937,12 +917,6 @@ async def start_websocket_server(agent, tools, logger, conversation_state, run_a
             )
         except websockets.exceptions.ConnectionClosed:
             pass
-
-    # Suppress noisy "no close frame received or sent" errors from the
-    # websockets library — these are normal when mobile tabs switch/reconnect
-    # and the client drops TCP without sending a WS close frame.
-    import logging as _logging
-    _logging.getLogger("websockets.server").setLevel(_logging.CRITICAL)
 
     # ping_interval keeps the TCP connection alive through sleep/idle.
     # ping_timeout gives the client 60s to respond before dropping.

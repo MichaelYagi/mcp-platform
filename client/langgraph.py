@@ -1899,7 +1899,15 @@ def create_langgraph_agent(llm_with_tools, tools):
             return result
 
         def _get_tool_meta(tool):
-            """Extract __tool_meta__ from a tool, unwrapping decorator layers."""
+            """Extract __tool_meta__ from a tool, checking tool.metadata first
+            (populated by CapabilityRegistry from @tool_meta), then unwrapping
+            decorator layers as fallback for locally-defined tools."""
+            # Primary: CapabilityRegistry stores triggers/tags/intent_category on metadata
+            if hasattr(tool, "metadata") and tool.metadata:
+                m = tool.metadata
+                if m.get("triggers") or m.get("tags"):
+                    return m
+            # Fallback: walk decorator chain for __tool_meta__ attribute
             fn = getattr(tool, "func", None) or getattr(tool, "_func", None) or tool
             meta = getattr(fn, "__tool_meta__", None)
             if meta is None:
