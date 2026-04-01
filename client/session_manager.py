@@ -78,6 +78,36 @@ class SessionManager:
             ON messages(created_at)
         ''')
 
+        # Settings table — generic key/value store for UI preferences
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        conn.commit()
+        conn.close()
+
+    def get_setting(self, key: str, default=None):
+        """Get a setting value by key."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else default
+
+    def set_setting(self, key: str, value: str):
+        """Set a setting value (upsert)."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO settings (key, value, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP
+        ''', (key, value))
         conn.commit()
         conn.close()
 

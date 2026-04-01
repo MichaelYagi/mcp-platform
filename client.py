@@ -2085,8 +2085,16 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     print()
 
     # Open browser
-    index_path = PROJECT_ROOT / "client/ui/index.html"
-    utils.open_browser_file(index_path)
+    import socket
+    try:
+        # Connect to an external address to find the real outbound interface IP
+        _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        _s.connect(("8.8.8.8", 80))
+        _host_ip = _s.getsockname()[0]
+        _s.close()
+    except Exception:
+        _host_ip = "localhost"
+    utils.open_browser_url(f"http://{_host_ip}:9000/client/ui/index.html")
 
     # Start HTTP server
     utils.start_http_server(port=9000)

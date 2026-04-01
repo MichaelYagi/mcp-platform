@@ -536,38 +536,88 @@ function hideThinking() {
 // WEBSOCKET
 // ============================================================
 const hostname = window.location.hostname || 'localhost';
-const ws = new WebSocket(`ws://${hostname}:8765`);
-ws.onerror = () => { status.textContent = "WebSocket error"; hideThinking(); };
-ws.onclose = () => { status.textContent = "Disconnected"; sendBtn.disabled = true; hideThinking(); };
-
-// Only restore session on the FIRST connection, not on every reconnect.
-// Reconnects (network blips, tab focus) were resetting backend conversation
-// state mid-session, causing instructions and context to be lost.
+const FAVORITES_SETTING_KEY = 'tool_favorites'; // declared here — used in onopen before favorites section
+let ws;
 let _wsHasConnected = false;
+let _wsReconnectTimer = null;
+let _wsReconnectDelay = 1000;
 
-ws.onopen = () => {
-    sendBtn.disabled = false;
-    updateStatusWithMode();
-    ws.send(JSON.stringify({ type:"list_models" }));
-    ws.send(JSON.stringify({ type:"list_tools" }));
-    ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
-    connectLogWebSocket();
-    if (!_wsHasConnected) {
-        _wsHasConnected = true;
-        const savedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
-        if (savedSessionId && savedSessionId !== '') {
-            const sessionId = parseInt(savedSessionId);
-            if (!isNaN(sessionId)) {
+function connectMainWS() {
+    if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+
+    try { ws = new WebSocket(`ws://${hostname}:8765`); }
+    catch (e) { scheduleReconnect(); return; }
+
+    ws.onerror = () => { status.textContent = "WebSocket error"; hideThinking(); };
+
+    ws.onclose = () => {
+        status.textContent = "Disconnected";
+        sendBtn.disabled = true;
+        hideThinking();
+        scheduleReconnect();
+    };
+
+    ws.onopen = () => {
+        sendBtn.disabled = false;
+        _wsReconnectDelay = 1000;
+        updateStatusWithMode();
+        ws.send(JSON.stringify({ type:"list_models" }));
+        ws.send(JSON.stringify({ type:"list_tools" }));
+        ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
+        connectLogWebSocket();
+        ws.send(JSON.stringify({ type:"get_setting", key:FAVORITES_SETTING_KEY }));
+        if (!_wsHasConnected) {
+            _wsHasConnected = true;
+            const savedSessionId = localStorage.getItem(CURRENT_SESSION_KEY);
+            if (savedSessionId && savedSessionId !== '') {
+                const sessionId = parseInt(savedSessionId);
+                if (!isNaN(sessionId)) {
+                    ws.send(JSON.stringify({ type:"list_sessions" }));
+                    setTimeout(() => selectSession(sessionId), 100);
+                }
+            }
+        } else {
+            if (currentSessionId) {
+                ws.send(JSON.stringify({ type:"load_session", session_id: currentSessionId }));
+            } else {
                 ws.send(JSON.stringify({ type:"list_sessions" }));
-                setTimeout(() => selectSession(sessionId), 100);
             }
         }
+    };
+}
+
+function scheduleReconnect() {
+    if (_wsReconnectTimer) return;
+    _wsReconnectTimer = setTimeout(() => {
+        _wsReconnectTimer = null;
+        connectMainWS();
+    }, _wsReconnectDelay);
+    _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, 30000);
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+            _wsReconnectDelay = 1000;
+            connectMainWS();
+        }
     }
-};
+});
+
+connectMainWS();
 
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     if (data.type==='system_stats')                              { updateSystemStats(data); return; }
+    if (data.type==='setting_value') {
+        if (data.key === FAVORITES_SETTING_KEY) {
+            try { _favorites = JSON.parse(data.value) || []; } catch { _favorites = []; }
+            if (_allTools.length > 0) renderToolsPanel(_allTools);
+        }
+        return;
+    }
+    if (data.type==='setting_saved')                             { return; }
     if (data.type==='subscribed'&&data.subscription==='system_stats') return;
     if (data.type==='sessions_list')                             { allSessions = data.sessions; renderSessions(allSessions); return; }
 
@@ -889,23 +939,25 @@ function toggleToolsPanel() {
 }
 
 // ── Favorites ─────────────────────────────────────────────────
-const FAVORITES_KEY = 'mcp_tool_favorites';
+let _favorites = []; // in-memory cache, loaded from DB on connect
 
-function getFavorites() {
-    try { return JSON.parse(localStorage.getItem(FAVORITES_KEY)) || []; }
-    catch { return []; }
-}
+function getFavorites() { return _favorites; }
 
 function setFavorites(favs) {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+    _favorites = favs;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            type:  "set_setting",
+            key:   FAVORITES_SETTING_KEY,
+            value: JSON.stringify(favs)
+        }));
+    }
 }
 
-function isFavorite(toolName) {
-    return getFavorites().includes(toolName);
-}
+function isFavorite(toolName) { return _favorites.includes(toolName); }
 
 function toggleFavorite(toolName) {
-    const favs = getFavorites();
+    const favs = [..._favorites];
     const idx = favs.indexOf(toolName);
     if (idx === -1) favs.push(toolName);
     else favs.splice(idx, 1);
@@ -1012,7 +1064,7 @@ function renderToolsPanel(tools) {
 
     const favHeader = document.createElement('div');
     favHeader.className = 'tools-category-header tools-favorites-header';
-    favHeader.innerHTML = `<span>Favorites <span class="tools-fav-count">(${favTools.length})</span></span><span class="tools-category-arrow">▶</span>`;
+    favHeader.innerHTML = `<span>⭐ Favorites <span class="tools-fav-count">(${favTools.length})</span></span><span class="tools-category-arrow">▶</span>`;
     favHeader.onclick = () => favCat.classList.toggle('open');
 
     const favItemsDiv = document.createElement('div');

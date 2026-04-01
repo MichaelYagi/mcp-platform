@@ -518,6 +518,28 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     }))
                 continue
 
+            if data.get("type") == "get_setting" and session_manager:
+                key = data.get("key")
+                if key:
+                    value = session_manager.get_setting(key)
+                    await websocket.send(json.dumps({
+                        "type": "setting_value",
+                        "key": key,
+                        "value": value
+                    }))
+                continue
+
+            if data.get("type") == "set_setting" and session_manager:
+                key   = data.get("key")
+                value = data.get("value")
+                if key is not None and value is not None:
+                    session_manager.set_setting(key, str(value))
+                    await websocket.send(json.dumps({
+                        "type": "setting_saved",
+                        "key": key
+                    }))
+                continue
+
             # ═══════════════════════════════════════════════════════════
             # IMMEDIATE STOP HANDLING - Always processed immediately
             # ═══════════════════════════════════════════════════════════
