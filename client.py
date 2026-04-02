@@ -1585,7 +1585,16 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                                               "city", "state", "country", "latitude",
                                               "longitude", "timezone")) >= 3
                         )
-                        if _sibling_dicts or _sibling_scalars:
+                        # Weather responses have a "current" dict + "forecast" list —
+                        # the list builder only sees the forecast array and renders bare
+                        # date strings. Route the whole response to the LLM instead so
+                        # it can render current conditions and forecast together.
+                        _is_weather_response = (
+                            isinstance(parsed, dict) and
+                            isinstance(parsed.get("current"), dict) and
+                            isinstance(parsed.get("forecast"), list)
+                        )
+                        if _sibling_dicts or _sibling_scalars or _is_weather_response:
                             items = None  # skip list path → falls through to LLM call
 
                     if items:

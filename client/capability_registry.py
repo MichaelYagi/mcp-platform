@@ -51,6 +51,15 @@ from typing import Any
 
 logger = logging.getLogger("mcp_client")
 
+# ─── Intent categories per tool name ─────────────────────────────────────────
+# Fallback for tools whose @tool_meta doesn't survive the MCP boundary.
+# Only needs entries where the first tag would give the wrong category grouping.
+_TOOL_INTENT_CATEGORY: dict[str, str] = {
+    "get_location_tool":  "location",
+    "get_time_tool":      "location",
+    "get_weather_tool":   "location",
+}
+
 # ─── Tag sets per tool name ────────────────────────────────────────────────────
 # Covers all tools referenced in INTENT_CATALOG plus well-known server tools.
 # Tools not listed here get an empty tag set — always safe, never wrong.
@@ -414,14 +423,16 @@ class CapabilityRegistry:
                                   else _TOOL_IDEMPOTENT.get(name, True)
                 example         = meta.get("example") or _example_from_desc or ""
                 triggers        = meta.get("triggers") or _triggers_from_desc or []
-                intent_category = meta.get("intent_category") or _intent_cat_from_desc or None
+                intent_category = (meta.get("intent_category") or _intent_cat_from_desc
+                                   or _TOOL_INTENT_CATEGORY.get(name))
             else:
                 tags            = _tags_from_desc or _TOOL_TAGS.get(name, [])
                 rate_limit      = _TOOL_RATE_LIMITS.get(name)
                 idempotent      = _TOOL_IDEMPOTENT.get(name, True)
                 example         = _example_from_desc or ""
                 triggers        = _triggers_from_desc
-                intent_category = _intent_cat_from_desc or None
+                intent_category = (_intent_cat_from_desc
+                                   or _TOOL_INTENT_CATEGORY.get(name))
 
             cap = ToolCapability(
                 name=name,
