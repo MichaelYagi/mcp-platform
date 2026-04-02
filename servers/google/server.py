@@ -282,24 +282,69 @@ def gmail_get_unread(max_results: int = 25) -> str:
                 "id":      _msg_id,
             })
 
-        # Add formatted text to each email
         import html as _html
         for em in emails:
             em["from"]    = _html.unescape(em["from"])
             em["subject"] = _html.unescape(em["subject"])
             em["preview"] = _html.unescape(em["preview"])
-            em["text"] = (
-                f"From: {em['from']}\n"
-                f"Subject: {em['subject']}\n"
-                f"Date: {em['date']}\n"
-                f"Preview: {em['preview']}\n"
-                f"ID: {em['id']}\n"
-                f"Link: {em['link']}"
+
+        # Batch-summarise all snippets in one Ollama call
+        _summaries = {}
+        try:
+            import time as _time_mod
+            _time_mod.sleep(1)
+            import urllib.request as _urllib_req
+            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            _model       = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
+            _batch_lines = []
+            for _i, _em in enumerate(emails, 1):
+                _batch_lines.append(f"{_i}. From: {_em['from']} | Subject: {_em['subject']} | Snippet: {_em['preview']}")
+            _prompt = (
+                "Summarise each email below in one short sentence (max 15 words). "
+                "Reply ONLY with numbered lines matching the input numbers, nothing else.\n\n"
+                + "\n".join(_batch_lines)
             )
+            _payload = json.dumps({
+                "model": _model,
+                "prompt": _prompt,
+                "stream": False,
+            }).encode()
+            _req = _urllib_req.Request(
+                f"{_ollama_url}/api/generate",
+                data=_payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with _urllib_req.urlopen(_req, timeout=120) as _resp:
+                _resp_json = json.loads(_resp.read().decode())
+                _resp_text = _resp_json.get("response", "")
+            for _line in _resp_text.strip().splitlines():
+                _line = _line.strip()
+                if _line and _line[0].isdigit():
+                    _dot = _line.find(".")
+                    if _dot != -1:
+                        _idx = int(_line[:_dot].strip())
+                        _summaries[_idx] = _line[_dot + 1:].strip()
+            logger.info(f"✅ Summarised {len(_summaries)} emails in one LLM call")
+        except Exception as _sum_err:
+            logger.warning(f"⚠️  Email summarisation failed, using snippets: {_sum_err}")
+
+        lines = []
+        for _i, em in enumerate(emails, 1):
+            _summary = _summaries.get(_i) or (em["preview"][:120] + "…" if len(em["preview"]) > 120 else em["preview"])
+            lines.append(f"{_i}. {em['subject']}")
+            lines.append(f"   From:    {em['from']}")
+            lines.append(f"   Date:    {em['date']}")
+            lines.append(f"   Summary: {_summary}")
+            lines.append(f"   ID:      {em['id']}")
+            lines.append(f"   Link:    {em['link']}")
+            lines.append("")
+
         logger.info(f"✅ Fetched {len(emails)} unread emails")
         return json.dumps({
             "total_unread": len(emails),
-            "emails": emails
+            "text":         "\n".join(lines),
+            "emails":       emails
         }, indent=2)
 
     except MCPToolError:
