@@ -170,6 +170,16 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
     }
 
 
+def _fmt_sun(iso: str) -> str:
+    """Format ISO sunrise/sunset string (e.g. '2026-04-02T06:45') to '6:45 AM'."""
+    if not iso:
+        return iso
+    try:
+        return datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M").strftime("%-I:%M %p")
+    except Exception:
+        return iso
+
+
 def get_weather(
         city: Optional[str] = None,
         state: Optional[str] = None,
@@ -239,7 +249,6 @@ def get_weather(
         "relative_humidity_2m",
         "weather_code",
         "precipitation_probability",
-        "is_day",
     ]
     daily_vars = [
         "weather_code",
@@ -296,7 +305,6 @@ def get_weather(
         "feelslike_c": cur_feels_c,
         "feelslike_f": _celsius_to_fahrenheit(cur_feels_c) if cur_feels_c is not None else None,
         "humidity": f"{current.get('relative_humidity_2m', 0)}%",
-        "is_day": bool(current.get("is_day", 1)),
     }
 
     # --- Build daily forecast ---
@@ -351,8 +359,8 @@ def get_weather(
             "max_temp_f": _celsius_to_fahrenheit(max_c) if max_c is not None else None,
             "min_temp_c": min_c,
             "min_temp_f": _celsius_to_fahrenheit(min_c) if min_c is not None else None,
-            "sunrise": sunrises[i] if i < len(sunrises) else None,
-            "sunset": sunsets[i] if i < len(sunsets) else None,
+            "sunrise": _fmt_sun(sunrises[i]) if i < len(sunrises) else None,
+            "sunset":  _fmt_sun(sunsets[i])  if i < len(sunsets)  else None,
         })
 
     result = {

@@ -31,7 +31,7 @@ def get_time(
         "state": loc["state"],
         "country": loc["country"],
         "timezone": tz_name,
-        "local_time": now.isoformat()
+        "local_time": now.strftime("%-I:%M %p, %A %B %-d %Y"),
     }
 
     return json.dumps(result, indent=2)
