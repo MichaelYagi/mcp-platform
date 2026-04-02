@@ -111,7 +111,7 @@ CITY_TIMEZONES = {
     ("Kuala Lumpur", "Malaysia"): "Asia/Kuala_Lumpur",
     ("Bangkok", "Thailand"): "Asia/Bangkok",
     ("Ho Chi Minh City", "Vietnam"): "Asia/Ho_Chi_Minh",
-    ("Hanoi", "Vietnam"): "Asia/Bangkok",
+    ("Hanoi", "Vietnam"): "Asia/Ho_Chi_Minh",
     ("Manila", "Philippines"): "Asia/Manila",
     ("Jakarta", "Indonesia"): "Asia/Jakarta",
 
@@ -154,7 +154,7 @@ STATE_TIMEZONES = {
     ("Saskatchewan", "Canada"): "America/Regina",
     ("Manitoba", "Canada"): "America/Winnipeg",
     ("Ontario", "Canada"): "America/Toronto",
-    ("Quebec", "Canada"): "America/Toronto",
+    ("Quebec", "Canada"): "America/Montreal",
     ("New Brunswick", "Canada"): "America/Moncton",
     ("Nova Scotia", "Canada"): "America/Halifax",
     ("Prince Edward Island", "Canada"): "America/Halifax",
@@ -352,8 +352,8 @@ STATE_TO_COUNTRY = {
     "Wisconsin": "USA", "Wyoming": "USA", "District of Columbia": "USA",
 
     # ==================== AUSTRALIA ====================
-    "NSW": "Australia", "VIC": "Australia", "QLD": "Australia", "WA": "Australia",
-    "SA": "Australia", "TAS": "Australia", "NT": "Australia", "ACT": "Australia",
+    "NSW": "Australia", "VIC": "Australia", "QLD": "Australia",
+    "SA": "Australia", "TAS": "Australia", "ACT": "Australia",
     "New South Wales": "Australia", "Victoria": "Australia", "Queensland": "Australia",
     "Western Australia": "Australia", "South Australia": "Australia", "Tasmania": "Australia",
     "Northern Territory": "Australia", "Australian Capital Territory": "Australia",

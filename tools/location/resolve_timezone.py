@@ -100,37 +100,46 @@ _STATE_EXPAND = {
 }
 
 
+def _title(s: str | None) -> str:
+    """Normalize a location string to title case, or empty string if None."""
+    return s.strip().title() if s else ""
+
+
 def resolve_timezone(city: str, state: str, country: str) -> str:
     """
     Resolve timezone for a location using a cascading lookup strategy.
 
     Priority:
-    1. City + Country exact match
+    1. City + Country exact match (case-insensitive via title-case normalization)
     2. State + Country exact match (tries abbreviation expansion)
     3. Country fallback
     4. UTC default
     """
+    # Normalize to title case so e.g. "british columbia" matches "British Columbia"
+    city_n    = _title(city)
+    country_n = _title(country)
+    state_n   = state.strip() if state else ""  # keep abbreviations as-is for _STATE_EXPAND
 
     # Try exact city + country match first
-    city_key = (city, country)
+    city_key = (city_n, country_n)
     if city_key in CITY_TIMEZONES:
         return CITY_TIMEZONES[city_key]
 
     # Try state + country match — also try expanding abbreviations
-    state_key = (state, country)
+    state_key = (state_n, country_n)
     if state_key in STATE_TIMEZONES:
         return STATE_TIMEZONES[state_key]
 
     # Try expanded state name (e.g. "BC" → "British Columbia")
-    state_expanded = _STATE_EXPAND.get(state.upper() if state else "", state)
-    if state_expanded != state:
-        expanded_key = (state_expanded, country)
+    state_expanded = _STATE_EXPAND.get(state_n.upper(), _title(state_n))
+    if state_expanded != state_n:
+        expanded_key = (state_expanded, country_n)
         if expanded_key in STATE_TIMEZONES:
             return STATE_TIMEZONES[expanded_key]
 
     # Country-level fallback
-    if country in COUNTRY_TIMEZONES:
-        return COUNTRY_TIMEZONES[country]
+    if country_n in COUNTRY_TIMEZONES:
+        return COUNTRY_TIMEZONES[country_n]
 
     # Final fallback to UTC
     return DEFAULT_TZ

@@ -45,19 +45,22 @@ def _celsius_to_fahrenheit(c: float) -> float:
     return round(c * 9 / 5 + 32, 1)
 
 
-def _get_date_label(date_str: str) -> str:
+def _get_date_label(date_str: str, today: date = None) -> str:
     """
     Convert date string to friendly label like 'Today', 'Tomorrow', or day name
 
     Args:
         date_str: Date in format "2026-02-23"
+        today: Reference date in the location's local timezone. Falls back to
+               date.today() (UTC) only if not provided.
 
     Returns:
         Label like "Today", "Tomorrow", "Wednesday", etc.
     """
     try:
         forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        today = date.today()
+        if today is None:
+            today = date.today()
 
         days_diff = (forecast_date - today).days
 
@@ -306,7 +309,15 @@ def get_weather(
     sunsets = daily.get("sunset", [])
 
     forecast = []
-    today = date.today()
+
+    # Derive "today" in the location's local timezone so that relative day
+    # labels (today/tomorrow) are correct regardless of the server's UTC clock.
+    try:
+        from zoneinfo import ZoneInfo
+        _local_tz = ZoneInfo(timezone) if timezone and timezone != "auto" else None
+        today = datetime.now(_local_tz).date() if _local_tz else date.today()
+    except Exception:
+        today = date.today()
 
     for i, date_str in enumerate(dates):
         code = codes[i] if i < len(codes) else 0
@@ -331,7 +342,7 @@ def get_weather(
 
         forecast.append({
             "date": date_str,
-            "day_label": _get_date_label(date_str),
+            "day_label": _get_date_label(date_str, today),
             "relative_day": relative_day,
             "condition": _wmo_description(code),
             "precipitation_chance": f"{precip_probs[i]}%" if i < len(precip_probs) and precip_probs[

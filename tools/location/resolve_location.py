@@ -17,9 +17,15 @@ def resolve_location(city: Optional[str], state: Optional[str], country: Optiona
     state_clean = state.strip() if state else None
     country_clean = country.strip() if country else None
 
-    # If country is missing but we have a state, try to infer it
+    # If country is missing but we have a state, try to infer it.
+    # Try uppercase first (abbreviations like "BC", "CA"), then title case
+    # (full names like "British Columbia"), to handle mixed-case input.
     if not country_clean and state_clean:
-        country_clean = STATE_TO_COUNTRY.get(state_clean)
+        country_clean = (
+            STATE_TO_COUNTRY.get(state_clean.upper())
+            or STATE_TO_COUNTRY.get(state_clean.title())
+            or STATE_TO_COUNTRY.get(state_clean)
+        )
 
     return {
         "city": city_clean,

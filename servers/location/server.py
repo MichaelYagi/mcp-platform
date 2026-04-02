@@ -110,13 +110,13 @@ def get_location_tool(city: str | None = None, state: str | None = None, country
     """
     logger.info(f"🛠 [server] get_location_tool called with city: {city}, state: {state}, country: {country}")
     try:
-        if not city:
+        if not city and not state and not country:
             _env_city = os.getenv("DEFAULT_CITY")
             if _env_city:
                 city    = _env_city
-                state   = state   or os.getenv("DEFAULT_STATE")
-                country = country or os.getenv("DEFAULT_COUNTRY")
-            if not city and CLIENT_IP:
+                state   = os.getenv("DEFAULT_STATE")
+                country = os.getenv("DEFAULT_COUNTRY")
+            elif CLIENT_IP:
                 loc = geolocate_ip(CLIENT_IP)
                 if loc:
                     city    = loc.get("city")
@@ -164,13 +164,13 @@ def get_time_tool(city: str | None = None, state: str | None = None, country: st
     """
     logger.info(f"🛠 [server] get_time_tool called with city: {city}, state: {state}, country: {country}")
     try:
-        if not city:
+        if not city and not state and not country:
             _env_city = os.getenv("DEFAULT_CITY")
             if _env_city:
                 city    = _env_city
-                state   = state   or os.getenv("DEFAULT_STATE")
-                country = country or os.getenv("DEFAULT_COUNTRY")
-            if not city and CLIENT_IP:
+                state   = os.getenv("DEFAULT_STATE")
+                country = os.getenv("DEFAULT_COUNTRY")
+            elif CLIENT_IP:
                 loc = geolocate_ip(CLIENT_IP)
                 if loc:
                     city    = loc.get("city")
@@ -242,15 +242,15 @@ def get_weather_tool(
     logger.info(f"🌤️  CLIENT_IP = {CLIENT_IP}")
 
     try:
-        if not city:
+        if not city and not state and not country:
             _env_city = os.getenv("DEFAULT_CITY")
             if _env_city:
                 city    = _env_city
-                state   = state   or os.getenv("DEFAULT_STATE")
-                country = country or os.getenv("DEFAULT_COUNTRY")
+                state   = os.getenv("DEFAULT_STATE")
+                country = os.getenv("DEFAULT_COUNTRY")
                 logger.info(f"🌤️  Using env defaults: city={city}, state={state}, country={country}")
             elif CLIENT_IP:
-                logger.info(f"🌤️  No city provided, using IP geolocation...")
+                logger.info(f"🌤️  No location provided, using IP geolocation...")
                 loc = geolocate_ip(CLIENT_IP)
                 logger.info(f"🌤️  Geolocation result: {loc}")
                 if loc:

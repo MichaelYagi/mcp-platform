@@ -1248,7 +1248,17 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         try:
             service = _calendar_service()
             if service:
-                now = datetime.now(timezone.utc)
+                try:
+                    from zoneinfo import ZoneInfo
+                    from tools.location.resolve_timezone import resolve_timezone
+                    _city    = os.getenv("DEFAULT_CITY", "")
+                    _state   = os.getenv("DEFAULT_STATE", "")
+                    _country = os.getenv("DEFAULT_COUNTRY", "")
+                    _tz_name = resolve_timezone(_city, _state, _country)
+                    _tz = ZoneInfo(_tz_name)
+                except Exception:
+                    _tz = timezone.utc
+                now = datetime.now(_tz)
                 start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
                 end_of_day = start_of_day + timedelta(days=1)
                 calendar_ids = _get_all_calendar_ids(service)

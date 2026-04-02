@@ -15,12 +15,8 @@ def get_time(
 ) -> str:
     loc = resolve_location(city, state, country)
 
-    # DEBUG: Print what we resolved
-
     # Determine timezone
     tz_name = timezone or resolve_timezone(loc["city"], loc["state"], loc["country"])
-
-    # DEBUG: Print the timezone we found
 
     try:
         tz = ZoneInfo(tz_name)
