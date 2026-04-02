@@ -1070,10 +1070,14 @@ function removeFavorite(toolName) {
 }
 // ──────────────────────────────────────────────────────────────
 
-function buildToolItem(tool, { onFavoriteToggle } = {}) {
+function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false } = {}) {
     const item = document.createElement('div');
     const isDisabled = tool.enabled === false;
     item.className = 'tool-item' + (isDisabled ? ' tool-disabled' : '');
+    if (isDraggable) {
+        item.dataset.toolName = tool.name;
+        item.setAttribute('draggable', 'true');
+    }
 
     const fullDesc = tool.description || '';
     const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
@@ -1112,9 +1116,10 @@ function buildToolItem(tool, { onFavoriteToggle } = {}) {
     const disabledHtml = isDisabled ? `<span class="tool-disabled-badge">disabled</span>` : '';
 
     const fav = isFavorite(tool.name);
+    const gripHtml = isDraggable ? `<span class="tool-drag-handle" title="Drag to reorder" aria-hidden="true">⠿</span>` : '';
     item.innerHTML = `
         <div class="tool-item-header">
-            <div class="tool-item-name">${tool.name}${disabledHtml}</div>
+            ${gripHtml}<div class="tool-item-name">${tool.name}${disabledHtml}</div>
             <div class="tool-item-actions">
                 ${rateHtml}
                 <button class="tool-fav-btn${fav ? ' active' : ''}" title="${fav ? 'Remove from favorites' : 'Add to favorites'}" aria-label="Toggle favorite">★</button>
@@ -1152,6 +1157,57 @@ function buildToolItem(tool, { onFavoriteToggle } = {}) {
 
 let _allTools = [];
 
+function attachFavDragHandlers(container) {
+    let dragSrc = null;
+
+    container.querySelectorAll('.tool-item[draggable="true"]').forEach(item => {
+        item.addEventListener('dragstart', (e) => {
+            dragSrc = item;
+            item.classList.add('fav-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.dataset.toolName);
+        });
+
+        item.addEventListener('dragend', () => {
+            dragSrc = null;
+            container.querySelectorAll('.tool-item').forEach(i => {
+                i.classList.remove('fav-dragging', 'fav-drag-over');
+            });
+        });
+
+        item.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if (item !== dragSrc) {
+                container.querySelectorAll('.tool-item').forEach(i => i.classList.remove('fav-drag-over'));
+                item.classList.add('fav-drag-over');
+            }
+        });
+
+        item.addEventListener('dragleave', () => {
+            item.classList.remove('fav-drag-over');
+        });
+
+        item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!dragSrc || dragSrc === item) return;
+
+            const srcName = dragSrc.dataset.toolName;
+            const tgtName = item.dataset.toolName;
+
+            const favs = [..._favorites];
+            const srcIdx = favs.indexOf(srcName);
+            const tgtIdx = favs.indexOf(tgtName);
+            if (srcIdx === -1 || tgtIdx === -1) return;
+
+            favs.splice(srcIdx, 1);
+            favs.splice(tgtIdx, 0, srcName);
+            setFavorites(favs);
+            renderToolsPanel(_allTools);
+        });
+    });
+}
+
 function renderToolsPanel(tools) {
     _allTools = tools;
     const body = document.getElementById('toolsBody');
@@ -1186,9 +1242,11 @@ function renderToolsPanel(tools) {
     } else {
         favTools.forEach(tool => {
             favItemsDiv.appendChild(buildToolItem(tool, {
+                draggable: true,
                 onFavoriteToggle: () => renderToolsPanel(_allTools)
             }));
         });
+        attachFavDragHandlers(favItemsDiv);
     }
 
     favCat.appendChild(favHeader);

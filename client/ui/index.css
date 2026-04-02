@@ -665,6 +665,27 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 .tool-fav-btn:hover { color: #f0c040; transform: scale(1.2); }
 .tool-fav-btn.active { color: #f0c040; }
 
+/* ── Favorites drag-and-drop ── */
+.tool-drag-handle {
+    cursor: grab;
+    font-size: 0.9rem;
+    color: #555;
+    padding: 0 4px 0 0;
+    flex-shrink: 0;
+    user-select: none;
+    line-height: 1;
+    transition: color 0.15s;
+}
+.tool-drag-handle:hover { color: #aaa; }
+.tool-item[draggable="true"] { cursor: default; }
+.tool-item[draggable="true"].fav-dragging {
+    opacity: 0.4;
+}
+.tool-item[draggable="true"].fav-drag-over {
+    border-left-color: #f0c040;
+    background: rgba(240,192,64,0.08);
+}
+
 /* ── Favorites category ── */
 .tools-favorites-header {
     color: #f0c040 !important;
