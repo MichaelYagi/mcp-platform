@@ -2530,3 +2530,48 @@ body {
 [data-theme="matrix"] .tools-favorites-category .tools-category-arrow {
     color: #006622 !important;
 }
+/* ── Matrix theme — bulk selection UI ── */
+[data-theme="matrix"] .session-select-btn {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #006622 !important;
+    letter-spacing: 0.05em;
+}
+[data-theme="matrix"] .session-select-btn:hover {
+    color: #00ff41 !important;
+    background: rgba(0,255,65,0.06) !important;
+}
+
+[data-theme="matrix"] #selectionToolbar {
+    border-bottom: 1px solid #00ff4122 !important;
+}
+
+[data-theme="matrix"] .sel-all-label {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #00aa33 !important;
+    letter-spacing: 0.05em;
+}
+[data-theme="matrix"] .sel-all-label input[type="checkbox"] {
+    accent-color: #00ff41 !important;
+}
+
+[data-theme="matrix"] .sel-delete-btn {
+    font-family: 'Share Tech Mono', monospace !important;
+    color: #ff3333 !important;
+    letter-spacing: 0.05em;
+}
+[data-theme="matrix"] .sel-delete-btn:hover:not(:disabled) {
+    background: rgba(255,51,51,0.1) !important;
+}
+[data-theme="matrix"] .sel-delete-btn:disabled {
+    color: rgba(255,51,51,0.25) !important;
+}
+
+[data-theme="matrix"] .session-item.session-checked {
+    background: rgba(0,255,65,0.07) !important;
+    border-left: 2px solid #00ff41 !important;
+    padding-left: calc(0.75rem - 2px) !important;
+}
+
+[data-theme="matrix"] .session-cb {
+    accent-color: #00ff41 !important;
+}

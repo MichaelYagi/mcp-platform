@@ -317,6 +317,58 @@ input:checked + .toggle-slider:before {
 .session-edit-cancel:hover { background: rgba(127,140,141,1); }
 .session-item.editing { overflow: visible; }
 
+/* "Select" link-style button in sidebar header */
+.session-select-btn {
+    background: none; border: none;
+    color: rgba(255,255,255,0.5);
+    font-size: 0.8rem; padding: 0.1rem 0.25rem;
+    cursor: pointer; border-radius: 3px;
+    transition: color 0.15s;
+}
+.session-select-btn:hover { color: white; }
+
+/* Selection toolbar — same bg as sessions-header, tight single row */
+#selectionToolbar {
+    background: var(--sidebar-header);
+    border-bottom: 1px solid var(--header-border);
+    padding: 0.4rem 0.75rem;
+    display: flex; align-items: center; gap: 0.5rem;
+}
+
+.sel-all-label {
+    display: flex; align-items: center; gap: 0.35rem;
+    color: rgba(255,255,255,0.65); font-size: 0.82rem;
+    cursor: pointer; user-select: none; white-space: nowrap;
+}
+.sel-all-label input[type="checkbox"] {
+    width: 13px; height: 13px; cursor: pointer; flex-shrink: 0;
+    accent-color: var(--sidebar-active, #3d5a80);
+    margin: 0;
+}
+
+.sel-delete-btn {
+    margin-left: auto;
+    background: none; border: none;
+    color: #e74c3c; font-size: 0.82rem;
+    padding: 0.2rem 0.4rem; border-radius: 3px;
+    cursor: pointer; white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+.sel-delete-btn:hover:not(:disabled) { background: rgba(231,76,60,0.15); }
+.sel-delete-btn:disabled { color: rgba(231,76,60,0.3); cursor: not-allowed; }
+
+/* Selected session item */
+.session-item.session-checked {
+    background: var(--sidebar-hover);
+}
+
+/* Checkbox inside session item */
+.session-cb {
+    width: 14px; height: 14px; flex-shrink: 0;
+    cursor: pointer; margin-right: 0.3rem;
+    accent-color: var(--sidebar-active, #3d5a80);
+}
+
 .session-close-btn {
     padding: 0.35rem 0.7rem; font-size: 0.8rem;
     background: #7f8c8d; color: white; border: none; border-radius: 4px; cursor: pointer;

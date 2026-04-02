@@ -222,6 +222,8 @@ let allSessions            = [];
 let sessionsSidebarOpen    = false;
 let openMenuSessionId      = null;
 let editingSessionId       = null;
+let selectionMode          = false;
+let selectedSessionIds     = new Set();
 
 let logPanelOpen    = false;
 let logAutoscroll   = true;
@@ -244,8 +246,10 @@ function toggleSessionsSidebar() {
     } else {
         sidebar.classList.remove('open');
         btn.classList.remove('open');
-        openMenuSessionId = null;
-        editingSessionId  = null;
+        openMenuSessionId  = null;
+        editingSessionId   = null;
+        selectionMode      = false;
+        selectedSessionIds = new Set();
     }
 }
 
@@ -283,12 +287,61 @@ function formatSessionDate(timestamp) {
 function renderSessions(sessions) {
     const list = document.getElementById('sessionsList');
     list.innerHTML = '';
+
+    // Sync header button label
+    const selectBtn = document.getElementById('selectModeBtn');
+    if (selectBtn) selectBtn.textContent = selectionMode ? 'Done' : 'Select';
+
+    // Sync toolbar
+    const toolbar = document.getElementById('selectionToolbar');
+    if (toolbar) toolbar.style.display = selectionMode ? 'flex' : 'none';
+
+    if (selectionMode) {
+        const allCb  = document.getElementById('selectAllCb');
+        const delBtn = document.getElementById('bulkDeleteBtn');
+        const n = selectedSessionIds.size;
+        if (allCb) {
+            allCb.checked       = n > 0 && n === sessions.length;
+            allCb.indeterminate = n > 0 && n < sessions.length;
+        }
+        if (delBtn) {
+            delBtn.disabled     = n === 0;
+            delBtn.textContent  = n > 0 ? `Delete (${n})` : 'Delete';
+        }
+    }
+
     sessions.forEach(session => {
         const item = document.createElement('div');
         item.className = 'session-item';
         if (session.id === currentSessionId) item.classList.add('active');
 
-        if (editingSessionId === session.id) {
+        if (selectionMode) {
+            const checked = selectedSessionIds.has(session.id);
+            if (checked) item.classList.add('session-checked');
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.className = 'session-cb';
+            cb.checked = checked;
+            cb.onclick = e => e.stopPropagation();
+            cb.onchange = () => {
+                if (cb.checked) selectedSessionIds.add(session.id);
+                else            selectedSessionIds.delete(session.id);
+                item.classList.toggle('session-checked', cb.checked);
+                renderSessions(allSessions);
+            };
+
+            const textWrap = document.createElement('div');
+            textWrap.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;';
+            const text = document.createElement('span'); text.className = 'session-item-text';
+            text.textContent = session.name || 'Untitled Session';
+            const dateLabel = document.createElement('div'); dateLabel.className = 'session-item-date';
+            dateLabel.textContent = formatSessionDate(session.created_at);
+            textWrap.appendChild(text); textWrap.appendChild(dateLabel);
+
+            item.appendChild(cb); item.appendChild(textWrap);
+            item.onclick = () => { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); };
+
+        } else if (editingSessionId === session.id) {
             item.classList.add('editing');
             const inp = document.createElement('input');
             inp.type = 'text'; inp.className = 'session-edit-input';
@@ -334,6 +387,49 @@ function renderSessions(sessions) {
             item.onclick = () => selectSession(session.id);
         }
         list.appendChild(item);
+    });
+}
+
+function toggleSelectionMode() {
+    selectionMode      = !selectionMode;
+    selectedSessionIds = new Set();
+    openMenuSessionId  = null;
+    editingSessionId   = null;
+    renderSessions(allSessions);
+}
+
+function toggleSelectAll() {
+    const allCb = document.getElementById('selectAllCb');
+    if (!allCb) return;
+    if (allCb.checked) allSessions.forEach(s => selectedSessionIds.add(s.id));
+    else               selectedSessionIds = new Set();
+    renderSessions(allSessions);
+}
+
+function bulkDeleteSessions() {
+    const count = selectedSessionIds.size;
+    if (count === 0) return;
+    showConfirm({
+        title:       `Delete ${count} Conversation${count !== 1 ? 's' : ''}`,
+        message:     `Are you sure you want to delete ${count} conversation${count !== 1 ? 's' : ''}? This cannot be undone.`,
+        confirmText: 'Delete',
+        cancelText:  'Cancel',
+        danger:      true
+    }).then(confirmed => {
+        if (!confirmed) return;
+        let deletedCurrent = false;
+        selectedSessionIds.forEach(id => {
+            ws.send(JSON.stringify({ type: 'delete_session', session_id: id }));
+            if (id === currentSessionId) deletedCurrent = true;
+        });
+        selectedSessionIds = new Set();
+        selectionMode      = false;
+        if (deletedCurrent) {
+            currentSessionId = null;
+            localStorage.setItem(CURRENT_SESSION_KEY, '');
+            chat.innerHTML = '';
+            ws.send(JSON.stringify({ type: 'new_session' }));
+        }
     });
 }
 

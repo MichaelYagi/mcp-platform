@@ -33,7 +33,16 @@
         <div id="sessionsSidebar">
             <div class="sessions-header">
                 <h2>Chats</h2>
-                <button class="session-close-btn" onclick="toggleSessionsSidebar()">✖ Close</button>
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <button id="selectModeBtn" class="session-select-btn" onclick="toggleSelectionMode()">Select</button>
+                    <button class="session-close-btn" onclick="toggleSessionsSidebar()">✖ Close</button>
+                </div>
+            </div>
+            <div id="selectionToolbar" style="display:none;">
+                <label class="sel-all-label">
+                    <input type="checkbox" id="selectAllCb" onchange="toggleSelectAll()"> All
+                </label>
+                <button id="bulkDeleteBtn" class="sel-delete-btn" onclick="bulkDeleteSessions()" disabled>Delete</button>
             </div>
             <div class="sessions-search-container">
                 <button class="new-session-btn" onclick="startNewSession()" title="New Chat">+</button>
