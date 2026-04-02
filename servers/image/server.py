@@ -299,10 +299,11 @@ def shashin_search_tool(
     shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
 
     for i, r in enumerate(results, 1):
-        lines.append(f"{i}. {r['fileName']} — {r['takenAt']}")
-        lines.append(f"   🆔 {r['id']}")
+        lines.append(f"{i}.")
         if r.get("thumbnailUrl"):
             lines.append(f"   ![{r['fileName']}]({shashin_base}/api/v1/thumbnails/225/{r['id']})")
+        lines.append(f"   📕 {r['fileName']} — {r['takenAt']}")
+        lines.append(f"   🆔 {r['id']}")
         if r.get("id"):
             lines.append(f"   🔗 {shashin_base}/search?term={r['id']}")
         if r.get("description"):

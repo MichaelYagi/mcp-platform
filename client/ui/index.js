@@ -807,6 +807,8 @@ modelSelect.addEventListener("change", (e) => {
 // MESSAGE FORMATTING
 // ============================================================
 function formatMessage(text) {
+    // Unescape literal \n and \t sequences (e.g. from tool output)
+    text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
     const blocks=[],inline=[],links=[],mathInline=[],mathBlock=[];
     text=text.replace(/\$\$([\s\S]*?)\$\$/g,(m,math)=>{const i=mathBlock.length;mathBlock.push(math);return`@@MATHBLOCK_${i}@@`;});
     text=text.replace(/\\\[([\s\S]*?)\\\]/g,(m,math)=>{const i=mathBlock.length;mathBlock.push(math);return`@@MATHBLOCK_${i}@@`;});
