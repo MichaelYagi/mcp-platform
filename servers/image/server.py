@@ -299,9 +299,8 @@ def shashin_search_tool(
     shashin_base = os.getenv("SHASHIN_BASE_URL", "http://192.168.0.199:6624")
 
     for i, r in enumerate(results, 1):
-        lines.append(f"{i}.")
-        if r.get("thumbnailUrl"):
-            lines.append(f"   ![{r['fileName']}]({shashin_base}/api/v1/thumbnails/225/{r['id']})")
+        img_md = f"![{r['fileName']}]({shashin_base}/api/v1/thumbnails/225/{r['id']})" if r.get("thumbnailUrl") else ""
+        lines.append(f"{i}. {img_md}")
         lines.append(f"   📕 {r['fileName']} — {r['takenAt']}")
         lines.append(f"   🆔 {r['id']}")
         if r.get("id"):

@@ -870,7 +870,7 @@ function formatMessage(text) {
     text=text.replace(/@@MATHINLINE_(\d+)@@/g,(m,i)=>processMath(mathInline[i]));
     text=text.replace(/@@MATHBLOCK_(\d+)@@/g,(m,i)=>processMath(mathBlock[i]));
     text=text.replace(/@@LINK_(\d+)@@/g,(m,i)=>`<a href="${links[i].url}" target="_blank">${links[i].label}</a>`);
-    text=text.replace(/@@IMAGE_(\d+)@@/g,(m,i)=>`<img src="${images[i].url}" alt="${images[i].alt}" style="max-width:100%;max-height:200px;border-radius:${document.documentElement.getAttribute('data-theme')==='matrix'?'0':'6px'};display:block;margin:4px 0;object-fit:contain;">`);
+    text=text.replace(/@@IMAGE_(\d+)@@/g,(m,i)=>`<img src="${images[i].url}" alt="${images[i].alt}" style="max-width:180px;max-height:180px;border-radius:${document.documentElement.getAttribute('data-theme')==='matrix'?'0':'6px'};display:inline-block;vertical-align:top;margin:0 4px 0 0;object-fit:cover;">`);
     return text;
 }
 
