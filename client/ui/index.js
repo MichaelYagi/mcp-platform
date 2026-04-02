@@ -964,6 +964,14 @@ function toggleFavorite(toolName) {
     setFavorites(favs);
     return idx === -1;
 }
+
+function addFavorite(toolName) {
+    if (!_favorites.includes(toolName)) setFavorites([..._favorites, toolName]);
+}
+
+function removeFavorite(toolName) {
+    setFavorites(_favorites.filter(n => n !== toolName));
+}
 // ──────────────────────────────────────────────────────────────
 
 function buildToolItem(tool, { onFavoriteToggle } = {}) {
@@ -1053,6 +1061,13 @@ function renderToolsPanel(tools) {
     const body = document.getElementById('toolsBody');
     if (!body) return;
 
+    // Snapshot which groups are currently open before wiping
+    const openGroups = new Set();
+    body.querySelectorAll('.tools-category.open').forEach(cat => {
+        const label = cat.querySelector('.tools-category-header span')?.textContent?.trim();
+        if (label) openGroups.add(label);
+    });
+
     body.innerHTML = '';
 
     // ── Favorites section ──────────────────────────────────────
@@ -1101,8 +1116,24 @@ function renderToolsPanel(tools) {
         const isExternal = items.some(t => t.external);
         const header = document.createElement('div');
         header.className = 'tools-category-header';
+        const allFaved = items.every(t => isFavorite(t.name));
+        const groupStar = document.createElement('button');
+        groupStar.className = 'tool-fav-btn group-fav-btn' + (allFaved ? ' active' : '');
+        groupStar.title = allFaved ? 'Remove all from favorites' : 'Add all to favorites';
+        groupStar.textContent = '★';
+        groupStar.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const nowAllFaved = items.every(t => isFavorite(t.name));
+            items.forEach(t => {
+                if (nowAllFaved) removeFavorite(t.name);
+                else addFavorite(t.name);
+            });
+            renderToolsPanel(_allTools);
+        });
         header.innerHTML = `<span>${serverName}${isExternal ? ' <span style="color:#858585;font-size:0.7rem;font-weight:normal;">[external]</span>' : ''} <span style="color:#858585;font-weight:normal;">(${items.length})</span></span><span class="tools-category-arrow">▶</span>`;
-        header.onclick = () => {
+        header.insertBefore(groupStar, header.firstChild);
+        header.onclick = (e) => {
+            if (e.target === groupStar) return;
             body.querySelectorAll('.tools-category:not(.tools-favorites-category)').forEach(c => {
                 if (c !== cat) c.classList.remove('open');
             });
@@ -1120,6 +1151,9 @@ function renderToolsPanel(tools) {
 
         cat.appendChild(header);
         cat.appendChild(itemsDiv);
+        // Restore open state
+        const catLabel = cat.querySelector('.tools-category-header span')?.textContent?.trim();
+        if (catLabel && openGroups.has(catLabel)) cat.classList.add('open');
         body.appendChild(cat);
     });
 }
