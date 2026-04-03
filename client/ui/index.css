@@ -557,7 +557,7 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 }
 
 .tools-category-header {
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: flex-start; align-items: center; gap: 0.4rem;
     padding: 0.6rem 1rem;
     cursor: pointer;
     user-select: none;
@@ -566,6 +566,8 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     background: transparent;
     transition: background 0.15s;
 }
+.tools-category-header > span:first-of-type { margin-right: auto; }
+.tools-category-header .tools-category-arrow { margin-left: 0; }
 .tools-category-header:hover { background: rgba(255,255,255,0.04); }
 
 .tools-category-arrow {
