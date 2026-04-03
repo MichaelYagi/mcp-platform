@@ -314,6 +314,7 @@ function renderSessions(sessions) {
         const item = document.createElement('div');
         item.className = 'session-item';
         if (session.id === currentSessionId) item.classList.add('active');
+        if (session.pinned) item.classList.add('pinned');
 
         if (selectionMode) {
             const checked = selectedSessionIds.has(session.id);
@@ -361,7 +362,13 @@ function renderSessions(sessions) {
             const textContainer = document.createElement('div');
             textContainer.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;';
             const text = document.createElement('span'); text.className = 'session-item-text';
-            text.textContent = session.name || 'Untitled Session';
+            if (session.pinned) {
+                const pin = document.createElement('span');
+                pin.className = 'session-pin-indicator';
+                pin.textContent = '📌 ';
+                text.appendChild(pin);
+            }
+            text.appendChild(document.createTextNode(session.name || 'Untitled Session'));
             const dateLabel = document.createElement('div'); dateLabel.className = 'session-item-date';
             dateLabel.textContent = formatSessionDate(session.created_at);
             textContainer.appendChild(text); textContainer.appendChild(dateLabel);
@@ -374,6 +381,10 @@ function renderSessions(sessions) {
             const submenu    = document.createElement('div'); submenu.className = 'session-submenu';
             if (openMenuSessionId === session.id) submenu.classList.add('open');
 
+            const pinItem    = document.createElement('div'); pinItem.className = 'session-submenu-item pin';
+            pinItem.innerHTML = session.pinned ? '📌 Unpin' : '📌 Pin';
+            pinItem.onclick = (e) => { e.stopPropagation(); pinSession(session.id, !session.pinned); };
+
             const editItem   = document.createElement('div'); editItem.className = 'session-submenu-item';
             editItem.innerHTML = '✏️ Edit';
             editItem.onclick = (e) => { e.stopPropagation(); startSessionEdit(session.id); };
@@ -382,7 +393,7 @@ function renderSessions(sessions) {
             deleteItem.innerHTML = '🗑️ Delete';
             deleteItem.onclick = (e) => { e.stopPropagation(); deleteSession(session.id); };
 
-            submenu.appendChild(editItem); submenu.appendChild(deleteItem);
+            submenu.appendChild(pinItem); submenu.appendChild(editItem); submenu.appendChild(deleteItem);
             item.appendChild(textContainer); item.appendChild(menuBtn2); item.appendChild(submenu);
             item.onclick = () => selectSession(session.id);
         }
@@ -472,6 +483,11 @@ function deleteSession(sessionId) {
             ws.send(JSON.stringify({ type: "new_session" }));
         }
     });
+}
+
+function pinSession(sessionId, pinned) {
+    ws.send(JSON.stringify({ type: 'pin_session', session_id: sessionId, pinned: pinned }));
+    openMenuSessionId = null;
 }
 
 function selectSession(sessionId) {
@@ -744,6 +760,19 @@ ws.onmessage = (event) => {
     if (data.type==='session_name_updated') { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;if(sessionsSidebarOpen)renderSessions(allSessions);} return; }
     if (data.type==='session_renamed')      { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;renderSessions(allSessions);} return; }
     if (data.type==='session_deleted')      { allSessions=allSessions.filter(s=>s.id!==data.session_id); renderSessions(allSessions); return; }
+    if (data.type==='session_pinned') {
+        const s = allSessions.find(s => s.id === data.session_id);
+        if (s) {
+            s.pinned = data.pinned;
+            // Re-sort: pinned first, then by updated_at desc (mirrors backend ORDER BY)
+            allSessions.sort((a, b) => {
+                if (a.pinned !== b.pinned) return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
+                return new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at);
+            });
+            renderSessions(allSessions);
+        }
+        return;
+    }
 
     if (data.type==="user_message") {
         if (data.text===lastSentMessage) {

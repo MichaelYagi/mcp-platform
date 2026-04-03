@@ -2575,3 +2575,67 @@ body {
 [data-theme="matrix"] .session-cb {
     accent-color: #00ff41 !important;
 }
+/* ============================================================
+   PIN FEATURE – base styles (all themes)
+   ============================================================ */
+
+/* Pin indicator inside session name */
+.session-pin-indicator {
+    font-size: 0.75em;
+    opacity: 0.85;
+    margin-right: 0.1em;
+    vertical-align: middle;
+}
+
+/* Pinned session items get a subtle top-border accent */
+.session-item.pinned {
+    border-top: 1px solid var(--sidebar-border, rgba(0,0,0,0.12));
+}
+
+/* Pin submenu item – distinct from delete but not alarming */
+.session-submenu-item.pin {
+    border-bottom: 1px solid rgba(128,128,128,0.15);
+    margin-bottom: 2px;
+    padding-bottom: 4px;
+}
+
+/* ============================================================
+   PIN FEATURE – matrix theme overrides
+   ============================================================ */
+
+/* Square corners on pin indicator (inherits from global matrix rule,
+   but the span isn't a block so we just ensure no radius leaks) */
+[data-theme="matrix"] .session-pin-indicator {
+    font-style: normal;
+}
+
+/* Pinned item left-bar: use matrix accent green (same shade as .active
+   but thinner so it doesn't clash when both pinned + active) */
+[data-theme="matrix"] .session-item.pinned {
+    border-top: 1px solid #00ff4133 !important;
+    box-shadow: inset 1px 0 0 #00cc3388;
+}
+
+/* Active + pinned: active accent wins, pin glow added */
+[data-theme="matrix"] .session-item.pinned.active {
+    box-shadow: inset 2px 0 0 #00ff41, 0 0 6px rgba(0,255,65,0.08) !important;
+}
+
+/* Pin submenu item: matrix green separator */
+[data-theme="matrix"] .session-submenu-item.pin {
+    color: #00cc33 !important;
+    border-bottom: 1px solid #00ff4122 !important;
+}
+
+[data-theme="matrix"] .session-submenu-item.pin:hover {
+    background: rgba(0,255,65,0.08) !important;
+    color: #00ff41 !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.4);
+}
+
+/* Uppercase + mono for pin item in matrix (matches other submenu items) */
+[data-theme="matrix"] .session-submenu-item.pin {
+    font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}

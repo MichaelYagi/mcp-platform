@@ -68,6 +68,12 @@ class SessionManager:
         if 'image_source' not in columns:
             cursor.execute('ALTER TABLE messages ADD COLUMN image_source TEXT')
 
+        # Migrate sessions table — add pinned column if missing
+        cursor.execute("PRAGMA table_info(sessions)")
+        session_cols = [col[1] for col in cursor.fetchall()]
+        if 'pinned' not in session_cols:
+            cursor.execute('ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0')
+
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_messages_session 
             ON messages(session_id)
@@ -334,18 +340,37 @@ class SessionManager:
     # ------------------------------------------------------------------ #
 
     def get_all_sessions(self) -> List[Dict]:
-        """Get all sessions ordered by most recent"""
+        """Get all sessions — pinned first, then by most recent"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT id, name, created_at, updated_at FROM sessions ORDER BY updated_at DESC
+            SELECT id, name, created_at, updated_at, pinned
+            FROM sessions
+            ORDER BY pinned DESC, updated_at DESC
         ''')
         sessions = [
-            {'id': r[0], 'name': r[1] or 'Untitled Session', 'created_at': r[2], 'updated_at': r[3]}
+            {
+                'id': r[0],
+                'name': r[1] or 'Untitled Session',
+                'created_at': r[2],
+                'updated_at': r[3],
+                'pinned': bool(r[4]),
+            }
             for r in cursor.fetchall()
         ]
         conn.close()
         return sessions
+
+    def pin_session(self, session_id: int, pinned: bool):
+        """Set the pinned state of a session."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE sessions SET pinned = ? WHERE id = ?',
+            (1 if pinned else 0, session_id)
+        )
+        conn.commit()
+        conn.close()
 
     def delete_session(self, session_id: int):
         """Delete a session, all its messages, and its RAG conversation turns"""
@@ -387,9 +412,9 @@ class SessionManager:
         """Get all session details"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        cursor.execute('SELECT id, name, created_at, updated_at FROM sessions')
+        cursor.execute('SELECT id, name, created_at, updated_at, pinned FROM sessions')
         sessions = [
-            {'id': r[0], 'name': r[1] or 'Untitled Session', 'created_at': r[2], 'updated_at': r[3]}
+            {'id': r[0], 'name': r[1] or 'Untitled Session', 'created_at': r[2], 'updated_at': r[3], 'pinned': bool(r[4])}
             for r in cursor.fetchall()
         ]
         conn.close()
@@ -400,12 +425,12 @@ class SessionManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT id, name, created_at, updated_at FROM sessions WHERE id = ?
+            SELECT id, name, created_at, updated_at, pinned FROM sessions WHERE id = ?
         ''', (session_id,))
         row = cursor.fetchone()
         conn.close()
         if row:
-            return {'id': row[0], 'name': row[1], 'created_at': row[2], 'updated_at': row[3]}
+            return {'id': row[0], 'name': row[1], 'created_at': row[2], 'updated_at': row[3], 'pinned': bool(row[4])}
         return None
 
     def get_user_session_count(self) -> int:

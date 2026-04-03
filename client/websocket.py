@@ -518,6 +518,18 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     }))
                 continue
 
+            if data.get("type") == "pin_session" and session_manager:
+                session_id = data.get("session_id")
+                pinned     = bool(data.get("pinned", False))
+                if session_id:
+                    session_manager.pin_session(session_id, pinned)
+                    await websocket.send(json.dumps({
+                        "type": "session_pinned",
+                        "session_id": session_id,
+                        "pinned": pinned
+                    }))
+                continue
+
             if data.get("type") == "get_setting" and session_manager:
                 key = data.get("key")
                 if key:
