@@ -4,6 +4,7 @@ MCP Client - Main Entry Point (WITH MULTI-AGENT INTEGRATION + MULTI-A2A SUPPORT)
 
 import json
 import logging
+import socket
 import sys
 import asyncio
 import os
@@ -337,13 +338,28 @@ def convert_path_for_platform(path: str) -> str:
 
     return path
 
+def _is_private_ip(host: str) -> bool:
+    """Return True if host resolves to a private/loopback RFC-1918 address."""
+    try:
+        import ipaddress
+        addr = ipaddress.ip_address(socket.gethostbyname(host))
+        return addr.is_private or addr.is_loopback
+    except Exception:
+        return False
+
 async def verify_transport_reachable(host: str, port: int, timeout: float = 2.0) -> bool:
-    """Check if a TCP port is open."""
+    """Check if a TCP port is open.
+
+    Uses a shorter timeout for private/loopback addresses — they respond in
+    milliseconds if they're up, so waiting 2 s for a silent firewall drop is
+    wasteful and makes startup feel sluggish.
+    """
+    effective_timeout = 0.5 if _is_private_ip(host) else timeout
     try:
         # Use asyncio to avoid blocking the event loop during the socket check
         _, writer = await asyncio.wait_for(
             asyncio.open_connection(host, port),
-            timeout=timeout
+            timeout=effective_timeout
         )
         writer.close()
         await writer.wait_closed()
@@ -455,29 +471,43 @@ async def auto_discover_servers(servers_dir: Path, logger):
                 server_meta.append((name, cfg, "http"))
 
         # Execute all network checks in parallel
-        results = await asyncio.gather(*verification_tasks, return_exceptions=True)
+        tcp_results = await asyncio.gather(*verification_tasks, return_exceptions=True)
 
-        for (name, cfg, s_type), is_ok in zip(server_meta, results):
+        # For servers that passed TCP, run OAuth probes in parallel too
+        async def _probe_oauth(url: str) -> bool:
+            """Return True if the endpoint requires OAuth (HTTP 401)."""
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=1.5) as hc:
+                    r = await hc.get(url, headers={"Accept": "text/event-stream"})
+                    return r.status_code == 401
+            except Exception:
+                return False  # let mcp_use try
+
+        oauth_tasks = []
+        oauth_meta = []
+        for (name, cfg, s_type), is_ok in zip(server_meta, tcp_results):
+            if is_ok is True and s_type in ("sse", "http"):
+                oauth_tasks.append(_probe_oauth(cfg["url"]))
+                oauth_meta.append((name, cfg, s_type))
+
+        oauth_results = await asyncio.gather(*oauth_tasks, return_exceptions=True)
+        oauth_blocked = {
+            name for (name, _, _), blocked in zip(oauth_meta, oauth_results)
+            if blocked is True
+        }
+
+        for (name, cfg, s_type), is_ok in zip(server_meta, tcp_results):
             if is_ok is True:
                 if s_type in ("sse", "http"):
-                    url = cfg["url"]
-                    auth_blocked = False
-                    try:
-                        import httpx
-                        async with httpx.AsyncClient(timeout=3.0) as hc:
-                            r = await hc.get(url, headers={"Accept": "text/event-stream"})
-                            if r.status_code == 401:
-                                logger.warning(f"⏭️  Skipping '{name}': OAuth required (401)")
-                                auth_blocked = True
-                    except Exception:
-                        pass  # let mcp_use try
-
-                    if not auth_blocked:
-                        entry = {"url": url, "transport": s_type}
-                        headers = cfg.get("headers")
-                        if headers:
-                            entry["headers"] = resolve_headers(name, headers)
-                        mcp_servers[name] = entry
+                    if name in oauth_blocked:
+                        logger.warning(f"⏭️  Skipping '{name}': OAuth required (401)")
+                        continue
+                    entry = {"url": cfg["url"], "transport": s_type}
+                    headers = cfg.get("headers")
+                    if headers:
+                        entry["headers"] = resolve_headers(name, headers)
+                    mcp_servers[name] = entry
                 else:  # bridge
                     mcp_servers[name] = {
                         "command": convert_path_for_platform(cfg["command"]),
