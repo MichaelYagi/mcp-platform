@@ -447,6 +447,8 @@ function bulkDeleteSessions() {
             currentSessionId = null;
             localStorage.setItem(CURRENT_SESSION_KEY, '');
             chat.innerHTML = '';
+            messageIndex = [];
+            renderNavigator();
             ws.send(JSON.stringify({ type: 'new_session' }));
         }
     });
@@ -488,6 +490,8 @@ function deleteSession(sessionId) {
             currentSessionId = null;
             localStorage.setItem(CURRENT_SESSION_KEY, '');
             chat.innerHTML = '';
+            messageIndex = [];
+            renderNavigator();
             ws.send(JSON.stringify({ type: "new_session" }));
         }
     });
@@ -805,15 +809,20 @@ ws.onmessage = (event) => {
     if (data.type==='session_created') {
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
-        // Add the new session to the local list so it appears immediately
         const newSession = { id: data.session_id, name: data.name || 'Untitled Session', created_at: new Date().toISOString() };
         allSessions.unshift(newSession);
         renderSessions(allSessions);
+        renderNavigator();
         return;
     }
     if (data.type==='session_name_updated') { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;if(sessionsSidebarOpen)renderSessions(allSessions);} return; }
     if (data.type==='session_renamed')      { const s=allSessions.find(s=>s.id===data.session_id); if(s){s.name=data.name;renderSessions(allSessions);} return; }
-    if (data.type==='session_deleted')      { allSessions=allSessions.filter(s=>s.id!==data.session_id); renderSessions(allSessions); return; }
+    if (data.type==='session_deleted') {
+        allSessions = allSessions.filter(s => s.id !== data.session_id);
+        renderNavigator();
+        renderSessions(allSessions);
+        return;
+    }
     if (data.type==='session_pinned') {
         const s = allSessions.find(s => s.id === data.session_id);
         if (s) {
