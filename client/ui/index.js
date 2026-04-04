@@ -851,6 +851,8 @@ ws.onmessage = (event) => {
 
     if (data.type==="complete") {
         hideThinking(); isProcessing=false; sendBtn.disabled=false; sendBtn.style.opacity='1'; sendBtn.style.cursor="pointer";
+        if (messageIndex.length > 0)
+            messageIndex[messageIndex.length - 1].domRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
         if (data.stopped) status.textContent="Stopped"; else updateStatusWithMode(); return;
     }
 
@@ -1079,7 +1081,7 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
             renderNavigator();
         }
     }
-    chat.scrollTop = chat.scrollHeight;
+    // scroll handled by complete handler after response arrives
     if (saveToDb) saveMessageToSession(role, text);
 }
 
