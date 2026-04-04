@@ -1025,3 +1025,102 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 /* ── Narrow chat area: triggered by ResizeObserver in JS ── */
 #chatContainer.narrow .msg { max-width: 100%; }
 #chatContainer.narrow .msg-wrapper { max-width: 100%; }
+/* ============================================================
+   PROMPT NAVIGATOR
+   ============================================================ */
+#promptNavigator {
+    flex-direction: column;
+    border-top: 1px solid var(--header-border);
+    background: var(--sidebar-bg);
+    flex-shrink: 0;
+    max-height: 45%;
+}
+
+#promptNavHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--sidebar-header);
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.8rem;
+    color: rgba(255,255,255,0.75);
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+#promptNavHeader:hover { background: var(--sidebar-hover); color: white; }
+
+#promptNavLabel { font-weight: 600; letter-spacing: 0.02em; }
+
+.prompt-nav-count {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.prompt-nav-chevron {
+    margin-left: auto;
+    font-size: 0.6rem;
+    opacity: 0.6;
+}
+
+#promptNavList {
+    overflow-y: auto;
+    max-height: 100%;
+    padding: 0.3rem 0.5rem;
+}
+
+.prompt-nav-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+.prompt-nav-item:hover { background: var(--sidebar-hover); color: white; }
+
+.prompt-nav-num {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    opacity: 0.45;
+    min-width: 14px;
+    text-align: right;
+    padding-top: 1px;
+}
+
+.prompt-nav-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Flash highlight when jumping to a message */
+@keyframes nav-flash {
+    0%   { outline-color: rgba(99,102,241,0.9); }
+    60%  { outline-color: rgba(99,102,241,0.5); }
+    100% { outline-color: transparent; }
+}
+.prompt-nav-highlight {
+    outline: 2px solid rgba(99,102,241,0.9);
+    outline-offset: 2px;
+    border-radius: 6px;
+    animation: nav-flash 1.2s ease forwards;
+}
+
+/* Scrollbar inside navigator list */
+#promptNavList::-webkit-scrollbar { width: 6px; }
+#promptNavList::-webkit-scrollbar-track { background: var(--sidebar-bg); }
+#promptNavList::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 3px; }

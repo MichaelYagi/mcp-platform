@@ -49,6 +49,15 @@
                 <input type="text" id="sessionSearch" placeholder="Search chats..." oninput="filterSessions()">
             </div>
             <div class="sessions-list" id="sessionsList"></div>
+
+            <div id="promptNavigator" style="display:none;">
+                <div id="promptNavHeader" onclick="togglePromptNavigator()">
+                    <span id="promptNavLabel">💬 Prompts</span>
+                    <span id="promptNavCount" class="prompt-nav-count"></span>
+                    <span id="promptNavChevron" class="prompt-nav-chevron">▲</span>
+                </div>
+                <div id="promptNavList"></div>
+            </div>
         </div>
 
         <div id="chatContainer">

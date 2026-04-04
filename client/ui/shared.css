@@ -2639,3 +2639,80 @@ body {
     text-transform: uppercase !important;
     letter-spacing: 0.08em !important;
 }
+/* ============================================================
+   PROMPT NAVIGATOR – matrix theme
+   ============================================================ */
+
+/* Square corners */
+[data-theme="matrix"] #promptNavigator,
+[data-theme="matrix"] #promptNavHeader,
+[data-theme="matrix"] .prompt-nav-item,
+[data-theme="matrix"] .prompt-nav-count {
+    border-radius: 0 !important;
+}
+
+/* Header */
+[data-theme="matrix"] #promptNavHeader {
+    background: #0a0a0a !important;
+    color: #00cc33 !important;
+    border-top: 1px solid #00ff4122 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+}
+[data-theme="matrix"] #promptNavHeader:hover {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+}
+
+/* Count badge */
+[data-theme="matrix"] .prompt-nav-count {
+    background: #002200 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4133 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+
+/* Chevron */
+[data-theme="matrix"] .prompt-nav-chevron { color: #00cc33 !important; opacity: 1; }
+
+/* Container */
+[data-theme="matrix"] #promptNavigator {
+    background: #050505 !important;
+    border-top: 1px solid #00ff4133 !important;
+}
+
+/* List items */
+[data-theme="matrix"] .prompt-nav-item {
+    color: #008822 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+}
+[data-theme="matrix"] .prompt-nav-item:hover {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.35);
+}
+
+/* Line numbers */
+[data-theme="matrix"] .prompt-nav-num {
+    color: #00ff4166 !important;
+    opacity: 1 !important;
+}
+
+/* Scrollbar */
+[data-theme="matrix"] #promptNavList::-webkit-scrollbar-track { background: #030303 !important; }
+[data-theme="matrix"] #promptNavList::-webkit-scrollbar-thumb {
+    background: #00ff4133 !important;
+    box-shadow: 0 0 4px rgba(0,255,65,0.2);
+}
+
+/* Flash highlight — matrix green pulse instead of indigo */
+@keyframes nav-flash-matrix {
+    0%   { outline-color: rgba(0,255,65,0.9); box-shadow: 0 0 8px rgba(0,255,65,0.4); }
+    60%  { outline-color: rgba(0,255,65,0.4); box-shadow: 0 0 4px rgba(0,255,65,0.15); }
+    100% { outline-color: transparent;        box-shadow: none; }
+}
+[data-theme="matrix"] .prompt-nav-highlight {
+    outline: 2px solid rgba(0,255,65,0.9) !important;
+    animation: nav-flash-matrix 1.2s ease forwards !important;
+}

@@ -233,6 +233,12 @@ let systemMonitorOpen   = false;
 let systemStatsEnabled  = true;
 
 // ============================================================
+// PROMPT NAVIGATOR STATE
+// ============================================================
+let messageIndex        = [];   // { text, domRef } — user messages only
+let promptNavCollapsed  = false;
+
+// ============================================================
 // SESSION MANAGEMENT
 // ============================================================
 function toggleSessionsSidebar() {
@@ -265,6 +271,8 @@ function startNewSession() {
     currentSessionId = null;
     localStorage.setItem(CURRENT_SESSION_KEY, '');
     chat.innerHTML = "";
+    messageIndex = [];
+    renderNavigator();
     ws.send(JSON.stringify({ type: "new_session" }));
 }
 
@@ -488,6 +496,50 @@ function deleteSession(sessionId) {
 function pinSession(sessionId, pinned) {
     ws.send(JSON.stringify({ type: 'pin_session', session_id: sessionId, pinned: pinned }));
     openMenuSessionId = null;
+}
+
+// ============================================================
+// PROMPT NAVIGATOR
+// ============================================================
+function renderNavigator() {
+    const nav     = document.getElementById('promptNavigator');
+    const list    = document.getElementById('promptNavList');
+    const count   = document.getElementById('promptNavCount');
+    const chevron = document.getElementById('promptNavChevron');
+    if (!nav || !list) return;
+
+    if (messageIndex.length === 0) {
+        nav.style.display = 'none';
+        return;
+    }
+
+    nav.style.display = 'flex';
+    count.textContent = messageIndex.length;
+    chevron.textContent = promptNavCollapsed ? '\u25bc' : '\u25b2';
+    list.style.display  = promptNavCollapsed ? 'none' : 'block';
+
+    list.innerHTML = '';
+    messageIndex.forEach((entry, i) => {
+        const item = document.createElement('div');
+        item.className = 'prompt-nav-item';
+
+        const label = document.createElement('span');
+        label.className = 'prompt-nav-text';
+        label.textContent = entry.text;
+
+        item.appendChild(label);
+        item.onclick = () => {
+            entry.domRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            entry.domRef.classList.add('prompt-nav-highlight');
+            setTimeout(() => entry.domRef.classList.remove('prompt-nav-highlight'), 1200);
+        };
+        list.appendChild(item);
+    });
+}
+
+function togglePromptNavigator() {
+    promptNavCollapsed = !promptNavCollapsed;
+    renderNavigator();
 }
 
 function selectSession(sessionId) {
@@ -735,6 +787,8 @@ ws.onmessage = (event) => {
 
     if (data.type==='session_loaded') {
         chat.innerHTML = "";
+        messageIndex = [];
+        renderNavigator();
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
         data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null, msg.image_url||null));
@@ -998,7 +1052,6 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper';
         wrapper.appendChild(div);
-
         const meta = document.createElement('div');
         meta.className = 'msg-meta';
 
@@ -1021,6 +1074,10 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
         chat.appendChild(wrapper);
     } else {
         chat.appendChild(div);
+        if (role === 'user') {
+            messageIndex.push({ text: text.slice(0, 80), domRef: div });
+            renderNavigator();
+        }
     }
     chat.scrollTop = chat.scrollHeight;
     if (saveToDb) saveMessageToSession(role, text);
