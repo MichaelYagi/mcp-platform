@@ -978,7 +978,11 @@ function formatMessage(text) {
     text=text.replace(/@@MATHINLINE_(\d+)@@/g,(m,i)=>processMath(mathInline[i]));
     text=text.replace(/@@MATHBLOCK_(\d+)@@/g,(m,i)=>processMath(mathBlock[i]));
     text=text.replace(/@@LINK_(\d+)@@/g,(m,i)=>`<a href="${links[i].url}" target="_blank">${links[i].label}</a>`);
-    text=text.replace(/@@IMAGE_(\d+)@@/g,(m,i)=>`<img src="${images[i].url}" alt="${images[i].alt}" style="max-width:180px;max-height:180px;border-radius:${document.documentElement.getAttribute('data-theme')==='matrix'?'0':'6px'};display:inline-block;vertical-align:top;margin:0 4px 0 0;object-fit:cover;">`);
+    text=text.replace(/@@IMAGE_(\d+)@@/g,(m,i)=>{
+        const src = images[i].url.replace(/\/thumbnails\/\d+\//,'/thumbnails/original/');
+        const radius = document.documentElement.getAttribute('data-theme')==='matrix'?'0':'6px';
+        return `<img src="${src}" alt="${images[i].alt}" style="max-width:100%;height:auto;border-radius:${radius};display:block;margin:4px 0;object-fit:contain;">`;
+    });
     return text;
 }
 
@@ -1063,7 +1067,7 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
         if (imgSrc) {
             const img = document.createElement("img");
             img.src = imgSrc;
-            img.style.cssText = `max-width:100%;max-height:320px;border-radius:${document.documentElement.getAttribute('data-theme')==='matrix'?'0':'6px'};display:block;margin-bottom:8px;object-fit:contain;`;
+            img.style.cssText = `max-width:100%;height:auto;border-radius:${document.documentElement.getAttribute('data-theme')==='matrix'?'0':'6px'};display:block;margin-bottom:8px;object-fit:contain;`;
             img.alt = "Image result";
             div.appendChild(img);
         }
