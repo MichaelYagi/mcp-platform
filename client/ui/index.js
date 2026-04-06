@@ -321,6 +321,7 @@ function renderSessions(sessions) {
     sessions.forEach(session => {
         const item = document.createElement('div');
         item.className = 'session-item';
+        item.title = session.name || 'Untitled Session';
         if (session.id === currentSessionId) item.classList.add('active');
         if (session.pinned) item.classList.add('pinned');
 
@@ -356,6 +357,16 @@ function renderSessions(sessions) {
             inp.type = 'text'; inp.className = 'session-edit-input';
             inp.value = session.name || 'Untitled Session';
             inp.onclick = (e) => e.stopPropagation();
+            inp.addEventListener('mouseenter', () => {
+                let tip = document.getElementById('session-edit-tip');
+                if (!tip) { tip = document.createElement('div'); tip.id = 'session-edit-tip'; tip.className = 'session-edit-tooltip'; document.body.appendChild(tip); }
+                tip.textContent = inp.value;
+                const r = inp.getBoundingClientRect();
+                tip.style.left = r.left + 'px';
+                tip.style.top  = (r.bottom + 4) + 'px';
+                tip.style.display = 'block';
+            });
+            inp.addEventListener('mouseleave', () => { const tip = document.getElementById('session-edit-tip'); if (tip) tip.style.display = 'none'; });
 
             const actions  = document.createElement('div'); actions.className = 'session-edit-actions';
             const saveBtn2 = document.createElement('button'); saveBtn2.textContent = '✓'; saveBtn2.className = 'session-edit-btn';
@@ -365,7 +376,7 @@ function renderSessions(sessions) {
 
             actions.appendChild(saveBtn2); actions.appendChild(cancelBtn);
             item.appendChild(inp); item.appendChild(actions);
-            setTimeout(() => inp.focus(), 10);
+            setTimeout(() => { inp.focus(); inp.setSelectionRange(0, 0); }, 10);
         } else {
             const textContainer = document.createElement('div');
             textContainer.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;';
@@ -526,6 +537,7 @@ function renderNavigator() {
     messageIndex.forEach((entry, i) => {
         const item = document.createElement('div');
         item.className = 'prompt-nav-item';
+        item.title = entry.text;
 
         const label = document.createElement('span');
         label.className = 'prompt-nav-text';
@@ -1088,7 +1100,7 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
     } else {
         chat.appendChild(div);
         if (role === 'user') {
-            messageIndex.push({ text: text.slice(0, 80), domRef: div });
+            messageIndex.push({ text: text.slice(0, 200), domRef: div });
             renderNavigator();
         }
     }
