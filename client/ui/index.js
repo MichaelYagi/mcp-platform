@@ -810,7 +810,9 @@ ws.onmessage = (event) => {
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
         const newSession = { id: data.session_id, name: data.name || 'Untitled Session', created_at: new Date().toISOString() };
-        allSessions.unshift(newSession);
+        const firstUnpinned = allSessions.findIndex(s => !s.pinned);
+        if (firstUnpinned === -1) allSessions.push(newSession);
+        else allSessions.splice(firstUnpinned, 0, newSession);
         renderSessions(allSessions);
         renderNavigator();
         return;
