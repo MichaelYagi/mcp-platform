@@ -157,7 +157,7 @@ class SessionManager:
         # Ensure session exists before adding message
         cursor.execute('SELECT id FROM sessions WHERE id = ?', (session_id,))
         if not cursor.fetchone():
-            default_name = content[:50] if role == 'user' else 'New Chat'
+            default_name = content if role == 'user' else 'New Chat'
             cursor.execute('''
                 INSERT INTO sessions (id, name, created_at, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
