@@ -1,4 +1,5 @@
 import json
+import urllib.parse
 import requests
 from typing import Optional
 from datetime import datetime, date
@@ -363,6 +364,8 @@ def get_weather(
             "sunset":  _fmt_sun(sunsets[i])  if i < len(sunsets)  else None,
         })
 
+    parts = [p for p in [geo["city"], geo["state"], geo["country"]] if p]
+    maps_query = ", ".join(parts)
     result = {
         "city": geo["city"],
         "state": geo["state"],
@@ -370,6 +373,7 @@ def get_weather(
         "latitude": lat,
         "longitude": lon,
         "timezone": timezone,
+        "maps_link": f"[{maps_query}](https://maps.google.com/?q={urllib.parse.quote(maps_query)})",
         "current": current_weather,
         "forecast": forecast,
     }

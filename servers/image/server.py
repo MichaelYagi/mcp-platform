@@ -309,7 +309,8 @@ def shashin_search_tool(
             lines.append(f"   📝 {r['description']}")
         if r.get("placeName"):
             placename = r['placeName'].split(";", 1)[0].strip()
-            lines.append(f"   📍 {placename}")
+            import urllib.parse as _up
+            lines.append(f"   📍 [{placename}](https://maps.google.com/?q={_up.quote(placename)})")
         if r.get("keywords"):
             kw = r["keywords"] if isinstance(r["keywords"], str) else ", ".join(r["keywords"])
             lines.append(f"   🏷️ {kw}")

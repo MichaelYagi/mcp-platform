@@ -146,7 +146,7 @@ def _get_google_creds() -> Optional["Credentials"]:
                 logger.error(f"credentials.json not found at {CREDENTIALS_FILE}")
                 return None
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_console()
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
@@ -706,7 +706,9 @@ def _format_event(event: dict, include_id: bool = False) -> dict:
         "all_day": all_day,
     }
     if event.get("location"):
-        result["location"] = event["location"]
+        raw_loc = event["location"]
+        import urllib.parse as _up
+        result["location"] = f"[{raw_loc}](https://maps.google.com/?q={_up.quote(raw_loc)})"
     if clean_desc:
         result["notes"] = clean_desc[:200]
     if organizer_email:

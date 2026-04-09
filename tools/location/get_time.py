@@ -1,10 +1,17 @@
 import json
+import urllib.parse
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Optional
 from tools.location.resolve_location import resolve_location
 from tools.location.resolve_timezone import resolve_timezone
 from tools.location.get_time_data import DEFAULT_TZ
+
+
+def _maps_link(city, state, country) -> str:
+    parts = [p for p in [city, state, country] if p]
+    query = ", ".join(parts)
+    return f"[{query}](https://maps.google.com/?q={urllib.parse.quote(query)})"
 
 
 def get_time(
@@ -32,6 +39,7 @@ def get_time(
         "country": loc["country"],
         "timezone": tz_name,
         "local_time": now.strftime("%-I:%M %p, %A %B %-d %Y"),
+        "maps_link": _maps_link(loc["city"], loc["state"], loc["country"]),
     }
 
     return json.dumps(result, indent=2)
