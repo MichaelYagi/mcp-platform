@@ -1167,8 +1167,8 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","email","calendar","external"],triggers=["my day","day briefing","morning briefing","what's on today","today's summary","how's my day"],idempotent=False,example='use get_day_briefing [max_emails=""] [forecast_days=""]',intent_category="google")
-def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int] = 1) -> str:
+@tool_meta(tags=["read","email","calendar","external"],triggers=["my day","day briefing","morning briefing","what's on today","today's summary","how's my day"],idempotent=False,example='use get_day_briefing [max_emails=""] [forecast_days=""] [calendar_days=""]',intent_category="google")
+def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int] = 1, calendar_days: Optional[int] = 1) -> str:
     """
     Get a combined briefing for today: weather, unread emails, and calendar events.
 
@@ -1178,6 +1178,7 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
     Args:
         max_emails (int, optional):    Max unread emails to include (default: 10)
         forecast_days (int, optional): Days of weather forecast (default: 1 = today only)
+        calendar_days (int, optional): Days of calendar events to include (default: 1 = today only)
 
     Returns:
         JSON with:
@@ -1188,9 +1189,24 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
     """
     max_emails    = int(max_emails)    if max_emails    is not None else 10
     forecast_days = int(forecast_days) if forecast_days is not None else 1
-    logger.info(f"🛠  get_day_briefing called (max_emails={max_emails}, forecast_days={forecast_days})")
+    calendar_days = int(calendar_days) if calendar_days is not None else 1
+    logger.info(f"🛠  get_day_briefing called (max_emails={max_emails}, forecast_days={forecast_days}, calendar_days={calendar_days})")
 
-    result = {"weather": None, "email": None, "calendar": None, "errors": {}}
+    # Compute local date label up front for the briefing header
+    try:
+        from zoneinfo import ZoneInfo
+        from tools.location.resolve_timezone import resolve_timezone
+        _tz_name = resolve_timezone(
+            os.getenv("DEFAULT_CITY", ""),
+            os.getenv("DEFAULT_STATE", ""),
+            os.getenv("DEFAULT_COUNTRY", ""),
+        )
+        _now = datetime.now(ZoneInfo(_tz_name))
+    except Exception:
+        _now = datetime.now(timezone.utc)
+    _date_label = _now.strftime("%A, %B %-d %Y")
+
+    result = {"date": _date_label, "weather": None, "email": None, "calendar": None, "errors": {}}
 
     # ── Weather ───────────────────────────────────────────────────────────────
     try:
@@ -1262,7 +1278,7 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                     _tz = timezone.utc
                 now = datetime.now(_tz)
                 start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                end_of_day = start_of_day + timedelta(days=1)
+                end_of_day = start_of_day + timedelta(days=calendar_days)
                 calendar_ids = _get_all_calendar_ids(service)
                 events = []
                 seen_ids = set()

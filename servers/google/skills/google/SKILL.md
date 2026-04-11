@@ -205,8 +205,9 @@ calendar_create_event(
 ### Day briefing
 
 ```python
-get_day_briefing()                            # today's weather + 10 unread emails + calendar
-get_day_briefing(max_emails=5, forecast_days=2)  # include tomorrow's weather too
+get_day_briefing()                                              # today's weather + 10 unread emails + today's calendar
+get_day_briefing(max_emails=5, forecast_days=2)                 # include tomorrow's weather too
+get_day_briefing(max_emails=5, forecast_days=2, calendar_days=3)  # 3 days of calendar events
 ```
 
 **Returns:**
@@ -312,7 +313,7 @@ Subject: 'Updated wireframes' (Tuesday 4:22 PM)"
 | `calendar_get_this_week` | This week's events | — |
 | `calendar_create_event` | Create a calendar event | `summary`, `start`, `end`, `attendees`, `all_day` |
 | `gmail_reply_tool` | Reply to an existing email | `message_id`, `body`, `cc` |
-| `get_day_briefing` | Weather + unread email + calendar in one call | `max_emails`, `forecast_days` |
+| `get_day_briefing` | Weather + unread email + calendar in one call | `max_emails`, `forecast_days`, `calendar_days` |
 
 ---
 
