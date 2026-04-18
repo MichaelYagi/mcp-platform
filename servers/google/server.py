@@ -146,7 +146,7 @@ def _get_google_creds() -> Optional["Credentials"]:
                 logger.error(f"credentials.json not found at {CREDENTIALS_FILE}")
                 return None
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_console()
+            creds = flow.run_local_server(port=0)
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
