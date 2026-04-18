@@ -146,7 +146,7 @@ def _get_google_creds() -> Optional["Credentials"]:
                 logger.error(f"credentials.json not found at {CREDENTIALS_FILE}")
                 return None
             flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_local_server(port=0)
+            creds = flow.run_console()
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
@@ -1454,9 +1454,72 @@ if __name__ == "__main__":
     if not GOOGLE_AVAILABLE:
         logger.warning("⚠️  Google API libraries not installed — run: pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client")
 
-    creds_exists = Path(CREDENTIALS_FILE).exists()
-    token_exists = Path(TOKEN_FILE).exists()
-    logger.info(f"🔑 credentials.json: {'✅ found' if creds_exists else '❌ missing — download from Google Cloud Console'}")
-    logger.info(f"🔑 token.json: {'✅ found' if token_exists else '⚠️  not yet — will be created on first auth'}")
+    # ── OAuth startup validation ───────────────────────────────────────────────
+    _creds_path = Path(CREDENTIALS_FILE)
+    _token_path = Path(TOKEN_FILE)
+    _auth_script = PROJECT_ROOT / "auth_google.py"
+
+    def _run_auth_script():
+        """Run auth_google.py to obtain a fresh token. Returns True on success."""
+        if not _auth_script.exists():
+            logger.error(f"❌ auth_google.py not found at {_auth_script} — run it manually from the project root")
+            return False
+        logger.info("🌐 Launching auth_google.py for browser-based OAuth...")
+        import subprocess as _sp
+        result = _sp.run([sys.executable, str(_auth_script)], capture_output=False)
+        if result.returncode == 0:
+            logger.info("🔑 OAuth complete — token.json written")
+            return True
+        else:
+            logger.error(f"❌ auth_google.py exited with code {result.returncode} — Google tools will be unavailable")
+            return False
+
+    if not _creds_path.exists():
+        logger.info("🔑 credentials.json not found — skipping OAuth validation (no Google integration configured)")
+    else:
+        # Validate credentials.json structure
+        _creds_valid = False
+        try:
+            import json as _json
+            with open(_creds_path) as _f:
+                _creds_data = _json.load(_f)
+            if "installed" not in _creds_data and "web" not in _creds_data:
+                logger.error(f"❌ credentials.json is not a valid OAuth client file — download a fresh copy from Google Cloud Console")
+            else:
+                _creds_valid = True
+                logger.info("🔑 credentials.json: ✅ valid")
+        except Exception as _e:
+            logger.error(f"❌ credentials.json could not be read: {_e} — download a fresh copy from Google Cloud Console")
+
+        if _creds_valid:
+            _run_auth = False
+            if not _token_path.exists():
+                logger.warning("🔑 token.json: ❌ missing")
+                _run_auth = True
+            else:
+                try:
+                    from google.oauth2.credentials import Credentials as _Creds
+                    from google.auth.transport.requests import Request as _Request
+                    _tok = _Creds.from_authorized_user_file(str(_token_path), SCOPES)
+                    if _tok.valid:
+                        logger.info("🔑 token.json: ✅ valid")
+                    elif _tok.expired and _tok.refresh_token:
+                        try:
+                            _tok.refresh(_Request())
+                            with open(_token_path, "w") as _f:
+                                _f.write(_tok.to_json())
+                            logger.info("🔑 token.json: ✅ refreshed successfully")
+                        except Exception as _e:
+                            logger.warning(f"🔑 token.json: ❌ refresh failed ({_e})")
+                            _run_auth = True
+                    else:
+                        logger.warning("🔑 token.json: ❌ invalid and cannot be refreshed")
+                        _run_auth = True
+                except Exception as _e:
+                    logger.warning(f"🔑 token.json: ❌ could not be read ({_e})")
+                    _run_auth = True
+
+            if _run_auth:
+                _run_auth_script()
 
     mcp.run(transport="stdio")

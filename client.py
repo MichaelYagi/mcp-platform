@@ -164,23 +164,8 @@ GLOBAL_CONVERSATION_STATE = {
 }
 
 
-class _OAuthSkipper(logging.Handler):
-    """Suppress OAuth browser-open prompts and mark those hostnames to skip."""
-    PATTERN = _re.compile(r'opening\s+browser.*?https?://([^/?#\s]+)', _re.IGNORECASE)
-
-    def __init__(self):
-        super().__init__(); self.blocked = set()
-
-    def emit(self, r):
-        m = self.PATTERN.search(r.getMessage())
-        if m: self.blocked.add(m.group(1).lower())
-
-    def write(self, text):  # stdout intercept
-        m = self.PATTERN.search(text)
-        if m: self.blocked.add(m.group(1).lower())
-
-    def flush(self):
-        pass
+_OAUTH_BROWSER_PATTERN = _re.compile(r'opening\s+browser.*?https?://([^/?#\s]+)', _re.IGNORECASE)
+_OAUTH_ERROR_PATTERN = _re.compile(r'(invalid_grant|unauthorized|oauth|token.*expired|auth.*required|could not locate runnable browser)', _re.IGNORECASE)
 
 # ═════════════════════════════════════════════════════════════════════
 # A2A MULTI-ENDPOINT SUPPORT
@@ -654,9 +639,18 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         system_prompt=SYSTEM_PROMPT
     )
 
-    _skipper = _OAuthSkipper()
-    logging.getLogger("mcp_use").addHandler(_skipper)
-    _real_stdout, sys.stdout = sys.stdout, _skipper
+    # Detect OAuth-blocked servers during init (browser opens are allowed through)
+    class _OAuthDetector(logging.Handler):
+        def __init__(self):
+            super().__init__()
+            self.blocked = set()
+        def emit(self, r):
+            m = _OAUTH_BROWSER_PATTERN.search(r.getMessage())
+            if m:
+                self.blocked.add(m.group(1).lower())
+
+    _detector = _OAuthDetector()
+    logging.getLogger("mcp_use").addHandler(_detector)
 
     mcp_agent.debug = False
     try:
@@ -664,20 +658,19 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     except Exception as e:
         logger.error(f"❌ Some MCP servers failed to initialize: {e}")
     finally:
-        sys.stdout = _real_stdout
-        logging.getLogger("mcp_use").removeHandler(_skipper)
+        logging.getLogger("mcp_use").removeHandler(_detector)
 
-    if _skipper.blocked:
+    if _detector.blocked:
         before = len(mcp_agent._tools)
         mcp_agent._tools = [
             t for t in mcp_agent._tools
             if urlparse(getattr(getattr(t, 'tool_connector', None), 'url', '') or
                         getattr(getattr(t, 'tool_connector', None), 'base_url', '') or '').hostname
-               not in _skipper.blocked
+               not in _detector.blocked
         ]
         removed = before - len(mcp_agent._tools)
-        for h in _skipper.blocked:
-            logger.warning(f"⏭️  Skipped '{h}': OAuth sign-in required")
+        for h in _detector.blocked:
+            logger.warning(f"⏭️  Skipped '{h}': OAuth sign-in required — complete auth for this server and restart")
         if removed:
             logger.warning(f"   Removed {removed} tools from OAuth-blocked server(s)")
 
@@ -1241,6 +1234,58 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     _client_metrics["tool_calls"][explicit_tool.name] += 1
                     _client_metrics["tool_errors"][explicit_tool.name] += 1
                     _client_metrics["tool_times"][explicit_tool.name].append((_time.time(), _duration))
+
+                # ── Mid-session OAuth recovery ─────────────────────────────────
+                # If the error looks like an OAuth/auth failure, attempt re-auth
+                # and retry the tool call once.
+                if _OAUTH_ERROR_PATTERN.search(str(e)):
+                    _server_hostname = None
+                    _connector = getattr(explicit_tool, 'tool_connector', None)
+                    if _connector:
+                        _url = getattr(_connector, 'url', '') or getattr(_connector, 'base_url', '')
+                        _server_hostname = urlparse(_url).hostname or ""
+
+                    # Local Google server — use auth_google.py
+                    _is_local_google = (
+                        not _server_hostname or
+                        _server_hostname in ("localhost", "127.0.0.1") or
+                        (explicit_tool.metadata or {}).get('source_server', '').lower() in ('google-server', 'google')
+                    )
+
+                    if _is_local_google:
+                        _auth_script = PROJECT_ROOT / "auth_google.py"
+                        if _auth_script.exists():
+                            logger.warning(f"🔐 OAuth failure detected — launching auth_google.py to re-authenticate")
+                            import subprocess as _oauth_sp
+                            _auth_result = _oauth_sp.run(
+                                [sys.executable, str(_auth_script)],
+                                capture_output=False
+                            )
+                            if _auth_result.returncode == 0:
+                                logger.info("🔐 Re-auth complete — retrying tool call")
+                                try:
+                                    tool_result = await _invoke_tool_directly(explicit_tool, explicit_arg, logger)
+                                    logger.info(f"✅ Retry succeeded for {explicit_tool.name}")
+                                    if _client_metrics is not None:
+                                        _client_metrics["tool_calls"][explicit_tool.name] += 1
+                                except Exception as _retry_e:
+                                    logger.error(f"❌ Retry failed after re-auth: {_retry_e}")
+                                    tool_result = f"Re-authentication succeeded but tool still failed: {_retry_e}"
+                            else:
+                                logger.error("❌ auth_google.py failed — Google tools will remain unavailable")
+                                tool_result = "Google authentication failed. Run auth_google.py manually and restart."
+                        else:
+                            logger.error(f"❌ OAuth failure on local server but auth_google.py not found at {_auth_script}")
+                    else:
+                        # External MCP server OAuth failure — log clearly, no auto-recovery possible
+                        logger.warning(
+                            f"🔐 OAuth failure on external server '{_server_hostname}' — "
+                            f"complete authentication for this server manually and restart mcp-platform"
+                        )
+                        tool_result = (
+                            f"Authentication required for '{_server_hostname}'. "
+                            f"Please complete OAuth sign-in for this server and restart mcp-platform."
+                        )
 
             # Log a short preview so the result count is visible immediately
             # Strip base64 blobs before logging — they flood the log with useless noise
