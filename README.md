@@ -526,7 +526,7 @@ touch servers/my_tool/skills/my_feature.md
 
 ### Step 4: Add external MCP servers (optional)
 
-To connect external or third-party MCP servers, create `client/external_servers.json`.
+To connect external or third-party MCP servers, create `mcp-platform/external_servers.json`.
 The client auto-discovers this file on startup — no code changes needed.
 
 **SSE transport** (remote HTTP event stream):
