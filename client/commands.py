@@ -385,6 +385,15 @@ async def handle_command(
                         output.append(f"      klein           FLUX.2 Klein 4B — fast generation")
                         output.append(f"      qwen-image      Qwen Image Plus — Alibaba text-to-image")
                         output.append(f"      wan-image       Wan 2.7 Image — up to 2K resolution")
+                    if tool_name == "improve_text_tool":
+                        output.append(f"    Modes:")
+                        output.append(f"      improve   Improve clarity and flow (default)")
+                        output.append(f"      expand    Add detail and depth")
+                        output.append(f"      fix       Fix grammar and spelling only")
+                        output.append(f"      shorten   Condense, remove redundancy")
+                        output.append(f"      formal    Rewrite in formal/professional tone")
+                        output.append(f"      casual    Rewrite in casual/conversational tone")
+                        output.append(f"      custom    Use your own instruction")
 
                 total_enabled += len(enabled)
 

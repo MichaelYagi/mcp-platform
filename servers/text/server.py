@@ -33,6 +33,7 @@ from tools.text.summarize_direct import summarize_direct
 from tools.text.explain_simplified import explain_simplified
 from tools.text.concept_contextualizer import concept_contextualizer
 from tools.text.read_file_tool import read_file_tool
+from tools.text.improve_text import improve_text
 
 from client.search_client import get_search_client
 
@@ -180,6 +181,52 @@ def read_file_tool_handler(file_path: str) -> str:
     """
     logger.info(f"🛠 [server] read_file_tool called: {file_path}")
     result = read_file_tool(file_path)
+    return json.dumps(result, indent=2)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# improve_text_tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+@check_tool_enabled(category="text")
+@tool_meta(
+    tags=["write", "ai"],
+    triggers=[
+        "improve text", "rewrite", "expand text", "fix grammar", "fix spelling",
+        "shorten text", "make it formal", "make it casual", "make it shorter",
+        "make it longer", "clean up", "polish", "proofread",
+    ],
+    idempotent=True,
+    example='use improve_text_tool: text="" mode="improve" [instruction=""]',
+    text_fields=["result"],
+)
+def improve_text_tool(
+    text: str,
+    mode: Optional[str] = "improve",
+    instruction: Optional[str] = None,
+) -> str:
+    """
+    Improve, rewrite, or transform text using a local Ollama model.
+
+    Args:
+        text (str, required):         The text to process.
+        mode (str, optional):         What to do with the text. Options:
+                                        expand   — Add detail and depth
+                                        improve  — Improve clarity and flow (default)
+                                        fix      — Fix grammar/spelling only
+                                        shorten  — Remove redundancy, condense
+                                        formal   — Rewrite in formal/professional tone
+                                        casual   — Rewrite in casual/conversational tone
+                                        custom   — Use a custom instruction (requires instruction param)
+        instruction (str, optional):  Custom instruction when mode is "custom".
+                                      e.g. "Rewrite this as bullet points"
+
+    Returns:
+        JSON string with result (str), mode (str), original_length (int),
+        result_length (int), and error (str on failure).
+    """
+    logger.info(f"🛠 [server] improve_text_tool called — mode={mode!r}, len={len(text)}")
+    result = improve_text(text, mode or "improve", instruction)
     return json.dumps(result, indent=2)
 
 
