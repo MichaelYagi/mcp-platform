@@ -306,7 +306,36 @@ These work in both CLI and web UI:
 
 **AI Image Generation:**
 
-Uses [Pollinations.ai](https://pollinations.ai) — completely free, no account or API key required. Works out of the box. Available models: `flux` (default), `flux-realism`, `flux-anime`, `flux-3d`, `turbo`.
+Uses [Pollinations.ai](https://pollinations.ai) — completely free, no account or API key required. Works out of the box.
+
+```
+use generate_image_tool: prompt="A cat holding a sign that says hello" [model=""] [width=""] [height=""] [seed=""]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `prompt` | string | required | Text description of the image to generate |
+| `model` | string | `flux` | Model to use — see table below |
+| `width` | integer | `1024` | Image width in pixels |
+| `height` | integer | `1024` | Image height in pixels |
+| `seed` | integer | random | Fixed seed for reproducible results — same seed + same prompt = same image every time. Useful when you like a result and want to reproduce it exactly, or tweak the prompt while keeping the same overall composition. Any whole number works e.g. `42`, `12345` |
+
+**Available models (free — no API key needed):**
+
+| Model | Description |
+|-------|-------------|
+| `flux` | Flux Schnell — fast, high-quality (default) |
+| `zimage` | Z-Image Turbo — fast Flux with 2x upscaling |
+| `gptimage` | GPT Image 1 Mini — OpenAI image model |
+| `gptimage-large` | GPT Image 1.5 — OpenAI advanced model, highest fidelity |
+| `kontext` | FLUX.1 Kontext — in-context editing, supports image input |
+| `klein` | FLUX.2 Klein 4B — fast generation and editing |
+| `qwen-image` | Qwen Image Plus — Alibaba text-to-image |
+| `wan-image` | Wan 2.7 Image — Alibaba text-to-image up to 2K |
+
+> ⚠️ All other models (`nanobanana`, `grok-imagine`, `seedream`, `nova-canvas`, etc.) are paid-only and require Pollen credits at [enter.pollinations.ai](https://enter.pollinations.ai).
 
 **Ollama Search API (web search):**
 1. Sign up at https://ollama.com/

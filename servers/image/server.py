@@ -544,37 +544,38 @@ def generate_image_tool(
     """
     Generate an image from a text prompt using Pollinations.ai (free, no API key required).
 
-    Returns a base64-encoded image for inline display.
+    Returns a URL for inline display.
 
     Args:
         prompt (str, required):   Text description of the image to generate.
         width (int, optional):    Image width in pixels (default: 1024).
         height (int, optional):   Image height in pixels (default: 1024).
-        seed (int, optional):     Fixed seed for reproducible results.
-        model (str, optional):    Pollinations model name (default: flux).
-                                  Options: flux, flux-realism, flux-anime, flux-3d,
-                                           turbo (faster, lower quality)
+        seed (int, optional):     Fixed seed for reproducible results. If omitted,
+                                  a random seed is generated so each call produces
+                                  a unique image. Pass the logged seed to reproduce.
+        model (str, optional):    Pollinations model name (default: gptimage-large).
+                                  Free options: flux, zimage, gptimage, gptimage-large,
+                                  kontext, klein, qwen-image, wan-image
 
     Returns:
-        JSON string with success (bool), image_base64 (str), prompt (str),
-        image_url (str), and error (str on failure).
+        JSON string with success (bool), image_source (str), prompt (str),
+        model (str), seed (int), and error (str on failure).
     """
     if not prompt or not prompt.strip():
         raise MCPToolError(FailureKind.USER_ERROR, "prompt must not be empty",
                            {"tool": "generate_image_tool"})
 
     import urllib.parse as _urlparse
+    import random as _random
 
-    _model = model or "flux"
+    _model = model or os.getenv("IMAGE_MODEL", "gptimage-large")
+    _seed = seed if seed is not None else _random.randint(1, 2**31)
     _encoded_prompt = _urlparse.quote(prompt)
 
-    params = f"width={width}&height={height}&model={_model}&nologo=true"
-    if seed is not None:
-        params += f"&seed={seed}"
-
+    params = f"width={width}&height={height}&model={_model}&seed={_seed}&nologo=true"
     api_url = f"https://image.pollinations.ai/prompt/{_encoded_prompt}?{params}"
 
-    logger.info(f"🛠 [server] generate_image_tool called — model={_model}, prompt={prompt!r}")
+    logger.info(f"🛠 [server] generate_image_tool called — model={_model}, seed={_seed}, prompt={prompt!r}")
 
     try:
         resp = requests.get(api_url, timeout=120)
@@ -597,10 +598,11 @@ def generate_image_tool(
         logger.info(f"[generate_image_tool] ✅ Image ready ({len(resp.content)} bytes), model={_model}")
 
         return json.dumps({
-            "success":    True,
+            "success":      True,
             "image_source": api_url,
-            "prompt":     prompt,
-            "model":      _model,
+            "prompt":       prompt,
+            "model":        _model,
+            "seed":         _seed,
         }, indent=2)
 
     except MCPToolError:
