@@ -1350,6 +1350,29 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 _tool_json = None
 
             if isinstance(_tool_json, dict) and (_tool_json.get("image_source") or _tool_json.get("image_base64")):
+                # For generate_image_tool — skip vision, just show image + metadata
+                if explicit_tool.name == "generate_image_tool":
+                    _seed = _tool_json.get("seed", "")
+                    _model_used = _tool_json.get("model", "")
+                    summary_text = f"🌱 Seed: `{_seed}` · Model: `{_model_used}`"
+                    import uuid as _gen_uuid
+                    _gen_call_id = str(_gen_uuid.uuid4())
+                    conversation_state["messages"].append(HumanMessage(content=user_message))
+                    conversation_state["messages"].append(AIMessage(
+                        content="",
+                        tool_calls=[{"id": _gen_call_id, "name": explicit_tool.name, "args": {}}]
+                    ))
+                    conversation_state["messages"].append(ToolMessage(
+                        content=tool_result,
+                        tool_call_id=_gen_call_id,
+                        name=explicit_tool.name
+                    ))
+                    conversation_state["messages"].append(AIMessage(content=summary_text))
+                    return {
+                        "messages": conversation_state["messages"],
+                        "current_model": getattr(active_llm, "model", "unknown")
+                    }
+
                 logger.info("[direct dispatch] 🖼️ Image result — delegating to vision")
                 import httpx as _httpx2, base64 as _b642
                 _img_src = _tool_json.get("image_source")
@@ -1484,9 +1507,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
                 if summary_text:
                     summary_text += _shashin_link
-                    # Append seed for generated images so user can reproduce them
-                    if explicit_tool.name == "generate_image_tool" and _tool_json.get("seed"):
-                        summary_text += f"\n\n🌱 Seed: `{_tool_json['seed']}` · Model: `{_tool_json.get('model', '')}`"
                     import uuid as _vis_uuid
                     _vis_call_id = str(_vis_uuid.uuid4())
                     conversation_state["messages"].append(HumanMessage(content=user_message))
