@@ -1484,6 +1484,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
                 if summary_text:
                     summary_text += _shashin_link
+                    # Append seed for generated images so user can reproduce them
+                    if explicit_tool.name == "generate_image_tool" and _tool_json.get("seed"):
+                        summary_text += f"\n\n🌱 Seed: `{_tool_json['seed']}` · Model: `{_tool_json.get('model', '')}`"
                     import uuid as _vis_uuid
                     _vis_call_id = str(_vis_uuid.uuid4())
                     conversation_state["messages"].append(HumanMessage(content=user_message))
