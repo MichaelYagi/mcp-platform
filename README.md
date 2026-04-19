@@ -151,7 +151,7 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 - `code_review` - Code analysis (5 tools)
 - `github` - GitHub integration
 - `google` - Gmail + Google Calendar ⚠️ *Requires one-time OAuth setup — see [Google Setup](#google-setup)*
-- `image` - Image search and analysis ⚠️ *Requires `SERPER_API_KEY`*
+- `image` - Image search, analysis, and AI generation ⚠️ *Requires `SERPER_API_KEY` for web image search; AI generation is free with no API key*
 - `location` - Weather, time, location (3 tools)
 - `plex` - Media library + ML recommendations (17 tools) ⚠️ *Requires `PLEX_URL`, `PLEX_TOKEN`*
 - `rag` - Vector search (4 tools) ⚠️ *Requires Ollama + `bge-large`*
@@ -271,6 +271,7 @@ Some features require additional setup before they will function. The table belo
 | Plex ingestion & recommendations | `PLEX_URL`, `PLEX_TOKEN` | Ollama running + `bge-large` pulled |
 | Ollama web search | `OLLAMA_TOKEN` | Ollama account + API key |
 | Image search | `SERPER_API_KEY` | Serper account + API key (https://serper.dev) |
+| AI image generation | — | Free via Pollinations.ai — no account or API key required |
 | Trilium notes | `TRILIUM_URL`, `TRILIUM_TOKEN` | Trilium server running |
 | Shashin photo gallery | `SHASHIN_BASE_URL`, `SHASHIN_API_KEY` | Shashin server running |
 | A2A distributed mode | `A2A_ENDPOINTS` | Remote A2A server running |
@@ -302,6 +303,10 @@ These work in both CLI and web UI:
 ```
 
 ### API Setup
+
+**AI Image Generation:**
+
+Uses [Pollinations.ai](https://pollinations.ai) — completely free, no account or API key required. Works out of the box. Available models: `flux` (default), `flux-realism`, `flux-anime`, `flux-3d`, `turbo`.
 
 **Ollama Search API (web search):**
 1. Sign up at https://ollama.com/
@@ -367,30 +372,7 @@ Make sure mcp-platform is stopped, then run from the project root:
 .venv/bin/python auth_google.py
 ```
 
-Where `auth_google.py` contains:
-
-```python
-from google_auth_oauthlib.flow import InstalledAppFlow
-
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/calendar.readonly",
-    "https://www.googleapis.com/auth/calendar.events",
-]
-
-flow = InstalledAppFlow.from_client_secrets_file(
-    "servers/google/credentials.json", SCOPES
-)
-creds = flow.run_local_server(port=0)
-
-with open("servers/google/token.json", "w") as f:
-    f.write(creds.to_json())
-
-print("✅ token.json written")
-```
-
-A browser window will open. Sign in to Google → if you see an **unverified app** warning, click **Advanced** → **Go to mcp-platform (unsafe)** → grant permissions.
+`auth_google.py` validates `credentials.json`, opens a browser for OAuth consent, and writes `servers/google/token.json`. If the server is already running and the token goes invalid, it will automatically launch `auth_google.py` at startup without manual intervention.
 
 `token.json` is written to `servers/google/token.json`. Because the app is published to production, this token will not expire unless unused for 6 months or your Google password changes.
 
@@ -695,11 +677,12 @@ tests/
 servers/
 ├── code_review/       5 tools  - Code analysis
 ├── google/            7 tools  - Gmail + Google Calendar       [requires one-time OAuth setup]
+├── image/             6 tools  - Image search, analysis, AI generation  [requires SERPER_API_KEY for search; generation is free]
 ├── location/          3 tools  - Weather, time, location
 ├── plex/             17 tools  - Media + ML recommendations    [requires PLEX_URL + PLEX_TOKEN]
 ├── rag/               4 tools  - Vector search                 [requires Ollama + bge-large]
-├── system/      4 tools  - System info
-└── text/        7 tools  - Text processing
+├── system/            4 tools  - System info
+└── text/              7 tools  - Text processing
 ```
 
 ### Directory Structure
@@ -755,6 +738,11 @@ Queries that start with personal statements (`"I like…"`, `"My favourite…"`)
 ---
 
 ### Troubleshooting
+
+**AI image generation not working:**
+- No API key required — uses Pollinations.ai which is free
+- If you get a rate limit error: wait a moment and try again
+- If generation times out: try again or use `model="turbo"` for faster results
 
 **Google tools not working:**
 - Confirm `servers/google/token.json` exists — if not, re-run the auth script in [Google Setup](#google-setup)

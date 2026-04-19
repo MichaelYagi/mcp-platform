@@ -523,6 +523,101 @@ def web_image_search_tool(query: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# generate_image_tool
+# ─────────────────────────────────────────────────────────────────────────────
+
+@mcp.tool()
+@check_tool_enabled(category="image")
+@tool_meta(
+    tags=["write", "ai", "generate"],
+    triggers=["generate image", "create image", "make image", "draw", "image of", "generate a picture"],
+    idempotent=False,
+    example='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]',
+)
+def generate_image_tool(
+    prompt: str,
+    width: Optional[int] = 1024,
+    height: Optional[int] = 1024,
+    seed: Optional[int] = None,
+    model: Optional[str] = None,
+) -> str:
+    """
+    Generate an image from a text prompt using Pollinations.ai (free, no API key required).
+
+    Returns a base64-encoded image for inline display.
+
+    Args:
+        prompt (str, required):   Text description of the image to generate.
+        width (int, optional):    Image width in pixels (default: 1024).
+        height (int, optional):   Image height in pixels (default: 1024).
+        seed (int, optional):     Fixed seed for reproducible results.
+        model (str, optional):    Pollinations model name (default: flux).
+                                  Options: flux, flux-realism, flux-anime, flux-3d,
+                                           turbo (faster, lower quality)
+
+    Returns:
+        JSON string with success (bool), image_base64 (str), prompt (str),
+        image_url (str), and error (str on failure).
+    """
+    if not prompt or not prompt.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "prompt must not be empty",
+                           {"tool": "generate_image_tool"})
+
+    import urllib.parse as _urlparse
+
+    _model = model or "flux"
+    _encoded_prompt = _urlparse.quote(prompt)
+
+    params = f"width={width}&height={height}&model={_model}&nologo=true"
+    if seed is not None:
+        params += f"&seed={seed}"
+
+    api_url = f"https://image.pollinations.ai/prompt/{_encoded_prompt}?{params}"
+
+    logger.info(f"🛠 [server] generate_image_tool called — model={_model}, prompt={prompt!r}")
+
+    try:
+        resp = requests.get(api_url, timeout=120)
+
+        if resp.status_code == 429:
+            raise MCPToolError(FailureKind.RETRYABLE,
+                               "Pollinations.ai rate limit reached — try again in a moment.",
+                               {"tool": "generate_image_tool"})
+
+        resp.raise_for_status()
+
+        content_type = resp.headers.get("content-type", "").lower()
+        if not any(t in content_type for t in ("image/", "application/octet-stream")):
+            raise MCPToolError(
+                FailureKind.UPSTREAM_ERROR,
+                f"Unexpected response from Pollinations.ai (content-type: {content_type})",
+                {"tool": "generate_image_tool"},
+            )
+
+        logger.info(f"[generate_image_tool] ✅ Image ready ({len(resp.content)} bytes), model={_model}")
+
+        return json.dumps({
+            "success":    True,
+            "image_source": api_url,
+            "prompt":     prompt,
+            "model":      _model,
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except requests.exceptions.ConnectionError:
+        raise MCPToolError(FailureKind.RETRYABLE, "Connection to Pollinations.ai failed",
+                           {"tool": "generate_image_tool"})
+    except requests.exceptions.Timeout:
+        raise MCPToolError(FailureKind.RETRYABLE, "Pollinations.ai timed out — try again",
+                           {"tool": "generate_image_tool"})
+    except Exception as exc:
+        logger.error(f"[generate_image_tool] Unexpected error: {exc}")
+        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"Image generation failed: {exc}",
+                           {"tool": "generate_image_tool"})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Skills plumbing
 # ─────────────────────────────────────────────────────────────────────────────
 

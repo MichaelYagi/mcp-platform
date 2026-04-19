@@ -305,6 +305,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 if not place_name and tool_data.get("placeName"):
                     place_name = tool_data["placeName"]
 
+                # Pick up inline base64 image (e.g. from hf_generate_image_tool)
+                if image_b64 is None and tool_data.get("image_base64") and tool_data.get("success"):
+                    image_b64 = tool_data["image_base64"]
+                    logger.info(f"🖼️ Found image_base64 ({len(image_b64)} chars) in ToolMessage")
+
                 # Pick up image_source — convert local paths to /image?path= endpoint
                 _candidate = tool_data.get("image_source", "")
                 if image_source is None and _candidate:
@@ -317,7 +322,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             except Exception as parse_err:
                 logger.warning(f"🖼️ JSON parse failed: {parse_err}")
 
-        logger.info(f"🖼️ image_url={image_source or 'None'}, place={place_name}")
+        logger.info(f"🖼️ image_b64={'yes' if image_b64 else 'None'}, image_url={image_source or 'None'}, place={place_name}")
 
         # Write updated history back to the outer conversation_state so
         # the next call sees the accumulated Human+AI pairs.
@@ -344,7 +349,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         try:
             await broadcast_message("assistant_message", {
                 "text": assistant_text,
-                "image": None,
+                "image": image_b64 or None,
                 "image_url": image_source or None,
                 "multi_agent": result.get("multi_agent", False),
                 "a2a": result.get("a2a", False),
