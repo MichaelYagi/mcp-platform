@@ -3589,3 +3589,93 @@ body {
 [data-theme="mono"] .theme-opt-swatch {
     border: 1px solid #e2e2e2 !important;
 }
+
+/* ── TE: Prompt Navigator — dark text on light sidebar ── */
+[data-theme="te"] #promptNavigator {
+    background: var(--sidebar-bg) !important;
+    border-top: 1px solid #c8c0b0 !important;
+}
+[data-theme="te"] #promptNavHeader {
+    background: #e6e0d4 !important;
+    color: #1a1a1a !important;
+    font-family: 'DM Mono', monospace !important;
+    text-transform: lowercase;
+    letter-spacing: 0.05em;
+    border-radius: 0 !important;
+}
+[data-theme="te"] #promptNavHeader:hover {
+    background: #d8d0c0 !important;
+    color: #1a1a1a !important;
+}
+[data-theme="te"] .prompt-nav-count {
+    background: #1a1a1a !important;
+    color: #fff !important;
+    border-radius: 0 !important;
+}
+[data-theme="te"] .prompt-nav-chevron { color: #888 !important; opacity: 1; }
+[data-theme="te"] .prompt-nav-item {
+    color: #444 !important;
+    font-family: 'DM Mono', monospace !important;
+    border-radius: 0 !important;
+}
+[data-theme="te"] .prompt-nav-item:hover {
+    background: #d8d0c0 !important;
+    color: #1a1a1a !important;
+}
+[data-theme="te"] .prompt-nav-num { color: #aaa090 !important; opacity: 1 !important; }
+[data-theme="te"] #promptNavList::-webkit-scrollbar-track { background: #f0ece4 !important; }
+[data-theme="te"] #promptNavList::-webkit-scrollbar-thumb { background: #c0b8a8 !important; border-radius: 0 !important; }
+
+@keyframes nav-flash-te {
+    0%   { outline-color: rgba(255,85,0,0.9); }
+    60%  { outline-color: rgba(255,85,0,0.4); }
+    100% { outline-color: transparent; }
+}
+[data-theme="te"] .prompt-nav-highlight {
+    outline: 2px solid rgba(255,85,0,0.9) !important;
+    border-radius: 0 !important;
+    animation: nav-flash-te 1.2s ease forwards !important;
+}
+
+/* ── Mono: Prompt Navigator — dark text on light sidebar ── */
+[data-theme="mono"] #promptNavigator {
+    background: var(--sidebar-bg) !important;
+    border-top: 1px solid #e2e2e2 !important;
+}
+[data-theme="mono"] #promptNavHeader {
+    background: #f0f0f0 !important;
+    color: #333 !important;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+}
+[data-theme="mono"] #promptNavHeader:hover {
+    background: #e8e8e8 !important;
+    color: #1a1a1a !important;
+}
+[data-theme="mono"] .prompt-nav-count {
+    background: #1a1a1a !important;
+    color: #fff !important;
+    font-weight: 400;
+}
+[data-theme="mono"] .prompt-nav-chevron { color: #bbb !important; opacity: 1; }
+[data-theme="mono"] .prompt-nav-item {
+    color: #555 !important;
+    font-weight: 300;
+}
+[data-theme="mono"] .prompt-nav-item:hover {
+    background: #efefef !important;
+    color: #1a1a1a !important;
+}
+[data-theme="mono"] .prompt-nav-num { color: #bbb !important; opacity: 1 !important; font-weight: 300; }
+[data-theme="mono"] #promptNavList::-webkit-scrollbar-track { background: #f4f4f4 !important; }
+[data-theme="mono"] #promptNavList::-webkit-scrollbar-thumb { background: #d4d4d4 !important; }
+
+@keyframes nav-flash-mono {
+    0%   { outline-color: rgba(45,106,106,0.9); }
+    60%  { outline-color: rgba(45,106,106,0.4); }
+    100% { outline-color: transparent; }
+}
+[data-theme="mono"] .prompt-nav-highlight {
+    outline: 2px solid rgba(45,106,106,0.9) !important;
+    animation: nav-flash-mono 1.2s ease forwards !important;
+}
