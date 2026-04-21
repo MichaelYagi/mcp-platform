@@ -25,7 +25,7 @@ function getThemeSwatches(themeId) {
 }
 
 function themeIdToLabel(id) {
-    const overrides = { optimus: 'Optimus Prime', tokyo: 'Tokyo Night', te: 'teenage engineering', mono: 'Mono' };
+    const overrides = { optimus: 'Optimus Prime', tokyo: 'Tokyo Night', te: 'te', mono: 'Mono' };
     return overrides[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 }
 
