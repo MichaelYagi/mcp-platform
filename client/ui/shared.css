@@ -2323,7 +2323,7 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,matrix,tron,dragonball,neon,dracula,nimbus,tokyo,garbagefire";
+    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,matrix,tron,dragonball,neon,dracula,nimbus,tokyo,garbagefire,te,mono";
 }
 /* ============================================================
    MATRIX THEME — new elements from capability registry,
@@ -2715,4 +2715,877 @@ body {
 [data-theme="matrix"] .prompt-nav-highlight {
     outline: 2px solid rgba(0,255,65,0.9) !important;
     animation: nav-flash-matrix 1.2s ease forwards !important;
+}
+/* ============================================================
+   TEENAGE ENGINEERING THEME  ("te")
+   Industrial product design language: warm off-white paper,
+   sharp black geometry, safety orange accent, DIN-style mono.
+   No gradients. No softness. Precise.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap');
+
+[data-theme="te"] {
+    /* Header */
+    --header-bg:        #1a1a1a;
+    --header-border:    #000000;
+
+    /* Sidebar */
+    --sidebar-bg:       #f0ece4;
+    --sidebar-header:   #e6e0d4;
+    --sidebar-item:     #f0ece4;
+    --sidebar-hover:    #e0dbd0;
+    --sidebar-active:   #1a1a1a;
+    --sidebar-border:   #c8c0b0;
+    --sidebar-search:   #e6e0d4;
+
+    /* Page & Chat */
+    --page-bg:          #f5f1e8;
+    --chat-bg:          #faf8f3;
+    --chat-border:      #ccc5b5;
+    --chat-assistant:   #f0ece4;
+    --chat-asst-border: #ccc5b5;
+    --chat-asst-color:  #1a1a1a;
+    --input-bg:         #faf8f3;
+    --input-border:     #aaa090;
+    --status-color:     #666;
+
+    /* User bubble & send */
+    --user-bubble:      #1a1a1a;
+    --send-btn:         #ff5500;
+    --send-btn-hover:   #e04a00;
+    --send-btn-focus:   rgba(255,85,0,0.25);
+
+    /* Top bar buttons */
+    --btn-logs:         #1a1a1a;
+    --btn-logs-hover:   #333;
+    --btn-monitor:      #1a1a1a;
+    --btn-monitor-hover:#333;
+    --btn-dashboard:    #1a1a1a;
+    --btn-dashboard-hover:#333;
+    --btn-newsession:   #ff5500;
+    --btn-newsession-hover:#e04a00;
+
+    /* Log panel */
+    --log-bg:           #1a1a1a;
+    --log-header:       #111111;
+    --log-border:       #333;
+    --log-filter-bg:    #222;
+    --log-filter-btn:   #333;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #1a1a1a 0%, #333 100%);
+    --monitor-header:   rgba(0,0,0,0.4);
+
+    /* Dashboard */
+    --btn-back:         #1a1a1a;
+    --btn-back-hover:   #333;
+    --btn-tools:        #ff5500;
+    --btn-tools-hover:  #e04a00;
+    --card-bg:          #faf8f3;
+    --card-border:      #ccc5b5;
+    --card-shadow:      rgba(0,0,0,0.06);
+    --card-shadow-hover:rgba(0,0,0,0.12);
+    --title-color:      #1a1a1a;
+    --metric-color:     #1a1a1a;
+    --subtitle-color:   #888;
+    --label-color:      #555;
+    --chart-blue:       #ff5500;
+    --chart-purple:     #1a1a1a;
+    --chart-red:        #cc2200;
+    --chart-green:      #005522;
+    --chart-orange:     #ff5500;
+    --tool-border:      #ff5500;
+    --tool-bg:          #f0ece4;
+    --status-bg:        #faf8f3;
+
+    /* Scrollbars */
+    --scrollbar-track:  #f0ece4;
+    --scrollbar-thumb:  #c0b8a8;
+    --scrollbar-hover:  #999080;
+
+    /* Session dates */
+    --session-date-color:  #aaa090;
+    --session-date-hover:  #888070;
+    --session-date-active: rgba(255,255,255,0.6);
+
+    /* Swatches */
+    --swatch1:          #1a1a1a;
+    --swatch2:          #ff5500;
+    --swatch3:          #f0ece4;
+}
+
+/* ── TE: Font overrides — DM Mono for UI, Space Mono for code ── */
+[data-theme="te"],
+[data-theme="te"] body,
+[data-theme="te"] #input,
+[data-theme="te"] #status,
+[data-theme="te"] .session-item,
+[data-theme="te"] #sessionSearch,
+[data-theme="te"] .sessions-header h2,
+[data-theme="te"] #sendBtn,
+[data-theme="te"] #stopBtn,
+[data-theme="te"] .filter-btn,
+[data-theme="te"] .log-btn,
+[data-theme="te"] .monitor-btn,
+[data-theme="te"] .stat-label,
+[data-theme="te"] .stat-secondary,
+[data-theme="te"] .metric-title,
+[data-theme="te"] .metric-subtitle,
+[data-theme="te"] .label-color,
+[data-theme="te"] .tools-btn {
+    font-family: 'DM Mono', 'Courier New', monospace !important;
+    letter-spacing: 0.02em;
+}
+
+/* Header title — bolder mono feel */
+[data-theme="te"] #header h1,
+[data-theme="te"] .sessions-header h2,
+[data-theme="te"] .metric-value,
+[data-theme="te"] .chart-title,
+[data-theme="te"] #toolsHeader h2,
+[data-theme="te"] #logHeader h2,
+[data-theme="te"] .monitor-header h2 {
+    font-family: 'Space Mono', 'Courier New', monospace !important;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* ── TE: Header — flat black bar ── */
+[data-theme="te"] #header {
+    background: #1a1a1a !important;
+    border-bottom: 3px solid #ff5500;
+    box-shadow: none;
+}
+[data-theme="te"] #header h1 {
+    color: #ffffff;
+    font-size: 1rem !important;
+    text-transform: lowercase;
+    letter-spacing: 0.12em;
+}
+
+/* ── TE: Top bar buttons — flat black, orange hover line ── */
+[data-theme="te"] #logToggle,
+[data-theme="te"] #monitorToggle,
+[data-theme="te"] #toolsToggle,
+[data-theme="te"] #dashboardBtn {
+    background: transparent !important;
+    color: #ccc !important;
+    border: 1px solid #444 !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.78rem !important;
+    text-transform: lowercase;
+    letter-spacing: 0.05em;
+    border-radius: 0 !important;
+}
+[data-theme="te"] #logToggle:hover,
+[data-theme="te"] #monitorToggle:hover,
+[data-theme="te"] #toolsToggle:hover,
+[data-theme="te"] #dashboardBtn:hover {
+    background: #ff5500 !important;
+    color: #fff !important;
+    border-color: #ff5500 !important;
+}
+
+/* ── TE: Send button — orange block ── */
+[data-theme="te"] #sendBtn {
+    background: #ff5500 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 0 !important;
+    font-family: 'DM Mono', monospace !important;
+    text-transform: lowercase;
+    letter-spacing: 0.08em;
+}
+[data-theme="te"] #sendBtn:hover {
+    background: #e04a00 !important;
+}
+[data-theme="te"] #stopBtn {
+    border-radius: 0 !important;
+    border: 1px solid #aaa090 !important;
+    font-family: 'DM Mono', monospace !important;
+    text-transform: lowercase;
+}
+
+/* ── TE: Input area — paper feel ── */
+[data-theme="te"] #inputRow {
+    border-radius: 0 !important;
+    border: 1px solid #aaa090 !important;
+}
+[data-theme="te"] #input {
+    color: #1a1a1a !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.9rem !important;
+}
+[data-theme="te"] #input::placeholder {
+    color: #b0a890 !important;
+    font-style: normal;
+}
+
+/* ── TE: Chat bubbles — user is black block, assistant is paper ── */
+[data-theme="te"] .user {
+    background: #1a1a1a !important;
+    color: #ffffff !important;
+    border-radius: 0 !important;
+    border: none !important;
+}
+[data-theme="te"] .assistant {
+    background: #f0ece4 !important;
+    border: 1px solid #ccc5b5 !important;
+    border-radius: 0 !important;
+    color: #1a1a1a !important;
+}
+
+/* ── TE: Hard corners everywhere ── */
+[data-theme="te"] #chat,
+[data-theme="te"] .msg,
+[data-theme="te"] #sessionSearch,
+[data-theme="te"] .session-item,
+[data-theme="te"] .new-session-btn,
+[data-theme="te"] .session-close-btn,
+[data-theme="te"] .filter-btn,
+[data-theme="te"] .log-btn,
+[data-theme="te"] .monitor-btn,
+[data-theme="te"] .tools-btn,
+[data-theme="te"] .stat-group,
+[data-theme="te"] .progress-bar,
+[data-theme="te"] .progress-fill,
+[data-theme="te"] .toggle-slider,
+[data-theme="te"] .theme-opt-swatch,
+[data-theme="te"] .theme-swatch,
+[data-theme="te"] .mcp-modal-dialog,
+[data-theme="te"] .mcp-modal-btn,
+[data-theme="te"] .metric-card,
+[data-theme="te"] .chart-container,
+[data-theme="te"] .tool-card,
+[data-theme="te"] .status-bar,
+[data-theme="te"] #backBtn,
+[data-theme="te"] .error-badge,
+[data-theme="te"] .status-indicator,
+[data-theme="te"] .failure-kind-card,
+[data-theme="te"] .histogram-bar,
+[data-theme="te"] .histogram-bar-wrap,
+[data-theme="te"] .mini-bar,
+[data-theme="te"] .mini-bar-wrap,
+[data-theme="te"] .failure-kind-bar,
+[data-theme="te"] .failure-kind-bar-wrap,
+[data-theme="te"] .reset-btn,
+[data-theme="te"] .tool-tag,
+[data-theme="te"] pre,
+[data-theme="te"] .code-inline,
+[data-theme="te"] #logPanel,
+[data-theme="te"] #systemMonitor,
+[data-theme="te"] #toolsPanel {
+    border-radius: 0 !important;
+}
+
+/* ── TE: Metric cards — border + orange accent on top ── */
+[data-theme="te"] .metric-card {
+    border-top: 3px solid #1a1a1a !important;
+    background: #faf8f3 !important;
+}
+[data-theme="te"] .metric-card:hover {
+    border-top-color: #ff5500 !important;
+    transform: none !important;
+}
+[data-theme="te"] .metric-value {
+    font-size: 2.2rem !important;
+    font-family: 'Space Mono', monospace !important;
+    color: #1a1a1a !important;
+}
+
+/* ── TE: Chart container ── */
+[data-theme="te"] .chart-container {
+    border: 1px solid #ccc5b5 !important;
+    background: #faf8f3 !important;
+}
+[data-theme="te"] .chart-title {
+    color: #1a1a1a !important;
+    font-size: 0.85rem !important;
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+}
+
+/* ── TE: Histogram bars — orange scale ── */
+[data-theme="te"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #ff5500 !important; }
+[data-theme="te"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #cc4400 !important; }
+[data-theme="te"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #993300 !important; }
+[data-theme="te"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #661f00 !important; }
+[data-theme="te"] .histogram-bar-group:nth-child(5) .histogram-bar { background: #1a1a1a !important; }
+[data-theme="te"] .mini-bar-group:nth-child(1) .mini-bar { background: #ff5500 !important; }
+[data-theme="te"] .mini-bar-group:nth-child(2) .mini-bar { background: #cc4400 !important; }
+[data-theme="te"] .mini-bar-group:nth-child(3) .mini-bar { background: #993300 !important; }
+[data-theme="te"] .mini-bar-group:nth-child(4) .mini-bar { background: #661f00 !important; }
+[data-theme="te"] .mini-bar-group:nth-child(5) .mini-bar { background: #1a1a1a !important; }
+
+[data-theme="te"] .histogram-bar-wrap { background: #e6e0d4 !important; }
+[data-theme="te"] .mini-bar-wrap { background: #e6e0d4 !important; }
+[data-theme="te"] .histogram-title { color: #888 !important; font-family: 'DM Mono', monospace !important; font-style: normal !important; font-size: 0.7rem !important; text-transform: lowercase; letter-spacing: 0.06em; }
+[data-theme="te"] .histogram-bar-label { color: #888 !important; font-family: 'DM Mono', monospace !important; }
+[data-theme="te"] .histogram-bar-count { color: #1a1a1a !important; font-family: 'DM Mono', monospace !important; }
+
+/* ── TE: Tool cards ── */
+[data-theme="te"] .tool-card { border-left-color: #ff5500 !important; background: #f0ece4 !important; }
+[data-theme="te"] .tool-stat-label { font-family: 'DM Mono', monospace !important; text-transform: lowercase; color: #888 !important; }
+[data-theme="te"] .tool-stat-value { font-family: 'DM Mono', monospace !important; color: #1a1a1a !important; }
+
+/* ── TE: Failure cards ── */
+[data-theme="te"] .failure-kind-card { background: #f0ece4 !important; border: 1px solid #ccc5b5 !important; }
+[data-theme="te"] .failure-kind-label { font-family: 'DM Mono', monospace !important; color: #555 !important; text-transform: lowercase; letter-spacing: 0.05em; }
+[data-theme="te"] .failure-kind-pct { font-family: 'DM Mono', monospace !important; color: #888 !important; }
+[data-theme="te"] .failure-kind-bar-wrap { background: #ccc5b5 !important; }
+
+/* ── TE: Reset button ── */
+[data-theme="te"] .reset-btn {
+    background: transparent !important;
+    border: 1px solid #aaa090 !important;
+    color: #555 !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.75rem !important;
+    text-transform: lowercase;
+}
+[data-theme="te"] .reset-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
+
+/* ── TE: Back button ── */
+[data-theme="te"] #backBtn {
+    background: #1a1a1a !important;
+    color: #fff !important;
+    font-family: 'DM Mono', monospace !important;
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="te"] #backBtn:hover { background: #ff5500 !important; }
+
+/* ── TE: Sidebar session items ── */
+[data-theme="te"] .session-item.active {
+    background: #1a1a1a !important;
+    color: #fff !important;
+}
+[data-theme="te"] .session-item.active .session-item-text { color: #fff !important; }
+[data-theme="te"] .new-session-btn {
+    background: #ff5500 !important;
+    color: #fff !important;
+    font-family: 'DM Mono', monospace !important;
+}
+[data-theme="te"] .new-session-btn:hover { background: #e04a00 !important; }
+[data-theme="te"] .session-close-btn {
+    background: #f0ece4 !important;
+    color: #1a1a1a !important;
+    border: 1px solid #ccc5b5 !important;
+    font-family: 'DM Mono', monospace !important;
+}
+[data-theme="te"] #sessionSearch {
+    background: #e6e0d4 !important;
+    color: #1a1a1a !important;
+    border: 1px solid #c0b8a8 !important;
+    font-family: 'DM Mono', monospace !important;
+}
+[data-theme="te"] #sessionSearch::placeholder { color: #aaa090 !important; }
+
+/* ── TE: Log panel ── */
+[data-theme="te"] #logPanel { background: #1a1a1a !important; border-left: 3px solid #ff5500 !important; }
+[data-theme="te"] #logHeader { background: #111 !important; border-bottom: 1px solid #333 !important; }
+[data-theme="te"] #logHeader h2 { color: #fff !important; font-family: 'Space Mono', monospace !important; font-size: 0.9rem !important; text-transform: lowercase; letter-spacing: 0.1em; }
+[data-theme="te"] #logFilters { background: #111 !important; border-bottom: 1px solid #333 !important; }
+[data-theme="te"] #logContainer { background: #1a1a1a !important; }
+[data-theme="te"] .log-message { color: #ccc !important; font-family: 'DM Mono', monospace !important; }
+[data-theme="te"] .log-timestamp { color: #555 !important; font-family: 'DM Mono', monospace !important; }
+[data-theme="te"] .log-entry:hover { background: #222 !important; }
+[data-theme="te"] .log-entry.USER     { border-left-color: #ff5500; }
+[data-theme="te"] .log-entry.ASSISTANT{ border-left-color: #ccc5b5; }
+[data-theme="te"] .log-entry.ERROR    { border-left-color: #cc2200; background: rgba(204,34,0,0.06) !important; }
+[data-theme="te"] .log-entry.WARNING  { border-left-color: #ffaa00; background: rgba(255,170,0,0.05) !important; }
+[data-theme="te"] .log-level.USER      { color: #ff5500 !important; }
+[data-theme="te"] .log-level.ASSISTANT { color: #aaa !important; }
+[data-theme="te"] .log-level.INFO      { color: #888 !important; }
+[data-theme="te"] .log-level.WARNING   { color: #ffaa00 !important; }
+[data-theme="te"] .log-level.ERROR     { color: #cc2200 !important; }
+[data-theme="te"] .log-level.DEBUG     { color: #555 !important; }
+[data-theme="te"] .filter-btn { background: #222 !important; color: #555 !important; border: 1px solid #333 !important; font-family: 'DM Mono', monospace !important; font-size: 0.7rem !important; text-transform: lowercase; }
+[data-theme="te"] .filter-btn.active { color: #fff !important; background: #333 !important; border-color: #555 !important; }
+[data-theme="te"] .filter-btn.USER.active   { border-left: 2px solid #ff5500 !important; }
+[data-theme="te"] .filter-btn.ERROR.active  { border-left: 2px solid #cc2200 !important; }
+[data-theme="te"] .log-btn { background: #222 !important; color: #aaa !important; border: 1px solid #333 !important; font-family: 'DM Mono', monospace !important; text-transform: lowercase; }
+[data-theme="te"] .log-btn:hover { background: #ff5500 !important; color: #fff !important; border-color: #ff5500 !important; }
+[data-theme="te"] .log-status-indicator { background: #cc2200; }
+[data-theme="te"] .log-status-indicator.connected { background: #ff5500; box-shadow: 0 0 4px rgba(255,85,0,0.5); }
+
+/* ── TE: System monitor ── */
+[data-theme="te"] #systemMonitor { background: #1a1a1a !important; border-left: 3px solid #ff5500 !important; }
+[data-theme="te"] .monitor-header { background: #111 !important; border-bottom: 1px solid #333 !important; }
+[data-theme="te"] .monitor-header h2 { color: #fff !important; font-family: 'Space Mono', monospace !important; text-transform: lowercase; letter-spacing: 0.1em; }
+[data-theme="te"] .monitor-btn { background: #333 !important; color: #aaa !important; border-radius: 0 !important; }
+[data-theme="te"] .monitor-btn:hover { background: #ff5500 !important; color: #fff !important; }
+[data-theme="te"] .stat-group { background: #222 !important; border: 1px solid #333 !important; border-radius: 0 !important; }
+[data-theme="te"] .stat-label { color: #888 !important; font-family: 'DM Mono', monospace !important; text-transform: lowercase; font-size: 0.75rem !important; }
+[data-theme="te"] .stat-value { color: #fff !important; font-family: 'Space Mono', monospace !important; }
+[data-theme="te"] .stat-secondary { color: #666 !important; font-family: 'DM Mono', monospace !important; }
+[data-theme="te"] .progress-bar { background: #333 !important; border-radius: 0 !important; }
+[data-theme="te"] .progress-fill { background: #ff5500 !important; border-radius: 0 !important; }
+[data-theme="te"] .progress-fill.high { background: #cc2200 !important; }
+[data-theme="te"] .progress-fill.critical { background: #880000 !important; }
+
+/* ── TE: Tools panel ── */
+[data-theme="te"] #toolsPanel { background: #f5f1e8 !important; border-left: 3px solid #1a1a1a !important; }
+[data-theme="te"] #toolsHeader h2 { color: #1a1a1a !important; font-family: 'Space Mono', monospace !important; text-transform: lowercase; letter-spacing: 0.1em; }
+[data-theme="te"] .tools-btn { background: #1a1a1a !important; color: #fff !important; border-radius: 0 !important; font-family: 'DM Mono', monospace !important; text-transform: lowercase; }
+[data-theme="te"] .tools-btn:hover { background: #ff5500 !important; }
+[data-theme="te"] .tools-category-header { font-family: 'DM Mono', monospace !important; color: #1a1a1a !important; background: #e6e0d4 !important; border-bottom: 1px solid #ccc5b5 !important; text-transform: lowercase; letter-spacing: 0.05em; border-radius: 0 !important; }
+[data-theme="te"] .tools-category-header:hover { background: #d8d0c0 !important; }
+[data-theme="te"] .tool-item { background: #faf8f3 !important; border-bottom: 1px solid #e6e0d4 !important; border-radius: 0 !important; }
+[data-theme="te"] .tool-item:hover { background: #f0ece4 !important; border-left: 3px solid #ff5500; }
+[data-theme="te"] .tool-item-name { color: #1a1a1a !important; font-family: 'DM Mono', monospace !important; }
+[data-theme="te"] .tool-item-desc { color: #666 !important; font-family: 'DM Mono', monospace !important; font-size: 0.78rem !important; }
+[data-theme="te"] .tool-param { background: #e6e0d4 !important; color: #1a1a1a !important; border: 1px solid #ccc5b5 !important; border-radius: 0 !important; font-family: 'DM Mono', monospace !important; }
+[data-theme="te"] .tool-fav-btn { color: #c0b8a8 !important; }
+[data-theme="te"] .tool-fav-btn:hover { color: #ff5500 !important; }
+[data-theme="te"] .tool-fav-btn.active { color: #ff5500 !important; }
+
+/* ── TE: Modal ── */
+[data-theme="te"] .mcp-modal-backdrop { background: rgba(0,0,0,0.6) !important; }
+[data-theme="te"] .mcp-modal-dialog { background: #faf8f3 !important; border: 2px solid #1a1a1a !important; }
+[data-theme="te"] .mcp-modal-header { border-bottom: 2px solid #1a1a1a !important; background: #f0ece4 !important; }
+[data-theme="te"] .mcp-modal-title { color: #1a1a1a !important; font-family: 'Space Mono', monospace !important; text-transform: lowercase; }
+[data-theme="te"] .mcp-modal-body { font-family: 'DM Mono', monospace !important; color: #333 !important; }
+[data-theme="te"] .mcp-modal-footer { border-top: 1px solid #ccc5b5 !important; background: #f0ece4 !important; }
+[data-theme="te"] .mcp-modal-btn-primary { background: #ff5500 !important; color: #fff !important; border: none !important; }
+[data-theme="te"] .mcp-modal-btn-primary:hover { background: #e04a00 !important; }
+[data-theme="te"] .mcp-modal-btn-secondary { background: #f0ece4 !important; color: #1a1a1a !important; border: 1px solid #ccc5b5 !important; }
+[data-theme="te"] .mcp-modal-btn-danger { background: #1a1a1a !important; color: #fff !important; border: none !important; }
+[data-theme="te"] .mcp-modal-btn-danger:hover { background: #cc2200 !important; }
+
+/* ── TE: Status bar ── */
+[data-theme="te"] .status-bar { border-left: 3px solid #ff5500 !important; }
+[data-theme="te"] .status-indicator { border-radius: 0 !important; }
+[data-theme="te"] .status-indicator.connected { background: #ff5500 !important; animation: none !important; }
+
+/* ── TE: Hamburger bars ── */
+[data-theme="te"] #hamburgerBtn .bar { background: #fff !important; border-radius: 0 !important; }
+
+/* ── TE: Scrollbar ── */
+[data-theme="te"] ::-webkit-scrollbar-track { background: #f0ece4 !important; }
+[data-theme="te"] ::-webkit-scrollbar-thumb { background: #c0b8a8 !important; border-radius: 0 !important; }
+[data-theme="te"] ::-webkit-scrollbar-thumb:hover { background: #888 !important; }
+
+/* ── TE: Bulk selection ── */
+[data-theme="te"] .sel-all-label input[type="checkbox"] { accent-color: #ff5500 !important; }
+[data-theme="te"] .sel-delete-btn { color: #cc2200 !important; }
+
+/* ── TE: model select ── */
+[data-theme="te"] #modelSelect {
+    background: transparent !important;
+    color: #ccc !important;
+    border: 1px solid #444 !important;
+    border-radius: 0 !important;
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.78rem !important;
+}
+
+/* ── TE: theme dropdown ── */
+[data-theme="te"] #themeDropdown,
+[data-theme="te"] .theme-option {
+    border-radius: 0 !important;
+}
+[data-theme="te"] #themeBtn {
+    border-radius: 0 !important;
+}
+
+
+/* ============================================================
+   MONO THEME  ("mono")
+   Ultra-minimalist — pure white, near-black text, single
+   hairline borders, generous space, one muted teal accent.
+   Nothing decorative. Nothing gratuitous.
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+[data-theme="mono"] {
+    /* Header */
+    --header-bg:        #fafafa;
+    --header-border:    #e8e8e8;
+
+    /* Sidebar */
+    --sidebar-bg:       #f7f7f7;
+    --sidebar-header:   #f0f0f0;
+    --sidebar-item:     #f7f7f7;
+    --sidebar-hover:    #efefef;
+    --sidebar-active:   #e8e8e8;
+    --sidebar-border:   #e2e2e2;
+    --sidebar-search:   #f0f0f0;
+
+    /* Page & Chat */
+    --page-bg:          #f4f4f4;
+    --chat-bg:          #ffffff;
+    --chat-border:      #e2e2e2;
+    --chat-assistant:   #f9f9f9;
+    --chat-asst-border: #e8e8e8;
+    --chat-asst-color:  #1a1a1a;
+    --input-bg:         #ffffff;
+    --input-border:     #d4d4d4;
+    --status-color:     #888;
+
+    /* User bubble & send */
+    --user-bubble:      #1a1a1a;
+    --send-btn:         #2d6a6a;
+    --send-btn-hover:   #245858;
+    --send-btn-focus:   rgba(45,106,106,0.15);
+
+    /* Top bar buttons */
+    --btn-logs:         #1a1a1a;
+    --btn-logs-hover:   #2d6a6a;
+    --btn-monitor:      #1a1a1a;
+    --btn-monitor-hover:#2d6a6a;
+    --btn-dashboard:    #1a1a1a;
+    --btn-dashboard-hover:#2d6a6a;
+    --btn-newsession:   #2d6a6a;
+    --btn-newsession-hover:#245858;
+
+    /* Log panel */
+    --log-bg:           #1c1c1c;
+    --log-header:       #161616;
+    --log-border:       #2e2e2e;
+    --log-filter-bg:    #1c1c1c;
+    --log-filter-btn:   #2a2a2a;
+
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+    --monitor-header:   rgba(0,0,0,0.3);
+
+    /* Dashboard */
+    --btn-back:         #1a1a1a;
+    --btn-back-hover:   #2d6a6a;
+    --btn-tools:        #2d6a6a;
+    --btn-tools-hover:  #245858;
+    --card-bg:          #ffffff;
+    --card-border:      #e2e2e2;
+    --card-shadow:      rgba(0,0,0,0.04);
+    --card-shadow-hover:rgba(0,0,0,0.08);
+    --title-color:      #1a1a1a;
+    --metric-color:     #1a1a1a;
+    --subtitle-color:   #999;
+    --label-color:      #666;
+    --chart-blue:       #2d6a6a;
+    --chart-purple:     #1a1a1a;
+    --chart-red:        #c0392b;
+    --chart-green:      #27ae60;
+    --chart-orange:     #e67e22;
+    --tool-border:      #2d6a6a;
+    --tool-bg:          #f9f9f9;
+    --status-bg:        #ffffff;
+
+    /* Scrollbars */
+    --scrollbar-track:  #f4f4f4;
+    --scrollbar-thumb:  #d4d4d4;
+    --scrollbar-hover:  #b4b4b4;
+
+    /* Session dates */
+    --session-date-color:  #aaa;
+    --session-date-hover:  #888;
+    --session-date-active: #666;
+
+    /* Swatches */
+    --swatch1:          #1a1a1a;
+    --swatch2:          #2d6a6a;
+    --swatch3:          #f4f4f4;
+}
+
+/* ── Mono: Global font — IBM Plex Sans for UI ── */
+[data-theme="mono"],
+[data-theme="mono"] body {
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+    font-weight: 300;
+}
+
+/* Monospace for data/labels */
+[data-theme="mono"] #input,
+[data-theme="mono"] .metric-value,
+[data-theme="mono"] .stat-value,
+[data-theme="mono"] .tool-stat-value,
+[data-theme="mono"] .session-item-date,
+[data-theme="mono"] .log-message,
+[data-theme="mono"] .log-timestamp,
+[data-theme="mono"] .log-level,
+[data-theme="mono"] #status,
+[data-theme="mono"] .histogram-bar-count,
+[data-theme="mono"] .histogram-bar-label,
+[data-theme="mono"] .failure-kind-value {
+    font-family: 'IBM Plex Mono', 'Courier New', monospace !important;
+}
+
+/* ── Mono: Header — white bar, black text, hairline border ── */
+[data-theme="mono"] #header {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e2e2e2 !important;
+    box-shadow: none !important;
+    color: #1a1a1a !important;
+}
+[data-theme="mono"] #header h1 {
+    color: #1a1a1a !important;
+    font-size: 0.95rem !important;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+/* ── Mono: Top bar buttons — ghost style ── */
+[data-theme="mono"] #logToggle,
+[data-theme="mono"] #monitorToggle,
+[data-theme="mono"] #toolsToggle,
+[data-theme="mono"] #dashboardBtn {
+    background: transparent !important;
+    color: #666 !important;
+    border: 1px solid #d8d8d8 !important;
+    font-size: 0.78rem !important;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+}
+[data-theme="mono"] #logToggle:hover,
+[data-theme="mono"] #monitorToggle:hover,
+[data-theme="mono"] #toolsToggle:hover,
+[data-theme="mono"] #dashboardBtn:hover {
+    background: #1a1a1a !important;
+    color: #fff !important;
+    border-color: #1a1a1a !important;
+}
+
+/* Hamburger — dark bars on light header */
+[data-theme="mono"] #hamburgerBtn .bar { background: #1a1a1a !important; }
+
+/* Model select */
+[data-theme="mono"] #modelSelect {
+    background: transparent !important;
+    color: #666 !important;
+    border: 1px solid #d8d8d8 !important;
+    font-size: 0.78rem !important;
+}
+[data-theme="mono"] #modelSelectLabel { color: #666 !important; }
+
+/* ── Mono: Send button ── */
+[data-theme="mono"] #sendBtn {
+    background: #2d6a6a !important;
+    color: #fff !important;
+    border: none !important;
+    font-weight: 400;
+}
+[data-theme="mono"] #sendBtn:hover { background: #245858 !important; }
+[data-theme="mono"] #stopBtn { border: 1px solid #e2e2e2 !important; color: #666 !important; }
+
+/* ── Mono: Input area ── */
+[data-theme="mono"] #input {
+    color: #1a1a1a !important;
+    font-weight: 300;
+    font-size: 0.9rem !important;
+    background: #ffffff !important;
+}
+[data-theme="mono"] #input::placeholder { color: #c0c0c0 !important; font-weight: 300; }
+
+/* ── Mono: Chat messages ── */
+[data-theme="mono"] .user {
+    background: #1a1a1a !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-weight: 300;
+}
+[data-theme="mono"] .assistant {
+    background: #f9f9f9 !important;
+    border: 1px solid #e8e8e8 !important;
+    color: #1a1a1a !important;
+    font-weight: 300;
+}
+
+/* ── Mono: Sidebar ── */
+[data-theme="mono"] .session-item-text { color: #333 !important; font-weight: 300; }
+[data-theme="mono"] .session-item.active { background: #1a1a1a !important; }
+[data-theme="mono"] .session-item.active .session-item-text { color: #fff !important; }
+[data-theme="mono"] .sessions-header h2 { color: #1a1a1a !important; font-weight: 300; font-size: 0.9rem !important; letter-spacing: 0.1em; text-transform: uppercase; }
+[data-theme="mono"] .new-session-btn {
+    background: #2d6a6a !important;
+    color: #fff !important;
+    font-weight: 400;
+    font-size: 1.1rem !important;
+}
+[data-theme="mono"] .new-session-btn:hover { background: #245858 !important; }
+[data-theme="mono"] .session-close-btn { background: transparent !important; color: #888 !important; border: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] #sessionSearch {
+    background: #f0f0f0 !important;
+    border: 1px solid #e2e2e2 !important;
+    color: #1a1a1a !important;
+    font-weight: 300;
+}
+[data-theme="mono"] #sessionSearch::placeholder { color: #bbb !important; }
+
+/* ── Mono: Dashboard cards — clean white, teal border accent ── */
+[data-theme="mono"] .metric-card {
+    background: #ffffff !important;
+    border: 1px solid #e8e8e8 !important;
+    border-top: 2px solid #2d6a6a !important;
+    box-shadow: none !important;
+}
+[data-theme="mono"] .metric-card:hover {
+    border-top-color: #1a1a1a !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+[data-theme="mono"] .metric-value {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 300 !important;
+    font-size: 2.4rem !important;
+    color: #1a1a1a !important;
+    letter-spacing: -0.02em;
+}
+[data-theme="mono"] .metric-title { font-weight: 400; font-size: 0.72rem !important; letter-spacing: 0.12em; color: #999 !important; }
+[data-theme="mono"] .metric-subtitle { font-weight: 300; color: #bbb !important; font-size: 0.8rem !important; }
+[data-theme="mono"] .chart-container { background: #ffffff !important; border: 1px solid #e8e8e8 !important; box-shadow: none !important; }
+[data-theme="mono"] .chart-title { color: #1a1a1a !important; font-weight: 400; font-size: 0.85rem !important; letter-spacing: 0.06em; }
+
+/* ── Mono: Histogram — teal scale ── */
+[data-theme="mono"] .histogram-bar-wrap { background: #f0f0f0 !important; }
+[data-theme="mono"] .mini-bar-wrap { background: #f0f0f0 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #2d6a6a !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #3a8080 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #888 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #555 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(5) .histogram-bar { background: #1a1a1a !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(1) .mini-bar { background: #2d6a6a !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(2) .mini-bar { background: #3a8080 !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(3) .mini-bar { background: #888 !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(4) .mini-bar { background: #555 !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(5) .mini-bar { background: #1a1a1a !important; }
+[data-theme="mono"] .histogram-title { color: #bbb !important; font-style: normal !important; font-size: 0.7rem !important; letter-spacing: 0.06em; font-weight: 300; }
+[data-theme="mono"] .histogram-bar-label { color: #bbb !important; font-size: 0.62rem !important; }
+[data-theme="mono"] .histogram-bar-count { color: #1a1a1a !important; font-size: 0.65rem !important; }
+
+/* ── Mono: Tool cards ── */
+[data-theme="mono"] .tool-card { background: #f9f9f9 !important; border-left: 2px solid #2d6a6a !important; border: 1px solid #e8e8e8; border-left: 2px solid #2d6a6a !important; }
+[data-theme="mono"] .tool-stat-label { color: #bbb !important; font-size: 0.7rem !important; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 300; }
+[data-theme="mono"] .tool-stat-value { color: #1a1a1a !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 400; }
+[data-theme="mono"] .tool-name { color: #1a1a1a !important; font-weight: 400; }
+
+/* ── Mono: Failure cards ── */
+[data-theme="mono"] .failure-kind-card { background: #ffffff !important; border: 1px solid #e8e8e8 !important; }
+[data-theme="mono"] .failure-kind-label { color: #666 !important; font-weight: 400; font-size: 0.78rem !important; letter-spacing: 0.04em; }
+[data-theme="mono"] .failure-kind-pct { color: #bbb !important; }
+[data-theme="mono"] .failure-kind-bar-wrap { background: #f0f0f0 !important; }
+
+/* ── Mono: Reset + back buttons ── */
+[data-theme="mono"] .reset-btn {
+    background: transparent !important;
+    border: 1px solid #d8d8d8 !important;
+    color: #888 !important;
+    font-size: 0.78rem !important;
+    font-weight: 300;
+}
+[data-theme="mono"] .reset-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
+[data-theme="mono"] #backBtn { background: #1a1a1a !important; color: #fff !important; font-weight: 400; }
+[data-theme="mono"] #backBtn:hover { background: #2d6a6a !important; }
+
+/* ── Mono: Status bar ── */
+[data-theme="mono"] .status-bar { border: 1px solid #e8e8e8 !important; box-shadow: none !important; }
+[data-theme="mono"] .status-indicator.connected { background: #2d6a6a !important; box-shadow: none !important; }
+
+/* ── Mono: Log panel ── */
+[data-theme="mono"] #logPanel { background: #1c1c1c !important; border-left: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] #logHeader { background: #161616 !important; border-bottom: 1px solid #2e2e2e !important; }
+[data-theme="mono"] #logHeader h2 { color: #e0e0e0 !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
+[data-theme="mono"] #logFilters { background: #1c1c1c !important; border-bottom: 1px solid #2e2e2e !important; }
+[data-theme="mono"] #logContainer { background: #1c1c1c !important; }
+[data-theme="mono"] .log-message { color: #d0d0d0 !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 300; font-size: 0.8rem !important; }
+[data-theme="mono"] .log-timestamp { color: #555 !important; font-family: 'IBM Plex Mono', monospace !important; }
+[data-theme="mono"] .log-entry:hover { background: #222 !important; }
+[data-theme="mono"] .log-entry.USER      { border-left-color: #2d6a6a; }
+[data-theme="mono"] .log-entry.ERROR     { border-left-color: #c0392b; background: rgba(192,57,43,0.05) !important; }
+[data-theme="mono"] .log-entry.WARNING   { border-left-color: #e67e22; }
+[data-theme="mono"] .log-level.USER      { color: #2d6a6a !important; }
+[data-theme="mono"] .log-level.ASSISTANT { color: #888 !important; }
+[data-theme="mono"] .log-level.INFO      { color: #666 !important; }
+[data-theme="mono"] .log-level.WARNING   { color: #e67e22 !important; }
+[data-theme="mono"] .log-level.ERROR     { color: #c0392b !important; }
+[data-theme="mono"] .log-level.DEBUG     { color: #444 !important; }
+[data-theme="mono"] .filter-btn { background: #222 !important; color: #555 !important; border: 1px solid #2e2e2e !important; font-size: 0.7rem !important; font-weight: 400; letter-spacing: 0.04em; }
+[data-theme="mono"] .filter-btn.active { color: #e0e0e0 !important; background: #2e2e2e !important; border-color: #444 !important; }
+[data-theme="mono"] .filter-btn.USER.active { border-bottom: 2px solid #2d6a6a !important; }
+[data-theme="mono"] .log-btn { background: #222 !important; color: #888 !important; border: 1px solid #2e2e2e !important; font-weight: 300; }
+[data-theme="mono"] .log-btn:hover { background: #2d6a6a !important; color: #fff !important; border-color: #2d6a6a !important; }
+[data-theme="mono"] .log-status-indicator { background: #555; }
+[data-theme="mono"] .log-status-indicator.connected { background: #2d6a6a; box-shadow: none !important; }
+
+/* ── Mono: System monitor ── */
+[data-theme="mono"] #systemMonitor { background: #1c1c1c !important; border-left: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] .monitor-header { background: #161616 !important; border-bottom: 1px solid #2e2e2e !important; }
+[data-theme="mono"] .monitor-header h2 { color: #e0e0e0 !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
+[data-theme="mono"] .monitor-btn { background: #2a2a2a !important; color: #888 !important; }
+[data-theme="mono"] .monitor-btn:hover { background: #2d6a6a !important; color: #fff !important; }
+[data-theme="mono"] .stat-group { background: #222 !important; border: 1px solid #2e2e2e !important; }
+[data-theme="mono"] .stat-label { color: #666 !important; font-size: 0.72rem !important; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 300; }
+[data-theme="mono"] .stat-value { color: #e0e0e0 !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 300; }
+[data-theme="mono"] .stat-secondary { color: #555 !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 300; }
+[data-theme="mono"] .progress-bar { background: #2a2a2a !important; }
+[data-theme="mono"] .progress-fill { background: #2d6a6a !important; }
+[data-theme="mono"] .progress-fill.high { background: #e67e22 !important; }
+[data-theme="mono"] .progress-fill.critical { background: #c0392b !important; }
+
+/* ── Mono: Tools panel ── */
+[data-theme="mono"] #toolsPanel { background: #fafafa !important; border-left: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] #toolsHeader h2 { color: #1a1a1a !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
+[data-theme="mono"] .tools-btn { background: #1a1a1a !important; color: #fff !important; font-weight: 300; }
+[data-theme="mono"] .tools-btn:hover { background: #2d6a6a !important; }
+[data-theme="mono"] .tools-category-header { color: #999 !important; background: #f0f0f0 !important; border-bottom: 1px solid #e2e2e2 !important; font-weight: 400; font-size: 0.75rem !important; letter-spacing: 0.08em; text-transform: uppercase; }
+[data-theme="mono"] .tools-category-header:hover { background: #e8e8e8 !important; }
+[data-theme="mono"] .tool-item { background: #ffffff !important; border-bottom: 1px solid #f0f0f0 !important; }
+[data-theme="mono"] .tool-item:hover { background: #f7f7f7 !important; border-left: 2px solid #2d6a6a !important; }
+[data-theme="mono"] .tool-item-name { color: #1a1a1a !important; font-weight: 400; }
+[data-theme="mono"] .tool-item-desc { color: #999 !important; font-size: 0.8rem !important; font-weight: 300; }
+[data-theme="mono"] .tool-param { background: #f4f4f4 !important; color: #555 !important; border: 1px solid #e2e2e2 !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 0.75rem !important; }
+[data-theme="mono"] .tool-fav-btn { color: #d4d4d4 !important; }
+[data-theme="mono"] .tool-fav-btn:hover { color: #2d6a6a !important; }
+[data-theme="mono"] .tool-fav-btn.active { color: #2d6a6a !important; }
+
+/* ── Mono: Modal ── */
+[data-theme="mono"] .mcp-modal-backdrop { background: rgba(0,0,0,0.4) !important; }
+[data-theme="mono"] .mcp-modal-dialog { background: #ffffff !important; border: 1px solid #e2e2e2 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important; }
+[data-theme="mono"] .mcp-modal-header { background: #fafafa !important; border-bottom: 1px solid #e8e8e8 !important; }
+[data-theme="mono"] .mcp-modal-title { color: #1a1a1a !important; font-weight: 400; letter-spacing: 0.06em; }
+[data-theme="mono"] .mcp-modal-body { color: #444 !important; font-weight: 300; }
+[data-theme="mono"] .mcp-modal-footer { background: #fafafa !important; border-top: 1px solid #e8e8e8 !important; }
+[data-theme="mono"] .mcp-modal-btn-primary { background: #2d6a6a !important; color: #fff !important; border: none !important; }
+[data-theme="mono"] .mcp-modal-btn-primary:hover { background: #245858 !important; }
+[data-theme="mono"] .mcp-modal-btn-secondary { background: #fff !important; color: #666 !important; border: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] .mcp-modal-btn-danger { background: #fff !important; color: #c0392b !important; border: 1px solid #c0392b !important; }
+[data-theme="mono"] .mcp-modal-btn-danger:hover { background: #c0392b !important; color: #fff !important; }
+
+/* ── Mono: Scrollbar ── */
+[data-theme="mono"] ::-webkit-scrollbar-track { background: #f4f4f4 !important; }
+[data-theme="mono"] ::-webkit-scrollbar-thumb { background: #d4d4d4 !important; }
+[data-theme="mono"] ::-webkit-scrollbar-thumb:hover { background: #aaa !important; }
+
+/* ── Mono: Bulk selection ── */
+[data-theme="mono"] .sel-all-label input[type="checkbox"] { accent-color: #2d6a6a !important; }
+[data-theme="mono"] .sel-delete-btn { color: #c0392b !important; }
+
+/* ── Mono: Pinned sessions ── */
+[data-theme="mono"] .session-item.pinned { border-top: 1px solid #e8e8e8 !important; }
+[data-theme="mono"] .session-item.pinned.active { box-shadow: inset 2px 0 0 #2d6a6a !important; }
+
+/* ── Mono: Theme dropdown — dark text on white background ── */
+[data-theme="mono"] #themeDropdown {
+    background: #ffffff !important;
+    border: 1px solid #e2e2e2 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+}
+[data-theme="mono"] .theme-option {
+    color: #1a1a1a !important;
+    background: #ffffff !important;
+}
+[data-theme="mono"] .theme-option:hover {
+    background: #f4f4f4 !important;
+    color: #1a1a1a !important;
+}
+[data-theme="mono"] .theme-option.active {
+    background: #f0f0f0 !important;
+    color: #1a1a1a !important;
+}
+[data-theme="mono"] .theme-option .check {
+    color: #2d6a6a !important;
+}
+[data-theme="mono"] .theme-opt-swatch {
+    border: 1px solid #e2e2e2 !important;
 }
