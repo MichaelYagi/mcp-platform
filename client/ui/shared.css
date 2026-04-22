@@ -2326,7 +2326,7 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list:        "default,midnight,TMNT,superman,batman,matrix,tron,dragonball,te,mono,garbagefire";
+    --theme-list:        "default,midnight,mono,TMNT,superman,batman,matrix,tron,dragonball,te,garbagefire";
     --theme-list-hidden: "forest,crimson,neon,dracula,nimbus,tokyo";
 }
 /* ============================================================
