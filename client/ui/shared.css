@@ -2326,7 +2326,8 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list: "default,midnight,forest,crimson,TMNT,superman,batman,matrix,tron,dragonball,neon,dracula,nimbus,tokyo,garbagefire,te,mono";
+    --theme-list:        "default,midnight,TMNT,superman,batman,matrix,tron,dragonball,te,mono,garbagefire";
+    --theme-list-hidden: "forest,crimson,neon,dracula,nimbus,tokyo";
 }
 /* ============================================================
    MATRIX THEME — new elements from capability registry,
