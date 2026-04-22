@@ -4487,3 +4487,45 @@ body {
 [data-theme="dragonball"] #dashboardBtn:hover::after {
     color: #1c4595;
 }
+/* ============================================================
+   PROMPT NAVIGATOR — chat hover sync highlight
+   .nav-hover-active overrides per theme
+   ============================================================ */
+
+[data-theme="matrix"] .prompt-nav-item.nav-hover-active {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+    border-left: 2px solid #00ff41 !important;
+    text-shadow: 0 0 6px rgba(0,255,65,0.4);
+}
+
+[data-theme="tron"] .prompt-nav-item.nav-hover-active {
+    background: rgba(0,238,255,0.12) !important;
+    color: #00eeff !important;
+    border-left: 2px solid #00eeff !important;
+    text-shadow: 0 0 6px rgba(0,238,255,0.4);
+}
+
+[data-theme="te"] .prompt-nav-item.nav-hover-active {
+    background: #d8d0c0 !important;
+    color: #1a1a1a !important;
+    border-left: 2px solid #ff5500 !important;
+}
+
+[data-theme="mono"] .prompt-nav-item.nav-hover-active {
+    background: #efefef !important;
+    color: #1a1a1a !important;
+    border-left: 2px solid #2d6a6a !important;
+}
+
+[data-theme="nimbus"] .prompt-nav-item.nav-hover-active {
+    background: #c7d3e8 !important;
+    color: var(--text-strong) !important;
+    border-left: 2px solid #4a90e2 !important;
+}
+
+[data-theme="dragonball"] .prompt-nav-item.nav-hover-active {
+    background: rgba(28,69,149,0.15) !important;
+    color: #1c4595 !important;
+    border-left: 2px solid #e76a24 !important;
+}

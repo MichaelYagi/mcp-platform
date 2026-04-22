@@ -558,6 +558,106 @@ function togglePromptNavigator() {
     renderNavigator();
 }
 
+// ============================================================
+// PROMPT NAVIGATOR — scroll-based highlight sync
+// Watches #chat scroll position; highlights the nav item
+// corresponding to whichever user/assistant turn is most
+// visible in the viewport. Stays highlighted until scroll moves.
+// ============================================================
+(function initNavScrollSync() {
+    const chat = document.getElementById('chat');
+    if (!chat) return;
+
+    let activeNavIndex = -1;
+    let observer = null;
+
+    function setNavHighlight(index) {
+        if (index === activeNavIndex) return;
+        const list = document.getElementById('promptNavList');
+        if (!list) return;
+        list.querySelectorAll('.prompt-nav-item').forEach(el =>
+            el.classList.remove('nav-hover-active')
+        );
+        activeNavIndex = index;
+        if (index < 0) return;
+        const items = list.querySelectorAll('.prompt-nav-item');
+        if (items[index]) {
+            items[index].classList.add('nav-hover-active');
+            // Scroll the nav item into view within the list if needed
+            items[index].scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function getNavIndexForElement(el) {
+        // Direct user message
+        const userIdx = messageIndex.findIndex(entry => entry.domRef === el);
+        if (userIdx !== -1) return userIdx;
+
+        // Assistant wrapper — find preceding user message
+        const wrapper = el.closest('.msg-wrapper');
+        if (wrapper) {
+            let sibling = wrapper.previousElementSibling;
+            while (sibling) {
+                const idx = messageIndex.findIndex(entry => entry.domRef === sibling);
+                if (idx !== -1) return idx;
+                sibling = sibling.previousElementSibling;
+            }
+        }
+        return -1;
+    }
+
+    function buildObserver() {
+        if (observer) observer.disconnect();
+
+        // Track which elements are visible and how much
+        const visibilityMap = new Map();
+
+        observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                visibilityMap.set(entry.target, entry.intersectionRatio);
+            });
+
+            // Find the most visible element that maps to a nav index
+            let bestRatio = 0;
+            let bestIndex = -1;
+            visibilityMap.forEach((ratio, el) => {
+                if (ratio > bestRatio) {
+                    const idx = getNavIndexForElement(el);
+                    if (idx !== -1) {
+                        bestRatio = ratio;
+                        bestIndex = idx;
+                    }
+                }
+            });
+
+            if (bestRatio > 0) setNavHighlight(bestIndex);
+        }, {
+            root: chat,
+            threshold: [0, 0.1, 0.25, 0.5, 0.75, 1.0]
+        });
+
+        // Observe all .msg elements inside #chat
+        chat.querySelectorAll('.msg').forEach(el => observer.observe(el));
+    }
+
+    // Rebuild observer when new messages are added
+    // Patch renderNavigator to also rebuild
+    const _origRender = window.renderNavigator;
+    window.renderNavigator = function() {
+        _origRender && _origRender();
+        // Small delay so DOM is settled before observing
+        setTimeout(buildObserver, 50);
+    };
+
+    // Also rebuild when a session loads (chat gets repopulated)
+    const chatMutationObserver = new MutationObserver(() => {
+        buildObserver();
+    });
+    chatMutationObserver.observe(chat, { childList: true });
+
+    buildObserver();
+})();
+
 function selectSession(sessionId) {
     ws.send(JSON.stringify({ type:"load_session", session_id:sessionId }));
     currentSessionId = sessionId;

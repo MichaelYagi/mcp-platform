@@ -1089,6 +1089,12 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     line-height: 1.35;
 }
 .prompt-nav-item:hover { background: var(--sidebar-hover); color: white; }
+.prompt-nav-item.nav-hover-active {
+    background: var(--sidebar-active);
+    color: white;
+    border-left: 2px solid var(--send-btn);
+    padding-left: calc(0.5rem - 2px);
+}
 
 .prompt-nav-num {
     flex-shrink: 0;
