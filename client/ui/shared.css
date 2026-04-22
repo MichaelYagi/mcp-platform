@@ -922,89 +922,92 @@ body {
 }
 
 [data-theme="tron"] {
-    /* Header — deep black with cyan glow */
-    --header-bg:        #0a0e1a;
-    --header-border:    #00d4ff;
+    /* Header — deep blue-black, glowing cyan underline */
+    --header-bg:        #03060f;
+    --header-border:    #00eeff;
 
-    /* Sidebar — black grid with cyan accents */
-    --sidebar-bg:       #050810;
-    --sidebar-header:   #0a0e1a;
-    --sidebar-item:     #0d1525;
-    --sidebar-hover:    #00d4ff22;
-    --sidebar-active:   #00d4ff;
-    --sidebar-border:   #00d4ff44;
-    --sidebar-search:   #0d1525;
+    /* Sidebar */
+    --sidebar-bg:       #020510;
+    --sidebar-header:   #03060f;
+    --sidebar-item:     #04091a;
+    --sidebar-hover:    rgba(0,238,255,0.08);
+    --sidebar-active:   #00eeff;
+    --sidebar-border:   rgba(0,238,255,0.3);
+    --sidebar-search:   #04091a;
 
-    /* Page & Chat — dark grid with cyan tint */
-    --page-bg:          #080c18;
-    --chat-bg:          #0a0f1e;
-    --chat-border:      #00d4ff44;
-    --chat-assistant:   #0d1a2e;   /* slightly lighter dark blue panel */
-    --chat-asst-border: #00d4ff66;
-    --chat-asst-color:  #00d4ff;   /* cyan text — classic Tron */
-    --input-bg:         #0a0f1e;
-    --input-border:     #00d4ff66;
-    --status-color:     #00d4ff;
+    /* Page & Chat */
+    --page-bg:          #010408;
+    --chat-bg:          #03060f;
+    --chat-border:      rgba(0,238,255,0.25);
+    --chat-assistant:   #060d1e;
+    --chat-asst-border: rgba(0,238,255,0.4);
+    --chat-asst-color:  #c8f8ff;
+    --input-bg:         #03060f;
+    --input-border:     rgba(0,238,255,0.5);
+    --status-color:     #00eeff;
 
-    /* User bubbles — cyan to purple light cycle */
-    --user-bubble:      linear-gradient(135deg, #00d4ff, #9d00ff);
-    --send-btn:         #00d4ff;
-    --send-btn-hover:   #00a8cc;
-    --send-btn-focus:   rgba(0,212,255,0.35);
+    /* User bubbles */
+    --user-bubble:      linear-gradient(135deg, #00eeff, #7b00ff);
+    --send-btn:         #00eeff;
+    --send-btn-hover:   #00ccdd;
+    --send-btn-focus:   rgba(0,238,255,0.3);
 
-    --btn-logs:         #00d4ff;
-    --btn-logs-hover:   #00a8cc;
-    --btn-monitor:      #9d00ff;
-    --btn-monitor-hover:#7a00cc;
-    --btn-dashboard:    #00d4ff;
-    --btn-dashboard-hover:#00a8cc;
-    --btn-newsession:   #9d00ff;
-    --btn-newsession-hover:#7a00cc;
+    --btn-logs:         #00eeff;
+    --btn-logs-hover:   #00ccdd;
+    --btn-monitor:      #7b00ff;
+    --btn-monitor-hover:#6200cc;
+    --btn-dashboard:    #00eeff;
+    --btn-dashboard-hover:#00ccdd;
+    --btn-newsession:   #7b00ff;
+    --btn-newsession-hover:#6200cc;
 
-    /* Log panel — matrix black */
-    --log-bg:           #020408;
-    --log-header:       #0a0e1a;
-    --log-border:       #00d4ff44;
-    --log-filter-bg:    #050810;
-    --log-filter-btn:   #00d4ff;
+    /* Log panel */
+    --log-bg:           #010306;
+    --log-header:       #03060f;
+    --log-border:       rgba(0,238,255,0.2);
+    --log-filter-bg:    #020510;
+    --log-filter-btn:   #04091a;
 
-    /* System monitor — cyan to purple */
-    --monitor-gradient: linear-gradient(135deg, #00d4ff 0%, #9d00ff 100%);
-    --monitor-header:   rgba(0,0,0,0.5);
+    /* System monitor */
+    --monitor-gradient: linear-gradient(135deg, #00eeff 0%, #7b00ff 100%);
+    --monitor-header:   rgba(0,0,0,0.6);
 
     /* Dashboard */
-    --btn-back:         #00d4ff;
-    --btn-back-hover:   #00a8cc;
-    --btn-tools:        #e040fb;
-    --btn-tools-hover:  #b800d4;
-    --card-bg:          #0d1525;
-    --card-border:      #00d4ff44;
-    --card-shadow:      rgba(0,212,255,0.10);
-    --card-shadow-hover:rgba(0,212,255,0.20);
-    --title-color:      #00d4ff;
-    --metric-color:     #9d00ff;
-    --subtitle-color:   #00d4ff99;
-    --label-color:      #00d4ff77;
-    --chart-blue:       #00d4ff;
-    --chart-purple:     #9d00ff;
-    --tool-border:      #00d4ff44;
-    --tool-bg:          #0d1525;
-    --status-bg:        #0a0f1e;
+    --btn-back:         #00eeff;
+    --btn-back-hover:   #00ccdd;
+    --btn-tools:        #cc00ff;
+    --btn-tools-hover:  #aa00dd;
+    --card-bg:          #04091a;
+    --card-border:      rgba(0,238,255,0.25);
+    --card-shadow:      rgba(0,238,255,0.12);
+    --card-shadow-hover:rgba(0,238,255,0.28);
+    --title-color:      #00eeff;
+    --metric-color:     #00eeff;
+    --subtitle-color:   rgba(0,238,255,0.6);
+    --label-color:      rgba(0,238,255,0.75);
+    --chart-blue:       #00eeff;
+    --chart-purple:     #7b00ff;
+    --chart-red:        #ff003c;
+    --chart-green:      #00ff9d;
+    --chart-orange:     #ff6600;
+    --tool-border:      rgba(0,238,255,0.5);
+    --tool-bg:          #04091a;
+    --status-bg:        #03060f;
 
-    /* Scrollbars — cyan on black */
-    --scrollbar-track:  #050810;
-    --scrollbar-thumb:  #00d4ff;
-    --scrollbar-hover:  #9d00ff;
+    /* Scrollbars */
+    --scrollbar-track:  #010408;
+    --scrollbar-thumb:  rgba(0,238,255,0.4);
+    --scrollbar-hover:  #00eeff;
 
     /* Swatches */
-    --swatch1:          #00d4ff;   /* cyan */
-    --swatch2:          #9d00ff;   /* purple */
-    --swatch3:          #0a0e1a;   /* grid black */
+    --swatch1:          #00eeff;
+    --swatch2:          #7b00ff;
+    --swatch3:          #03060f;
 
     /* Session date */
-    --session-date-color:       #007a99;
-    --session-date-hover:       #00b0cc;
-    --session-date-active:      rgba(0,20,30,0.7);
+    --session-date-color:   rgba(0,238,255,0.4);
+    --session-date-hover:   rgba(0,238,255,0.7);
+    --session-date-active:  rgba(0,10,20,0.8);
 }
 
 /* Crimson – deep red accents */
@@ -3678,4 +3681,482 @@ body {
 [data-theme="mono"] .prompt-nav-highlight {
     outline: 2px solid rgba(45,106,106,0.9) !important;
     animation: nav-flash-mono 1.2s ease forwards !important;
+}
+/* ============================================================
+   TRON THEME — full override block
+   Deep blue-black, diagonal SVG grid, circle arc motifs,
+   heavy cyan neon bloom on everything
+   ============================================================ */
+
+/* ── Tron: diagonal circuit grid on page background ── */
+[data-theme="tron"] body {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cdefs%3E%3Cpattern id='grid' width='80' height='80' patternUnits='userSpaceOnUse'%3E%3Cpath d='M0 80 L80 0' stroke='%2300eeff' stroke-width='0.4' opacity='0.07'/%3E%3Cpath d='M-20 80 L60 0' stroke='%2300eeff' stroke-width='0.3' opacity='0.04'/%3E%3Cpath d='M20 80 L100 0' stroke='%2300eeff' stroke-width='0.3' opacity='0.04'/%3E%3Ccircle cx='80' cy='0' r='18' stroke='%2300eeff' stroke-width='0.4' fill='none' opacity='0.06'/%3E%3Ccircle cx='0' cy='80' r='18' stroke='%2300eeff' stroke-width='0.4' fill='none' opacity='0.06'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='80' height='80' fill='url(%23grid)'/%3E%3C/svg%3E") !important;
+    background-color: #010408 !important;
+}
+
+/* ── Tron: chat area — subtle diagonal lines + arc corners ── */
+[data-theme="tron"] #chat {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cpath d='M0 120 L120 0' stroke='%2300eeff' stroke-width='0.5' opacity='0.04'/%3E%3Cpath d='M60 120 L180 0' stroke='%2300eeff' stroke-width='0.3' opacity='0.03'/%3E%3Ccircle cx='120' cy='0' r='30' stroke='%2300eeff' stroke-width='0.5' fill='none' opacity='0.05'/%3E%3Ccircle cx='0' cy='120' r='30' stroke='%2300eeff' stroke-width='0.5' fill='none' opacity='0.05'/%3E%3C/svg%3E") !important;
+    background-color: #03060f !important;
+    border-color: rgba(0,238,255,0.25) !important;
+    box-shadow:
+        0 0 0 1px rgba(0,238,255,0.15),
+        0 0 20px rgba(0,238,255,0.06),
+        inset 0 0 30px rgba(0,238,255,0.03) !important;
+}
+
+/* ── Tron: header — strong cyan border glow ── */
+[data-theme="tron"] #header {
+    background: #03060f !important;
+    border-bottom: 2px solid #00eeff !important;
+    box-shadow:
+        0 0 12px rgba(0,238,255,0.5),
+        0 0 30px rgba(0,238,255,0.2),
+        0 2px 0 rgba(0,238,255,0.8) !important;
+}
+[data-theme="tron"] #header h1 {
+    color: #00eeff !important;
+    text-shadow:
+        0 0 8px rgba(0,238,255,1),
+        0 0 20px rgba(0,238,255,0.7),
+        0 0 40px rgba(0,238,255,0.4) !important;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+/* ── Tron: sidebar ── */
+[data-theme="tron"] #sessionsSidebar {
+    border-right: 1px solid rgba(0,238,255,0.3) !important;
+    box-shadow: 2px 0 15px rgba(0,238,255,0.08) !important;
+}
+[data-theme="tron"] .sessions-header {
+    border-bottom: 1px solid rgba(0,238,255,0.3) !important;
+    box-shadow: 0 1px 8px rgba(0,238,255,0.1) !important;
+}
+[data-theme="tron"] .sessions-header h2 {
+    color: #00eeff !important;
+    text-shadow: 0 0 8px rgba(0,238,255,0.8), 0 0 20px rgba(0,238,255,0.4) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+[data-theme="tron"] .session-item.active {
+    background: rgba(0,238,255,0.12) !important;
+    box-shadow: inset 3px 0 0 #00eeff, 0 0 12px rgba(0,238,255,0.1) !important;
+    color: #00eeff !important;
+}
+[data-theme="tron"] .session-item:hover {
+    background: rgba(0,238,255,0.06) !important;
+    box-shadow: inset 2px 0 0 rgba(0,238,255,0.5) !important;
+}
+[data-theme="tron"] .session-item-text { color: rgba(0,238,255,0.8) !important; }
+[data-theme="tron"] .session-item.active .session-item-text { color: #00eeff !important; }
+
+/* ── Tron: input area ── */
+[data-theme="tron"] #inputRow {
+    border: 1px solid rgba(0,238,255,0.4) !important;
+    box-shadow:
+        0 0 8px rgba(0,238,255,0.2),
+        0 0 20px rgba(0,238,255,0.08),
+        inset 0 0 10px rgba(0,238,255,0.04) !important;
+}
+[data-theme="tron"] #input {
+    color: #c8f8ff !important;
+    caret-color: #00eeff;
+}
+[data-theme="tron"] #input::placeholder { color: rgba(0,238,255,0.3) !important; }
+
+/* ── Tron: send button ── */
+[data-theme="tron"] #sendBtn {
+    background: #00eeff !important;
+    color: #010408 !important;
+    font-weight: 700;
+    box-shadow: 0 0 8px rgba(0,238,255,0.8), 0 0 20px rgba(0,238,255,0.4) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="tron"] #sendBtn:hover {
+    background: #00ffff !important;
+    box-shadow: 0 0 14px rgba(0,238,255,1), 0 0 35px rgba(0,238,255,0.6) !important;
+}
+
+/* ── Tron: top bar buttons ── */
+[data-theme="tron"] #logToggle,
+[data-theme="tron"] #monitorToggle,
+[data-theme="tron"] #toolsToggle,
+[data-theme="tron"] #dashboardBtn {
+    background: transparent !important;
+    color: #00eeff !important;
+    border: 1px solid rgba(0,238,255,0.5) !important;
+    box-shadow: 0 0 6px rgba(0,238,255,0.2), inset 0 0 6px rgba(0,238,255,0.05) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.78rem !important;
+}
+[data-theme="tron"] #logToggle:hover,
+[data-theme="tron"] #monitorToggle:hover,
+[data-theme="tron"] #toolsToggle:hover,
+[data-theme="tron"] #dashboardBtn:hover {
+    background: rgba(0,238,255,0.1) !important;
+    box-shadow: 0 0 12px rgba(0,238,255,0.5), inset 0 0 8px rgba(0,238,255,0.1) !important;
+    border-color: #00eeff !important;
+}
+
+/* ── Tron: model select ── */
+[data-theme="tron"] #modelSelect {
+    background: transparent !important;
+    color: #00eeff !important;
+    border: 1px solid rgba(0,238,255,0.4) !important;
+}
+[data-theme="tron"] #modelSelectLabel { color: rgba(0,238,255,0.7) !important; }
+
+/* ── Tron: chat messages ── */
+[data-theme="tron"] .user {
+    background: linear-gradient(135deg, #00eeff, #7b00ff) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 15px rgba(0,238,255,0.3), 0 0 30px rgba(123,0,255,0.15) !important;
+}
+[data-theme="tron"] .assistant {
+    background: #060d1e !important;
+    border: 1px solid rgba(0,238,255,0.3) !important;
+    color: #c8f8ff !important;
+    box-shadow: 0 0 10px rgba(0,238,255,0.08), inset 0 0 15px rgba(0,238,255,0.03) !important;
+}
+
+/* ── Tron: metric cards — arc motif in corner ── */
+[data-theme="tron"] .metric-card {
+    background: #04091a !important;
+    border: 1px solid rgba(0,238,255,0.25) !important;
+    box-shadow: 0 0 10px rgba(0,238,255,0.1), 0 0 1px rgba(0,238,255,0.3) !important;
+    position: relative;
+    overflow: hidden;
+}
+[data-theme="tron"] .metric-card::before {
+    content: '';
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,238,255,0.15);
+    pointer-events: none;
+}
+[data-theme="tron"] .metric-card::after {
+    content: '';
+    position: absolute;
+    top: -50px; right: -50px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,238,255,0.08);
+    pointer-events: none;
+}
+[data-theme="tron"] .metric-card:hover {
+    border-color: rgba(0,238,255,0.5) !important;
+    box-shadow: 0 0 20px rgba(0,238,255,0.2), 0 0 40px rgba(0,238,255,0.08) !important;
+    transform: translateY(-2px);
+}
+[data-theme="tron"] .metric-value {
+    color: #00eeff !important;
+    text-shadow: 0 0 10px rgba(0,238,255,0.8), 0 0 25px rgba(0,238,255,0.4) !important;
+}
+[data-theme="tron"] .metric-title {
+    color: rgba(0,238,255,0.7) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+[data-theme="tron"] .metric-subtitle { color: rgba(0,238,255,0.45) !important; }
+
+/* ── Tron: chart containers ── */
+[data-theme="tron"] .chart-container {
+    background: #04091a !important;
+    border: 1px solid rgba(0,238,255,0.2) !important;
+    box-shadow: 0 0 15px rgba(0,238,255,0.08) !important;
+    position: relative;
+    overflow: hidden;
+}
+[data-theme="tron"] .chart-container::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M0 60 L60 0' stroke='%2300eeff' stroke-width='0.3' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+}
+[data-theme="tron"] .chart-header,
+[data-theme="tron"] .chart-wrapper,
+[data-theme="tron"] .histogram-container,
+[data-theme="tron"] .failure-kinds-grid,
+[data-theme="tron"] .tools-grid { position: relative; z-index: 1; }
+[data-theme="tron"] .chart-title {
+    color: #00eeff !important;
+    text-shadow: 0 0 6px rgba(0,238,255,0.6) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.9rem !important;
+}
+
+/* ── Tron: histogram bars ── */
+[data-theme="tron"] .histogram-bar-wrap { background: rgba(0,238,255,0.05) !important; border: 1px solid rgba(0,238,255,0.1) !important; }
+[data-theme="tron"] .mini-bar-wrap { background: rgba(0,238,255,0.05) !important; }
+[data-theme="tron"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #00eeff !important; box-shadow: 0 0 8px rgba(0,238,255,0.8) !important; }
+[data-theme="tron"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #00ccee !important; box-shadow: 0 0 6px rgba(0,200,238,0.6) !important; }
+[data-theme="tron"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #0099bb !important; box-shadow: 0 0 4px rgba(0,153,187,0.5) !important; }
+[data-theme="tron"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #7b00ff !important; box-shadow: 0 0 6px rgba(123,0,255,0.5) !important; }
+[data-theme="tron"] .histogram-bar-group:nth-child(5) .histogram-bar { background: #5500bb !important; box-shadow: 0 0 4px rgba(85,0,187,0.4) !important; }
+[data-theme="tron"] .mini-bar-group:nth-child(1) .mini-bar { background: #00eeff !important; box-shadow: 0 0 5px rgba(0,238,255,0.7) !important; }
+[data-theme="tron"] .mini-bar-group:nth-child(2) .mini-bar { background: #00ccee !important; }
+[data-theme="tron"] .mini-bar-group:nth-child(3) .mini-bar { background: #0099bb !important; }
+[data-theme="tron"] .mini-bar-group:nth-child(4) .mini-bar { background: #7b00ff !important; }
+[data-theme="tron"] .mini-bar-group:nth-child(5) .mini-bar { background: #5500bb !important; }
+[data-theme="tron"] .histogram-title { color: rgba(0,238,255,0.5) !important; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.68rem !important; font-style: normal !important; }
+[data-theme="tron"] .histogram-bar-label { color: rgba(0,238,255,0.5) !important; }
+[data-theme="tron"] .histogram-bar-count { color: #00eeff !important; text-shadow: 0 0 4px rgba(0,238,255,0.6) !important; }
+
+/* ── Tron: tool cards ── */
+[data-theme="tron"] .tool-card {
+    background: #04091a !important;
+    border-left: 3px solid #00eeff !important;
+    box-shadow: -3px 0 12px rgba(0,238,255,0.2) !important;
+}
+[data-theme="tron"] .tool-name { color: #00eeff !important; text-shadow: 0 0 6px rgba(0,238,255,0.5) !important; }
+[data-theme="tron"] .tool-stat-label { color: rgba(0,238,255,0.5) !important; text-transform: uppercase; letter-spacing: 0.08em; }
+[data-theme="tron"] .tool-stat-value { color: #00eeff !important; }
+
+/* ── Tron: failure cards ── */
+[data-theme="tron"] .failure-kind-card {
+    background: #04091a !important;
+    border: 1px solid rgba(0,238,255,0.2) !important;
+    box-shadow: 0 0 8px rgba(0,238,255,0.06) !important;
+}
+[data-theme="tron"] .failure-kind-label { color: rgba(0,238,255,0.7) !important; text-transform: uppercase; letter-spacing: 0.06em; }
+[data-theme="tron"] .failure-kind-bar-wrap { background: rgba(0,238,255,0.08) !important; }
+[data-theme="tron"] .failure-kind-pct { color: rgba(0,238,255,0.45) !important; }
+
+/* ── Tron: status bar ── */
+[data-theme="tron"] .status-bar {
+    background: #04091a !important;
+    border: 1px solid rgba(0,238,255,0.25) !important;
+    box-shadow: 0 0 12px rgba(0,238,255,0.08) !important;
+}
+[data-theme="tron"] .status-indicator.connected {
+    background: #00eeff !important;
+    box-shadow: 0 0 8px rgba(0,238,255,1), 0 0 20px rgba(0,238,255,0.6) !important;
+    animation: tron-pulse 2s infinite !important;
+}
+@keyframes tron-pulse {
+    0%,100% { box-shadow: 0 0 8px rgba(0,238,255,1), 0 0 20px rgba(0,238,255,0.6); }
+    50%      { box-shadow: 0 0 4px rgba(0,238,255,0.6), 0 0 10px rgba(0,238,255,0.3); }
+}
+[data-theme="tron"] .status-text { color: rgba(0,238,255,0.8) !important; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.8rem !important; }
+[data-theme="tron"] .reset-btn {
+    background: transparent !important;
+    border: 1px solid rgba(0,238,255,0.4) !important;
+    color: rgba(0,238,255,0.7) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="tron"] .reset-btn:hover { background: rgba(0,238,255,0.1) !important; box-shadow: 0 0 8px rgba(0,238,255,0.3) !important; color: #00eeff !important; }
+
+/* ── Tron: back button ── */
+[data-theme="tron"] #backBtn {
+    background: transparent !important;
+    color: #00eeff !important;
+    border: 1px solid rgba(0,238,255,0.5) !important;
+    box-shadow: 0 0 8px rgba(0,238,255,0.2) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+[data-theme="tron"] #backBtn:hover { background: rgba(0,238,255,0.1) !important; box-shadow: 0 0 15px rgba(0,238,255,0.4) !important; }
+
+/* ── Tron: log panel ── */
+[data-theme="tron"] #logPanel { background: #010306 !important; border-left: 2px solid rgba(0,238,255,0.3) !important; box-shadow: -2px 0 20px rgba(0,238,255,0.08) !important; }
+[data-theme="tron"] #logHeader { background: #03060f !important; border-bottom: 1px solid rgba(0,238,255,0.3) !important; box-shadow: 0 1px 10px rgba(0,238,255,0.1) !important; }
+[data-theme="tron"] #logHeader h2 { color: #00eeff !important; text-shadow: 0 0 8px rgba(0,238,255,0.7) !important; text-transform: uppercase; letter-spacing: 0.1em; }
+[data-theme="tron"] #logFilters { background: #02050e !important; border-bottom: 1px solid rgba(0,238,255,0.15) !important; }
+[data-theme="tron"] #logContainer { background: #010306 !important; }
+[data-theme="tron"] .log-message { color: rgba(200,248,255,0.8) !important; }
+[data-theme="tron"] .log-timestamp { color: rgba(0,238,255,0.35) !important; }
+[data-theme="tron"] .log-entry:hover { background: rgba(0,238,255,0.04) !important; }
+[data-theme="tron"] .log-entry.USER     { border-left-color: #00eeff; background: rgba(0,238,255,0.04) !important; }
+[data-theme="tron"] .log-entry.ASSISTANT{ border-left-color: rgba(0,238,255,0.5); }
+[data-theme="tron"] .log-entry.ERROR    { border-left-color: #ff003c; background: rgba(255,0,60,0.05) !important; }
+[data-theme="tron"] .log-entry.WARNING  { border-left-color: #ff6600; background: rgba(255,102,0,0.04) !important; }
+[data-theme="tron"] .log-level.USER      { color: #00eeff !important; text-shadow: 0 0 4px rgba(0,238,255,0.6) !important; }
+[data-theme="tron"] .log-level.ASSISTANT { color: rgba(0,238,255,0.7) !important; }
+[data-theme="tron"] .log-level.INFO      { color: rgba(0,238,255,0.5) !important; }
+[data-theme="tron"] .log-level.WARNING   { color: #ff6600 !important; text-shadow: 0 0 4px rgba(255,102,0,0.5) !important; }
+[data-theme="tron"] .log-level.ERROR     { color: #ff003c !important; text-shadow: 0 0 4px rgba(255,0,60,0.6) !important; }
+[data-theme="tron"] .log-level.DEBUG     { color: rgba(0,238,255,0.25) !important; }
+[data-theme="tron"] .filter-btn { background: #03060f !important; color: rgba(0,238,255,0.4) !important; border: 1px solid rgba(0,238,255,0.15) !important; text-transform: uppercase; font-size: 0.68rem !important; letter-spacing: 0.06em; }
+[data-theme="tron"] .filter-btn.active { color: #00eeff !important; border-color: rgba(0,238,255,0.5) !important; box-shadow: 0 0 6px rgba(0,238,255,0.2) !important; }
+[data-theme="tron"] .log-btn { background: rgba(0,238,255,0.08) !important; color: #00eeff !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .log-btn:hover { background: rgba(0,238,255,0.15) !important; box-shadow: 0 0 8px rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .log-status-indicator { background: #ff003c; }
+[data-theme="tron"] .log-status-indicator.connected { background: #00eeff; box-shadow: 0 0 8px rgba(0,238,255,0.9) !important; }
+
+/* ── Tron: system monitor ── */
+[data-theme="tron"] #systemMonitor { background: #010306 !important; border-left: 2px solid rgba(0,238,255,0.3) !important; box-shadow: -2px 0 20px rgba(0,238,255,0.08) !important; }
+[data-theme="tron"] .monitor-header { background: linear-gradient(135deg, #00eeff 0%, #7b00ff 100%) !important; box-shadow: 0 2px 15px rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .monitor-header h2 { color: #010408 !important; text-shadow: none !important; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; }
+[data-theme="tron"] .monitor-btn { background: rgba(0,238,255,0.1) !important; color: #00eeff !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .monitor-btn:hover { background: rgba(0,238,255,0.2) !important; box-shadow: 0 0 8px rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .stat-group { background: #04091a !important; border: 1px solid rgba(0,238,255,0.15) !important; box-shadow: 0 0 8px rgba(0,238,255,0.05) !important; }
+[data-theme="tron"] .stat-label { color: rgba(0,238,255,0.55) !important; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem !important; }
+[data-theme="tron"] .stat-value { color: #00eeff !important; text-shadow: 0 0 8px rgba(0,238,255,0.7) !important; }
+[data-theme="tron"] .stat-unit { color: rgba(0,238,255,0.5) !important; }
+[data-theme="tron"] .stat-secondary { color: rgba(0,238,255,0.4) !important; }
+[data-theme="tron"] .progress-bar { background: rgba(0,238,255,0.08) !important; border: 1px solid rgba(0,238,255,0.1) !important; }
+[data-theme="tron"] .progress-fill { background: linear-gradient(90deg, #00eeff, #7b00ff) !important; box-shadow: 0 0 8px rgba(0,238,255,0.5) !important; }
+[data-theme="tron"] .progress-fill.high { background: linear-gradient(90deg, #ff6600, #ff003c) !important; box-shadow: 0 0 8px rgba(255,102,0,0.5) !important; }
+[data-theme="tron"] .progress-fill.critical { background: #ff003c !important; box-shadow: 0 0 10px rgba(255,0,60,0.7) !important; }
+
+/* ── Tron: tools panel ── */
+[data-theme="tron"] #toolsPanel { background: #02050e !important; border-left: 2px solid rgba(0,238,255,0.3) !important; box-shadow: -2px 0 20px rgba(0,238,255,0.08) !important; }
+[data-theme="tron"] #toolsHeader h2 { color: #00eeff !important; text-shadow: 0 0 8px rgba(0,238,255,0.7) !important; text-transform: uppercase; letter-spacing: 0.1em; }
+[data-theme="tron"] .tools-btn { background: rgba(0,238,255,0.1) !important; color: #00eeff !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .tools-btn:hover { background: rgba(0,238,255,0.18) !important; box-shadow: 0 0 8px rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .tools-category-header { color: rgba(0,238,255,0.7) !important; background: #03060f !important; border-bottom: 1px solid rgba(0,238,255,0.15) !important; text-transform: uppercase; letter-spacing: 0.08em; }
+[data-theme="tron"] .tools-category-header:hover { background: rgba(0,238,255,0.05) !important; }
+[data-theme="tron"] .tool-item { background: #04091a !important; border-bottom: 1px solid rgba(0,238,255,0.08) !important; }
+[data-theme="tron"] .tool-item:hover { background: rgba(0,238,255,0.06) !important; border-left: 2px solid #00eeff !important; box-shadow: -2px 0 10px rgba(0,238,255,0.2) !important; }
+[data-theme="tron"] .tool-item-name { color: rgba(200,248,255,0.9) !important; }
+[data-theme="tron"] .tool-item-desc { color: rgba(0,238,255,0.45) !important; }
+[data-theme="tron"] .tool-param { background: rgba(0,238,255,0.05) !important; color: #00eeff !important; border: 1px solid rgba(0,238,255,0.2) !important; }
+[data-theme="tron"] .tool-fav-btn { color: rgba(0,238,255,0.2) !important; }
+[data-theme="tron"] .tool-fav-btn:hover { color: #00eeff !important; text-shadow: 0 0 8px rgba(0,238,255,0.8) !important; }
+[data-theme="tron"] .tool-fav-btn.active { color: #00eeff !important; text-shadow: 0 0 8px rgba(0,238,255,0.8) !important; }
+
+/* ── Tron: modal ── */
+[data-theme="tron"] .mcp-modal-backdrop { background: rgba(0,2,8,0.85) !important; }
+[data-theme="tron"] .mcp-modal-dialog { background: #04091a !important; border: 1px solid rgba(0,238,255,0.4) !important; box-shadow: 0 0 30px rgba(0,238,255,0.2), 0 0 60px rgba(0,238,255,0.08) !important; }
+[data-theme="tron"] .mcp-modal-header { background: #03060f !important; border-bottom: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .mcp-modal-title { color: #00eeff !important; text-shadow: 0 0 8px rgba(0,238,255,0.7) !important; text-transform: uppercase; letter-spacing: 0.1em; }
+[data-theme="tron"] .mcp-modal-body { color: rgba(200,248,255,0.8) !important; }
+[data-theme="tron"] .mcp-modal-footer { background: #03060f !important; border-top: 1px solid rgba(0,238,255,0.2) !important; }
+[data-theme="tron"] .mcp-modal-btn-primary { background: #00eeff !important; color: #010408 !important; font-weight: 700; box-shadow: 0 0 10px rgba(0,238,255,0.5) !important; }
+[data-theme="tron"] .mcp-modal-btn-primary:hover { box-shadow: 0 0 18px rgba(0,238,255,0.8) !important; }
+[data-theme="tron"] .mcp-modal-btn-secondary { background: transparent !important; color: rgba(0,238,255,0.7) !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .mcp-modal-btn-danger { background: transparent !important; color: #ff003c !important; border: 1px solid rgba(255,0,60,0.4) !important; }
+[data-theme="tron"] .mcp-modal-btn-danger:hover { background: rgba(255,0,60,0.1) !important; box-shadow: 0 0 8px rgba(255,0,60,0.4) !important; }
+
+/* ── Tron: session search + misc ── */
+[data-theme="tron"] #sessionSearch { background: #04091a !important; color: rgba(0,238,255,0.8) !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] #sessionSearch::placeholder { color: rgba(0,238,255,0.25) !important; }
+[data-theme="tron"] #sessionSearch:focus { box-shadow: 0 0 8px rgba(0,238,255,0.3) !important; border-color: #00eeff !important; }
+[data-theme="tron"] .new-session-btn { background: #7b00ff !important; color: #fff !important; box-shadow: 0 0 8px rgba(123,0,255,0.5) !important; }
+[data-theme="tron"] .new-session-btn:hover { background: #6200cc !important; box-shadow: 0 0 14px rgba(123,0,255,0.7) !important; }
+[data-theme="tron"] .session-close-btn { background: transparent !important; color: rgba(0,238,255,0.6) !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+
+/* ── Tron: scrollbar ── */
+[data-theme="tron"] ::-webkit-scrollbar-track { background: #010408 !important; }
+[data-theme="tron"] ::-webkit-scrollbar-thumb { background: rgba(0,238,255,0.3) !important; border-radius: 2px !important; box-shadow: 0 0 4px rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] ::-webkit-scrollbar-thumb:hover { background: #00eeff !important; box-shadow: 0 0 8px rgba(0,238,255,0.6) !important; }
+
+/* ── Tron: prompt navigator ── */
+[data-theme="tron"] #promptNavigator { background: #02050e !important; border-top: 1px solid rgba(0,238,255,0.2) !important; }
+[data-theme="tron"] #promptNavHeader { background: #03060f !important; color: rgba(0,238,255,0.7) !important; border-top: 1px solid rgba(0,238,255,0.2) !important; text-transform: uppercase; letter-spacing: 0.08em; }
+[data-theme="tron"] #promptNavHeader:hover { background: rgba(0,238,255,0.05) !important; color: #00eeff !important; }
+[data-theme="tron"] .prompt-nav-count { background: rgba(0,238,255,0.15) !important; color: #00eeff !important; border: 1px solid rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .prompt-nav-item { color: rgba(0,238,255,0.55) !important; }
+[data-theme="tron"] .prompt-nav-item:hover { background: rgba(0,238,255,0.06) !important; color: #00eeff !important; text-shadow: 0 0 6px rgba(0,238,255,0.4) !important; }
+[data-theme="tron"] .prompt-nav-num { color: rgba(0,238,255,0.3) !important; opacity: 1 !important; }
+@keyframes nav-flash-tron {
+    0%   { outline-color: rgba(0,238,255,0.9); box-shadow: 0 0 10px rgba(0,238,255,0.5); }
+    60%  { outline-color: rgba(0,238,255,0.4); }
+    100% { outline-color: transparent; box-shadow: none; }
+}
+[data-theme="tron"] .prompt-nav-highlight { outline: 2px solid rgba(0,238,255,0.9) !important; animation: nav-flash-tron 1.2s ease forwards !important; }
+
+/* ── Tron: hamburger ── */
+[data-theme="tron"] #hamburgerBtn .bar { background: #00eeff !important; box-shadow: 0 0 4px rgba(0,238,255,0.7) !important; }
+
+/* ── Tron: theme dropdown ── */
+[data-theme="tron"] #themeDropdown { background: #04091a !important; border: 1px solid rgba(0,238,255,0.3) !important; box-shadow: 0 0 20px rgba(0,238,255,0.15) !important; }
+[data-theme="tron"] .theme-option { color: rgba(0,238,255,0.8) !important; background: transparent !important; }
+[data-theme="tron"] .theme-option:hover { background: rgba(0,238,255,0.08) !important; color: #00eeff !important; }
+[data-theme="tron"] .theme-option.active { background: rgba(0,238,255,0.12) !important; color: #00eeff !important; }
+[data-theme="tron"] .theme-option .check { color: #00eeff !important; text-shadow: 0 0 6px rgba(0,238,255,0.8) !important; }
+
+/* ── Tron: bulk selection ── */
+[data-theme="tron"] .sel-all-label input[type="checkbox"] { accent-color: #00eeff !important; }
+[data-theme="tron"] .sel-delete-btn { color: #ff003c !important; }
+[data-theme="tron"] .session-item.session-checked { background: rgba(0,238,255,0.07) !important; border-left: 2px solid #00eeff !important; }
+[data-theme="tron"] .session-cb { accent-color: #00eeff !important; }
+
+/* ── Tron: pinned sessions ── */
+[data-theme="tron"] .session-item.pinned { border-top: 1px solid rgba(0,238,255,0.15) !important; box-shadow: inset 1px 0 0 rgba(0,238,255,0.3) !important; }
+[data-theme="tron"] .session-item.pinned.active { box-shadow: inset 3px 0 0 #00eeff, 0 0 10px rgba(0,238,255,0.1) !important; }
+
+
+/* ============================================================
+   TE THEME — dot-grid background + hardware-label additions
+   ============================================================ */
+
+/* ── TE: dot grid on page background only ── */
+[data-theme="te"] body {
+    background-image: radial-gradient(circle, #c0b8a8 1px, transparent 1px) !important;
+    background-size: 20px 20px !important;
+    background-color: #f5f1e8 !important;
+}
+
+/* ── TE: clean surfaces — no dot grid ── */
+[data-theme="te"] #chat,
+[data-theme="te"] #sessionsSidebar,
+[data-theme="te"] #inputArea {
+    background-image: none !important;
+}
+[data-theme="te"] #chat { background: #faf8f3 !important; }
+[data-theme="te"] #sessionsSidebar { background: #f0ece4 !important; }
+
+/* ── TE: hardware-label style on metric titles ── */
+[data-theme="te"] .metric-title {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.65rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.18em !important;
+    text-transform: uppercase !important;
+    color: #888 !important;
+}
+
+/* ── TE: chart titles — silkscreen label style ── */
+[data-theme="te"] .chart-title {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.72rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: #555 !important;
+}
+
+/* ── TE: stat labels in monitor ── */
+[data-theme="te"] .stat-label {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.62rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.16em !important;
+    text-transform: uppercase !important;
+    color: #888 !important;
+}
+
+/* ── TE: tool stat labels ── */
+[data-theme="te"] .tool-stat-label {
+    font-family: 'DM Mono', monospace !important;
+    font-size: 0.6rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: #aaa090 !important;
+}
+
+/* ── TE: sidebar header label ── */
+[data-theme="te"] .sessions-header h2 {
+    font-size: 0.72rem !important;
+    letter-spacing: 0.18em !important;
+}
+
+/* ── TE: session search placeholder ── */
+[data-theme="te"] #sessionSearch::placeholder {
+    font-size: 0.75rem !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
 }
