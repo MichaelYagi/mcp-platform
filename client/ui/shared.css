@@ -1862,8 +1862,20 @@ body {
 [data-theme="matrix"] #toolsToggle,
 [data-theme="matrix"] #dashboardBtn {
     background: #001a00 !important;
-    color: #00ff41 !important;
+    color: transparent !important;
     border: 1px solid #00ff4144 !important;
+    font-size: 0 !important;
+}
+[data-theme="matrix"] #logToggle::after,
+[data-theme="matrix"] #monitorToggle::after,
+[data-theme="matrix"] #toolsToggle::after,
+[data-theme="matrix"] #dashboardBtn::after {
+    content: attr(data-label);
+    font-size: 0.78rem;
+    color: #00ff41;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 [data-theme="matrix"] #logToggle:hover,
 [data-theme="matrix"] #monitorToggle:hover,
@@ -2326,7 +2338,7 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list:        "default,midnight,mono,TMNT,superman,batman,matrix,tron,dragonball,te,garbagefire";
+    --theme-list:        "default,midnight,TMNT,superman,batman,matrix,tron,dragonball,te,mono,garbagefire";
     --theme-list-hidden: "forest,crimson,neon,dracula,nimbus,tokyo";
 }
 /* ============================================================
@@ -2868,26 +2880,138 @@ body {
 }
 
 /* ── TE: Top bar buttons — flat black, orange hover line ── */
+/* ── TE: knob buttons — shared geometry ── */
 [data-theme="te"] #logToggle,
 [data-theme="te"] #monitorToggle,
-[data-theme="te"] #toolsToggle,
+[data-theme="te"] #toolsToggle {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    font-size: 0 !important;        /* hide text/emoji */
+    color: transparent !important;
+    border: none !important;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.15s, box-shadow 0.15s !important;
+    box-shadow:
+        0 3px 6px rgba(0,0,0,0.25),
+        0 1px 2px rgba(0,0,0,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.25) !important;
+    text-decoration: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* tooltip label via ::before */
+[data-theme="te"] #logToggle::before,
+[data-theme="te"] #monitorToggle::before,
+[data-theme="te"] #toolsToggle::before {
+    content: attr(data-label);
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a1a;
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: lowercase;
+    white-space: nowrap;
+    padding: 3px 7px;
+    border-radius: 0;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 100;
+}
+[data-theme="te"] #logToggle:hover::before,
+[data-theme="te"] #monitorToggle:hover::before,
+[data-theme="te"] #toolsToggle:hover::before {
+    opacity: 1;
+}
+
+/* indicator dot via ::after */
+[data-theme="te"] #logToggle::after,
+[data-theme="te"] #monitorToggle::after,
+[data-theme="te"] #toolsToggle::after {
+    content: '';
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+/* hover & active — press down effect */
+[data-theme="te"] #logToggle:hover,
+[data-theme="te"] #monitorToggle:hover,
+[data-theme="te"] #toolsToggle:hover {
+    transform: translateY(1px) !important;
+    box-shadow:
+        0 1px 3px rgba(0,0,0,0.25),
+        0 0px 1px rgba(0,0,0,0.15),
+        inset 0 1px 0 rgba(255,255,255,0.15) !important;
+    background-color: inherit !important;
+    color: transparent !important;
+    border: none !important;
+}
+
+/* ── Tools toggle — orange knob ── */
+[data-theme="te"] #toolsToggle {
+    background: radial-gradient(circle at 38% 32%, #ff7733, #ff5500 55%, #cc3300) !important;
+}
+[data-theme="te"] #toolsToggle::after {
+    background: rgba(255,255,255,0.7);
+}
+
+/* ── Monitor toggle — beige/cream knob ── */
+[data-theme="te"] #monitorToggle {
+    background: radial-gradient(circle at 38% 32%, #f0e8d8, #d8cebb 55%, #b8ae9e) !important;
+}
+[data-theme="te"] #monitorToggle::after {
+    background: #3a3530;
+}
+
+/* ── Log toggle — grey knob ── */
+[data-theme="te"] #logToggle {
+    background: radial-gradient(circle at 38% 32%, #aaa49e, #888278 55%, #625e58) !important;
+}
+[data-theme="te"] #logToggle::after {
+    background: #1a1a1a;
+}
+
+/* ── Dashboard button stays as text (it's a link, not a knob) ── */
 [data-theme="te"] #dashboardBtn {
     background: transparent !important;
     color: #ccc !important;
     border: 1px solid #444 !important;
     font-family: 'DM Mono', monospace !important;
-    font-size: 0.78rem !important;
+    font-size: 0 !important;
     text-transform: lowercase;
     letter-spacing: 0.05em;
     border-radius: 0 !important;
 }
-[data-theme="te"] #logToggle:hover,
-[data-theme="te"] #monitorToggle:hover,
-[data-theme="te"] #toolsToggle:hover,
+[data-theme="te"] #dashboardBtn::after {
+    content: attr(data-label);
+    font-size: 0.78rem;
+    color: #ccc;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+}
 [data-theme="te"] #dashboardBtn:hover {
     background: #ff5500 !important;
     color: #fff !important;
     border-color: #ff5500 !important;
+}
+[data-theme="te"] #dashboardBtn:hover::after {
+    color: #fff;
 }
 
 /* ── TE: Send button — orange block ── */
@@ -3130,6 +3254,7 @@ body {
 
 /* ── TE: Tools panel ── */
 [data-theme="te"] #toolsPanel { background: #f5f1e8 !important; border-left: 3px solid #1a1a1a !important; }
+[data-theme="te"] #toolsHeader { background: #e6e0d4 !important; border-bottom: 2px solid #c8c0b0 !important; }
 [data-theme="te"] #toolsHeader h2 { color: #1a1a1a !important; font-family: 'Space Mono', monospace !important; text-transform: lowercase; letter-spacing: 0.1em; }
 [data-theme="te"] .tools-btn { background: #1a1a1a !important; color: #fff !important; border-radius: 0 !important; font-family: 'DM Mono', monospace !important; text-transform: lowercase; }
 [data-theme="te"] .tools-btn:hover { background: #ff5500 !important; }

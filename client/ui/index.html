@@ -28,10 +28,10 @@
             <select id="modelSelect">
                 <option value="llama3.1:8b">Llama 3.1 8B</option>
             </select>
-            <button id="toolsToggle">🔧 Tools</button>
-            <button id="monitorToggle" onclick="toggleSystemMonitor()">📊 System</button>
-            <button id="logToggle" onclick="toggleLogPanel()">📋 Logs</button>
-            <a href="./dashboard.html" id="dashboardBtn">📈 Dashboard</a>
+            <button id="toolsToggle" data-label="tools">🔧 Tools</button>
+            <button id="monitorToggle" data-label="system" onclick="toggleSystemMonitor()">📊 System</button>
+            <button id="logToggle" data-label="logs" onclick="toggleLogPanel()">📋 Logs</button>
+            <a href="./dashboard.html" id="dashboardBtn" data-label="dashboard">📈 Dashboard</a>
         </div>
     </div>
 
