@@ -132,6 +132,7 @@ input:checked + .toggle-slider:before {
     transition: background 0.2s, border-color 0.2s;
     flex-shrink: 0;
     position: relative;
+    outline: none;
 }
 #themeBtn:hover {
     background: rgba(0,0,0,0.06);
