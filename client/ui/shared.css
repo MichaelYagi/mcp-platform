@@ -4464,15 +4464,26 @@ body {
 /* ── Dashboard button — keep as text, style to match theme ── */
 [data-theme="dragonball"] #dashboardBtn {
     background: #1c4595 !important;
-    color: #fbbc42 !important;
+    color: transparent !important;
     border: 2px solid #1c4595 !important;
     font-weight: 700;
-    font-size: 0.78rem !important;
+    font-size: 0 !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+[data-theme="dragonball"] #dashboardBtn::after {
+    content: attr(data-label);
+    font-size: 0.78rem;
+    color: #fbbc42;
+    font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
 }
 [data-theme="dragonball"] #dashboardBtn:hover {
     background: #fbbc42 !important;
-    color: #1c4595 !important;
+    color: transparent !important;
     border-color: #1c4595 !important;
+}
+[data-theme="dragonball"] #dashboardBtn:hover::after {
+    color: #1c4595;
 }
