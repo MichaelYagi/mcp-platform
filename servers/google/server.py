@@ -1167,7 +1167,7 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","email","calendar","external"],triggers=["my day","day briefing","morning briefing","what's on today","today's summary","how's my day"],idempotent=False,example='use get_day_briefing [max_emails=""] [forecast_days=""] [calendar_days=""]',intent_category="google")
+@tool_meta(tags=["read","email","calendar","external"],triggers=["my day","day briefing","morning briefing","what's on today","today's summary","how's my day"],idempotent=False,example='use get_day_briefing [max_emails=""] [forecast_days=""] [calendar_days=""]',intent_category="google",text_fields=["weather.text","email.text","calendar.text"])
 def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int] = 1, calendar_days: Optional[int] = 1) -> str:
     """
     Get a combined briefing for today: weather, unread emails, and calendar events.
@@ -1224,7 +1224,29 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                 country = loc.get("country")
 
         weather_raw = get_weather_fn(city, state, country, forecast_days=forecast_days)
-        result["weather"] = json.loads(weather_raw) if isinstance(weather_raw, str) else weather_raw
+        weather_data = json.loads(weather_raw) if isinstance(weather_raw, str) else weather_raw
+        # Forward pre-rendered text if the weather tool produced one; otherwise build a fallback
+        if isinstance(weather_data, dict) and not weather_data.get("text"):
+            _cur = weather_data.get("current_conditions") or weather_data.get("current") or {}
+            _loc = weather_data.get("location", "")
+            _desc = _cur.get("description") or _cur.get("condition", "")
+            _temp = _cur.get("temperature") or _cur.get("temp", "")
+            _feel = _cur.get("feels_like", "")
+            _wind = _cur.get("wind", "")
+            _lines = [f"📍 {_loc}" if _loc else None,
+                      f"🌤 {_desc}" if _desc else None,
+                      f"🌡 {_temp}" + (f" (feels like {_feel})" if _feel else "") if _temp else None,
+                      f"💨 Wind: {_wind}" if _wind else None]
+            _forecast = weather_data.get("forecast", [])
+            for _day in _forecast[:3]:
+                _day_label = _day.get("day") or _day.get("date", "")
+                _day_desc  = _day.get("description") or _day.get("condition", "")
+                _day_hi    = _day.get("high") or _day.get("temp_max", "")
+                _day_lo    = _day.get("low") or _day.get("temp_min", "")
+                if _day_label:
+                    _lines.append(f"  {_day_label}: {_day_desc} {_day_hi}/{_day_lo}".strip())
+            weather_data["text"] = "\n".join(l for l in _lines if l)
+        result["weather"] = weather_data
         logger.info("✅ Weather fetched")
     except Exception as e:
         logger.warning(f"⚠️  Weather failed: {e}")
@@ -1256,6 +1278,17 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                         "id":      _msg_id,
                     })
                 result["email"] = {"total_unread": len(emails), "emails": emails}
+                # Build pre-rendered text so the LLM doesn't have to improvise
+                _email_lines = []
+                for _i, _em in enumerate(emails, 1):
+                    _preview = _em["preview"][:120] + "…" if len(_em["preview"]) > 120 else _em["preview"]
+                    _email_lines.append(f"{_i}. {_em['subject']}")
+                    _email_lines.append(f"   From:    {_em['from']}")
+                    _email_lines.append(f"   Date:    {_em['date']}")
+                    _email_lines.append(f"   Preview: {_preview}")
+                    _email_lines.append(f"   Link:    {_em['link']}")
+                    _email_lines.append("")
+                result["email"]["text"] = "\n".join(_email_lines)
                 logger.info(f"✅ {len(emails)} unread emails fetched")
         except Exception as e:
             logger.warning(f"⚠️  Gmail failed: {e}")
@@ -1298,9 +1331,27 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                     except Exception as _ce:
                         logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
                 events.sort(key=lambda e: e.get("start", ""))
+                _cal_lines = []
+                for _ev in events:
+                    _cal_lines.append(f"• Event: {_ev['title']}")
+                    _cal_lines.append(f"  - When: {_ev['when']}")
+                    if _ev.get("notes"):
+                        _cal_lines.append(f"  - Notes: {_ev['notes'][:200]}")
+                    if _ev.get("location"):
+                        _cal_lines.append(f"  - Location: {_ev['location']}")
+                    if _ev.get("organizer"):
+                        _cal_lines.append(f"  - Organizer: {_ev['organizer']}")
+                    if _ev.get("attendees"):
+                        _cal_lines.append(f"  - Attendees: {_ev['attendees']}")
+                    if _ev.get("meet_link"):
+                        _cal_lines.append(f"  - Meet Link: {_ev['meet_link']}")
+                    if _ev.get("calendar_link"):
+                        _cal_lines.append(f"  - Calendar Link: {_ev['calendar_link']}")
+                    _cal_lines.append("")
                 result["calendar"] = {
                     "date":   start_of_day.strftime("%Y-%m-%d"),
                     "count":  len(events),
+                    "text":   "\n".join(_cal_lines),
                     "events": events,
                 }
                 logger.info(f"✅ {len(events)} calendar events fetched")
