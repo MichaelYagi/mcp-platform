@@ -4286,3 +4286,196 @@ body {
     letter-spacing: 0.08em !important;
     text-transform: uppercase !important;
 }
+
+/* ============================================================
+   DRAGONBALL THEME — Dragon Ball buttons
+   #toolsToggle  = 1-star ball
+   #monitorToggle = 2-star ball
+   #logToggle    = 3-star ball
+   Pure CSS — no images, no SVG, no JS
+   ============================================================ */
+
+/* ── Shared ball geometry ── */
+[data-theme="dragonball"] #toolsToggle,
+[data-theme="dragonball"] #monitorToggle,
+[data-theme="dragonball"] #logToggle {
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    font-size: 0 !important;
+    color: transparent !important;
+    cursor: pointer;
+    position: relative;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    /* Outer sphere gradient — bright highlight top-left, deep orange bottom-right */
+    background:
+        radial-gradient(circle at 35% 30%,
+            #f5a623 0%,
+            #e07010 45%,
+            #c05808 75%,
+            #a04000 100%) !important;
+    /* Dark rim + depth shadow */
+    border: 3px solid #1a1a1a !important;
+    box-shadow:
+        0 4px 12px rgba(0,0,0,0.5),
+        0 2px 4px rgba(0,0,0,0.3) !important;
+    transition: transform 0.12s, box-shadow 0.12s !important;
+    overflow: visible !important;
+}
+
+/* ── Inner circle — transparent, just holds the star SVG ── */
+[data-theme="dragonball"] #toolsToggle::before,
+[data-theme="dragonball"] #monitorToggle::before,
+[data-theme="dragonball"] #logToggle::before {
+    content: '';
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+
+/* ── Gloss highlight (top-left shine) ── */
+[data-theme="dragonball"] #toolsToggle::after,
+[data-theme="dragonball"] #monitorToggle::after,
+[data-theme="dragonball"] #logToggle::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(255,255,220,0.65) 0%, transparent 100%);
+    top: 5px;
+    left: 7px;
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* ── Stars — injected as box-shadow constellations on a ::before child
+      We use the button's text node (font-size:0) and build stars via
+      absolutely positioned pseudo-spans. Since we only have ::before
+      and ::after, the stars are drawn using drop-shadow filters on
+      clip-path polygons injected via the label tooltip element trick.
+      Actually: we encode stars as multiple box-shadows on tiny elements.
+      Real approach: use inline SVG in data-label attr — not possible.
+      REAL solution: encode each star as a CSS clip-path polygon on
+      positioned ::before of the inner circle pseudo, but we've used both.
+      So: stars are painted with repeating radial-gradient on the
+      inner circle ::before, using a sharp-edged conic-gradient star shape.
+   ── */
+
+/* Star shape via conic-gradient — 5-pointed star mask */
+/* We abuse the fact that clip-path can be applied to pseudo-elements
+   by putting the stars on the button itself via a stacked approach.
+   Each ball gets its stars encoded as background-image layers on the
+   ::before inner circle. */
+
+/* 5-point star polygon (normalised 0..1 space, centered 0.5,0.5):
+   top: 0.5,0
+   outer points at 72° steps, inner at 36° steps, ratio ~0.382
+   Computed coords (×36px inner circle):
+   clip-path: polygon(
+     50% 0%, 61% 35%, 98% 35%, 68% 57%,
+     79% 91%, 50% 70%, 21% 91%, 32% 57%,
+     2% 35%, 39% 35%) */
+
+/* ── 1-star ball (toolsToggle) ── */
+[data-theme="dragonball"] #toolsToggle::before {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpolygon points='18,4 21.5,13.5 31.5,13.5 23.5,19.5 26.5,29 18,23 9.5,29 12.5,19.5 4.5,13.5 14.5,13.5' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3C/svg%3E");
+    background-size: 28px 28px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* ── 2-star ball (monitorToggle) ── */
+[data-theme="dragonball"] #monitorToggle::before {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpolygon points='11,12 13,18 19,18 14,22 16,28 11,24 6,28 8,22 3,18 9,18' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3Cpolygon points='25,12 27,18 33,18 28,22 30,28 25,24 20,28 22,22 17,18 23,18' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3C/svg%3E");
+    background-size: 34px 34px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* ── 3-star ball (logToggle) ── */
+[data-theme="dragonball"] #logToggle::before {
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpolygon points='18,2 20,8.5 26.5,8.5 21.5,12.5 23.5,19 18,15 12.5,19 14.5,12.5 9.5,8.5 16,8.5' fill='%23d10000' stroke='%23800000' stroke-width='0.4'/%3E%3Cpolygon points='9,17 11,23.5 17.5,23.5 12.5,27.5 14.5,34 9,30 3.5,34 5.5,27.5 0.5,23.5 7,23.5' fill='%23d10000' stroke='%23800000' stroke-width='0.4'/%3E%3Cpolygon points='27,17 29,23.5 35.5,23.5 30.5,27.5 32.5,34 27,30 21.5,34 23.5,27.5 18.5,23.5 25,23.5' fill='%23d10000' stroke='%23800000' stroke-width='0.4'/%3E%3C/svg%3E");
+    background-size: 34px 34px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+/* ── Press effect on hover ── */
+[data-theme="dragonball"] #toolsToggle:hover,
+[data-theme="dragonball"] #monitorToggle:hover,
+[data-theme="dragonball"] #logToggle:hover {
+    transform: translateY(2px) scale(0.96) !important;
+    box-shadow:
+        0 2px 6px rgba(0,0,0,0.5),
+        0 1px 2px rgba(0,0,0,0.3),
+        inset 0 -2px 5px rgba(0,0,0,0.2),
+        inset 2px 2px 4px rgba(255,220,80,0.3) !important;
+    background-color: inherit !important;
+    color: transparent !important;
+    border-color: #1a1a1a !important;
+}
+
+/* ── Tooltip label on hover ── */
+[data-theme="dragonball"] #toolsToggle::after,
+[data-theme="dragonball"] #monitorToggle::after,
+[data-theme="dragonball"] #logToggle::after {
+    content: attr(data-label);
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: none;
+    color: #1a1a1a;
+    font-family: sans-serif;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0;
+    border-radius: 0;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 100;
+}
+[data-theme="dragonball"] #toolsToggle:hover::after,
+[data-theme="dragonball"] #monitorToggle:hover::after,
+[data-theme="dragonball"] #logToggle:hover::after {
+    opacity: 1;
+}
+
+/* ── Dashboard button — keep as text, style to match theme ── */
+[data-theme="dragonball"] #dashboardBtn {
+    background: #1c4595 !important;
+    color: #fbbc42 !important;
+    border: 2px solid #1c4595 !important;
+    font-weight: 700;
+    font-size: 0.78rem !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+[data-theme="dragonball"] #dashboardBtn:hover {
+    background: #fbbc42 !important;
+    color: #1c4595 !important;
+    border-color: #1c4595 !important;
+}
