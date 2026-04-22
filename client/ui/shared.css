@@ -4299,9 +4299,9 @@ body {
 [data-theme="dragonball"] #toolsToggle,
 [data-theme="dragonball"] #monitorToggle,
 [data-theme="dragonball"] #logToggle {
-    width: 52px !important;
-    height: 52px !important;
-    min-width: 52px !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
     padding: 0 !important;
     border-radius: 50% !important;
     font-size: 0 !important;
@@ -4333,16 +4333,13 @@ body {
 [data-theme="dragonball"] #logToggle::before {
     content: '';
     position: absolute;
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     background: transparent;
     border: none;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 1;
-}
     transform: translate(-50%, -50%);
     z-index: 1;
 }
@@ -4403,7 +4400,7 @@ body {
 /* ── 2-star ball (monitorToggle) ── */
 [data-theme="dragonball"] #monitorToggle::before {
     background-image:
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpolygon points='11,12 13,18 19,18 14,22 16,28 11,24 6,28 8,22 3,18 9,18' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3Cpolygon points='25,12 27,18 33,18 28,22 30,28 25,24 20,28 22,22 17,18 23,18' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3C/svg%3E");
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpolygon points='11,10 13,16 19,16 14,20 16,26 11,22 6,26 8,20 3,16 9,16' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3Cpolygon points='25,10 27,16 33,16 28,20 30,26 25,22 20,26 22,20 17,16 23,16' fill='%23d10000' stroke='%23800000' stroke-width='0.5'/%3E%3C/svg%3E");
     background-size: 34px 34px;
     background-position: center;
     background-repeat: no-repeat;
@@ -4413,7 +4410,7 @@ body {
 [data-theme="dragonball"] #logToggle::before {
     background-image:
         url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Cpolygon points='18,2 20,8.5 26.5,8.5 21.5,12.5 23.5,19 18,15 12.5,19 14.5,12.5 9.5,8.5 16,8.5' fill='%23d10000' stroke='%23800000' stroke-width='0.4'/%3E%3Cpolygon points='9,17 11,23.5 17.5,23.5 12.5,27.5 14.5,34 9,30 3.5,34 5.5,27.5 0.5,23.5 7,23.5' fill='%23d10000' stroke='%23800000' stroke-width='0.4'/%3E%3Cpolygon points='27,17 29,23.5 35.5,23.5 30.5,27.5 32.5,34 27,30 21.5,34 23.5,27.5 18.5,23.5 25,23.5' fill='%23d10000' stroke='%23800000' stroke-width='0.4'/%3E%3C/svg%3E");
-    background-size: 34px 34px;
+    background-size: 22px 22px;
     background-position: center;
     background-repeat: no-repeat;
 }
