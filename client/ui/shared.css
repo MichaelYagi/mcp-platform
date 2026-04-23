@@ -3460,6 +3460,8 @@ body {
     background: #1a1a1a !important;
     color: #fff !important;
 }
+[data-theme="te"] .session-item-text { color: #1a1a1a !important; font-weight: 400; }
+[data-theme="te"] .session-item:hover .session-item-text { color: #1a1a1a !important; }
 [data-theme="te"] .session-item.active .session-item-text { color: #fff !important; }
 [data-theme="te"] .new-session-btn {
     background: #ff5500 !important;
