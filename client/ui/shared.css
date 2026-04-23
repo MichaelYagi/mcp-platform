@@ -4813,3 +4813,39 @@ body {
     color: #1c4595 !important;
     border-left: 2px solid #e76a24 !important;
 }
+
+/* ============================================================
+   MOBILE FIXES — themes using font-size:0 + pseudo-elements
+   for labels. On touch there is no :hover, so opacity:0
+   hover-only labels are invisible. Fix: always show on mobile.
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    /* ── Force line break after model dropdown ── */
+    /* modelSelect fills its own row; buttons wrap to the next line */
+    #modelSelect {
+        flex: 1 1 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* ── Matrix/TE/Dragonball dashboardBtn: needs min-width
+          so ::after text content isn't clipped ── */
+    [data-theme="matrix"] #logToggle,
+    [data-theme="matrix"] #monitorToggle,
+    [data-theme="matrix"] #toolsToggle,
+    [data-theme="matrix"] #dashboardBtn,
+    [data-theme="te"] #dashboardBtn,
+    [data-theme="dragonball"] #dashboardBtn {
+        min-width: 64px !important;
+        overflow: visible !important;
+    }
+
+    /* Dragonball balls stay compact — just need overflow visible */
+    [data-theme="dragonball"] #toolsToggle,
+    [data-theme="dragonball"] #monitorToggle,
+    [data-theme="dragonball"] #logToggle {
+        min-width: 38px !important;
+        overflow: visible !important;
+    }
+}
