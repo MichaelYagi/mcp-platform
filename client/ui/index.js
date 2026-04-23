@@ -551,6 +551,10 @@ function renderNavigator() {
         };
         list.appendChild(item);
     });
+
+    // Highlight the first item by default until scroll sync takes over
+    const firstItem = list.querySelector('.prompt-nav-item');
+    if (firstItem) firstItem.classList.add('nav-hover-active');
 }
 
 function togglePromptNavigator() {
@@ -647,6 +651,12 @@ function togglePromptNavigator() {
         _origRender && _origRender();
         // Small delay so DOM is settled before observing
         setTimeout(buildObserver, 50);
+    };
+
+    // Allow external code to reset the active index so index 0 re-highlights
+    window.resetNavHighlight = function() {
+        activeNavIndex = -1;
+        setTimeout(() => setNavHighlight(0), 150);
     };
 
     // Also rebuild when a session loads (chat gets repopulated)
@@ -916,6 +926,8 @@ ws.onmessage = (event) => {
             showThinking(); isProcessing = true;
             sendBtn.disabled = true; status.textContent = 'Processing…';
         }
+        // Reset nav highlight so first item is highlighted on session switch
+        if (window.resetNavHighlight) window.resetNavHighlight();
         return;
     }
     if (data.type==='session_created') {
