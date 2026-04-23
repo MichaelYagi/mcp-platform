@@ -3478,6 +3478,7 @@ body {
     background: transparent !important;
     color: #666 !important;
     border: 1px solid #d8d8d8 !important;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
     font-size: 0.78rem !important;
     font-weight: 400;
     letter-spacing: 0.04em;
@@ -3508,10 +3509,21 @@ body {
     background: #ffffff !important;
     color: #1a1a1a !important;
     border: 1px solid #d8d8d8 !important;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+    font-size: 0.78rem !important;
     font-weight: 400;
+    letter-spacing: 0.04em;
 }
 [data-theme="mono"] #sendBtn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
-[data-theme="mono"] #stopBtn { border: 1px solid #d8d8d8 !important; color: #666 !important; background: transparent !important; }
+[data-theme="mono"] #stopBtn {
+    border: 1px solid #d8d8d8 !important;
+    color: #666 !important;
+    background: transparent !important;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+    font-size: 0.78rem !important;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+}
 [data-theme="mono"] #stopBtn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 
 /* ── Mono: Input area ── */
@@ -3546,11 +3558,13 @@ body {
     background: #ffffff !important;
     color: #1a1a1a !important;
     border: 1px solid #d8d8d8 !important;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+    font-size: 0.78rem !important;
     font-weight: 400;
-    font-size: 1.1rem !important;
+    letter-spacing: 0.04em;
 }
 [data-theme="mono"] .new-session-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
-[data-theme="mono"] .session-close-btn { background: transparent !important; color: #888 !important; border: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] .session-close-btn { background: transparent !important; color: #888 !important; border: 1px solid #e2e2e2 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; }
 [data-theme="mono"] .session-close-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] #sessionSearch {
     background: #f0f0f0 !important;
@@ -3618,11 +3632,13 @@ body {
     background: transparent !important;
     border: 1px solid #d8d8d8 !important;
     color: #888 !important;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
     font-size: 0.78rem !important;
-    font-weight: 300;
+    font-weight: 400;
+    letter-spacing: 0.04em;
 }
 [data-theme="mono"] .reset-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
-[data-theme="mono"] #backBtn { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-weight: 400; }
+[data-theme="mono"] #backBtn { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] #backBtn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 
 /* ── Mono: Status bar ── */
@@ -3650,7 +3666,7 @@ body {
 [data-theme="mono"] .filter-btn { background: #222 !important; color: #555 !important; border: 1px solid #2e2e2e !important; font-size: 0.7rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .filter-btn.active { color: #e0e0e0 !important; background: #2e2e2e !important; border-color: #444 !important; }
 [data-theme="mono"] .filter-btn.USER.active { border-bottom: 2px solid #aaaaaa !important; }
-[data-theme="mono"] .log-btn { background: #222 !important; color: #888 !important; border: 1px solid #2e2e2e !important; font-weight: 300; }
+[data-theme="mono"] .log-btn { background: #222 !important; color: #888 !important; border: 1px solid #2e2e2e !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .log-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .log-status-indicator { background: #555; }
 [data-theme="mono"] .log-status-indicator.connected { background: #aaaaaa; box-shadow: none !important; }
@@ -3659,7 +3675,7 @@ body {
 [data-theme="mono"] #systemMonitor { background: #1c1c1c !important; border-left: 1px solid #e2e2e2 !important; }
 [data-theme="mono"] .monitor-header { background: #161616 !important; border-bottom: 1px solid #2e2e2e !important; }
 [data-theme="mono"] .monitor-header h2 { color: #e0e0e0 !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
-[data-theme="mono"] .monitor-btn { background: transparent !important; color: #888 !important; border: 1px solid #444 !important; }
+[data-theme="mono"] .monitor-btn { background: transparent !important; color: #888 !important; border: 1px solid #444 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .monitor-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .stat-group { background: #222 !important; border: 1px solid #2e2e2e !important; }
 [data-theme="mono"] .stat-label { color: #666 !important; font-size: 0.72rem !important; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 300; }
@@ -3673,7 +3689,7 @@ body {
 /* ── Mono: Tools panel ── */
 [data-theme="mono"] #toolsPanel { background: #fafafa !important; border-left: 1px solid #e2e2e2 !important; }
 [data-theme="mono"] #toolsHeader h2 { color: #1a1a1a !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
-[data-theme="mono"] .tools-btn { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-weight: 300; }
+[data-theme="mono"] .tools-btn { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .tools-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .tools-category-header { color: #999 !important; background: #f0f0f0 !important; border-bottom: 1px solid #e2e2e2 !important; font-weight: 400; font-size: 0.75rem !important; letter-spacing: 0.08em; text-transform: uppercase; }
 [data-theme="mono"] .tools-category-header:hover { background: #e8e8e8 !important; }
@@ -3693,9 +3709,9 @@ body {
 [data-theme="mono"] .mcp-modal-title { color: #1a1a1a !important; font-weight: 400; letter-spacing: 0.06em; }
 [data-theme="mono"] .mcp-modal-body { color: #444 !important; font-weight: 300; }
 [data-theme="mono"] .mcp-modal-footer { background: #fafafa !important; border-top: 1px solid #e8e8e8 !important; }
-[data-theme="mono"] .mcp-modal-btn-primary { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; }
+[data-theme="mono"] .mcp-modal-btn-primary { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .mcp-modal-btn-primary:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
-[data-theme="mono"] .mcp-modal-btn-secondary { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; }
+[data-theme="mono"] .mcp-modal-btn-secondary { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .mcp-modal-btn-secondary:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .mcp-modal-btn-danger { background: #fff !important; color: #c0392b !important; border: 1px solid #c0392b !important; }
 [data-theme="mono"] .mcp-modal-btn-danger:hover { background: #c0392b !important; color: #fff !important; }
