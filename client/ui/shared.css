@@ -2114,6 +2114,21 @@ body {
 [data-theme="matrix"] .log-status-indicator { background: #ff3333; }
 [data-theme="matrix"] .log-status-indicator.connected { background: #00ff41; box-shadow: 0 0 6px rgba(0,255,65,0.6); }
 
+/* matrix – Clear and Auto-scroll buttons (match tools button style) */
+[data-theme="matrix"] .log-btn {
+    background: #001a00 !important;
+    color: #00ff41 !important;
+    border: 1px solid #00ff4144 !important;
+    font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+}
+[data-theme="matrix"] .log-btn:hover {
+    background: #002200 !important;
+    box-shadow: 0 0 8px rgba(0,255,65,0.2) !important;
+    color: #00ff41 !important;
+}
+
 /* ============================================================
    MATRIX THEME ADDITIONS
    ============================================================ */
@@ -3354,19 +3369,19 @@ body {
 
     /* User bubble & send */
     --user-bubble:      #1a1a1a;
-    --send-btn:         #2d6a6a;
-    --send-btn-hover:   #245858;
-    --send-btn-focus:   rgba(45,106,106,0.15);
+    --send-btn:         #1a1a1a;
+    --send-btn-hover:   #000000;
+    --send-btn-focus:   rgba(0,0,0,0.1);
 
     /* Top bar buttons */
     --btn-logs:         #1a1a1a;
-    --btn-logs-hover:   #2d6a6a;
+    --btn-logs-hover:   #1a1a1a;
     --btn-monitor:      #1a1a1a;
-    --btn-monitor-hover:#2d6a6a;
+    --btn-monitor-hover:#1a1a1a;
     --btn-dashboard:    #1a1a1a;
-    --btn-dashboard-hover:#2d6a6a;
-    --btn-newsession:   #2d6a6a;
-    --btn-newsession-hover:#245858;
+    --btn-dashboard-hover:#1a1a1a;
+    --btn-newsession:   #1a1a1a;
+    --btn-newsession-hover:#000000;
 
     /* Log panel */
     --log-bg:           #1c1c1c;
@@ -3381,9 +3396,9 @@ body {
 
     /* Dashboard */
     --btn-back:         #1a1a1a;
-    --btn-back-hover:   #2d6a6a;
-    --btn-tools:        #2d6a6a;
-    --btn-tools-hover:  #245858;
+    --btn-back-hover:   #000000;
+    --btn-tools:        #1a1a1a;
+    --btn-tools-hover:  #000000;
     --card-bg:          #ffffff;
     --card-border:      #e2e2e2;
     --card-shadow:      rgba(0,0,0,0.04);
@@ -3392,12 +3407,12 @@ body {
     --metric-color:     #1a1a1a;
     --subtitle-color:   #999;
     --label-color:      #666;
-    --chart-blue:       #2d6a6a;
-    --chart-purple:     #1a1a1a;
+    --chart-blue:       #1a1a1a;
+    --chart-purple:     #555555;
     --chart-red:        #c0392b;
     --chart-green:      #27ae60;
     --chart-orange:     #e67e22;
-    --tool-border:      #2d6a6a;
+    --tool-border:      #1a1a1a;
     --tool-bg:          #f9f9f9;
     --status-bg:        #ffffff;
 
@@ -3413,7 +3428,7 @@ body {
 
     /* Swatches */
     --swatch1:          #1a1a1a;
-    --swatch2:          #2d6a6a;
+    --swatch2:          #555555;
     --swatch3:          #f4f4f4;
 }
 
@@ -3490,13 +3505,14 @@ body {
 
 /* ── Mono: Send button ── */
 [data-theme="mono"] #sendBtn {
-    background: #2d6a6a !important;
-    color: #fff !important;
-    border: none !important;
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    border: 1px solid #d8d8d8 !important;
     font-weight: 400;
 }
-[data-theme="mono"] #sendBtn:hover { background: #245858 !important; }
-[data-theme="mono"] #stopBtn { border: 1px solid #e2e2e2 !important; color: #666 !important; }
+[data-theme="mono"] #sendBtn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
+[data-theme="mono"] #stopBtn { border: 1px solid #d8d8d8 !important; color: #666 !important; background: transparent !important; }
+[data-theme="mono"] #stopBtn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 
 /* ── Mono: Input area ── */
 [data-theme="mono"] #input {
@@ -3527,13 +3543,15 @@ body {
 [data-theme="mono"] .session-item.active .session-item-text { color: #fff !important; }
 [data-theme="mono"] .sessions-header h2 { color: #1a1a1a !important; font-weight: 300; font-size: 0.9rem !important; letter-spacing: 0.1em; text-transform: uppercase; }
 [data-theme="mono"] .new-session-btn {
-    background: #2d6a6a !important;
-    color: #fff !important;
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+    border: 1px solid #d8d8d8 !important;
     font-weight: 400;
     font-size: 1.1rem !important;
 }
-[data-theme="mono"] .new-session-btn:hover { background: #245858 !important; }
+[data-theme="mono"] .new-session-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .session-close-btn { background: transparent !important; color: #888 !important; border: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] .session-close-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] #sessionSearch {
     background: #f0f0f0 !important;
     border: 1px solid #e2e2e2 !important;
@@ -3546,7 +3564,7 @@ body {
 [data-theme="mono"] .metric-card {
     background: #ffffff !important;
     border: 1px solid #e8e8e8 !important;
-    border-top: 2px solid #2d6a6a !important;
+    border-top: 2px solid #1a1a1a !important;
     box-shadow: none !important;
 }
 [data-theme="mono"] .metric-card:hover {
@@ -3569,22 +3587,22 @@ body {
 /* ── Mono: Histogram — teal scale ── */
 [data-theme="mono"] .histogram-bar-wrap { background: #f0f0f0 !important; }
 [data-theme="mono"] .mini-bar-wrap { background: #f0f0f0 !important; }
-[data-theme="mono"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #2d6a6a !important; }
-[data-theme="mono"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #3a8080 !important; }
-[data-theme="mono"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #888 !important; }
-[data-theme="mono"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #555 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #aaaaaa !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #888888 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #555555 !important; }
+[data-theme="mono"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #333333 !important; }
 [data-theme="mono"] .histogram-bar-group:nth-child(5) .histogram-bar { background: #1a1a1a !important; }
-[data-theme="mono"] .mini-bar-group:nth-child(1) .mini-bar { background: #2d6a6a !important; }
-[data-theme="mono"] .mini-bar-group:nth-child(2) .mini-bar { background: #3a8080 !important; }
-[data-theme="mono"] .mini-bar-group:nth-child(3) .mini-bar { background: #888 !important; }
-[data-theme="mono"] .mini-bar-group:nth-child(4) .mini-bar { background: #555 !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(1) .mini-bar { background: #aaaaaa !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(2) .mini-bar { background: #888888 !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(3) .mini-bar { background: #555555 !important; }
+[data-theme="mono"] .mini-bar-group:nth-child(4) .mini-bar { background: #333333 !important; }
 [data-theme="mono"] .mini-bar-group:nth-child(5) .mini-bar { background: #1a1a1a !important; }
 [data-theme="mono"] .histogram-title { color: #bbb !important; font-style: normal !important; font-size: 0.7rem !important; letter-spacing: 0.06em; font-weight: 300; }
 [data-theme="mono"] .histogram-bar-label { color: #bbb !important; font-size: 0.62rem !important; }
 [data-theme="mono"] .histogram-bar-count { color: #1a1a1a !important; font-size: 0.65rem !important; }
 
 /* ── Mono: Tool cards ── */
-[data-theme="mono"] .tool-card { background: #f9f9f9 !important; border-left: 2px solid #2d6a6a !important; border: 1px solid #e8e8e8; border-left: 2px solid #2d6a6a !important; }
+[data-theme="mono"] .tool-card { background: #f9f9f9 !important; border-left: 2px solid #1a1a1a !important; border: 1px solid #e8e8e8; border-left: 2px solid #1a1a1a !important; }
 [data-theme="mono"] .tool-stat-label { color: #bbb !important; font-size: 0.7rem !important; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 300; }
 [data-theme="mono"] .tool-stat-value { color: #1a1a1a !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 400; }
 [data-theme="mono"] .tool-name { color: #1a1a1a !important; font-weight: 400; }
@@ -3604,12 +3622,12 @@ body {
     font-weight: 300;
 }
 [data-theme="mono"] .reset-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
-[data-theme="mono"] #backBtn { background: #1a1a1a !important; color: #fff !important; font-weight: 400; }
-[data-theme="mono"] #backBtn:hover { background: #2d6a6a !important; }
+[data-theme="mono"] #backBtn { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-weight: 400; }
+[data-theme="mono"] #backBtn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 
 /* ── Mono: Status bar ── */
 [data-theme="mono"] .status-bar { border: 1px solid #e8e8e8 !important; box-shadow: none !important; }
-[data-theme="mono"] .status-indicator.connected { background: #2d6a6a !important; box-shadow: none !important; }
+[data-theme="mono"] .status-indicator.connected { background: #1a1a1a !important; box-shadow: none !important; }
 
 /* ── Mono: Log panel ── */
 [data-theme="mono"] #logPanel { background: #1c1c1c !important; border-left: 1px solid #e2e2e2 !important; }
@@ -3620,10 +3638,10 @@ body {
 [data-theme="mono"] .log-message { color: #d0d0d0 !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 300; font-size: 0.8rem !important; }
 [data-theme="mono"] .log-timestamp { color: #555 !important; font-family: 'IBM Plex Mono', monospace !important; }
 [data-theme="mono"] .log-entry:hover { background: #222 !important; }
-[data-theme="mono"] .log-entry.USER      { border-left-color: #2d6a6a; }
+[data-theme="mono"] .log-entry.USER      { border-left-color: #888888; }
 [data-theme="mono"] .log-entry.ERROR     { border-left-color: #c0392b; background: rgba(192,57,43,0.05) !important; }
 [data-theme="mono"] .log-entry.WARNING   { border-left-color: #e67e22; }
-[data-theme="mono"] .log-level.USER      { color: #2d6a6a !important; }
+[data-theme="mono"] .log-level.USER      { color: #aaaaaa !important; }
 [data-theme="mono"] .log-level.ASSISTANT { color: #888 !important; }
 [data-theme="mono"] .log-level.INFO      { color: #666 !important; }
 [data-theme="mono"] .log-level.WARNING   { color: #e67e22 !important; }
@@ -3631,42 +3649,42 @@ body {
 [data-theme="mono"] .log-level.DEBUG     { color: #444 !important; }
 [data-theme="mono"] .filter-btn { background: #222 !important; color: #555 !important; border: 1px solid #2e2e2e !important; font-size: 0.7rem !important; font-weight: 400; letter-spacing: 0.04em; }
 [data-theme="mono"] .filter-btn.active { color: #e0e0e0 !important; background: #2e2e2e !important; border-color: #444 !important; }
-[data-theme="mono"] .filter-btn.USER.active { border-bottom: 2px solid #2d6a6a !important; }
+[data-theme="mono"] .filter-btn.USER.active { border-bottom: 2px solid #aaaaaa !important; }
 [data-theme="mono"] .log-btn { background: #222 !important; color: #888 !important; border: 1px solid #2e2e2e !important; font-weight: 300; }
-[data-theme="mono"] .log-btn:hover { background: #2d6a6a !important; color: #fff !important; border-color: #2d6a6a !important; }
+[data-theme="mono"] .log-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .log-status-indicator { background: #555; }
-[data-theme="mono"] .log-status-indicator.connected { background: #2d6a6a; box-shadow: none !important; }
+[data-theme="mono"] .log-status-indicator.connected { background: #aaaaaa; box-shadow: none !important; }
 
 /* ── Mono: System monitor ── */
 [data-theme="mono"] #systemMonitor { background: #1c1c1c !important; border-left: 1px solid #e2e2e2 !important; }
 [data-theme="mono"] .monitor-header { background: #161616 !important; border-bottom: 1px solid #2e2e2e !important; }
 [data-theme="mono"] .monitor-header h2 { color: #e0e0e0 !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
-[data-theme="mono"] .monitor-btn { background: #2a2a2a !important; color: #888 !important; }
-[data-theme="mono"] .monitor-btn:hover { background: #2d6a6a !important; color: #fff !important; }
+[data-theme="mono"] .monitor-btn { background: transparent !important; color: #888 !important; border: 1px solid #444 !important; }
+[data-theme="mono"] .monitor-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .stat-group { background: #222 !important; border: 1px solid #2e2e2e !important; }
 [data-theme="mono"] .stat-label { color: #666 !important; font-size: 0.72rem !important; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 300; }
 [data-theme="mono"] .stat-value { color: #e0e0e0 !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 300; }
 [data-theme="mono"] .stat-secondary { color: #555 !important; font-family: 'IBM Plex Mono', monospace !important; font-weight: 300; }
 [data-theme="mono"] .progress-bar { background: #2a2a2a !important; }
-[data-theme="mono"] .progress-fill { background: #2d6a6a !important; }
+[data-theme="mono"] .progress-fill { background: #888888 !important; }
 [data-theme="mono"] .progress-fill.high { background: #e67e22 !important; }
 [data-theme="mono"] .progress-fill.critical { background: #c0392b !important; }
 
 /* ── Mono: Tools panel ── */
 [data-theme="mono"] #toolsPanel { background: #fafafa !important; border-left: 1px solid #e2e2e2 !important; }
 [data-theme="mono"] #toolsHeader h2 { color: #1a1a1a !important; font-weight: 300; font-size: 0.85rem !important; letter-spacing: 0.12em; text-transform: uppercase; }
-[data-theme="mono"] .tools-btn { background: #1a1a1a !important; color: #fff !important; font-weight: 300; }
-[data-theme="mono"] .tools-btn:hover { background: #2d6a6a !important; }
+[data-theme="mono"] .tools-btn { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; font-weight: 300; }
+[data-theme="mono"] .tools-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .tools-category-header { color: #999 !important; background: #f0f0f0 !important; border-bottom: 1px solid #e2e2e2 !important; font-weight: 400; font-size: 0.75rem !important; letter-spacing: 0.08em; text-transform: uppercase; }
 [data-theme="mono"] .tools-category-header:hover { background: #e8e8e8 !important; }
 [data-theme="mono"] .tool-item { background: #ffffff !important; border-bottom: 1px solid #f0f0f0 !important; }
-[data-theme="mono"] .tool-item:hover { background: #f7f7f7 !important; border-left: 2px solid #2d6a6a !important; }
+[data-theme="mono"] .tool-item:hover { background: #f7f7f7 !important; border-left: 2px solid #1a1a1a !important; }
 [data-theme="mono"] .tool-item-name { color: #1a1a1a !important; font-weight: 400; }
 [data-theme="mono"] .tool-item-desc { color: #999 !important; font-size: 0.8rem !important; font-weight: 300; }
 [data-theme="mono"] .tool-param { background: #f4f4f4 !important; color: #555 !important; border: 1px solid #e2e2e2 !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 0.75rem !important; }
 [data-theme="mono"] .tool-fav-btn { color: #d4d4d4 !important; }
-[data-theme="mono"] .tool-fav-btn:hover { color: #2d6a6a !important; }
-[data-theme="mono"] .tool-fav-btn.active { color: #2d6a6a !important; }
+[data-theme="mono"] .tool-fav-btn:hover { color: #1a1a1a !important; }
+[data-theme="mono"] .tool-fav-btn.active { color: #1a1a1a !important; }
 
 /* ── Mono: Modal ── */
 [data-theme="mono"] .mcp-modal-backdrop { background: rgba(0,0,0,0.4) !important; }
@@ -3675,9 +3693,10 @@ body {
 [data-theme="mono"] .mcp-modal-title { color: #1a1a1a !important; font-weight: 400; letter-spacing: 0.06em; }
 [data-theme="mono"] .mcp-modal-body { color: #444 !important; font-weight: 300; }
 [data-theme="mono"] .mcp-modal-footer { background: #fafafa !important; border-top: 1px solid #e8e8e8 !important; }
-[data-theme="mono"] .mcp-modal-btn-primary { background: #2d6a6a !important; color: #fff !important; border: none !important; }
-[data-theme="mono"] .mcp-modal-btn-primary:hover { background: #245858 !important; }
-[data-theme="mono"] .mcp-modal-btn-secondary { background: #fff !important; color: #666 !important; border: 1px solid #e2e2e2 !important; }
+[data-theme="mono"] .mcp-modal-btn-primary { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; }
+[data-theme="mono"] .mcp-modal-btn-primary:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
+[data-theme="mono"] .mcp-modal-btn-secondary { background: transparent !important; color: #666 !important; border: 1px solid #d8d8d8 !important; }
+[data-theme="mono"] .mcp-modal-btn-secondary:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .mcp-modal-btn-danger { background: #fff !important; color: #c0392b !important; border: 1px solid #c0392b !important; }
 [data-theme="mono"] .mcp-modal-btn-danger:hover { background: #c0392b !important; color: #fff !important; }
 
@@ -3687,12 +3706,12 @@ body {
 [data-theme="mono"] ::-webkit-scrollbar-thumb:hover { background: #aaa !important; }
 
 /* ── Mono: Bulk selection ── */
-[data-theme="mono"] .sel-all-label input[type="checkbox"] { accent-color: #2d6a6a !important; }
+[data-theme="mono"] .sel-all-label input[type="checkbox"] { accent-color: #1a1a1a !important; }
 [data-theme="mono"] .sel-delete-btn { color: #c0392b !important; }
 
 /* ── Mono: Pinned sessions ── */
 [data-theme="mono"] .session-item.pinned { border-top: 1px solid #e8e8e8 !important; }
-[data-theme="mono"] .session-item.pinned.active { box-shadow: inset 2px 0 0 #2d6a6a !important; }
+[data-theme="mono"] .session-item.pinned.active { box-shadow: inset 2px 0 0 #1a1a1a !important; }
 
 /* ── Mono: Theme dropdown — dark text on white background ── */
 [data-theme="mono"] #themeDropdown {
@@ -3713,7 +3732,7 @@ body {
     color: #1a1a1a !important;
 }
 [data-theme="mono"] .theme-option .check {
-    color: #2d6a6a !important;
+    color: #1a1a1a !important;
 }
 [data-theme="mono"] .theme-opt-swatch {
     border: 1px solid #e2e2e2 !important;
