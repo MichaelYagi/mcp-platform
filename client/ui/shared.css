@@ -3635,6 +3635,15 @@ body {
 }
 [data-theme="te"] #themeBtn {
     border-radius: 0 !important;
+    border-color: #aaa090 !important;
+    background: #f0ece4 !important;
+}
+[data-theme="te"] #themeBtn:hover {
+    background: #e0dbd0 !important;
+    border-color: #ff5500 !important;
+}
+[data-theme="te"] .theme-swatch {
+    border-color: rgba(0,0,0,0.2) !important;
 }
 
 
