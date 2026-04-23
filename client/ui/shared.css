@@ -1779,13 +1779,7 @@ body {
 
 /* ── GARBAGEFIRE: System monitor ── */
 [data-theme="garbagefire"] #systemMonitor {
-    background: repeating-linear-gradient(
-        47deg,
-        #5c3a1e 0px,
-        #5c3a1e 16px,
-        #39ff14 16px,
-        #39ff14 32px
-    ) !important;
+    background: linear-gradient(135deg, #ff0000 0%, #00ffff 100%) !important;
 }
 [data-theme="garbagefire"] .monitor-header { background: rgba(255,255,0,0.4) !important; border-bottom: 4px dotted #0000ff !important; }
 [data-theme="garbagefire"] .monitor-header h2 { color: #ff00ff !important; font-size: 1.3rem !important; text-shadow: 2px 2px 0 #000 !important; }
@@ -3462,12 +3456,13 @@ body {
 [data-theme="te"] #backBtn:hover { background: #ff5500 !important; }
 
 /* ── TE: Sidebar session items ── */
+[data-theme="te"] .session-item { color: #1a1a1a !important; }
+[data-theme="te"] .session-item:hover { color: #1a1a1a !important; }
 [data-theme="te"] .session-item.active {
     background: #1a1a1a !important;
     color: #fff !important;
 }
 [data-theme="te"] .session-item-text { color: #1a1a1a !important; font-weight: 400; }
-[data-theme="te"] .session-item:hover .session-item-text { color: #1a1a1a !important; }
 [data-theme="te"] .session-item.active .session-item-text { color: #fff !important; }
 [data-theme="te"] .new-session-btn {
     background: #ff5500 !important;
@@ -3480,6 +3475,44 @@ body {
     color: #1a1a1a !important;
     border: 1px solid #ccc5b5 !important;
     font-family: 'DM Mono', monospace !important;
+}
+
+/* ── TE: session submenu — dark text on light background ── */
+[data-theme="te"] .session-submenu { background: #e6e0d4 !important; border: 1px solid #c8c0b0 !important; }
+[data-theme="te"] .session-submenu-item { color: #1a1a1a !important; }
+[data-theme="te"] .session-submenu-item:hover { background: rgba(0,0,0,0.08) !important; }
+[data-theme="te"] .session-submenu-item.delete { color: #cc3300 !important; }
+[data-theme="te"] .session-submenu-item.delete:hover { background: rgba(204,51,0,0.1) !important; }
+
+/* ── TE: session menu button (⋯) — dark on light sidebar ── */
+[data-theme="te"] .session-menu-btn { color: #1a1a1a !important; }
+[data-theme="te"] .session-menu-btn:hover { background: rgba(0,0,0,0.08) !important; }
+[data-theme="te"] .session-menu-btn.active { background: rgba(0,0,0,0.08) !important; }
+[data-theme="te"] .session-item.active .session-menu-btn { color: #fff !important; }
+[data-theme="te"] .session-item.active .session-menu-btn:hover { background: rgba(255,255,255,0.15) !important; }
+[data-theme="te"] .session-item.active .session-menu-btn.active { background: rgba(255,255,255,0.15) !important; }
+
+/* ── TE: theme dropdown — dark text on cream background ── */
+[data-theme="te"] #themeDropdown { background: #f0ece4 !important; border: 1px solid #c8c0b0 !important; }
+[data-theme="te"] .theme-option { color: #1a1a1a !important; }
+[data-theme="te"] .theme-option:hover { background: rgba(0,0,0,0.06) !important; }
+[data-theme="te"] .theme-option.active { background: rgba(0,0,0,0.08) !important; }
+[data-theme="te"] .theme-option .check { color: #ff5500 !important; }
+
+/* ── TE: Select button and bulk selection toolbar — dark on light sidebar ── */
+[data-theme="te"] .session-select-btn { color: #888 !important; }
+[data-theme="te"] .session-select-btn:hover { color: #1a1a1a !important; }
+[data-theme="te"] .sel-all-label { color: #555 !important; }
+
+/* ── TE: Session rename input — dark text on light background ── */
+[data-theme="te"] .session-edit-input {
+    background: #fff !important;
+    border: 1px solid #aaa090 !important;
+    color: #1a1a1a !important;
+}
+[data-theme="te"] .session-edit-input:focus {
+    border-color: #ff5500 !important;
+    background: #fff !important;
 }
 [data-theme="te"] #sessionSearch {
     background: #e6e0d4 !important;
@@ -3815,7 +3848,9 @@ body {
 
 /* ── Mono: Sidebar ── */
 [data-theme="mono"] .session-item-text { color: #333 !important; font-weight: 300; }
-[data-theme="mono"] .session-item.active { background: #1a1a1a !important; }
+[data-theme="mono"] .session-item { color: #333 !important; }
+[data-theme="mono"] .session-item:hover { color: #1a1a1a !important; }
+[data-theme="mono"] .session-item.active { background: #1a1a1a !important; color: #fff !important; }
 [data-theme="mono"] .session-item.active .session-item-text { color: #fff !important; }
 [data-theme="mono"] .sessions-header h2 { color: #1a1a1a !important; font-weight: 300; font-size: 0.9rem !important; letter-spacing: 0.1em; text-transform: uppercase; }
 [data-theme="mono"] .new-session-btn {
@@ -3830,6 +3865,45 @@ body {
 [data-theme="mono"] .new-session-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
 [data-theme="mono"] .session-close-btn { background: transparent !important; color: #888 !important; border: 1px solid #e2e2e2 !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-size: 0.78rem !important; font-weight: 400; }
 [data-theme="mono"] .session-close-btn:hover { background: #1a1a1a !important; color: #fff !important; border-color: #1a1a1a !important; }
+
+/* ── Mono: session submenu — dark text on light background ── */
+[data-theme="mono"] .session-submenu { background: #ffffff !important; border: 1px solid #e2e2e2 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; }
+[data-theme="mono"] .session-submenu-item { color: #1a1a1a !important; font-family: 'IBM Plex Sans', system-ui, sans-serif !important; font-weight: 400; }
+[data-theme="mono"] .session-submenu-item:hover { background: #f4f4f4 !important; }
+[data-theme="mono"] .session-submenu-item.delete { color: #c0392b !important; }
+[data-theme="mono"] .session-submenu-item.delete:hover { background: rgba(192,57,43,0.08) !important; }
+
+/* ── Mono: session menu button (⋯) — dark on light sidebar ── */
+[data-theme="mono"] .session-menu-btn { color: #1a1a1a !important; }
+[data-theme="mono"] .session-menu-btn:hover { background: rgba(0,0,0,0.08) !important; }
+[data-theme="mono"] .session-menu-btn.active { background: rgba(0,0,0,0.08) !important; }
+[data-theme="mono"] .session-item.active .session-menu-btn { color: #fff !important; }
+[data-theme="mono"] .session-item.active .session-menu-btn:hover { background: rgba(255,255,255,0.15) !important; }
+[data-theme="mono"] .session-item.active .session-menu-btn.active { background: rgba(255,255,255,0.15) !important; }
+
+/* ── Mono: theme dropdown — dark text on white background ── */
+[data-theme="mono"] #themeDropdown { background: #ffffff !important; border: 1px solid #e2e2e2 !important; box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; }
+[data-theme="mono"] .theme-option { color: #1a1a1a !important; }
+[data-theme="mono"] .theme-option:hover { background: #f4f4f4 !important; }
+[data-theme="mono"] .theme-option.active { background: #f0f0f0 !important; }
+[data-theme="mono"] .theme-option .check { color: #1a1a1a !important; }
+
+/* ── Mono: Select button and bulk selection toolbar — dark on light sidebar ── */
+[data-theme="mono"] .session-select-btn { color: #888 !important; }
+[data-theme="mono"] .session-select-btn:hover { color: #1a1a1a !important; }
+[data-theme="mono"] .sel-all-label { color: #555 !important; }
+
+/* ── Mono: Session rename input — dark text on light background ── */
+[data-theme="mono"] .session-edit-input {
+    background: #fff !important;
+    border: 1px solid #d4d4d4 !important;
+    color: #1a1a1a !important;
+    font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+}
+[data-theme="mono"] .session-edit-input:focus {
+    border-color: #1a1a1a !important;
+    background: #fff !important;
+}
 [data-theme="mono"] #sessionSearch {
     background: #f0f0f0 !important;
     border: 1px solid #e2e2e2 !important;
