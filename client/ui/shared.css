@@ -1779,7 +1779,13 @@ body {
 
 /* ── GARBAGEFIRE: System monitor ── */
 [data-theme="garbagefire"] #systemMonitor {
-    background: linear-gradient(135deg, #ff0000 0%, #00ffff 100%) !important;
+    background: repeating-linear-gradient(
+        47deg,
+        #5c3a1e 0px,
+        #5c3a1e 16px,
+        #39ff14 16px,
+        #39ff14 32px
+    ) !important;
 }
 [data-theme="garbagefire"] .monitor-header { background: rgba(255,255,0,0.4) !important; border-bottom: 4px dotted #0000ff !important; }
 [data-theme="garbagefire"] .monitor-header h2 { color: #ff00ff !important; font-size: 1.3rem !important; text-shadow: 2px 2px 0 #000 !important; }
@@ -4884,7 +4890,7 @@ body {
 [data-theme="mono"] .prompt-nav-item.nav-hover-active {
     background: #efefef !important;
     color: #1a1a1a !important;
-    border-left: 2px solid #2d6a6a !important;
+    border-left: 2px solid #1a1a1a !important;
 }
 [data-theme="nimbus"] .prompt-nav-item.nav-hover-active {
     background: #c7d3e8 !important;
