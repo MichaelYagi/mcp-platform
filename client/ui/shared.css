@@ -1519,24 +1519,21 @@ body {
     --send-btn-focus:   rgba(255,0,0,0.4);
 
     /* Buttons */
-    --btn-logs:             #ff00ff; /* magenta */
-    --btn-logs-hover:       #ff69b4; /* hot pink */
-
-    --btn-monitor:          #00ff00; /* neon green */
-    --btn-monitor-hover:    #008000; /* muddy green */
-
-    --btn-dashboard:        #ff7f00; /* orange */
-    --btn-dashboard-hover:  #ff4500; /* red-orange */
-
-    --btn-newsession:       #0000ff; /* blue */
-    --btn-newsession-hover: #00008b; /* dark blue */
+    --btn-logs:             #ff00ff;
+    --btn-logs-hover:       #ff69b4;
+    --btn-monitor:          #00ff00;
+    --btn-monitor-hover:    #008000;
+    --btn-dashboard:        #ff7f00;
+    --btn-dashboard-hover:  #ff4500;
+    --btn-newsession:       #0000ff;
+    --btn-newsession-hover: #00008b;
 
     /* Log panel */
-    --log-bg:           #7f7f7f;   /* depressing gray */
-    --log-header:       #ff00ff;   /* magenta */
-    --log-border:       #00ffff;   /* cyan */
-    --log-filter-bg:    #ff69b4;   /* hot pink */
-    --log-filter-btn:   #8b4513;   /* brown */
+    --log-bg:           #7f7f7f;
+    --log-header:       #ff00ff;
+    --log-border:       #00ffff;
+    --log-filter-bg:    #ff69b4;
+    --log-filter-btn:   #8b4513;
 
     /* System monitor */
     --monitor-gradient: linear-gradient(135deg, #ff0000 0%, #00ffff 100%);
@@ -1547,7 +1544,7 @@ body {
     --btn-back-hover:   #00ff00;
     --btn-tools:        #00ffff;
     --btn-tools-hover:  #00cccc;
-    --card-bg:          #ffefd5;   /* pale peach */
+    --card-bg:          #ffefd5;
     --card-border:      #ff00ff;
     --card-shadow:      rgba(0,255,0,0.4);
     --card-shadow-hover:rgba(255,0,0,0.6);
@@ -1566,7 +1563,7 @@ body {
     --scrollbar-thumb:  #ff00ff;
     --scrollbar-hover:  #00ff00;
 
-    /* Swatches (header, logs, monitor) */
+    /* Swatches */
     --swatch1:          #ffea00;
     --swatch2:          #ff00ff;
     --swatch3:          #00ff00;
@@ -1576,6 +1573,265 @@ body {
     --session-date-hover:       #ffe0a0;
     --session-date-active:      #001a33;
 }
+
+/* ── GARBAGEFIRE: Comic Sans everything ── */
+[data-theme="garbagefire"],
+[data-theme="garbagefire"] *,
+[data-theme="garbagefire"] body,
+[data-theme="garbagefire"] button,
+[data-theme="garbagefire"] input,
+[data-theme="garbagefire"] textarea,
+[data-theme="garbagefire"] select {
+    font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", cursive !important;
+}
+
+/* ── GARBAGEFIRE: Header — yellow bg, purple text, way too big ── */
+[data-theme="garbagefire"] #header {
+    background: #ffea00 !important;
+    border-bottom: 6px dashed #7f00ff !important;
+    box-shadow: 0 4px 0 #ff00ff, 0 8px 0 #00ff00 !important;
+}
+[data-theme="garbagefire"] #header h1 {
+    color: #ff0000 !important;
+    font-size: 2rem !important;
+    font-weight: 900 !important;
+    text-shadow: 3px 3px 0 #0000ff, -1px -1px 0 #00ff00 !important;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    transform: rotate(-2deg);
+    display: inline-block;
+}
+
+/* ── GARBAGEFIRE: Top bar buttons — each one different and wrong ── */
+[data-theme="garbagefire"] #toolsToggle {
+    background: #ff00ff !important;
+    color: #ffff00 !important;
+    border: 4px solid #00ff00 !important;
+    border-radius: 50% !important;
+    font-size: 0.7rem !important;
+    font-weight: 900 !important;
+    transform: rotate(3deg);
+    box-shadow: 3px 3px 0 #ff0000 !important;
+}
+[data-theme="garbagefire"] #monitorToggle {
+    background: #00ff00 !important;
+    color: #ff00ff !important;
+    border: 3px dotted #ff0000 !important;
+    border-radius: 0 !important;
+    font-size: 1.1rem !important;
+    transform: rotate(-2deg);
+    box-shadow: -3px 3px 0 #0000ff !important;
+}
+[data-theme="garbagefire"] #logToggle {
+    background: #0000ff !important;
+    color: #ffff00 !important;
+    border: 5px double #ff7f00 !important;
+    border-radius: 12px 0 12px 0 !important;
+    font-size: 0.85rem !important;
+    transform: rotate(1deg);
+    box-shadow: 4px -2px 0 #ff00ff !important;
+}
+[data-theme="garbagefire"] #dashboardBtn {
+    background: #ff7f00 !important;
+    color: #0000ff !important;
+    border: 3px solid #00ffff !important;
+    border-radius: 0 16px 0 16px !important;
+    font-size: 0.9rem !important;
+    font-weight: 900 !important;
+    text-decoration: underline wavy #ff0000 !important;
+    transform: rotate(-1deg);
+}
+[data-theme="garbagefire"] #toolsToggle:hover,
+[data-theme="garbagefire"] #monitorToggle:hover,
+[data-theme="garbagefire"] #logToggle:hover,
+[data-theme="garbagefire"] #dashboardBtn:hover {
+    filter: invert(1) hue-rotate(90deg) !important;
+    transform: rotate(5deg) scale(1.1) !important;
+}
+
+/* ── GARBAGEFIRE: Send button ── */
+[data-theme="garbagefire"] #sendBtn {
+    background: linear-gradient(45deg, #ff0000, #00ff00, #0000ff) !important;
+    background-size: 200% !important;
+    color: #ffff00 !important;
+    border: 4px dashed #ff00ff !important;
+    border-radius: 50% 0 50% 0 !important;
+    font-size: 0.75rem !important;
+    font-weight: 900 !important;
+    text-transform: uppercase;
+    box-shadow: 4px 4px 0 #ff7f00, -2px -2px 0 #00ffff !important;
+    animation: garbagePulse 1.5s infinite alternate !important;
+}
+[data-theme="garbagefire"] #sendBtn:hover {
+    background: linear-gradient(135deg, #00ff00, #ff0000) !important;
+    transform: rotate(-5deg) scale(1.05) !important;
+    filter: saturate(3) !important;
+}
+@keyframes garbagePulse {
+    from { box-shadow: 4px 4px 0 #ff7f00, -2px -2px 0 #00ffff; }
+    to   { box-shadow: -4px -4px 0 #ff00ff, 3px 3px 0 #ffff00; }
+}
+
+/* ── GARBAGEFIRE: Stop button ── */
+[data-theme="garbagefire"] #stopBtn {
+    background: repeating-linear-gradient(45deg, #ff0000, #ff0000 5px, #ffff00 5px, #ffff00 10px) !important;
+    color: #000 !important;
+    border: 3px solid #0000ff !important;
+    border-radius: 0 !important;
+    font-weight: 900 !important;
+}
+
+/* ── GARBAGEFIRE: Input area ── */
+[data-theme="garbagefire"] #input {
+    background: #ffdead !important;
+    border: 3px solid #ff4500 !important;
+    border-radius: 20px 0 20px 0 !important;
+    color: #0000ff !important;
+    font-size: 0.95rem !important;
+}
+[data-theme="garbagefire"] #input::placeholder { color: #ff00ff !important; font-style: italic; }
+
+/* ── GARBAGEFIRE: Chat messages — each bubble wrong in its own way ── */
+[data-theme="garbagefire"] .user {
+    background: linear-gradient(135deg, #ff0000, #00ff00) !important;
+    color: #0000ff !important;
+    border: 3px dotted #ff00ff !important;
+    border-radius: 20px 0 20px 20px !important;
+    font-weight: 700 !important;
+    text-shadow: 1px 1px 0 #ffff00 !important;
+}
+[data-theme="garbagefire"] .assistant {
+    background: #adff2f !important;
+    color: #ff1493 !important;
+    border: 4px double #0000ff !important;
+    border-radius: 0 20px 20px 0 !important;
+}
+
+/* ── GARBAGEFIRE: Sidebar — every element a different mess ── */
+[data-theme="garbagefire"] #sessionsSidebar {
+    background: #8b4513 !important;
+    border-right: 5px dashed #ff7f00 !important;
+}
+[data-theme="garbagefire"] .sessions-header {
+    background: #ff69b4 !important;
+    border-bottom: 4px solid #00ff00 !important;
+}
+[data-theme="garbagefire"] .sessions-header h2 {
+    color: #0000ff !important;
+    font-size: 1.5rem !important;
+    font-weight: 900 !important;
+    text-decoration: underline wavy #ff0000 !important;
+}
+[data-theme="garbagefire"] .session-item {
+    background: #39ff14 !important;
+    border-bottom: 3px solid #ff7f00 !important;
+    border-radius: 0 !important;
+}
+[data-theme="garbagefire"] .session-item:hover {
+    background: #ff0000 !important;
+}
+[data-theme="garbagefire"] .session-item.active {
+    background: #00ffff !important;
+    border-left: 6px solid #ff00ff !important;
+}
+[data-theme="garbagefire"] .session-item-text { color: #7f00ff !important; font-weight: 700 !important; }
+[data-theme="garbagefire"] .session-item.active .session-item-text { color: #ff0000 !important; }
+[data-theme="garbagefire"] .new-session-btn {
+    background: #0000ff !important;
+    color: #ffff00 !important;
+    border: 3px solid #ff00ff !important;
+    border-radius: 0 !important;
+    font-size: 1.4rem !important;
+    font-weight: 900 !important;
+}
+[data-theme="garbagefire"] .new-session-btn:hover {
+    background: #ff0000 !important;
+    transform: rotate(15deg) !important;
+}
+[data-theme="garbagefire"] #sessionSearch {
+    background: #d2691e !important;
+    border: 3px solid #ff00ff !important;
+    border-radius: 20px !important;
+    color: #ffff00 !important;
+    font-size: 0.9rem !important;
+}
+[data-theme="garbagefire"] #sessionSearch::placeholder { color: #00ffff !important; }
+
+/* ── GARBAGEFIRE: Log panel ── */
+[data-theme="garbagefire"] #logPanel { background: #7f7f7f !important; }
+[data-theme="garbagefire"] #logHeader { background: #ff00ff !important; border-bottom: 4px dashed #ffff00 !important; }
+[data-theme="garbagefire"] #logHeader h2 { color: #00ff00 !important; font-size: 1.3rem !important; text-shadow: 2px 2px 0 #0000ff !important; }
+[data-theme="garbagefire"] .log-btn {
+    background: #ff7f00 !important;
+    color: #0000ff !important;
+    border: 3px solid #ff00ff !important;
+    border-radius: 50% 0 50% 0 !important;
+    font-weight: 900 !important;
+}
+[data-theme="garbagefire"] .log-btn:hover { background: #00ff00 !important; color: #ff0000 !important; transform: skew(-5deg) !important; }
+[data-theme="garbagefire"] .log-btn.danger { background: #ff0000 !important; color: #ffff00 !important; }
+[data-theme="garbagefire"] #logFilters { background: #ff69b4 !important; border-bottom: 3px solid #00ff00 !important; }
+[data-theme="garbagefire"] .filter-btn { background: #8b4513 !important; color: #ffff00 !important; border: 2px solid #00ffff !important; border-radius: 0 !important; font-weight: 700 !important; }
+[data-theme="garbagefire"] .filter-btn.active { background: #ff0000 !important; color: #00ff00 !important; border-color: #ffff00 !important; }
+[data-theme="garbagefire"] .log-message { color: #ffff00 !important; font-size: 0.85rem !important; }
+[data-theme="garbagefire"] .log-timestamp { color: #00ffff !important; }
+[data-theme="garbagefire"] .log-entry:hover { background: rgba(255,0,255,0.2) !important; }
+
+/* ── GARBAGEFIRE: System monitor ── */
+[data-theme="garbagefire"] #systemMonitor {
+    background: linear-gradient(135deg, #ff0000 0%, #00ffff 100%) !important;
+}
+[data-theme="garbagefire"] .monitor-header { background: rgba(255,255,0,0.4) !important; border-bottom: 4px dotted #0000ff !important; }
+[data-theme="garbagefire"] .monitor-header h2 { color: #ff00ff !important; font-size: 1.3rem !important; text-shadow: 2px 2px 0 #000 !important; }
+[data-theme="garbagefire"] .stat-group { background: rgba(0,0,0,0.3) !important; border: 3px dashed #ffff00 !important; border-radius: 50% 0 !important; }
+[data-theme="garbagefire"] .stat-label { color: #ffff00 !important; font-weight: 900 !important; }
+[data-theme="garbagefire"] .stat-value { color: #00ff00 !important; font-size: 1.8rem !important; text-shadow: 2px 2px 0 #ff0000 !important; }
+[data-theme="garbagefire"] .progress-fill { background: linear-gradient(90deg, #ff00ff, #ffff00, #00ff00) !important; }
+
+/* ── GARBAGEFIRE: Tools panel ── */
+[data-theme="garbagefire"] #toolsPanel { background: #fff8dc !important; border-left: 6px dashed #ff00ff !important; }
+[data-theme="garbagefire"] #toolsHeader { background: #00ffff !important; border-bottom: 4px solid #ff0000 !important; }
+[data-theme="garbagefire"] #toolsHeader h2 { color: #ff00ff !important; font-size: 1.3rem !important; text-shadow: 2px 2px 0 #0000ff !important; }
+[data-theme="garbagefire"] .tools-btn { background: #ff0000 !important; color: #ffff00 !important; border: 3px dotted #00ff00 !important; border-radius: 0 12px !important; font-weight: 900 !important; }
+[data-theme="garbagefire"] .tools-btn:hover { background: #00ff00 !important; color: #ff0000 !important; }
+[data-theme="garbagefire"] .tools-category-header { background: #ff69b4 !important; color: #0000ff !important; border-bottom: 3px solid #ffff00 !important; font-weight: 900 !important; font-size: 1rem !important; }
+[data-theme="garbagefire"] .tool-item { background: #fffacd !important; border-bottom: 2px dashed #ff00ff !important; }
+[data-theme="garbagefire"] .tool-item:hover { background: #ffff00 !important; border-left: 5px solid #ff0000 !important; }
+[data-theme="garbagefire"] .tool-item-name { color: #0000ff !important; font-weight: 900 !important; font-size: 1rem !important; }
+[data-theme="garbagefire"] .tool-item-desc { color: #8b4513 !important; font-style: italic !important; }
+
+/* ── GARBAGEFIRE: Dashboard cards ── */
+[data-theme="garbagefire"] .metric-card {
+    background: #ffefd5 !important;
+    border: 4px solid #ff00ff !important;
+    border-top: 8px solid #ff0000 !important;
+    border-radius: 0 20px 0 20px !important;
+    box-shadow: 5px 5px 0 #00ff00, -3px -3px 0 #0000ff !important;
+}
+[data-theme="garbagefire"] .metric-card:hover { transform: rotate(-1deg) scale(1.02) !important; filter: saturate(2) !important; }
+[data-theme="garbagefire"] .metric-value { color: #ff7f00 !important; font-size: 3rem !important; font-weight: 900 !important; text-shadow: 3px 3px 0 #0000ff !important; }
+[data-theme="garbagefire"] .metric-title { color: #ff00ff !important; font-weight: 900 !important; font-size: 0.9rem !important; text-transform: uppercase; letter-spacing: 0.1em; }
+[data-theme="garbagefire"] .chart-container { background: #ffefd5 !important; border: 4px dashed #ff0000 !important; border-radius: 0 !important; }
+[data-theme="garbagefire"] .tool-card { background: #ffff00 !important; border-left: 6px solid #ff0000 !important; border: 3px solid #0000ff !important; border-radius: 0 12px 12px 0 !important; }
+[data-theme="garbagefire"] .tool-name { color: #ff00ff !important; font-weight: 900 !important; }
+[data-theme="garbagefire"] .tool-stat-value { color: #0000ff !important; font-weight: 900 !important; }
+
+/* ── GARBAGEFIRE: Modal ── */
+[data-theme="garbagefire"] .mcp-modal-dialog {
+    background: #fff8dc !important;
+    border: 5px solid #ff00ff !important;
+    border-radius: 30px 0 30px 0 !important;
+    box-shadow: 8px 8px 0 #0000ff, -4px -4px 0 #ff0000 !important;
+}
+[data-theme="garbagefire"] .mcp-modal-header { background: #ff69b4 !important; border-bottom: 4px dashed #00ff00 !important; }
+[data-theme="garbagefire"] .mcp-modal-title { color: #0000ff !important; font-size: 1.3rem !important; font-weight: 900 !important; text-shadow: 2px 2px 0 #ff0000 !important; }
+[data-theme="garbagefire"] .mcp-modal-btn-primary { background: #ff0000 !important; color: #ffff00 !important; border: 3px solid #00ff00 !important; border-radius: 50% 0 !important; font-weight: 900 !important; }
+[data-theme="garbagefire"] .mcp-modal-btn-primary:hover { background: #00ff00 !important; color: #ff0000 !important; transform: rotate(-3deg) !important; }
+[data-theme="garbagefire"] .mcp-modal-btn-secondary { background: #0000ff !important; color: #ffff00 !important; border: 3px dotted #ff00ff !important; border-radius: 0 50% !important; font-weight: 900 !important; }
+
+/* ── GARBAGEFIRE: Scrollbars ── */
+[data-theme="garbagefire"] ::-webkit-scrollbar-thumb { border-radius: 0 !important; }
+
 
 /* Matrix – phosphor green CRT */
 [data-theme="matrix"] {
