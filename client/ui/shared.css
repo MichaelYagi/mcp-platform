@@ -5591,3 +5591,206 @@ body {
 [data-theme="steampunk"] ::-webkit-scrollbar-thumb:hover {
     background: #cd9b1d !important;
 }
+
+
+/* ============================================================
+   MOBILE-ONLY: Close buttons match their theme
+   The base .mobile-close has background:#424242 !important
+   which overrides everything. These rules win on mobile only.
+   ============================================================ */
+
+@media (max-width: 768px) {
+
+    /* ── Prompt navigator: bottom breathing room ── */
+    #promptNavList {
+        padding-bottom: max(4rem, calc(3.5rem + env(safe-area-inset-bottom))) !important;
+    }
+    #promptNavigator {
+        padding-bottom: 0 !important;
+    }
+
+    /* ── Default / Midnight / forest / etc: keep dark grey, just consistent ── */
+    .mobile-close {
+        font-size: 0.78rem !important;
+        padding: 0.4rem 0.8rem !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+    }
+
+    /* ── Matrix ── */
+    [data-theme="matrix"] .mobile-close,
+    [data-theme="matrix"] .session-close-btn {
+        background: #001a00 !important;
+        color: #00ff41 !important;
+        border: 1px solid #00ff4144 !important;
+        font-family: 'Share Tech Mono', 'Courier New', monospace !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        border-radius: 0 !important;
+    }
+    [data-theme="matrix"] .mobile-close:hover,
+    [data-theme="matrix"] .session-close-btn:hover {
+        background: #002200 !important;
+        box-shadow: 0 0 8px rgba(0,255,65,0.2) !important;
+    }
+
+    /* ── Tron ── */
+    [data-theme="tron"] .mobile-close,
+    [data-theme="tron"] .session-close-btn {
+        background: transparent !important;
+        color: #00eeff !important;
+        border: 1px solid rgba(0,238,255,0.3) !important;
+        border-radius: 2px !important;
+        letter-spacing: 0.06em !important;
+    }
+    [data-theme="tron"] .mobile-close:hover,
+    [data-theme="tron"] .session-close-btn:hover {
+        background: rgba(0,238,255,0.1) !important;
+        border-color: #00eeff !important;
+        box-shadow: 0 0 8px rgba(0,238,255,0.3) !important;
+    }
+
+    /* ── Dragonball ── */
+    [data-theme="dragonball"] .mobile-close,
+    [data-theme="dragonball"] .session-close-btn {
+        background: #1c4595 !important;
+        color: #f5a623 !important;
+        border: 2px solid #f5a623 !important;
+        border-radius: 4px !important;
+        font-weight: 700 !important;
+    }
+    [data-theme="dragonball"] .mobile-close:hover,
+    [data-theme="dragonball"] .session-close-btn:hover {
+        background: #f5a623 !important;
+        color: #1c4595 !important;
+    }
+
+    /* ── TE ── */
+    [data-theme="te"] .mobile-close,
+    [data-theme="te"] .session-close-btn {
+        background: #f0ece4 !important;
+        color: #1a1a1a !important;
+        border: 1px solid #ccc5b5 !important;
+        font-family: 'DM Mono', 'Courier New', monospace !important;
+        border-radius: 0 !important;
+        letter-spacing: 0.04em !important;
+    }
+    [data-theme="te"] .mobile-close:hover,
+    [data-theme="te"] .session-close-btn:hover {
+        background: #1a1a1a !important;
+        color: #fff !important;
+        border-color: #1a1a1a !important;
+    }
+
+    /* ── Mono ── */
+    [data-theme="mono"] .mobile-close,
+    [data-theme="mono"] .session-close-btn {
+        background: transparent !important;
+        color: #666 !important;
+        border: 1px solid #d8d8d8 !important;
+        font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
+        border-radius: 2px !important;
+        font-weight: 400 !important;
+    }
+    [data-theme="mono"] .mobile-close:hover,
+    [data-theme="mono"] .session-close-btn:hover {
+        background: #1a1a1a !important;
+        color: #fff !important;
+        border-color: #1a1a1a !important;
+    }
+
+    /* ── Steampunk ── */
+    [data-theme="steampunk"] .mobile-close,
+    [data-theme="steampunk"] .session-close-btn {
+        background: transparent !important;
+        color: #cd9b1d !important;
+        border: 1px solid #5c3a1e !important;
+        font-family: 'Georgia', serif !important;
+        font-style: italic !important;
+        border-radius: 2px !important;
+    }
+    [data-theme="steampunk"] .mobile-close:hover,
+    [data-theme="steampunk"] .session-close-btn:hover {
+        background: #b8860b !important;
+        color: #1a0f0a !important;
+        border-color: #b8860b !important;
+    }
+
+    /* ── Garbagefire ── */
+    [data-theme="garbagefire"] .mobile-close,
+    [data-theme="garbagefire"] .session-close-btn {
+        font-family: "Comic Sans MS", "Comic Sans", cursive !important;
+        background: #ff0000 !important;
+        color: #ffff00 !important;
+        border: 3px dotted #00ff00 !important;
+        border-radius: 50% 0 50% 0 !important;
+        font-weight: 900 !important;
+        transform: rotate(-2deg);
+    }
+    [data-theme="garbagefire"] .mobile-close:hover,
+    [data-theme="garbagefire"] .session-close-btn:hover {
+        background: #00ff00 !important;
+        color: #ff0000 !important;
+        transform: rotate(3deg) !important;
+    }
+
+    /* ── TMNT ── */
+    [data-theme="TMNT"] .mobile-close,
+    [data-theme="TMNT"] .session-close-btn {
+        background: #1a1a2e !important;
+        color: #4CAF50 !important;
+        border: 1px solid #4CAF50 !important;
+        border-radius: 4px !important;
+    }
+    [data-theme="TMNT"] .mobile-close:hover,
+    [data-theme="TMNT"] .session-close-btn:hover {
+        background: #4CAF50 !important;
+        color: #1a1a2e !important;
+    }
+
+    /* ── Superman ── */
+    [data-theme="superman"] .mobile-close,
+    [data-theme="superman"] .session-close-btn {
+        background: #0d47a1 !important;
+        color: #ffeb3b !important;
+        border: 2px solid #ffeb3b !important;
+        border-radius: 4px !important;
+        font-weight: 700 !important;
+    }
+    [data-theme="superman"] .mobile-close:hover,
+    [data-theme="superman"] .session-close-btn:hover {
+        background: #ffeb3b !important;
+        color: #0d47a1 !important;
+    }
+
+    /* ── Batman ── */
+    [data-theme="batman"] .mobile-close,
+    [data-theme="batman"] .session-close-btn {
+        background: #1a1a1a !important;
+        color: #f5c518 !important;
+        border: 1px solid #f5c518 !important;
+        border-radius: 0 !important;
+        font-weight: 700 !important;
+    }
+    [data-theme="batman"] .mobile-close:hover,
+    [data-theme="batman"] .session-close-btn:hover {
+        background: #f5c518 !important;
+        color: #1a1a1a !important;
+    }
+
+    /* ── Midnight ── */
+    [data-theme="midnight"] .mobile-close,
+    [data-theme="midnight"] .session-close-btn {
+        background: rgba(255,255,255,0.05) !important;
+        color: rgba(255,255,255,0.7) !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        border-radius: 4px !important;
+    }
+    [data-theme="midnight"] .mobile-close:hover,
+    [data-theme="midnight"] .session-close-btn:hover {
+        background: rgba(255,255,255,0.12) !important;
+        color: #fff !important;
+    }
+
+    /* ── Dragonball: dashboard min-width already handled above ── */
+}
