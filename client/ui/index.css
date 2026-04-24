@@ -202,9 +202,9 @@ input:checked + .toggle-slider:before {
     display: flex; flex-direction: column;
     transition: width 0.3s ease, background 0.3s ease;
     overflow: hidden;
-    border-right: 1px solid var(--header-bg);
+    border-right: none;
 }
-#sessionsSidebar.open { width: 300px; }
+#sessionsSidebar.open { width: 300px; border-right: 1px solid var(--chat-border); }
 
 .sessions-header {
     background: var(--sidebar-header);
@@ -527,9 +527,9 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     display: flex; flex-direction: column;
     transition: width 0.3s ease, background 0.3s ease;
     overflow: hidden;
-    border-left: 1px solid var(--log-border);
+    border-left: none;
 }
-#toolsPanel.open { width: 360px; }
+#toolsPanel.open { width: 360px; border-left: 1px solid var(--chat-border); }
 
 #toolsHeader {
     background: var(--log-header);
@@ -709,9 +709,9 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     display: flex; flex-direction: column;
     transition: width 0.3s ease, background 0.3s ease;
     overflow: hidden;
-    border-left: 1px solid var(--log-border);
+    border-left: none;
 }
-#logPanel.open { width: 500px; }
+#logPanel.open { width: 500px; border-left: 1px solid var(--chat-border); }
 
 #logHeader {
     background: var(--log-header);
@@ -796,9 +796,9 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     display: flex; flex-direction: column;
     transition: width 0.3s ease;
     overflow: hidden;
-    border-left: 1px solid rgba(255,255,255,0.1);
+    border-left: none;
 }
-#systemMonitor.open { width: 320px; }
+#systemMonitor.open { width: 320px; border-left: 1px solid var(--chat-border); }
 
 .monitor-header {
     background: var(--monitor-header);
