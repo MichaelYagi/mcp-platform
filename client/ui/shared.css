@@ -5603,10 +5603,15 @@ body {
 
     /* ── Prompt navigator: bottom breathing room ── */
     #promptNavList {
-        padding-bottom: max(4rem, calc(3.5rem + env(safe-area-inset-bottom))) !important;
+        padding-bottom: calc(env(safe-area-inset-bottom)) !important;
     }
     #promptNavigator {
         padding-bottom: 0 !important;
+    }
+
+    /* ── Theme picker / status row: safe area on top of existing 4rem margin ── */
+    #statusRow {
+        margin-bottom: calc(4rem + env(safe-area-inset-bottom)) !important;
     }
 
     /* ── Default / Midnight / forest / etc: keep dark grey, just consistent ── */
