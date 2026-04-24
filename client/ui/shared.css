@@ -3315,7 +3315,7 @@ body {
 /* ── TE: Input area — paper feel ── */
 [data-theme="te"] #inputRow {
     border-radius: 0 !important;
-    border: 1px solid #aaa090 !important;
+    border: none !important;
 }
 [data-theme="te"] #input {
     color: #1a1a1a !important;
@@ -4269,11 +4269,8 @@ body {
 
 /* ── Tron: input area ── */
 [data-theme="tron"] #inputRow {
-    border: 1px solid rgba(0,238,255,0.4) !important;
-    box-shadow:
-        0 0 8px rgba(0,238,255,0.2),
-        0 0 20px rgba(0,238,255,0.08),
-        inset 0 0 10px rgba(0,238,255,0.04) !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 [data-theme="tron"] #input {
     color: #c8f8ff !important;
@@ -5178,7 +5175,7 @@ body {
     border-bottom: 2px solid #4a90d9 !important;
 }
 [data-theme="argyle"] .sessions-header h2 { color: #ffffff !important; letter-spacing: 0.08em !important; font-size: 0.85rem !important; }
-[data-theme="argyle"] .session-item { color: #e8f0fc !important; border-bottom: 1px solid #1e3a7a !important; background: transparent !important; }
+[data-theme="argyle"] .session-item { color: #e8f0fc !important; border-bottom: 1px solid #1e3a7a !important; }
 [data-theme="argyle"] .session-item:hover { background: #1a3a8f !important; }
 [data-theme="argyle"] .session-item.active {
     background-color: #2563eb !important;
