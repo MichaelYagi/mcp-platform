@@ -28,10 +28,10 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
     background: var(--page-bg);
     overflow: hidden;
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
     transition: background 0.3s ease;
 }
 
@@ -5607,11 +5607,6 @@ body {
     }
     #promptNavigator {
         padding-bottom: 0 !important;
-    }
-
-    /* ── Theme picker / status row: safe area on top of existing 4rem margin ── */
-    #statusRow {
-        margin-bottom: calc(4rem + env(safe-area-inset-bottom)) !important;
     }
 
     /* ── Default / Midnight / forest / etc: keep dark grey, just consistent ── */
