@@ -5178,7 +5178,7 @@ body {
     border-bottom: 2px solid #4a90d9 !important;
 }
 [data-theme="argyle"] .sessions-header h2 { color: #ffffff !important; letter-spacing: 0.08em !important; font-size: 0.85rem !important; }
-[data-theme="argyle"] .session-item { color: #e8f0fc !important; border-bottom: 1px solid #1e3a7a !important; }
+[data-theme="argyle"] .session-item { color: #e8f0fc !important; border-bottom: 1px solid #1e3a7a !important; background: transparent !important; }
 [data-theme="argyle"] .session-item:hover { background: #1a3a8f !important; }
 [data-theme="argyle"] .session-item.active {
     background-color: #2563eb !important;
