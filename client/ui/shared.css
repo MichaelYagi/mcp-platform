@@ -2617,7 +2617,7 @@ body {
 * Update the theme-list below
  */
 :root {
-    --theme-list:        "default,midnight,TMNT,superman,batman,matrix,tron,dragonball,te,mono,garbagefire";
+    --theme-list:        "default,midnight,TMNT,superman,batman,matrix,tron,dragonball,te,mono,steampunk,garbagefire";
     --theme-list-hidden: "forest,crimson,neon,dracula,nimbus,tokyo";
 }
 /* ============================================================
@@ -4946,4 +4946,648 @@ body {
         min-width: 38px !important;
         overflow: visible !important;
     }
+}
+/* ============================================================
+   STEAMPUNK THEME
+   Aged parchment · sepia ink · brass & copper · Victorian
+   engineering. Pressure-gauge knobs for Tools/System/Logs.
+   ============================================================ */
+
+[data-theme="steampunk"] {
+    --header-bg:        #1a0f0a;
+    --header-border:    #b8860b;
+    --sidebar-bg:       #2c1e0f;
+    --sidebar-header:   #1a0f0a;
+    --sidebar-item:     #e8d5a3;
+    --sidebar-hover:    #3d2a14;
+    --sidebar-active:   #b8860b;
+    --sidebar-border:   #5c3a1e;
+    --sidebar-search:   #1a0f0a;
+    --page-bg:          #1a0f0a;
+    --chat-bg:          #f5e6c8;
+    --chat-border:      #b8860b;
+    --chat-assistant:   #ede0c4;
+    --chat-asst-border: #b8860b;
+    --chat-asst-color:  #2c1e0f;
+    --input-bg:         #fdf6e3;
+    --input-border:     #b8860b;
+    --status-color:     #b8860b;
+    --user-bubble:      #3d2a14;
+    --send-btn:         #b8860b;
+    --send-btn-hover:   #9a6f09;
+    --send-btn-focus:   rgba(184,134,11,0.2);
+    --btn-logs:         transparent;
+    --btn-logs-hover:   #b8860b;
+    --btn-monitor:      transparent;
+    --btn-monitor-hover:#b8860b;
+    --btn-dashboard:    transparent;
+    --btn-dashboard-hover:#b8860b;
+    --btn-newsession:   #b8860b;
+    --btn-newsession-hover:#9a6f09;
+    --btn-back:         transparent;
+    --btn-back-hover:   #b8860b;
+    --btn-tools:        transparent;
+    --btn-tools-hover:  #b8860b;
+    --card-bg:          #fdf6e3;
+    --card-border:      #c8a96e;
+    --card-shadow:      rgba(0,0,0,0.3);
+    --card-shadow-hover:rgba(184,134,11,0.3);
+    --title-color:      #2c1e0f;
+    --metric-color:     #b8860b;
+    --subtitle-color:   #7a5c2e;
+    --label-color:      #5c3a1e;
+    --chart-blue:       #b8860b;
+    --chart-purple:     #b87333;
+    --chart-red:        #8b2500;
+    --chart-green:      #4a6741;
+    --chart-orange:     #cd6600;
+    --tool-border:      #b8860b;
+    --tool-bg:          #f5e6c8;
+    --status-bg:        #fdf6e3;
+    --scrollbar-track:  #2c1e0f;
+    --scrollbar-thumb:  #b8860b;
+    --scrollbar-hover:  #cd9b1d;
+    --swatch1:          #1a0f0a;
+    --swatch2:          #b8860b;
+    --swatch3:          #f5e6c8;
+    --session-date-color: #7a5c2e;
+    --session-date-hover: #b8860b;
+    --session-date-active:#e8d5a3;
+}
+
+/* ── Fonts ── */
+[data-theme="steampunk"],
+[data-theme="steampunk"] body {
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+
+/* ── Header — dark wood, brass border ── */
+[data-theme="steampunk"] #header {
+    background: #1a0f0a !important;
+    border-bottom: 3px solid #b8860b !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.6), inset 0 -1px 0 #cd9b1d !important;
+}
+[data-theme="steampunk"] #header h1 {
+    color: #cd9b1d !important;
+    font-family: 'Georgia', serif !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.1em !important;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.8), 0 0 20px rgba(184,134,11,0.4) !important;
+    text-transform: uppercase !important;
+}
+[data-theme="steampunk"] #hamburgerBtn .bar { background: #cd9b1d !important; }
+
+/* ============================================================
+   PRESSURE-GAUGE KNOBS  (Tools / System / Logs)
+   38×38px circles — same size as TE and Dragonball.
+   Each knob = a brass/copper/iron gauge face with tick marks
+   painted via SVG background-image on ::before, plus a
+   needle indicator dot and gloss highlight on ::after.
+   Tooltip label on ::before (stacked z-index trick),
+   gauge face on ::before at z:1, highlight on ::after at z:3.
+   We encode the gauge SVG in ::before background-image and
+   the tooltip as a second layer via the TE ::before approach,
+   but since we need both the face AND the label we combine:
+   — face drawn on the button background itself (radial-gradient)
+   — tick marks + needle = ::before (SVG, z:2)
+   — glass highlight = ::after (radial-gradient, z:3)
+   — tooltip = position:absolute child via the ::before trick
+     duplicated on ::before with content:attr(data-label),
+     but opacity:0 / shown on hover (same as TE pattern)
+   ============================================================ */
+
+[data-theme="steampunk"] #toolsToggle,
+[data-theme="steampunk"] #monitorToggle,
+[data-theme="steampunk"] #logToggle {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    font-size: 0 !important;
+    color: transparent !important;
+    cursor: pointer;
+    position: relative;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: transform 0.12s, box-shadow 0.12s !important;
+    overflow: visible !important;
+    /* Outer brass rim */
+    border: 3px solid #6b4a00 !important;
+    box-shadow:
+        0 4px 10px rgba(0,0,0,0.6),
+        0 1px 3px rgba(0,0,0,0.4),
+        inset 0 1px 0 rgba(255,220,80,0.3),
+        inset 0 -1px 0 rgba(0,0,0,0.4) !important;
+}
+
+/* ── Tooltip label (::before, same as TE pattern) ── */
+[data-theme="steampunk"] #toolsToggle::before,
+[data-theme="steampunk"] #monitorToggle::before,
+[data-theme="steampunk"] #logToggle::before {
+    content: attr(data-label);
+    position: absolute;
+    top: calc(100% + 7px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a0f0a;
+    color: #cd9b1d;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 0.62rem;
+    font-weight: 400;
+    letter-spacing: 0.12em;
+    text-transform: lowercase;
+    font-style: italic;
+    white-space: nowrap;
+    padding: 3px 8px;
+    border: 1px solid #5c3a1e;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+    z-index: 100;
+    border-radius: 0;
+}
+[data-theme="steampunk"] #toolsToggle:hover::before,
+[data-theme="steampunk"] #monitorToggle:hover::before,
+[data-theme="steampunk"] #logToggle:hover::before {
+    opacity: 1;
+}
+
+/* ── Glass highlight (::after) — convex lens shine ── */
+[data-theme="steampunk"] #toolsToggle::after,
+[data-theme="steampunk"] #monitorToggle::after,
+[data-theme="steampunk"] #logToggle::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 10px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(255,248,200,0.55) 0%, transparent 100%);
+    top: 4px;
+    left: 6px;
+    z-index: 3;
+    pointer-events: none;
+}
+
+/* ── Press effect ── */
+[data-theme="steampunk"] #toolsToggle:hover,
+[data-theme="steampunk"] #monitorToggle:hover,
+[data-theme="steampunk"] #logToggle:hover {
+    transform: translateY(1px) scale(0.97) !important;
+    box-shadow:
+        0 2px 6px rgba(0,0,0,0.6),
+        inset 0 2px 5px rgba(0,0,0,0.3),
+        inset 0 -1px 0 rgba(255,220,80,0.15) !important;
+    color: transparent !important;
+    border-color: #8b6800 !important;
+}
+
+/* ── TOOLS: Edison bulb — brass face, glowing filament ── */
+[data-theme="steampunk"] #toolsToggle {
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 5 C10.5 5 7 9 7 13.5 C7 17.5 9.5 20.5 12 22.5 L12 26.5 Q12 27.5 13 27.5 L19 27.5 Q20 27.5 20 26.5 L20 22.5 C22.5 20.5 25 17.5 25 13.5 C25 9 21.5 5 16 5Z' fill='none' stroke='%236b4a00' stroke-width='1.2'/><path d='M13 15.5 Q14.5 13 16 15.5 Q17.5 18 19 15.5' fill='none' stroke='%23b8860b' stroke-width='1.1' stroke-linecap='round'/><line x1='16' y1='15.5' x2='16' y2='19' stroke='%236b4a00' stroke-width='0.8'/><line x1='12' y1='25' x2='20' y2='25' stroke='%236b4a00' stroke-width='1.2'/><line x1='12.5' y1='27' x2='19.5' y2='27' stroke='%236b4a00' stroke-width='1'/><line x1='13' y1='29' x2='19' y2='29' stroke='%236b4a00' stroke-width='0.8'/><path d='M10 11 Q11 8.5 13 7.5' fill='none' stroke='%23e8c84a' stroke-width='0.9' stroke-linecap='round' opacity='0.6'/></svg>")
+        center/30px 30px no-repeat,
+        radial-gradient(circle at 38% 32%, #f0c840 0%, #d4a010 35%, #b8860b 65%, #7a5800 100%) !important;
+}
+
+/* ── SYSTEM: Armillary sphere — copper face, intersecting rings ── */
+[data-theme="steampunk"] #monitorToggle {
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='12' fill='none' stroke='%236b4a00' stroke-width='1.3'/><ellipse cx='16' cy='16' rx='12' ry='4.5' fill='none' stroke='%238b6000' stroke-width='1.1'/><ellipse cx='16' cy='16' rx='12' ry='5' fill='none' stroke='%238b6000' stroke-width='1' transform='rotate(50 16 16)'/><ellipse cx='16' cy='16' rx='12' ry='5' fill='none' stroke='%238b6000' stroke-width='1' transform='rotate(-50 16 16)'/><line x1='16' y1='4' x2='16' y2='28' stroke='%236b4a00' stroke-width='0.9'/><circle cx='16' cy='4.5' r='1.3' fill='%236b4a00'/><circle cx='16' cy='27.5' r='1.3' fill='%236b4a00'/><circle cx='16' cy='16' r='2.5' fill='%23b8860b' stroke='%236b4a00' stroke-width='0.8'/></svg>")
+        center/30px 30px no-repeat,
+        radial-gradient(circle at 38% 32%, #e09060 0%, #c07040 35%, #a05020 65%, #6b3010 100%) !important;
+}
+
+/* ── LOGS: Pocket watch — dark iron face, clock hands ── */
+[data-theme="steampunk"] #logToggle {
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='17' r='11.5' fill='none' stroke='%237a5c2e' stroke-width='1.5'/><circle cx='16' cy='17' r='9.5' fill='none' stroke='%235c3a1e' stroke-width='0.5'/><rect x='14.5' y='3' width='3' height='3.5' rx='0.5' fill='%235c3a1e' stroke='%236b4a00' stroke-width='0.8'/><g stroke='%236b4a00' stroke-width='1' stroke-linecap='round'><line x1='16' y1='8' x2='16' y2='10.5'/><line x1='16' y1='23.5' x2='16' y2='26'/><line x1='7' y1='17' x2='9.5' y2='17'/><line x1='22.5' y1='17' x2='25' y2='17'/><line x1='10' y1='11' x2='11.8' y2='12.8'/><line x1='21.2' y1='21.2' x2='22' y2='23'/><line x1='22' y1='11' x2='20.2' y2='12.8'/><line x1='11.8' y1='21.2' x2='10' y2='23'/></g><line x1='16' y1='17' x2='11' y2='10.5' stroke='%23cc3300' stroke-width='1.3' stroke-linecap='round'/><line x1='16' y1='17' x2='20.5' y2='21' stroke='%234a2800' stroke-width='1.7' stroke-linecap='round'/><circle cx='16' cy='17' r='1.6' fill='%23b8860b' stroke='%236b4a00' stroke-width='0.5'/></svg>")
+        center/30px 30px no-repeat,
+        radial-gradient(circle at 38% 32%, #786858 0%, #584838 35%, #3c2e20 65%, #201810 100%) !important;
+}
+
+/* ── Dashboard button — parchment text style ── */
+[data-theme="steampunk"] #dashboardBtn {
+    background: transparent !important;
+    color: transparent !important;
+    border: 1px solid #5c3a1e !important;
+    font-size: 0 !important;
+    border-radius: 2px !important;
+}
+[data-theme="steampunk"] #dashboardBtn::after {
+    content: attr(data-label);
+    font-size: 0.78rem;
+    color: #cd9b1d;
+    font-family: 'Georgia', 'Times New Roman', serif;
+    letter-spacing: 0.08em;
+    font-style: italic;
+}
+[data-theme="steampunk"] #dashboardBtn:hover {
+    background: #b8860b !important;
+    border-color: #b8860b !important;
+}
+[data-theme="steampunk"] #dashboardBtn:hover::after {
+    color: #1a0f0a;
+}
+
+/* ── Model select ── */
+[data-theme="steampunk"] #modelSelect {
+    background: #2c1e0f !important;
+    color: #cd9b1d !important;
+    border: 1px solid #5c3a1e !important;
+    font-family: 'Georgia', serif !important;
+}
+[data-theme="steampunk"] #modelSelectLabel { color: #cd9b1d !important; font-family: 'Georgia', serif !important; }
+
+/* ── Sidebar ── */
+[data-theme="steampunk"] #sessionsSidebar {
+    background: #2c1e0f !important;
+    border-right: 2px solid #b8860b !important;
+}
+[data-theme="steampunk"] .sessions-header {
+    background: #1a0f0a !important;
+    border-bottom: 2px solid #b8860b !important;
+}
+[data-theme="steampunk"] .sessions-header h2 {
+    color: #cd9b1d !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    font-size: 0.75rem !important;
+    font-family: 'Georgia', serif !important;
+}
+[data-theme="steampunk"] .session-item { color: #e8d5a3 !important; border-bottom: 1px solid #3d2a14 !important; }
+[data-theme="steampunk"] .session-item:hover { background: #3d2a14 !important; color: #f5e6c8 !important; }
+[data-theme="steampunk"] .session-item.active { background: #b8860b !important; color: #1a0f0a !important; }
+[data-theme="steampunk"] .session-item-text { color: #e8d5a3 !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .session-item:hover .session-item-text { color: #f5e6c8 !important; }
+[data-theme="steampunk"] .session-item.active .session-item-text { color: #1a0f0a !important; font-weight: 700 !important; }
+[data-theme="steampunk"] .session-menu-btn { color: #7a5c2e !important; }
+[data-theme="steampunk"] .session-menu-btn:hover { background: rgba(184,134,11,0.2) !important; color: #cd9b1d !important; }
+[data-theme="steampunk"] .session-item.active .session-menu-btn { color: #1a0f0a !important; }
+[data-theme="steampunk"] .session-item.active .session-menu-btn:hover { background: rgba(0,0,0,0.2) !important; }
+[data-theme="steampunk"] .session-submenu { background: #2c1e0f !important; border: 1px solid #b8860b !important; box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important; }
+[data-theme="steampunk"] .session-submenu-item { color: #e8d5a3 !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .session-submenu-item:hover { background: rgba(184,134,11,0.2) !important; color: #cd9b1d !important; }
+[data-theme="steampunk"] .session-submenu-item.delete { color: #cd4400 !important; }
+[data-theme="steampunk"] #sessionSearch { background: #1a0f0a !important; border: 1px solid #5c3a1e !important; color: #e8d5a3 !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] #sessionSearch::placeholder { color: #5c3a1e !important; font-style: italic; }
+[data-theme="steampunk"] .new-session-btn { background: #b8860b !important; color: #1a0f0a !important; border: none !important; font-weight: 700 !important; font-size: 1.2rem !important; }
+[data-theme="steampunk"] .new-session-btn:hover { background: #cd9b1d !important; }
+[data-theme="steampunk"] .session-close-btn { background: transparent !important; color: #7a5c2e !important; border: 1px solid #5c3a1e !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; }
+[data-theme="steampunk"] .session-close-btn:hover { background: #b8860b !important; color: #1a0f0a !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .session-select-btn { color: #7a5c2e !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .session-select-btn:hover { color: #cd9b1d !important; }
+[data-theme="steampunk"] .sel-all-label { color: #e8d5a3 !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .session-edit-input { background: #fdf6e3 !important; border: 1px solid #b8860b !important; color: #2c1e0f !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .session-edit-input:focus { border-color: #cd9b1d !important; }
+
+/* ── Chat ── */
+[data-theme="steampunk"] #chatContainer,
+[data-theme="steampunk"] #chat { background: #f5e6c8 !important; }
+[data-theme="steampunk"] .user {
+    background: #3d2a14 !important;
+    color: #e8d5a3 !important;
+    border: 1px solid #b8860b !important;
+    border-radius: 2px !important;
+}
+[data-theme="steampunk"] .assistant {
+    background: #ede0c4 !important;
+    color: #2c1e0f !important;
+    border: 1px solid #c8a96e !important;
+    border-left: 3px solid #b8860b !important;
+    border-radius: 2px !important;
+    font-family: 'Georgia', serif !important;
+}
+
+/* ── Input area ── */
+[data-theme="steampunk"] #inputArea { background: #2c1e0f !important; border-top: 2px solid #b8860b !important; }
+[data-theme="steampunk"] #input { background: #fdf6e3 !important; color: #2c1e0f !important; border: 1px solid #b8860b !important; border-radius: 2px !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] #input::placeholder { color: #a08050 !important; font-style: italic; }
+[data-theme="steampunk"] #sendBtn {
+    background: #b8860b !important; color: #1a0f0a !important;
+    border: 1px solid #cd9b1d !important; border-radius: 2px !important;
+    font-family: 'Georgia', serif !important; font-weight: 700 !important;
+    letter-spacing: 0.06em !important; text-transform: uppercase !important;
+    font-size: 0.78rem !important;
+}
+[data-theme="steampunk"] #sendBtn:hover { background: #cd9b1d !important; box-shadow: 0 0 8px rgba(184,134,11,0.5) !important; }
+[data-theme="steampunk"] #stopBtn { background: transparent !important; color: #7a5c2e !important; border: 1px solid #5c3a1e !important; border-radius: 2px !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; }
+[data-theme="steampunk"] #stopBtn:hover { background: #3d2a14 !important; color: #cd9b1d !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] #status { color: #7a5c2e !important; font-style: italic !important; font-family: 'Georgia', serif !important; }
+
+/* ── Theme button & dropdown ── */
+[data-theme="steampunk"] #themeBtn { background: #2c1e0f !important; border: 1px solid #5c3a1e !important; border-radius: 2px !important; }
+[data-theme="steampunk"] #themeBtn:hover { background: #3d2a14 !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .theme-swatch { border-color: rgba(184,134,11,0.4) !important; }
+[data-theme="steampunk"] #themeDropdown { background: #2c1e0f !important; border: 1px solid #b8860b !important; box-shadow: 0 4px 16px rgba(0,0,0,0.6) !important; }
+[data-theme="steampunk"] .theme-option { color: #e8d5a3 !important; font-family: 'Georgia', serif !important; font-style: italic; }
+[data-theme="steampunk"] .theme-option:hover { background: rgba(184,134,11,0.2) !important; color: #cd9b1d !important; }
+[data-theme="steampunk"] .theme-option.active { background: rgba(184,134,11,0.15) !important; color: #cd9b1d !important; }
+[data-theme="steampunk"] .theme-option .check { color: #b8860b !important; }
+
+/* ── Prompt navigator ── */
+[data-theme="steampunk"] #promptNavigator { background: #2c1e0f !important; border-top: 2px solid #b8860b !important; }
+[data-theme="steampunk"] #promptNavHeader { color: #7a5c2e !important; font-family: 'Georgia', serif !important; font-style: italic; }
+[data-theme="steampunk"] #promptNavHeader:hover { color: #cd9b1d !important; background: #3d2a14 !important; }
+[data-theme="steampunk"] #promptNavLabel { font-size: 0 !important; color: transparent !important; }
+[data-theme="steampunk"] #promptNavLabel::after { content: "Dispatches"; font-size: 0.8rem; color: #7a5c2e; font-family: 'Georgia', serif; font-style: italic; }
+[data-theme="steampunk"] .prompt-nav-count { background: rgba(184,134,11,0.25) !important; color: #cd9b1d !important; }
+[data-theme="steampunk"] .prompt-nav-item { color: #c8a96e !important; font-family: 'Georgia', serif !important; font-style: italic; }
+[data-theme="steampunk"] .prompt-nav-item:hover { background: #3d2a14 !important; color: #e8d5a3 !important; }
+[data-theme="steampunk"] .prompt-nav-num { color: #5c3a1e !important; }
+[data-theme="steampunk"] .prompt-nav-item.nav-hover-active { background: #3d2a14 !important; color: #cd9b1d !important; border-left: 2px solid #b8860b !important; }
+
+/* ── Log panel ── */
+[data-theme="steampunk"] #logPanel { background: #160c05 !important; border-left: 2px solid #b8860b !important; }
+[data-theme="steampunk"] #logHeader { background: #1a0f0a !important; border-bottom: 2px solid #b8860b !important; }
+[data-theme="steampunk"] #logHeader h2 { color: transparent !important; font-size: 0 !important; }
+[data-theme="steampunk"] #logHeader h2::after { content: "Transmission Log"; color: #cd9b1d; font-family: 'Georgia', serif; letter-spacing: 0.1em; font-size: 0.9rem; text-transform: uppercase; }
+[data-theme="steampunk"] #logFilters { background: #1a0f0a !important; border-bottom: 1px solid #3d2a14 !important; }
+[data-theme="steampunk"] #logContainer { background: #160c05 !important; }
+[data-theme="steampunk"] .log-message { color: #c8a96e !important; font-family: 'Courier New', monospace !important; font-size: 0.8rem !important; }
+[data-theme="steampunk"] .log-timestamp { color: #5c3a1e !important; }
+[data-theme="steampunk"] .log-entry:hover { background: rgba(184,134,11,0.05) !important; }
+[data-theme="steampunk"] .log-entry.USER { border-left-color: #b8860b !important; }
+[data-theme="steampunk"] .log-entry.ERROR { border-left-color: #8b2500 !important; background: rgba(139,37,0,0.08) !important; }
+[data-theme="steampunk"] .log-entry.WARNING { border-left-color: #cd6600 !important; }
+[data-theme="steampunk"] .log-level.USER { color: #b8860b !important; }
+[data-theme="steampunk"] .log-level.ASSISTANT { color: #7a5c2e !important; }
+[data-theme="steampunk"] .log-level.INFO { color: #5c3a1e !important; }
+[data-theme="steampunk"] .log-level.WARNING { color: #cd6600 !important; }
+[data-theme="steampunk"] .log-level.ERROR { color: #8b2500 !important; }
+[data-theme="steampunk"] .log-level.DEBUG { color: #3d2a14 !important; }
+[data-theme="steampunk"] .filter-btn { background: #2c1e0f !important; color: #7a5c2e !important; border: 1px solid #3d2a14 !important; font-family: 'Georgia', serif !important; font-size: 0.72rem !important; font-style: italic; }
+[data-theme="steampunk"] .filter-btn.active { color: #cd9b1d !important; background: #3d2a14 !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .log-btn { background: #2c1e0f !important; color: #7a5c2e !important; border: 1px solid #3d2a14 !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; font-style: italic; }
+[data-theme="steampunk"] .log-btn:hover { background: #b8860b !important; color: #1a0f0a !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .log-btn.danger:hover { background: #8b2500 !important; border-color: #8b2500 !important; color: #f5e6c8 !important; }
+[data-theme="steampunk"] .log-status-indicator { background: #5c3a1e; }
+[data-theme="steampunk"] .log-status-indicator.connected { background: #b8860b; box-shadow: 0 0 6px rgba(184,134,11,0.6); }
+
+/* ── System monitor ── */
+[data-theme="steampunk"] #systemMonitor { background: #160c05 !important; border-left: 2px solid #b8860b !important; }
+[data-theme="steampunk"] .monitor-header { background: #1a0f0a !important; border-bottom: 2px solid #b8860b !important; }
+[data-theme="steampunk"] .monitor-header h2 { color: transparent !important; font-size: 0 !important; }
+[data-theme="steampunk"] .monitor-header h2::after { content: "Engine Room"; color: #cd9b1d; font-family: 'Georgia', serif; letter-spacing: 0.1em; font-size: 0.9rem; text-transform: uppercase; }
+[data-theme="steampunk"] .monitor-btn { background: transparent !important; color: #7a5c2e !important; border: 1px solid #3d2a14 !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; font-style: italic; }
+[data-theme="steampunk"] .monitor-btn:hover { background: #b8860b !important; color: #1a0f0a !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .stat-group { background: #2c1e0f !important; border: 1px solid #3d2a14 !important; border-top: 2px solid #b8860b !important; border-radius: 2px !important; }
+[data-theme="steampunk"] .stat-label { color: #7a5c2e !important; font-family: 'Georgia', serif !important; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.72rem !important; font-style: italic; }
+[data-theme="steampunk"] .stat-value { color: #cd9b1d !important; font-family: 'Courier New', monospace !important; }
+[data-theme="steampunk"] .stat-unit { color: #7a5c2e !important; }
+[data-theme="steampunk"] .stat-secondary { color: #5c3a1e !important; font-family: 'Courier New', monospace !important; }
+[data-theme="steampunk"] .progress-bar { background: #1a0f0a !important; border: 1px solid #3d2a14 !important; border-radius: 1px !important; }
+[data-theme="steampunk"] .progress-fill { background: linear-gradient(90deg, #5c3a1e, #b8860b) !important; border-radius: 1px !important; }
+[data-theme="steampunk"] .progress-fill.high { background: linear-gradient(90deg, #8b2500, #cd6600) !important; }
+[data-theme="steampunk"] .progress-fill.critical { background: #8b2500 !important; }
+
+/* ── Tools panel ── */
+[data-theme="steampunk"] #toolsPanel { background: #fdf6e3 !important; border-left: 2px solid #b8860b !important; }
+[data-theme="steampunk"] #toolsHeader { background: #1a0f0a !important; border-bottom: 2px solid #b8860b !important; }
+[data-theme="steampunk"] #toolsHeader h2 { color: transparent !important; font-size: 0 !important; }
+[data-theme="steampunk"] #toolsHeader h2::after { content: "Apparatus"; color: #cd9b1d; font-family: 'Georgia', serif; letter-spacing: 0.1em; font-size: 0.9rem; text-transform: uppercase; }
+[data-theme="steampunk"] .tools-btn { background: transparent !important; color: #7a5c2e !important; border: 1px solid #c8a96e !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; font-style: italic; }
+[data-theme="steampunk"] .tools-btn:hover { background: #b8860b !important; color: #1a0f0a !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .tools-category-header { background: #f5e6c8 !important; color: #7a5c2e !important; border-bottom: 1px solid #c8a96e !important; font-family: 'Georgia', serif !important; text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.72rem !important; font-style: italic; }
+[data-theme="steampunk"] .tools-category-header:hover { background: #ede0c4 !important; }
+[data-theme="steampunk"] .tool-item { background: #fdf6e3 !important; border-bottom: 1px solid #ede0c4 !important; }
+[data-theme="steampunk"] .tool-item:hover { background: #f5e6c8 !important; border-left: 3px solid #b8860b !important; }
+[data-theme="steampunk"] .tool-item-name { color: #2c1e0f !important; font-family: 'Georgia', serif !important; font-weight: 600 !important; }
+[data-theme="steampunk"] .tool-item-desc { color: #7a5c2e !important; font-style: italic !important; }
+[data-theme="steampunk"] .tool-param { background: #ede0c4 !important; color: #5c3a1e !important; border: 1px solid #c8a96e !important; font-family: 'Courier New', monospace !important; font-size: 0.75rem !important; border-radius: 2px !important; }
+[data-theme="steampunk"] .tool-fav-btn { color: #c8a96e !important; }
+[data-theme="steampunk"] .tool-fav-btn:hover,
+[data-theme="steampunk"] .tool-fav-btn.active { color: #b8860b !important; }
+
+/* ── Modal ── */
+[data-theme="steampunk"] .mcp-modal-dialog { background: #fdf6e3 !important; border: 2px solid #b8860b !important; box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; border-radius: 2px !important; }
+[data-theme="steampunk"] .mcp-modal-header { background: #1a0f0a !important; border-bottom: 2px solid #b8860b !important; }
+[data-theme="steampunk"] .mcp-modal-title { color: #cd9b1d !important; font-family: 'Georgia', serif !important; letter-spacing: 0.08em; }
+[data-theme="steampunk"] .mcp-modal-body { color: #2c1e0f !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .mcp-modal-footer { background: #f5e6c8 !important; border-top: 1px solid #c8a96e !important; }
+[data-theme="steampunk"] .mcp-modal-btn-primary { background: #b8860b !important; color: #1a0f0a !important; border: 1px solid #cd9b1d !important; font-family: 'Georgia', serif !important; font-weight: 700 !important; }
+[data-theme="steampunk"] .mcp-modal-btn-primary:hover { background: #cd9b1d !important; }
+[data-theme="steampunk"] .mcp-modal-btn-secondary { background: transparent !important; color: #7a5c2e !important; border: 1px solid #c8a96e !important; font-family: 'Georgia', serif !important; font-style: italic; }
+[data-theme="steampunk"] .mcp-modal-btn-secondary:hover { background: #3d2a14 !important; color: #cd9b1d !important; border-color: #b8860b !important; }
+
+/* ── Dashboard ── */
+[data-theme="steampunk"] .metric-card { background: #fdf6e3 !important; border: 1px solid #c8a96e !important; border-top: 3px solid #b8860b !important; border-radius: 2px !important; box-shadow: 2px 2px 8px rgba(0,0,0,0.2) !important; }
+[data-theme="steampunk"] .metric-card:hover { box-shadow: 3px 3px 12px rgba(184,134,11,0.25) !important; }
+[data-theme="steampunk"] .metric-value { color: #b8860b !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .metric-title { color: #5c3a1e !important; font-family: 'Georgia', serif !important; letter-spacing: 0.08em; }
+[data-theme="steampunk"] .metric-subtitle { color: #7a5c2e !important; font-style: italic !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .chart-container { background: #fdf6e3 !important; border: 1px solid #c8a96e !important; border-radius: 2px !important; }
+[data-theme="steampunk"] .chart-title { color: #2c1e0f !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .tool-card { background: #f5e6c8 !important; border: 1px solid #c8a96e !important; border-left: 3px solid #b8860b !important; border-radius: 2px !important; }
+[data-theme="steampunk"] .tool-name { color: #2c1e0f !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .tool-stat-label { color: #7a5c2e !important; font-style: italic; }
+[data-theme="steampunk"] .tool-stat-value { color: #5c3a1e !important; }
+[data-theme="steampunk"] .status-bar { background: #fdf6e3 !important; border: 1px solid #c8a96e !important; }
+[data-theme="steampunk"] .status-indicator.connected { background: #b8860b !important; box-shadow: 0 0 6px rgba(184,134,11,0.5) !important; }
+[data-theme="steampunk"] .status-text { color: #5c3a1e !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .status-note { color: #7a5c2e !important; font-style: italic !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .reset-btn { background: transparent !important; border: 1px solid #c8a96e !important; color: #7a5c2e !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; font-style: italic; }
+[data-theme="steampunk"] .reset-btn:hover { background: #b8860b !important; color: #1a0f0a !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] #backBtn { background: transparent !important; color: #cd9b1d !important; border: 1px solid #5c3a1e !important; font-family: 'Georgia', serif !important; font-size: 0.78rem !important; font-style: italic; }
+[data-theme="steampunk"] #backBtn:hover { background: #b8860b !important; color: #1a0f0a !important; border-color: #b8860b !important; }
+[data-theme="steampunk"] .no-data { color: #7a5c2e !important; font-style: italic !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .histogram-title { color: #7a5c2e !important; font-style: italic !important; }
+[data-theme="steampunk"] .histogram-bar-label { color: #7a5c2e !important; }
+[data-theme="steampunk"] .histogram-bar-count { color: #5c3a1e !important; }
+[data-theme="steampunk"] .failure-kind-card { background: #f5e6c8 !important; border: 1px solid #c8a96e !important; }
+[data-theme="steampunk"] .failure-kind-label { color: #5c3a1e !important; font-family: 'Georgia', serif !important; }
+[data-theme="steampunk"] .failure-kind-pct { color: #7a5c2e !important; font-style: italic !important; }
+
+/* ── Histogram bars — green through brass to burnt red ── */
+[data-theme="steampunk"] .histogram-bar-group:nth-child(1) .histogram-bar { background: #4a6741 !important; }
+[data-theme="steampunk"] .histogram-bar-group:nth-child(2) .histogram-bar { background: #7a5c2e !important; }
+[data-theme="steampunk"] .histogram-bar-group:nth-child(3) .histogram-bar { background: #b8860b !important; }
+[data-theme="steampunk"] .histogram-bar-group:nth-child(4) .histogram-bar { background: #cd6600 !important; }
+[data-theme="steampunk"] .histogram-bar-group:nth-child(5) .histogram-bar { background: #8b2500 !important; }
+[data-theme="steampunk"] .mini-bar-group:nth-child(1) .mini-bar { background: #4a6741 !important; }
+[data-theme="steampunk"] .mini-bar-group:nth-child(2) .mini-bar { background: #7a5c2e !important; }
+[data-theme="steampunk"] .mini-bar-group:nth-child(3) .mini-bar { background: #b8860b !important; }
+[data-theme="steampunk"] .mini-bar-group:nth-child(4) .mini-bar { background: #cd6600 !important; }
+[data-theme="steampunk"] .mini-bar-group:nth-child(5) .mini-bar { background: #8b2500 !important; }
+
+/* ── Scrollbars ── */
+[data-theme="steampunk"] ::-webkit-scrollbar-track { background: #1a0f0a !important; }
+[data-theme="steampunk"] ::-webkit-scrollbar-thumb { background: #5c3a1e !important; border-radius: 1px !important; }
+[data-theme="steampunk"] ::-webkit-scrollbar-thumb:hover { background: #b8860b !important; }
+
+/* ── Steampunk: hide/replace all emojis ── */
+
+/* Dashboard metric & chart icons — hide entirely */
+[data-theme="steampunk"] .metric-icon,
+[data-theme="steampunk"] .chart-icon { display: none !important; }
+
+/* Dashboard h1 — no emoji but style it */
+[data-theme="steampunk"] #header h1 { font-family: 'Georgia', serif !important; }
+
+/* ============================================================
+   STEAMPUNK: DECORATIVE DESIGN ELEMENTS
+   Ornaments, dividers, badges, gear cog, quill — all SVG,
+   all scoped to [data-theme="steampunk"] only.
+   ============================================================ */
+
+/* ── Header h1: flanking diamond ornaments ── */
+/* Inspired by the League of Gentlemen ◆ ─── ◆ motif */
+[data-theme="steampunk"] #header h1 {
+    position: relative;
+    display: inline-block;
+}
+[data-theme="steampunk"] #header h1::before,
+[data-theme="steampunk"] #header h1::after {
+    content: '';
+    display: inline-block;
+    width: 32px;
+    height: 12px;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 12'><line x1='0' y1='6' x2='32' y2='6' stroke='%23b8860b' stroke-width='0.8'/><polygon points='14,6 18,2 22,6 18,10' fill='%23b8860b'/><line x1='0' y1='3.5' x2='0' y2='8.5' stroke='%23b8860b' stroke-width='1'/></svg>")
+        center/32px 12px no-repeat;
+    vertical-align: middle;
+    opacity: 0.8;
+}
+[data-theme="steampunk"] #header h1::before { margin-right: 8px; transform: scaleX(-1); }
+[data-theme="steampunk"] #header h1::after  { margin-left: 8px; }
+
+/* ── Sessions header: ornamental rule below title ── */
+/* Thin chain-link divider like the band ornaments */
+[data-theme="steampunk"] .sessions-header {
+    position: relative;
+}
+[data-theme="steampunk"] .sessions-header::after {
+    content: '';
+    display: block;
+    position: absolute;
+    bottom: -1px;
+    left: 0; right: 0;
+    height: 4px;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 4'><rect x='0' y='1' width='3' height='2' rx='1' fill='none' stroke='%23b8860b' stroke-width='0.5'/><rect x='5' y='1' width='3' height='2' rx='1' fill='none' stroke='%23b8860b' stroke-width='0.5'/><line x1='3' y1='2' x2='5' y2='2' stroke='%23b8860b' stroke-width='0.5'/></svg>")
+        repeat-x center/8px 4px;
+    opacity: 0.6;
+    z-index: 1;
+}
+
+/* ── Input area top border: gear-chain decorative rule ── */
+/* Repeating cog-tooth pattern like the band dividers */
+[data-theme="steampunk"] #inputArea {
+    position: relative;
+}
+[data-theme="steampunk"] #inputArea::before {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'><rect x='0' y='2' width='12' height='2' fill='%235c3a1e'/><rect x='1' y='0' width='2' height='2' fill='%23b8860b'/><rect x='5' y='0' width='2' height='2' fill='%23b8860b'/><rect x='9' y='0' width='2' height='2' fill='%23b8860b'/><rect x='1' y='4' width='2' height='2' fill='%23b8860b'/><rect x='5' y='4' width='2' height='2' fill='%23b8860b'/><rect x='9' y='4' width='2' height='2' fill='%23b8860b'/></svg>")
+        repeat-x top/12px 6px;
+    z-index: 1;
+}
+
+/* ── Session item hover: pointing arrow ornament ── */
+/* Small compass/arrow like the Argonauts directional marker */
+[data-theme="steampunk"] .session-item {
+    position: relative;
+}
+[data-theme="steampunk"] .session-item::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 10px;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 10'><polygon points='0,5 5,0 8,5 5,10' fill='none' stroke='%23b8860b' stroke-width='0.8'/><circle cx='4' cy='5' r='1' fill='%23b8860b'/></svg>")
+        center/8px 10px no-repeat;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+[data-theme="steampunk"] .session-item:hover::before { opacity: 1; }
+[data-theme="steampunk"] .session-item.active::before {
+    opacity: 1;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 10'><polygon points='0,5 5,0 8,5 5,10' fill='%231a0f0a' stroke='%231a0f0a' stroke-width='0.5'/><circle cx='4' cy='5' r='1' fill='%231a0f0a'/></svg>")
+        center/8px 10px no-repeat;
+}
+
+/* ── New session + button: gear cog ── */
+[data-theme="steampunk"] .new-session-btn {
+    font-size: 0 !important;
+    position: relative;
+}
+[data-theme="steampunk"] .new-session-btn::after {
+    content: '';
+    display: block;
+    width: 20px;
+    height: 20px;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><circle cx='10' cy='10' r='3.5' fill='none' stroke='%231a0f0a' stroke-width='1.2'/><circle cx='10' cy='10' r='6' fill='none' stroke='%231a0f0a' stroke-width='0.8'/><g fill='%231a0f0a'><rect x='9' y='1' width='2' height='3' rx='0.5'/><rect x='9' y='16' width='2' height='3' rx='0.5'/><rect x='1' y='9' width='3' height='2' rx='0.5'/><rect x='16' y='9' width='3' height='2' rx='0.5'/><rect x='3.2' y='3.2' width='2' height='3' rx='0.5' transform='rotate(45 4.2 4.7)'/><rect x='13.5' y='13.5' width='2' height='3' rx='0.5' transform='rotate(45 14.5 15)'/><rect x='13.5' y='3.2' width='2' height='3' rx='0.5' transform='rotate(-45 14.5 4.7)'/><rect x='3.2' y='13.5' width='2' height='3' rx='0.5' transform='rotate(-45 4.2 15)'/></g></svg>")
+        center/20px 20px no-repeat;
+    pointer-events: none;
+}
+
+/* ── Prompt navigator header: quill ornament ── */
+/* Referencing the Graham & Madson quill pen */
+[data-theme="steampunk"] #promptNavHeader::before {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 16px;
+    margin-right: 6px;
+    vertical-align: middle;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 16'><path d='M12 1 C8 2 4 6 3 10 L2 15 L5 12 C6 9 8 6 12 3Z' fill='none' stroke='%237a5c2e' stroke-width='0.8'/><path d='M12 1 C10 4 8 7 6 11' fill='none' stroke='%23b8860b' stroke-width='0.6'/><line x1='3' y1='10' x2='2' y2='15' stroke='%237a5c2e' stroke-width='0.8' stroke-linecap='round'/></svg>")
+        center/14px 16px no-repeat;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+/* ── Send button: lightning bolt prefix ── */
+/* Small engraved bolt — industrial power motif */
+[data-theme="steampunk"] #sendBtn {
+    position: relative;
+    padding-left: 2rem !important;
+}
+[data-theme="steampunk"] #sendBtn::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 14px;
+    background:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 14'><polygon points='7,0 2,7 5,7 3,14 8,6 5,6' fill='%231a0f0a' stroke='%231a0f0a' stroke-width='0.3'/></svg>")
+        center/10px 14px no-repeat;
+    pointer-events: none;
+}
+
+/* ── Chat container: parchment watermark gear ── */
+/* Subtle large gear watermark in background, like the decorative
+   elements sheet cogs — barely visible, purely atmospheric */
+[data-theme="steampunk"] #chat {
+    background-image:
+        url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><circle cx='60' cy='60' r='30' fill='none' stroke='%23b8860b' stroke-width='0.8' opacity='0.07'/><circle cx='60' cy='60' r='20' fill='none' stroke='%23b8860b' stroke-width='0.5' opacity='0.07'/><circle cx='60' cy='60' r='8' fill='none' stroke='%23b8860b' stroke-width='0.8' opacity='0.07'/><g fill='none' stroke='%23b8860b' stroke-width='1.5' opacity='0.06'><line x1='60' y1='24' x2='60' y2='30'/><line x1='60' y1='90' x2='60' y2='96'/><line x1='24' y1='60' x2='30' y2='60'/><line x1='90' y1='60' x2='96' y2='60'/><line x1='36.5' y1='36.5' x2='40.7' y2='40.7'/><line x1='79.3' y1='79.3' x2='83.5' y2='83.5'/><line x1='83.5' y1='36.5' x2='79.3' y2='40.7'/><line x1='40.7' y1='79.3' x2='36.5' y2='83.5'/></g></svg>") !important;
+    background-repeat: repeat !important;
+    background-size: 120px 120px !important;
+    background-color: #f5e6c8 !important;
+}
+
+/* ── Scrollbar: brass rail ── */
+[data-theme="steampunk"] ::-webkit-scrollbar { width: 6px !important; }
+[data-theme="steampunk"] ::-webkit-scrollbar-track {
+    background: #1a0f0a !important;
+    border-left: 1px solid #3d2a14 !important;
+}
+[data-theme="steampunk"] ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #cd9b1d, #b8860b, #8b6800) !important;
+    border-radius: 0 !important;
+}
+[data-theme="steampunk"] ::-webkit-scrollbar-thumb:hover {
+    background: #cd9b1d !important;
 }
