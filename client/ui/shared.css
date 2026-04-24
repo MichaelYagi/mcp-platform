@@ -5210,10 +5210,14 @@ body {
 [data-theme="argyle"] #chatContainer {
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%231a3a8f' fill-opacity='0.6'/><polygon points='30,8 52,30 30,52 8,30' fill='%232563eb' fill-opacity='0.3'/><line x1='0' y1='0' x2='60' y2='60' stroke='%2393c5fd' stroke-width='1' opacity='0.35'/><line x1='60' y1='0' x2='0' y2='60' stroke='%2393c5fd' stroke-width='1' opacity='0.35'/></svg>") #0d2b6e !important;
     background-size: 60px 60px !important;
+    background-attachment: fixed !important;
 }
 [data-theme="argyle"] #chat {
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.18'/><polygon points='30,10 50,30 30,50 10,30' fill='%2393c5fd' fill-opacity='0.22'/><line x1='0' y1='0' x2='60' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/><line x1='60' y1='0' x2='0' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/></svg>") #dbeafe !important;
     background-size: 60px 60px !important;
+    border: 1px solid #4a90d9 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
 }
 [data-theme="argyle"] .user {
     background-color: #1a3a8f !important;
@@ -5236,7 +5240,8 @@ body {
 [data-theme="argyle"] #inputArea {
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%231a3a8f' fill-opacity='0.6'/><polygon points='30,8 52,30 30,52 8,30' fill='%232563eb' fill-opacity='0.3'/><line x1='0' y1='0' x2='60' y2='60' stroke='%2393c5fd' stroke-width='1' opacity='0.35'/><line x1='60' y1='0' x2='0' y2='60' stroke='%2393c5fd' stroke-width='1' opacity='0.35'/></svg>") #0d2b6e !important;
     background-size: 60px 60px !important;
-    border-top: 2px solid #4a90d9 !important;
+    background-attachment: fixed !important;
+    border-top: none !important;
 }
 
 [data-theme="argyle"] #input { background: #f8faff !important; color: #0d2b6e !important; border: 1px solid #4a90d9 !important; border-radius: 6px !important; }
