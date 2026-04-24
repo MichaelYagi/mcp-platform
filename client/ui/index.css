@@ -991,9 +991,20 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     #headerLeft { justify-content: flex-start; position: relative; }
     #header h1  { font-size: 1.1rem; position: absolute; left: 0; right: 0; text-align: center; pointer-events: none; }
 
-    #topBar { flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
-    #topBar button { font-size: 0.85rem; padding: 0.5rem 0.75rem; }
+    #topBar { flex-wrap: wrap; gap: 0.25rem; justify-content: center; }
+    #topBar button, #topBar a { font-size: 0.78rem; padding: 0.4rem 0.5rem; white-space: nowrap; }
     #hamburgerBtn  { width: 44px; height: 44px; }
+    /* Remove emojis on default themes to fit on one line — special themes handle their own buttons */
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #toolsToggle,
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #monitorToggle,
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #logToggle,
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #dashboardBtn {
+        font-size: 0 !important;
+    }
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #toolsToggle::after   { content: attr(data-label); font-size: 0.78rem; color: inherit; }
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #monitorToggle::after { content: attr(data-label); font-size: 0.78rem; color: inherit; }
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #logToggle::after     { content: attr(data-label); font-size: 0.78rem; color: inherit; }
+    :not([data-theme="matrix"]):not([data-theme="te"]):not([data-theme="dragonball"]):not([data-theme="tron"]) #dashboardBtn::after  { content: attr(data-label); font-size: 0.78rem; color: inherit; }
 
     #modelSelect { font-size: 16px; max-width: 100%; }
     .mode-toggle-container { order: -1; width: 100%; justify-content: center; }
