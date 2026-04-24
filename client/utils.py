@@ -93,10 +93,19 @@ def start_http_server(port=9000):
 
     # Resolve private IP before starting thread so caller can use it
     try:
-        _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        _s.connect(("8.8.8.8", 80))
-        private_ip = _s.getsockname()[0]
-        _s.close()
+        # Find the LAN IP (prefer 192.168.x.x over WSL2 172.x.x.x)
+        private_ip = "127.0.0.1"
+        for iface_ip in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = iface_ip[4][0]
+            if ip.startswith("192.168."):
+                private_ip = ip
+                break
+        # Fallback to UDP trick if no 192.168 found
+        if private_ip == "127.0.0.1":
+            _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            _s.connect(("8.8.8.8", 80))
+            private_ip = _s.getsockname()[0]
+            _s.close()
     except Exception:
         private_ip = "127.0.0.1"
 
