@@ -700,8 +700,8 @@ body {
     --btn-logs-hover:   #16356f;
     --btn-monitor:      #6a2ca0;
     --btn-monitor-hover:#572383;
-    --btn-dashboard:    #e76a24;
-    --btn-dashboard-hover:#c85a1f;
+    --btn-dashboard:    #cc0000;
+    --btn-dashboard-hover:#aa0000;
     --btn-newsession:   #ff0000;
     --btn-newsession-hover:#cc0000;
 
@@ -3315,7 +3315,7 @@ body {
 /* ── TE: Input area — paper feel ── */
 [data-theme="te"] #inputRow {
     border-radius: 0 !important;
-    border: none !important;
+    border: 1px solid #aaa090 !important;
 }
 [data-theme="te"] #input {
     color: #1a1a1a !important;
@@ -4269,8 +4269,11 @@ body {
 
 /* ── Tron: input area ── */
 [data-theme="tron"] #inputRow {
-    border: none !important;
-    box-shadow: none !important;
+    border: 1px solid rgba(0,238,255,0.4) !important;
+    box-shadow:
+        0 0 8px rgba(0,238,255,0.2),
+        0 0 20px rgba(0,238,255,0.08),
+        inset 0 0 10px rgba(0,238,255,0.04) !important;
 }
 [data-theme="tron"] #input {
     color: #c8f8ff !important;
