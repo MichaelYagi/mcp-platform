@@ -5176,11 +5176,12 @@ body {
 }
 [data-theme="argyle"] .sessions-header h2 { color: #ffffff !important; letter-spacing: 0.08em !important; font-size: 0.85rem !important; }
 [data-theme="argyle"] .session-item { color: #1a3a8f !important; border-bottom: 1px solid #93c5fd !important; background: #f0f5ff !important; }
-[data-theme="argyle"] .session-item:hover { background: #1a3a8f !important; }
+[data-theme="argyle"] .session-item:hover { background: #1a3a8f !important; border-bottom: none !important; }
 [data-theme="argyle"] .session-item.active {
     background-color: #2563eb !important;
     background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><polygon points='10,0 20,10 10,20 0,10' fill='none' stroke='%23ffffff' stroke-width='0.4' opacity='0.2'/></svg>") !important;
     background-size: 20px 20px !important;
+    border-bottom: none !important;
 }
 [data-theme="argyle"] .session-item-text { color: #1a3a8f !important; }
 [data-theme="argyle"] .session-item:hover .session-item-text { color: #ffffff !important; }
