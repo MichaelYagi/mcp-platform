@@ -5244,7 +5244,7 @@ body {
 
 [data-theme="argyle"] #input { background: #f8faff !important; color: #0d2b6e !important; border: 1px solid #4a90d9 !important; border-radius: 6px !important; }
 [data-theme="argyle"] #input::placeholder { color: #93c5fd !important; }
-[data-theme="argyle"] #sendBtn { background: #2563eb !important; color: #ffffff !important; border: 1px solid #1d4ed8 !important; border-radius: 6px !important; font-weight: 600 !important; font-size: 0.78rem !important; box-shadow: 0 2px 4px rgba(37,99,235,0.3) !important; }
+[data-theme="argyle"] #sendBtn { background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.25'/><polygon points='30,10 50,30 30,50 10,30' fill='%234a90d9' fill-opacity='0.2'/><line x1='0' y1='0' x2='60' y2='60' stroke='%234a90d9' stroke-width='0.8' opacity='0.4'/><line x1='60' y1='0' x2='0' y2='60' stroke='%234a90d9' stroke-width='0.8' opacity='0.4'/></svg>") #2563eb !important; background-size: 60px 60px !important; background-attachment: fixed !important; color: #ffffff !important; border: 1px solid #1d4ed8 !important; border-radius: 6px !important; font-weight: 600 !important; font-size: 0.78rem !important; box-shadow: 0 2px 4px rgba(37,99,235,0.3) !important; }
 [data-theme="argyle"] #sendBtn:hover { background: #1d4ed8 !important; box-shadow: 0 3px 8px rgba(37,99,235,0.4) !important; }
 [data-theme="argyle"] #stopBtn { background: transparent !important; color: #93c5fd !important; border: 1px solid #1e3a7a !important; border-radius: 6px !important; font-size: 0.78rem !important; }
 [data-theme="argyle"] #stopBtn:hover { background: rgba(255,255,255,0.1) !important; color: #ffffff !important; border-color: #4a90d9 !important; }
@@ -5407,6 +5407,22 @@ body {
 [data-theme="argyle"] ::-webkit-scrollbar-track { background: #0a2057 !important; }
 [data-theme="argyle"] ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #1e3a7a, #2563eb, #1e3a7a) !important; border-radius: 3px !important; }
 [data-theme="argyle"] ::-webkit-scrollbar-thumb:hover { background: #4a90d9 !important; }
+/* ── Argyle: dashboard mainContainer ── */
+[data-theme="argyle"] #mainContainer {
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.18'/><polygon points='30,10 50,30 30,50 10,30' fill='%2393c5fd' fill-opacity='0.22'/><line x1='0' y1='0' x2='60' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/><line x1='60' y1='0' x2='0' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/></svg>") #dbeafe !important;
+    background-size: 60px 60px !important;
+    background-attachment: fixed !important;
+}
+
+/* ── Hide drawer borders when closed, show when open (all themes) ── */
+[data-theme] #sessionsSidebar { border-right: none !important; }
+[data-theme] #toolsPanel { border-left: none !important; }
+[data-theme] #logPanel { border-left: none !important; }
+[data-theme] #systemMonitor { border-left: none !important; }
+[data-theme] #sessionsSidebar.open { border-right: 1px solid var(--chat-border) !important; }
+[data-theme] #toolsPanel.open { border-left: 1px solid var(--chat-border) !important; }
+[data-theme] #logPanel.open { border-left: 1px solid var(--chat-border) !important; }
+[data-theme] #systemMonitor.open { border-left: 1px solid var(--chat-border) !important; }
 /* ── Argyle: dashboard mainContainer ── */
 [data-theme="argyle"] #mainContainer {
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.18'/><polygon points='30,10 50,30 30,50 10,30' fill='%2393c5fd' fill-opacity='0.22'/><line x1='0' y1='0' x2='60' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/><line x1='60' y1='0' x2='0' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/></svg>") #dbeafe !important;
