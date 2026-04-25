@@ -149,7 +149,7 @@ def analyze_code_file(file_path: str, language: str = "auto", deep_analysis: boo
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
 @tool_meta(tags=["write","code","ai"],triggers=["fix code","fix file","auto fix"],idempotent=False,example='use fix_code_file: file_path="" [auto_fix=""] [backup=""] [dry_run=""]',intent_category="code_assistant")
-def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dry_run: bool = False) -> str:
+def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dry_run: bool = True) -> str:
     """
     Automatically fix detected issues in a code file.
 
@@ -159,7 +159,8 @@ def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dr
         file_path (str, required): Path to the code file
         auto_fix (bool, optional): Apply automatic fixes (True) or just show suggestions (False)
         backup (bool, optional): Create backup before fixing (default: True, recommended)
-        dry_run (bool, optional): Show what would be fixed without actually modifying (default: False)
+        dry_run (bool, optional): Show what would be fixed without actually modifying (default: True).
+                                  Set dry_run=False to apply fixes to disk.
 
     Returns:
         JSON with:
@@ -171,12 +172,14 @@ def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dr
         - new_content: Fixed code (if dry_run=True)
 
     Example:
-        fix_code_file("buggy.py")                          # Fix with backup
-        fix_code_file("test.py", auto_fix=False)          # Just show suggestions
-        fix_code_file("script.py", dry_run=True)          # Preview changes
+        fix_code_file("buggy.py")                           # Preview fixes (default)
+        fix_code_file("buggy.py", dry_run=False)           # Apply fixes to disk
+        fix_code_file("test.py", auto_fix=False)           # Just show suggestions
+        fix_code_file("script.py", dry_run=False)          # Apply changes
 
     Safety features:
-        - Always creates backup by default
+        - Previews changes by default before writing
+        - Always creates backup by default when writing
         - Validates fixes don't break syntax
         - Logs all changes
         - Can be reverted using backup
@@ -760,6 +763,556 @@ def read_skill(skill_name: str) -> str:
         "error": f"Skill '{skill_name}' not found",
         "available_skills": available
     }, indent=2)
+
+
+def _get_ollama_llm(temperature: float = 0.1):
+    """Shared Ollama LLM factory used by inline tools."""
+    from langchain_ollama import ChatOllama
+    import os
+    MODEL_STATE_FILE = str(PROJECT_ROOT / "client" / "last_model.txt")
+    model_name = open(MODEL_STATE_FILE).read().strip() if Path(MODEL_STATE_FILE).exists() else "qwen2.5:latest"
+    return ChatOllama(
+        model=model_name,
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
+        temperature=temperature,
+    )
+
+
+@mcp.tool()
+@check_tool_enabled(category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["extend code","add to file","add function","add tool","add method","follow pattern"],idempotent=False,example='use extend_code: file_path="" description="" [write=""]',intent_category="code_assistant")
+def extend_code(file_path: str, description: str, write: bool = False) -> str:
+    """
+    Add new code to an existing file that follows its conventions and patterns.
+
+    Reads the target file, extracts its conventions (decorators, error handling,
+    imports, naming style, docstring format), then generates new code that
+    conforms to those patterns — the way a developer familiar with the codebase would.
+
+    Args:
+        file_path (str, required): Path to the file to extend
+        description (str, required): What to add — be specific (e.g. "a tool that
+                                     searches files by keyword, following the existing
+                                     @tool_meta and MCPToolError patterns")
+        write (bool, optional): Write generated code to the file (default: False).
+                                 By default shows a preview only. Set write=True to apply.
+
+    Returns:
+        JSON with:
+        - file: Target file path
+        - description: What was requested
+        - generated_code: The new code block to add
+        - insertion_point: Where in the file to insert (e.g. "before __main__ block")
+        - conventions_detected: Key patterns extracted from the file
+        - written: Whether the code was written to disk
+        - dry_run: True when write=False
+
+    Examples:
+        extend_code("servers/code_assistant/server.py",
+                    "a tool called search_in_code that greps for a pattern across files")
+        extend_code("servers/weather/server.py",
+                    "a get_forecast_weekly tool following existing @tool_meta pattern",
+                    write=True)
+
+    Use cases:
+        - Adding a new MCP tool that matches the server's decorator/error handling style
+        - Adding a method to a class that follows its naming and docstring conventions
+        - Extending a module with a new function that matches existing patterns
+    """
+    logger.info(f"[TOOL] extend_code called: {file_path} | write={write}")
+    if not file_path or not Path(file_path).exists():
+        raise MCPToolError(FailureKind.USER_ERROR, f"File not found: {file_path}",
+                           {"tool": "extend_code", "file_path": file_path})
+    if not description or not description.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "description must not be empty",
+                           {"tool": "extend_code"})
+    try:
+        code = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+        prompt = (
+            f"You are extending an existing codebase. Study the file below carefully.\n"
+            f"Extract its conventions: decorator patterns, error handling style, logging style, "
+            f"docstring format, naming conventions, and import patterns.\n\n"
+            f"Then generate NEW code that fulfills this request:\n"
+            f"  {description}\n\n"
+            f"Requirements:\n"
+            f"- Match the existing patterns exactly — decorators, error handling, logging, docstrings\n"
+            f"- Do NOT repeat or modify existing code\n"
+            f"- Return only the new code block to add, nothing else\n"
+            f"- Include a comment at the top indicating where to insert it "
+            f"(e.g. '# Insert before __main__ block' or '# Append after last @mcp.tool()')\n\n"
+            f"File: {Path(file_path).name}\n"
+            f"```\n{code[:8000]}\n```"
+        )
+
+        llm = _get_ollama_llm(temperature=0.2)
+        response = llm.invoke(prompt)
+        generated = response.content.strip()
+
+        # Strip markdown fences if present
+        if generated.startswith("```"):
+            lines = generated.split("\n")
+            generated = "\n".join(
+                l for l in lines if not l.startswith("```")
+            ).strip()
+
+        # Detect conventions for the response metadata
+        conventions = []
+        if "@tool_meta" in code:
+            conventions.append("@tool_meta decorator")
+        if "MCPToolError" in code:
+            conventions.append("MCPToolError/FailureKind error handling")
+        if "@check_tool_enabled" in code:
+            conventions.append("@check_tool_enabled decorator")
+        if "logger.info" in code:
+            conventions.append("structured logging via logger")
+        if '"""' in code:
+            conventions.append("triple-quote docstrings")
+
+        written = False
+        if write:
+            backup_path = f"{file_path}.backup"
+            import shutil
+            shutil.copy2(file_path, backup_path)
+            with open(file_path, "r", encoding="utf-8") as f:
+                existing = f.read()
+            # Insert before __main__ block if present, otherwise append
+            if 'if __name__ == "__main__":' in existing:
+                existing = existing.replace(
+                    'if __name__ == "__main__":',
+                    generated + "\n\n\nif __name__ == \"__main__\":",
+                    1
+                )
+            else:
+                existing = existing.rstrip() + "\n\n\n" + generated + "\n"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(existing)
+            written = True
+            logger.info(f"extend_code wrote to {file_path} (backup: {backup_path})")
+
+        return json.dumps({
+            "file": file_path,
+            "description": description,
+            "generated_code": generated,
+            "insertion_point": "before __main__ block" if 'if __name__ == "__main__":' in code else "end of file",
+            "conventions_detected": conventions,
+            "written": written,
+            "dry_run": not write,
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except Exception as e:
+        logger.error(f"extend_code failed: {e}", exc_info=True)
+        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"extend_code failed: {e}",
+                           {"tool": "extend_code", "file_path": file_path})
+
+
+@mcp.tool()
+@check_tool_enabled(category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["detect inconsistencies","convention drift","inconsistent patterns","check consistency","audit servers"],idempotent=True,example='use detect_inconsistencies: paths="" [category=""]',intent_category="code_assistant")
+def detect_inconsistencies(paths: str, category: str = "all") -> str:
+    """
+    Scan multiple files for convention drift and inconsistent patterns.
+
+    Unlike a linter, this reasons about intent — it understands that all files
+    are supposed to follow the same conventions and flags where they diverge.
+    Particularly useful for MCP server codebases where every server should
+    follow the same decorator, error handling, and logging patterns.
+
+    Args:
+        paths (str, required): Comma-separated list of file paths or a single
+                               directory path to scan recursively for .py files
+        category (str, optional): What to check — "all", "error_handling",
+                                  "decorators", "logging", "naming", "imports"
+                                  (default: "all")
+
+    Returns:
+        JSON with:
+        - files_scanned: Number of files analyzed
+        - inconsistencies: List of findings grouped by category
+          - category: Type of inconsistency
+          - severity: "high", "medium", "low"
+          - description: What the drift is
+          - files_affected: Which files have the issue
+          - recommendation: How to fix it
+        - summary: High-level overview
+
+    Examples:
+        detect_inconsistencies("servers/")
+        detect_inconsistencies("servers/weather/server.py,servers/plex/server.py")
+        detect_inconsistencies("servers/", category="error_handling")
+
+    Use cases:
+        - "Are all my MCP servers using MCPToolError consistently?"
+        - "Which servers are missing @tool_meta?"
+        - "Find convention drift across the codebase"
+        - "Why does this server behave differently from the others?"
+    """
+    logger.info(f"[TOOL] detect_inconsistencies called: paths={paths} category={category}")
+    if not paths or not paths.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "paths must not be empty",
+                           {"tool": "detect_inconsistencies"})
+    try:
+        # Resolve file list
+        file_list = []
+        for raw in paths.split(","):
+            p = Path(raw.strip())
+            if p.is_dir():
+                file_list.extend(sorted(p.rglob("*.py")))
+            elif p.is_file():
+                file_list.append(p)
+            else:
+                raise MCPToolError(FailureKind.USER_ERROR, f"Path not found: {p}",
+                                   {"tool": "detect_inconsistencies"})
+
+        if not file_list:
+            raise MCPToolError(FailureKind.USER_ERROR, "No Python files found at the given paths",
+                               {"tool": "detect_inconsistencies"})
+
+        # Read all files
+        file_contents = {}
+        for fp in file_list:
+            try:
+                file_contents[str(fp)] = fp.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                pass
+
+        # Build a compact summary of each file's patterns for the LLM
+        summaries = []
+        for fpath, content in file_contents.items():
+            lines = content.splitlines()
+            has_tool_meta      = "@tool_meta" in content
+            has_check_enabled  = "@check_tool_enabled" in content
+            has_mcp_tool_error = "MCPToolError" in content
+            has_failure_kind   = "FailureKind" in content
+            has_logger         = "logger." in content
+            has_bare_except    = "except:" in content
+            has_bare_raise     = bool(__import__("re").search(r"\braise\s+Exception\b", content))
+            has_json_formatter = "JsonFormatter" in content
+            tool_count         = content.count("@mcp.tool()")
+            summaries.append(
+                f"File: {fpath}\n"
+                f"  @mcp.tool() count: {tool_count}\n"
+                f"  @tool_meta: {has_tool_meta}\n"
+                f"  @check_tool_enabled: {has_check_enabled}\n"
+                f"  MCPToolError: {has_mcp_tool_error}\n"
+                f"  FailureKind: {has_failure_kind}\n"
+                f"  logger.*: {has_logger}\n"
+                f"  JsonFormatter: {has_json_formatter}\n"
+                f"  bare except: {has_bare_except}\n"
+                f"  bare raise Exception: {has_bare_raise}\n"
+            )
+
+        category_instruction = (
+            f"Focus only on '{category}' inconsistencies." if category != "all"
+            else "Check all categories: error_handling, decorators, logging, naming, imports."
+        )
+
+        prompt = (
+            f"You are auditing a Python MCP server codebase for convention drift.\n"
+            f"All files are supposed to follow the same patterns. Find where they diverge.\n"
+            f"{category_instruction}\n\n"
+            f"Here is a pattern summary for each file:\n\n"
+            + "\n".join(summaries)
+            + "\n\nReturn a JSON object with this exact structure:\n"
+            '{\n'
+            '  "inconsistencies": [\n'
+            '    {\n'
+            '      "category": "error_handling",\n'
+            '      "severity": "high",\n'
+            '      "description": "...",\n'
+            '      "files_affected": ["path/to/file.py"],\n'
+            '      "recommendation": "..."\n'
+            '    }\n'
+            '  ],\n'
+            '  "summary": "One paragraph overview of the findings."\n'
+            '}\n'
+            "Return only valid JSON, no markdown fences, no preamble."
+        )
+
+        llm = _get_ollama_llm(temperature=0.1)
+        response = llm.invoke(prompt)
+        raw = response.content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {"inconsistencies": [], "summary": raw}
+
+        parsed["files_scanned"] = len(file_contents)
+        parsed["category"] = category
+        return json.dumps(parsed, indent=2)
+
+    except MCPToolError:
+        raise
+    except Exception as e:
+        logger.error(f"detect_inconsistencies failed: {e}", exc_info=True)
+        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"detect_inconsistencies failed: {e}",
+                           {"tool": "detect_inconsistencies"})
+
+
+@mcp.tool()
+@check_tool_enabled(category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["explain architecture","how does this work","how do these files connect","system design","data flow"],idempotent=True,example='use explain_architecture: paths="" [focus=""]',intent_category="code_assistant")
+def explain_architecture(paths: str, focus: str = "all") -> str:
+    """
+    Explain how multiple files fit together as a system.
+
+    Goes beyond structure scanning — reasons about data flow, dependency
+    relationships, layering, and design decisions across files. Produces
+    a narrative explanation, not a directory tree.
+
+    Args:
+        paths (str, required): Comma-separated file paths or a directory path.
+                               For a directory, scans .py files up to 2 levels deep.
+        focus (str, optional): What to emphasize — "all", "data_flow",
+                               "dependencies", "layering", "entry_points"
+                               (default: "all")
+
+    Returns:
+        JSON with:
+        - files_analyzed: List of files read
+        - architecture: Narrative explanation of how the system works
+        - components: Key components identified and their roles
+        - data_flow: How data moves through the system
+        - entry_points: Where execution begins
+        - dependencies: Inter-file and external dependencies
+        - design_patterns: Patterns detected (e.g. decorator chain, factory, registry)
+
+    Examples:
+        explain_architecture("servers/code_assistant/")
+        explain_architecture("client/client.py,client/websocket.py,client/capability_registry.py")
+        explain_architecture("servers/", focus="data_flow")
+
+    Use cases:
+        - "How does my LangGraph orchestrator connect to the MCP servers?"
+        - "Explain how the RAG pipeline works across these files"
+        - "What is the data flow from WebSocket to tool execution?"
+        - Onboarding — understanding an unfamiliar subsystem quickly
+    """
+    logger.info(f"[TOOL] explain_architecture called: paths={paths} focus={focus}")
+    if not paths or not paths.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "paths must not be empty",
+                           {"tool": "explain_architecture"})
+    try:
+        file_list = []
+        for raw in paths.split(","):
+            p = Path(raw.strip())
+            if p.is_dir():
+                # 2-level deep scan
+                for fp in sorted(p.rglob("*.py")):
+                    rel = fp.relative_to(p)
+                    if len(rel.parts) <= 3:
+                        file_list.append(fp)
+            elif p.is_file():
+                file_list.append(p)
+            else:
+                raise MCPToolError(FailureKind.USER_ERROR, f"Path not found: {p}",
+                                   {"tool": "explain_architecture"})
+
+        if not file_list:
+            raise MCPToolError(FailureKind.USER_ERROR, "No Python files found",
+                               {"tool": "explain_architecture"})
+
+        # Build file digests — first 200 lines each to stay within context
+        digests = []
+        analyzed = []
+        for fp in file_list:
+            try:
+                content = fp.read_text(encoding="utf-8", errors="ignore")
+                preview = "\n".join(content.splitlines()[:200])
+                digests.append(f"### {fp}\n```python\n{preview}\n```")
+                analyzed.append(str(fp))
+            except Exception:
+                pass
+
+        focus_instruction = {
+            "all":          "Cover data flow, dependencies, layering, entry points, and design patterns.",
+            "data_flow":    "Focus primarily on how data moves through the system — inputs, transformations, outputs.",
+            "dependencies": "Focus on inter-file and external dependencies — what calls what, what imports what.",
+            "layering":     "Focus on architectural layers — which layer handles what responsibility.",
+            "entry_points": "Focus on where execution begins and how control flows from there.",
+        }.get(focus, "Cover all aspects of the architecture.")
+
+        prompt = (
+            f"You are a senior software architect. Analyze these files and explain how they work together as a system.\n"
+            f"{focus_instruction}\n\n"
+            f"Write a clear narrative explanation — not a file list or directory tree.\n"
+            f"Identify: components and their roles, how data flows, entry points, design patterns used.\n\n"
+            + "\n\n".join(digests[:6000 // max(1, len(digests))])  # budget tokens across files
+            + "\n\nReturn a JSON object with this exact structure:\n"
+            '{\n'
+            '  "architecture": "Narrative explanation...",\n'
+            '  "components": [{"name": "...", "role": "..."}],\n'
+            '  "data_flow": "How data moves through the system...",\n'
+            '  "entry_points": ["file:function"],\n'
+            '  "dependencies": {"file": ["depends_on"]},\n'
+            '  "design_patterns": ["pattern name"]\n'
+            '}\n'
+            "Return only valid JSON, no markdown fences, no preamble."
+        )
+
+        llm = _get_ollama_llm(temperature=0.1)
+        response = llm.invoke(prompt)
+        raw = response.content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {"architecture": raw, "components": [], "data_flow": "", "entry_points": [], "dependencies": {}, "design_patterns": []}
+
+        parsed["files_analyzed"] = analyzed
+        parsed["focus"] = focus
+        return json.dumps(parsed, indent=2)
+
+    except MCPToolError:
+        raise
+    except Exception as e:
+        logger.error(f"explain_architecture failed: {e}", exc_info=True)
+        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"explain_architecture failed: {e}",
+                           {"tool": "explain_architecture"})
+
+
+@mcp.tool()
+@check_tool_enabled(category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["change impact","what will break","impact analysis","safe to change","ripple effect"],idempotent=True,example='use explain_change_impact: file_path="" [description=""] [change=""] [scan_path=""]',intent_category="code_assistant")
+def explain_change_impact(
+    file_path: str,
+    description: str = "",
+    change: str = "",
+    scan_path: str = ".",
+) -> str:
+    """
+    Reason about the impact of a proposed change across the codebase.
+
+    Unlike static import analysis, this reasons about behavioral impact —
+    what callers assume about the current behavior, what could break if
+    that assumption changes, and what needs to be updated.
+
+    Args:
+        file_path (str, required): The file being changed
+        description (str, optional): Natural language description of the change
+                                     e.g. "change dry_run default from False to True"
+        change (str, optional): A code snippet or diff showing the change.
+                                Can be used alongside or instead of description.
+        scan_path (str, optional): Root path to scan for dependent files
+                                   (default: "." — current directory)
+
+    Returns:
+        JSON with:
+        - file_changed: The file being modified
+        - change_summary: What is changing
+        - impacted_files: Files that may be affected, with reason
+        - behavioral_changes: How runtime behavior changes
+        - breaking_changes: Changes that will definitely break callers
+        - safe_changes: Parts of the change that are safe
+        - recommended_actions: What to update before/after applying the change
+
+    Examples:
+        explain_change_impact("servers/code_assistant/server.py",
+                              description="change dry_run default from False to True")
+        explain_change_impact("client/capability_registry.py",
+                              change="def route_tool(...) -> List[str]  # was -> str",
+                              scan_path="client/")
+        explain_change_impact("client/client.py",
+                              description="remove the text field shortcut in list builder",
+                              change="# removing: if 'text' in result: return result['text']")
+
+    Use cases:
+        - "Is it safe to change this default?"
+        - "What will break if I rename this function?"
+        - "What callers depend on this return format?"
+        - Pre-change impact assessment before touching shared infrastructure
+    """
+    logger.info(f"[TOOL] explain_change_impact called: {file_path}")
+    if not file_path or not Path(file_path).exists():
+        raise MCPToolError(FailureKind.USER_ERROR, f"File not found: {file_path}",
+                           {"tool": "explain_change_impact", "file_path": file_path})
+    if not description.strip() and not change.strip():
+        raise MCPToolError(FailureKind.USER_ERROR,
+                           "Provide at least one of: description or change",
+                           {"tool": "explain_change_impact"})
+    try:
+        target_content = Path(file_path).read_text(encoding="utf-8", errors="ignore")
+
+        # Scan for dependent files — files that import or reference the target
+        target_name = Path(file_path).stem
+        dependent_files = {}
+        scan_root = Path(scan_path)
+        if scan_root.exists():
+            for fp in scan_root.rglob("*.py"):
+                if str(fp) == file_path:
+                    continue
+                try:
+                    content = fp.read_text(encoding="utf-8", errors="ignore")
+                    if target_name in content or Path(file_path).name in content:
+                        dependent_files[str(fp)] = "\n".join(content.splitlines()[:100])
+                except Exception:
+                    pass
+
+        dep_section = ""
+        if dependent_files:
+            dep_section = "\n\nFiles that reference the changed file:\n"
+            for fpath, preview in list(dependent_files.items())[:8]:
+                dep_section += f"\n### {fpath} (first 100 lines)\n```python\n{preview}\n```\n"
+
+        change_section = ""
+        if description:
+            change_section += f"Change description: {description}\n"
+        if change:
+            change_section += f"Change snippet/diff:\n```\n{change}\n```\n"
+
+        prompt = (
+            f"You are a senior engineer performing a change impact analysis.\n\n"
+            f"File being changed: {file_path}\n"
+            f"{change_section}\n"
+            f"Current file content (first 300 lines):\n"
+            f"```python\n{chr(10).join(target_content.splitlines()[:300])}\n```\n"
+            f"{dep_section}\n"
+            f"Analyze:\n"
+            f"1. What behavioral assumptions do callers currently make?\n"
+            f"2. Which of those assumptions does this change violate?\n"
+            f"3. What will definitely break vs what might break?\n"
+            f"4. What needs to be updated before or after applying the change?\n\n"
+            f"Return a JSON object with this exact structure:\n"
+            '{\n'
+            '  "change_summary": "...",\n'
+            '  "impacted_files": [{"file": "...", "reason": "..."}],\n'
+            '  "behavioral_changes": ["..."],\n'
+            '  "breaking_changes": ["..."],\n'
+            '  "safe_changes": ["..."],\n'
+            '  "recommended_actions": ["..."]\n'
+            '}\n'
+            "Return only valid JSON, no markdown fences, no preamble."
+        )
+
+        llm = _get_ollama_llm(temperature=0.1)
+        response = llm.invoke(prompt)
+        raw = response.content.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {
+                "change_summary": raw,
+                "impacted_files": [],
+                "behavioral_changes": [],
+                "breaking_changes": [],
+                "safe_changes": [],
+                "recommended_actions": [],
+            }
+
+        parsed["file_changed"] = file_path
+        parsed["dependent_files_scanned"] = len(dependent_files)
+        return json.dumps(parsed, indent=2)
+
+    except MCPToolError:
+        raise
+    except Exception as e:
+        logger.error(f"explain_change_impact failed: {e}", exc_info=True)
+        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"explain_change_impact failed: {e}",
+                           {"tool": "explain_change_impact", "file_path": file_path})
 
 
 def get_tool_names_from_module():

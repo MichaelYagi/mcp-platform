@@ -26,8 +26,6 @@ except Exception:
         return decorator
 
 from mcp.server.fastmcp import FastMCP
-from tools.code_review.scan_directory import scan_directory
-from tools.code_review.summarize_codebase import summarize_codebase
 from tools.code_review.fix_bug import fix_bug
 from tools.code_review.search_code import search_code
 from tools.code_review.review_code import review_python_file
@@ -168,65 +166,6 @@ def search_code_in_directory(
         logger.error(f"❌ search_code_in_directory failed: {e}", exc_info=True)
         raise MCPToolError(FailureKind.INTERNAL_ERROR, f"Code search failed: {e}",
                            {"tool": "search_code_in_directory", "query": query})
-
-
-@mcp.tool()
-@check_tool_enabled(category="code_reviewer")
-@tool_meta(tags=["read","code"],triggers=["scan directory","code structure","file breakdown"],idempotent=True,example='use scan_code_directory: path=""',intent_category="code")
-def scan_code_directory(path: str) -> str:
-    """
-    Recursively scan a directory and summarize its code structure.
-
-    Args:
-        path (str, required): Directory path to scan
-
-    Returns:
-        JSON string with directory, total_files, total_size_bytes, languages, and files.
-
-    Use when user wants a language/file-count breakdown or structural overview
-    of a project directory.
-    """
-    logger.info(f"🛠 [server] scan_code_directory called with path: {path}")
-
-    if not Path(path).exists():
-        raise MCPToolError(FailureKind.USER_ERROR, f"Directory does not exist: {path}",
-                           {"tool": "scan_code_directory", "path": path})
-
-    try:
-        result = scan_directory(path)
-        return json.dumps(result, indent=2)
-    except MCPToolError:
-        raise
-    except Exception as e:
-        logger.error(f"❌ scan_code_directory failed: {e}", exc_info=True)
-        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"Directory scan failed: {e}",
-                           {"tool": "scan_code_directory", "path": path})
-
-
-@mcp.tool()
-@check_tool_enabled(category="code_reviewer")
-@tool_meta(tags=["read","code","ai"],triggers=["summarize codebase","code overview","codebase summary"],idempotent=True,example="use summarize_code",intent_category="code")
-def summarize_code() -> str:
-    """
-    Generate a high-level summary of the entire codebase.
-
-    Args:
-        None (scans current project directory)
-
-    Returns:
-        JSON string with project_structure, language_breakdown, key_files,
-        architecture_notes, entry_points, and dependencies.
-
-    Use when user wants a broad architectural overview of the whole project.
-    """
-    logger.info(f"🛠 [server] summarize_code called")
-    try:
-        result = summarize_codebase()
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        logger.error(f"❌ summarize_code failed: {e}", exc_info=True)
-        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"Codebase summarization failed: {e}",
-                           {"tool": "summarize_code"})
 
 
 @mcp.tool()
