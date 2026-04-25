@@ -4316,9 +4316,13 @@ body {
 
 /* ── Tron: model select ── */
 [data-theme="tron"] #modelSelect {
-    background: transparent !important;
+    background: #000000 !important;
     color: #00eeff !important;
     border: 1px solid rgba(0,238,255,0.4) !important;
+}
+[data-theme="tron"] #modelSelect option {
+    background: #000000 !important;
+    color: #00eeff !important;
 }
 [data-theme="tron"] #modelSelectLabel { color: rgba(0,238,255,0.7) !important; }
 
@@ -5160,7 +5164,14 @@ body {
     border-color: rgba(255,255,255,0.6) !important;
     color: #ffffff !important;
 }
-[data-theme="argyle"] #modelSelect { background: rgba(255,255,255,0.1) !important; color: #ffffff !important; border: 1px solid rgba(255,255,255,0.3) !important; }
+[data-theme="argyle"] #modelSelect {
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.25'/><polygon points='30,10 50,30 30,50 10,30' fill='%234a90d9' fill-opacity='0.2'/><line x1='0' y1='0' x2='60' y2='60' stroke='%234a90d9' stroke-width='0.8' opacity='0.4'/><line x1='60' y1='0' x2='0' y2='60' stroke='%234a90d9' stroke-width='0.8' opacity='0.4'/></svg>") #0a2057 !important;
+    background-size: 60px 60px !important;
+    background-attachment: fixed !important;
+    color: #ffffff !important;
+    border: 1px solid #2563eb !important;
+}
+[data-theme="argyle"] #modelSelect option { background: #0a2057 !important; color: #ffffff !important; }
 
 [data-theme="argyle"] #sessionsSidebar {
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.25'/><polygon points='30,10 50,30 30,50 10,30' fill='%234a90d9' fill-opacity='0.2'/><line x1='0' y1='0' x2='60' y2='60' stroke='%234a90d9' stroke-width='0.8' opacity='0.4'/><line x1='60' y1='0' x2='0' y2='60' stroke='%234a90d9' stroke-width='0.8' opacity='0.4'/></svg>") #0a2057 !important;
