@@ -535,6 +535,19 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     }))
                 continue
 
+            if data.get("type") == "search_messages" and session_manager:
+                term = (data.get("term") or "").strip()
+                if term:
+                    results = session_manager.search_messages(term)
+                else:
+                    results = []
+                await websocket.send(json.dumps({
+                    "type": "search_messages_result",
+                    "term": term,
+                    "results": results,
+                }))
+                continue
+
             if data.get("type") == "get_setting" and session_manager:
                 key = data.get("key")
                 if key:

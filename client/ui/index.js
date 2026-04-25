@@ -465,12 +465,161 @@ function bulkDeleteSessions() {
     });
 }
 
+// ── Message search state ──
+let _searchDebounceTimer = null;
+let _searchDropdownVisible = false;
+
 function filterSessions() {
     const searchTerm = document.getElementById('sessionSearch').value;
-    if (!searchTerm) { renderSessions(allSessions); return; }
+
+    // Clear any pending debounce
+    if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);
+
+    // Hide dropdown and restore session list if empty
+    if (!searchTerm.trim()) {
+        hideSearchDropdown();
+        renderSessions(allSessions);
+        return;
+    }
+
+    // Local name filter immediately
     const regex = new RegExp(searchTerm, 'i');
     renderSessions(allSessions.filter(s => regex.test(s.name)));
+
+    // Debounce DB content search — only fire after 350ms pause
+    _searchDebounceTimer = setTimeout(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'search_messages', term: searchTerm.trim() }));
+        }
+    }, 350);
 }
+
+function handleSearchResults(data) {
+    const term = data.term || '';
+    const results = data.results || [];
+    const currentTerm = (document.getElementById('sessionSearch').value || '').trim();
+
+    // Discard stale responses
+    if (term !== currentTerm) return;
+
+    if (!results.length) {
+        hideSearchDropdown();
+        return;
+    }
+
+    showSearchDropdown(results, term);
+}
+
+function showSearchDropdown(results, term) {
+    let dropdown = document.getElementById('searchResultsDropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = 'searchResultsDropdown';
+        dropdown.className = 'search-results-dropdown';
+        // Insert after the search container
+        const container = document.querySelector('.sessions-search-container');
+        container.parentNode.insertBefore(dropdown, container.nextSibling);
+    }
+
+    // Deduplicate by session — keep first (most recent) hit per session
+    const seen = new Map();
+    for (const r of results) {
+        if (!seen.has(r.session_id)) seen.set(r.session_id, r);
+    }
+    const deduped = [...seen.values()];
+
+    dropdown.innerHTML = deduped.map(r => {
+        const snippet = makeSnippet(r.content, term, 80);
+        const full    = escapeHtml(r.content);
+        const role    = r.role === 'user' ? 'You' : 'Assistant';
+        return `
+            <div class="search-result-item"
+                 data-session-id="${r.session_id}"
+                 data-message-id="${r.message_id}"
+                 data-full="${escapeAttr(r.content)}"
+                 onclick="goToSearchResult(${r.session_id}, ${r.message_id})"
+                 title="${escapeAttr(r.content)}">
+                <div class="search-result-session">${escapeHtml(r.session_name)}</div>
+                <div class="search-result-snippet"><span class="search-result-role">${role}:</span> ${snippet}</div>
+            </div>`;
+    }).join('');
+
+    // Hide session list while showing search results
+    const sessionsList = document.getElementById('sessionsList');
+    if (sessionsList) sessionsList.style.display = 'none';
+
+    dropdown.style.display = 'block';
+    _searchDropdownVisible = true;
+}
+
+function hideSearchDropdown() {
+    const dropdown = document.getElementById('searchResultsDropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    // Restore session list
+    const sessionsList = document.getElementById('sessionsList');
+    if (sessionsList) sessionsList.style.display = '';
+    _searchDropdownVisible = false;
+}
+
+function makeSnippet(content, term, maxLen) {
+    const idx = content.toLowerCase().indexOf(term.toLowerCase());
+    let raw;
+    if (idx === -1) {
+        raw = content.slice(0, maxLen);
+    } else {
+        const start = Math.max(0, idx - 20);
+        const end   = Math.min(content.length, idx + term.length + 60);
+        raw = (start > 0 ? '…' : '') + content.slice(start, end) + (end < content.length ? '…' : '');
+    }
+    // Highlight the term
+    const escaped = escapeHtml(raw);
+    const re = new RegExp(`(${escapeRegex(term)})`, 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+}
+
+function escapeAttr(str) {
+    return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ── Pending post-load scroll (set before selectSession, consumed in session_loaded) ──
+let _pendingScrollMessageId = null;
+
+function goToSearchResult(sessionId, messageId) {
+    hideSearchDropdown();
+    document.getElementById('sessionSearch').value = '';
+    renderSessions(allSessions);
+
+    _pendingScrollMessageId = messageId;
+    selectSession(sessionId);
+}
+
+function scrollToMessage(messageId) {
+    const tryScroll = (attempts) => {
+        const el = document.querySelector(`[data-chat-message-id="${messageId}"]`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            el.classList.add('search-highlight');
+            setTimeout(() => el.classList.remove('search-highlight'), 2000);
+        } else if (attempts > 0) {
+            setTimeout(() => tryScroll(attempts - 1), 150);
+        }
+    };
+    setTimeout(() => tryScroll(10), 200);
+}
+
+// Dismiss dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!_searchDropdownVisible) return;
+    const dropdown = document.getElementById('searchResultsDropdown');
+    const container = document.querySelector('.sessions-search-container');
+    if (dropdown && !dropdown.contains(e.target) && container && !container.contains(e.target)) {
+        hideSearchDropdown();
+    }
+});
 
 function toggleSessionMenu(sessionId) {
     openMenuSessionId = (openMenuSessionId === sessionId) ? null : sessionId;
@@ -910,6 +1059,7 @@ ws.onmessage = (event) => {
     if (data.type==='setting_saved')                             { return; }
     if (data.type==='subscribed'&&data.subscription==='system_stats') return;
     if (data.type==='sessions_list')                             { allSessions = data.sessions; renderSessions(allSessions); return; }
+    if (data.type==='search_messages_result')                    { handleSearchResults(data); return; }
 
     if (data.type==='session_loaded') {
         chat.innerHTML = "";
@@ -917,7 +1067,7 @@ ws.onmessage = (event) => {
         renderNavigator();
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
-        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null, msg.image_url||null));
+        data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null, msg.image_url||null, msg.id||null));
         renderSessions(allSessions);
         // If the last message is from the user, a response is still in-flight.
         // Show the thinking indicator so the user knows to wait.
@@ -928,6 +1078,12 @@ ws.onmessage = (event) => {
         }
         // Reset nav highlight so first item is highlighted on session switch
         if (window.resetNavHighlight) window.resetNavHighlight();
+        // Consume any pending search scroll
+        if (_pendingScrollMessageId !== null) {
+            const mid = _pendingScrollMessageId;
+            _pendingScrollMessageId = null;
+            scrollToMessage(mid);
+        }
         return;
     }
     if (data.type==='session_created') {
@@ -1090,12 +1246,13 @@ function fallbackCopy(text, onSuccess) {
 // ============================================================
 // ADD MESSAGE
 // ============================================================
-function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, imageB64=null, imageUrl=null) {
+function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, imageB64=null, imageUrl=null, messageId=null) {
     text = text || "";
     if (text.startsWith("[TextContent(")) return;
     if (text.trim()===""&&!imageB64&&!imageUrl) return;
     const div = document.createElement("div");
     div.className = `msg ${role}`;
+    if (messageId && role !== 'assistant') div.setAttribute('data-chat-message-id', messageId);
     if (role==="assistant"&&isMultiAgent) div.className += " multi-agent";
     if (role==="user") {
         div.textContent = text;
@@ -1117,6 +1274,7 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
     if (role === 'assistant') {
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper';
+        if (messageId) wrapper.setAttribute('data-chat-message-id', messageId);
         wrapper.appendChild(div);
         const meta = document.createElement('div');
         meta.className = 'msg-meta';

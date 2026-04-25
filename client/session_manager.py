@@ -204,18 +204,44 @@ class SessionManager:
         conn.commit()
         conn.close()
 
+    def search_messages(self, search_term: str, limit: int = 30) -> List[Dict]:
+        """Search messages table content column for a term, returning session info and snippet."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT m.id, m.session_id, m.role, m.content, m.created_at,
+                   s.name
+            FROM messages m
+            JOIN sessions s ON s.id = m.session_id
+            WHERE m.content LIKE ?
+            ORDER BY m.created_at DESC
+            LIMIT ?
+        ''', (f'%{search_term}%', limit))
+        results = []
+        for r in cursor.fetchall():
+            results.append({
+                'message_id': r[0],
+                'session_id': r[1],
+                'role':       r[2],
+                'content':    r[3],
+                'created_at': r[4],
+                'session_name': r[5] or 'Untitled Session',
+            })
+        conn.close()
+        return results
+
     def get_session_messages(self, session_id: int) -> List[Dict]:
         """Get all messages for a session"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT role, content, model, created_at, image_source
+            SELECT id, role, content, model, created_at, image_source
             FROM messages WHERE session_id = ? ORDER BY created_at ASC
         ''', (session_id,))
         messages = []
         for r in cursor.fetchall():
-            msg = {'role': r[0], 'text': r[1], 'model': r[2], 'timestamp': r[3]}
-            image_source = r[4]
+            msg = {'id': r[0], 'role': r[1], 'text': r[2], 'model': r[3], 'timestamp': r[4]}
+            image_source = r[5]
             if image_source:
                 if image_source.startswith('http://') or image_source.startswith('https://'):
                     # Remote URL — browser fetches directly

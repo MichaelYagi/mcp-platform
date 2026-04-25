@@ -1045,6 +1045,7 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     background: var(--sidebar-bg);
     flex-shrink: 0;
     max-height: 45%;
+    margin-top: auto;
 }
 
 #promptNavHeader {
@@ -1141,3 +1142,75 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 #promptNavList::-webkit-scrollbar { width: 6px; }
 #promptNavList::-webkit-scrollbar-track { background: var(--sidebar-bg); }
 #promptNavList::-webkit-scrollbar-thumb { background: var(--sidebar-border); border-radius: 3px; }
+/* ============================================================
+   MESSAGE SEARCH DROPDOWN
+   ============================================================ */
+
+.search-results-dropdown {
+    position: relative;
+    z-index: 200;
+    background: var(--sidebar-bg);
+    border-bottom: 1px solid var(--sidebar-border);
+    max-height: 320px;
+    overflow-y: auto;
+    display: none;
+}
+
+.search-result-item {
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    border-bottom: 1px solid var(--sidebar-border);
+    transition: background 0.15s;
+    position: relative;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: var(--sidebar-hover);
+}
+
+.search-result-session {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--title-color);
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-result-snippet {
+    font-size: 0.75rem;
+    color: var(--subtitle-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.search-result-role {
+    font-weight: 600;
+    color: var(--label-color);
+    margin-right: 0.25rem;
+}
+
+.search-result-item mark {
+    background: rgba(255, 200, 0, 0.35);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+/* Search highlight flash on scroll target */
+.search-highlight {
+    animation: search-flash 2s ease-out;
+}
+
+@keyframes search-flash {
+    0%   { outline: 2px solid var(--user-bubble, #4da3ff); outline-offset: 2px; }
+    80%  { outline: 2px solid var(--user-bubble, #4da3ff); outline-offset: 2px; }
+    100% { outline: none; }
+}
