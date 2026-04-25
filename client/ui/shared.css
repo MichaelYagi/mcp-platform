@@ -3315,7 +3315,7 @@ body {
 /* ── TE: Input area — paper feel ── */
 [data-theme="te"] #inputRow {
     border-radius: 0 !important;
-    border: 1px solid #aaa090 !important;
+    border: none !important;
 }
 [data-theme="te"] #input {
     color: #1a1a1a !important;
@@ -4269,11 +4269,8 @@ body {
 
 /* ── Tron: input area ── */
 [data-theme="tron"] #inputRow {
-    border: 1px solid rgba(0,238,255,0.4) !important;
-    box-shadow:
-        0 0 8px rgba(0,238,255,0.2),
-        0 0 20px rgba(0,238,255,0.08),
-        inset 0 0 10px rgba(0,238,255,0.04) !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 [data-theme="tron"] #input {
     color: #c8f8ff !important;
@@ -5178,14 +5175,14 @@ body {
     border-bottom: 2px solid #4a90d9 !important;
 }
 [data-theme="argyle"] .sessions-header h2 { color: #ffffff !important; letter-spacing: 0.08em !important; font-size: 0.85rem !important; }
-[data-theme="argyle"] .session-item { color: #e8f0fc !important; border-bottom: 1px solid #1e3a7a !important; }
+[data-theme="argyle"] .session-item { color: #1a3a8f !important; border-bottom: 1px solid #93c5fd !important; background: #f0f5ff !important; }
 [data-theme="argyle"] .session-item:hover { background: #1a3a8f !important; }
 [data-theme="argyle"] .session-item.active {
     background-color: #2563eb !important;
     background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'><polygon points='10,0 20,10 10,20 0,10' fill='none' stroke='%23ffffff' stroke-width='0.4' opacity='0.2'/></svg>") !important;
     background-size: 20px 20px !important;
 }
-[data-theme="argyle"] .session-item-text { color: #e8f0fc !important; }
+[data-theme="argyle"] .session-item-text { color: #1a3a8f !important; }
 [data-theme="argyle"] .session-item:hover .session-item-text { color: #ffffff !important; }
 [data-theme="argyle"] .session-item.active .session-item-text { color: #ffffff !important; font-weight: 600 !important; }
 [data-theme="argyle"] .session-menu-btn { color: #4a7ac8 !important; }
@@ -5409,6 +5406,22 @@ body {
 [data-theme="argyle"] ::-webkit-scrollbar-track { background: #0a2057 !important; }
 [data-theme="argyle"] ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #1e3a7a, #2563eb, #1e3a7a) !important; border-radius: 3px !important; }
 [data-theme="argyle"] ::-webkit-scrollbar-thumb:hover { background: #4a90d9 !important; }
+/* ── Argyle: dashboard mainContainer ── */
+[data-theme="argyle"] #mainContainer {
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.18'/><polygon points='30,10 50,30 30,50 10,30' fill='%2393c5fd' fill-opacity='0.22'/><line x1='0' y1='0' x2='60' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/><line x1='60' y1='0' x2='0' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/></svg>") #dbeafe !important;
+    background-size: 60px 60px !important;
+    background-attachment: fixed !important;
+}
+
+/* ── Hide drawer borders when closed, show when open (all themes) ── */
+[data-theme] #sessionsSidebar { border-right: none !important; }
+[data-theme] #toolsPanel { border-left: none !important; }
+[data-theme] #logPanel { border-left: none !important; }
+[data-theme] #systemMonitor { border-left: none !important; }
+[data-theme] #sessionsSidebar.open { border-right: 1px solid var(--chat-border) !important; }
+[data-theme] #toolsPanel.open { border-left: 1px solid var(--chat-border) !important; }
+[data-theme] #logPanel.open { border-left: 1px solid var(--chat-border) !important; }
+[data-theme] #systemMonitor.open { border-left: 1px solid var(--chat-border) !important; }
 /* ── Argyle: dashboard mainContainer ── */
 [data-theme="argyle"] #mainContainer {
     background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'><polygon points='30,0 60,30 30,60 0,30' fill='%232563eb' fill-opacity='0.18'/><polygon points='30,10 50,30 30,50 10,30' fill='%2393c5fd' fill-opacity='0.22'/><line x1='0' y1='0' x2='60' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/><line x1='60' y1='0' x2='0' y2='60' stroke='%23ffffff' stroke-width='1' opacity='0.5'/></svg>") #dbeafe !important;
