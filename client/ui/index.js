@@ -521,12 +521,13 @@ function showSearchDropdown(results, term) {
         container.parentNode.insertBefore(dropdown, container.nextSibling);
     }
 
-    // Deduplicate by session — keep first (most recent) hit per session
-    const seen = new Map();
-    for (const r of results) {
-        if (!seen.has(r.session_id)) seen.set(r.session_id, r);
-    }
-    const deduped = [...seen.values()];
+    // Deduplicate by message_id — same session can appear multiple times
+    const seen = new Set();
+    const deduped = results.filter(r => {
+        if (seen.has(r.message_id)) return false;
+        seen.add(r.message_id);
+        return true;
+    });
 
     dropdown.innerHTML = deduped.map(r => {
         const snippet = makeSnippet(r.content, term, 80);
@@ -544,7 +545,7 @@ function showSearchDropdown(results, term) {
             </div>`;
     }).join('');
 
-    // Hide session list while showing search results
+    // Hide session list while showing search results — dropdown overlays absolutely
     const sessionsList = document.getElementById('sessionsList');
     if (sessionsList) sessionsList.style.display = 'none';
 
