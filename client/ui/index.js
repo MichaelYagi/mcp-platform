@@ -695,7 +695,7 @@ function renderNavigator() {
 
         item.appendChild(label);
         item.onclick = () => {
-            entry.domRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            entry.domRef.scrollIntoView({ behavior: 'smooth', block: 'start' });
             entry.domRef.classList.add('prompt-nav-highlight');
             setTimeout(() => entry.domRef.classList.remove('prompt-nav-highlight'), 1200);
         };
