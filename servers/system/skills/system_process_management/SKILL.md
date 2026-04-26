@@ -9,7 +9,6 @@ tags:
   - management
 tools:
   - list_system_processes
-  - terminate_process
 ---
 
 # System Process Management Skill
@@ -18,5 +17,4 @@ Use this skill when the user asks for:
 
 - "List running processes"
 - "Show top CPU processes"
-- "Kill process 1234"
 - "What is using my RAM"

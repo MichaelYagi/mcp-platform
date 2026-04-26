@@ -169,34 +169,34 @@ def list_system_processes(top_n: Optional[int] = 10) -> str:
         raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Process listing failed: {e}", {"tool": "list_system_processes"})
 
 
-@mcp.tool()
-@check_tool_enabled(category="system")
-@tool_meta(tags=["write","destructive","system"],triggers=["kill process","terminate","stop process"],idempotent=False,example='use terminate_process: pid=""')
-def terminate_process(pid: int) -> str:
-    """
-    Terminate a process by its process ID (PID).
-
-    Args:
-        pid (int, required): The process ID to terminate
-
-    Returns:
-        JSON string with:
-        - success: Boolean indicating if termination succeeded
-        - pid: The process ID that was terminated
-        - message: Confirmation or error message
-
-    Use when user explicitly requests to stop or kill a specific process.
-    """
-    logger.info(f"🛠 [server] terminate_process called with pid: {pid}")
-    try:
-        return kill_process(pid)
-    except ProcessLookupError as e:
-        raise MCPToolError(FailureKind.USER_ERROR, f"Process {pid} not found", {"tool": "terminate_process", "pid": pid})
-    except PermissionError as e:
-        raise MCPToolError(FailureKind.USER_ERROR, f"Permission denied to terminate process {pid}", {"tool": "terminate_process", "pid": pid})
-    except Exception as e:
-        logger.error(f"❌ terminate_process failed: {e}", exc_info=True)
-        raise MCPToolError(FailureKind.INTERNAL_ERROR, f"Failed to terminate process {pid}: {e}", {"tool": "terminate_process", "pid": pid})
+# @mcp.tool()
+# @check_tool_enabled(category="system")
+# @tool_meta(tags=["write","destructive","system"],triggers=["kill process","terminate","stop process"],idempotent=False,example='use terminate_process: pid=""')
+# def terminate_process(pid: int) -> str:
+#     """
+#     Terminate a process by its process ID (PID).
+#
+#     Args:
+#         pid (int, required): The process ID to terminate
+#
+#     Returns:
+#         JSON string with:
+#         - success: Boolean indicating if termination succeeded
+#         - pid: The process ID that was terminated
+#         - message: Confirmation or error message
+#
+#     Use when user explicitly requests to stop or kill a specific process.
+#     """
+#     logger.info(f"🛠 [server] terminate_process called with pid: {pid}")
+#     try:
+#         return kill_process(pid)
+#     except ProcessLookupError as e:
+#         raise MCPToolError(FailureKind.USER_ERROR, f"Process {pid} not found", {"tool": "terminate_process", "pid": pid})
+#     except PermissionError as e:
+#         raise MCPToolError(FailureKind.USER_ERROR, f"Permission denied to terminate process {pid}", {"tool": "terminate_process", "pid": pid})
+#     except Exception as e:
+#         logger.error(f"❌ terminate_process failed: {e}", exc_info=True)
+#         raise MCPToolError(FailureKind.INTERNAL_ERROR, f"Failed to terminate process {pid}: {e}", {"tool": "terminate_process", "pid": pid})
 
 skill_registry = None
 
