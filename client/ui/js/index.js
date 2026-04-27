@@ -267,6 +267,19 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// ── Search clear button ──
+(function() {
+    const clearBtn = document.getElementById('searchClearBtn');
+    const input    = document.getElementById('sessionSearch');
+    if (!clearBtn || !input) return;
+    clearBtn.addEventListener('click', () => {
+        input.value = '';
+        clearBtn.style.display = 'none';
+        input.focus();
+        filterSessions();
+    });
+})();
+
 function startNewSession() {
     currentSessionId = null;
     localStorage.setItem(CURRENT_SESSION_KEY, '');
@@ -471,6 +484,7 @@ let _searchDropdownVisible = false;
 
 function filterSessions() {
     const searchTerm = document.getElementById('sessionSearch').value;
+    document.getElementById('searchClearBtn').style.display = searchTerm ? 'block' : 'none';
 
     // Clear any pending debounce
     if (_searchDebounceTimer) clearTimeout(_searchDebounceTimer);

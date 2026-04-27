@@ -54,7 +54,10 @@
             </div>
             <div class="sessions-search-container">
                 <button class="new-session-btn" onclick="startNewSession()" title="New Chat">+</button>
-                <input type="text" id="sessionSearch" placeholder="Search chats..." oninput="filterSessions()">
+                <div class="search-input-wrap">
+                    <input type="text" id="sessionSearch" placeholder="Search chats..." oninput="filterSessions()">
+                    <button id="searchClearBtn" title="Clear search" aria-label="Clear search">&times;</button>
+                </div>
             </div>
             <div class="sessions-list" id="sessionsList"></div>
 
