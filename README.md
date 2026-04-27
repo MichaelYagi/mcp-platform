@@ -168,6 +168,7 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 Create `.env` in project root:
 ```bash
 # === LLM Backend ===
+OLLAMA_BASE_URL=http://127.0.0.1:11434  # Ollama server URL (default: http://127.0.0.1:11434)
 OLLAMA_VISION_MODEL=qwen3-vl:8b-instruct
 MAX_MESSAGE_HISTORY=30          # Chat history limit (default: 20)
 LLM_TEMPERATURE=0.3             # Model temperature 0 to 1 (default: 0.3)
@@ -778,6 +779,11 @@ Queries that start with personal statements (`"I like…"`, `"My favourite…"`)
 - If token is expired or invalid: delete `token.json` and re-run the auth script
 - Confirm Gmail API and Google Calendar API are enabled in Google Cloud Console
 - Confirm the OAuth app is published to **In Production** in Google Auth Platform → Audience
+
+**Ollama not reachable / connection refused:**
+- By default Ollama binds to `127.0.0.1` only — set `OLLAMA_BASE_URL=http://127.0.0.1:11434` in `.env` and use `127.0.0.1` rather than a LAN IP
+- If running Ollama in WSL and need LAN access, start Ollama with `OLLAMA_HOST=0.0.0.0 ollama serve` and add a Windows port proxy: `netsh interface portproxy add v4tov4 listenport=11434 listenaddress=0.0.0.0 connectport=11434 connectaddress=<WSL_IP>`
+- Get WSL IP with: `ip addr show eth0 | grep 'inet '`
 
 **Ollama models not appearing:**
 ```bash
