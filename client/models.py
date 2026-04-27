@@ -18,7 +18,7 @@ def get_ollama_models():
     by checking the model family reported by the Ollama API."""
     try:
         import httpx
-        response = httpx.get("http://127.0.0.1:11434/api/tags", timeout=3.0)
+        response = httpx.get(os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/"), timeout=3.0)
         if response.status_code != 200:
             return []
 
@@ -152,7 +152,7 @@ async def switch_model(model_name, tools, logger, create_agent_fn, a2a_state=Non
             try:
                 import httpx
                 async with httpx.AsyncClient(timeout=1.0) as client:
-                    await client.get("http://127.0.0.1:11434/api/tags")
+                    await client.get(os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/"))
             except:
                 logger.error("❌ Ollama not running")
                 print("\n❌ Ollama not running")

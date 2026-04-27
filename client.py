@@ -592,7 +592,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     # Check backend-specific requirements
     if backend == "ollama":
         try:
-            await utils.ensure_ollama_running()
+            await utils.ensure_ollama_running(os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/"))
             available_models = [m["name"] for m in all_models if m["backend"] == "ollama"]
             if not available_models:
                 raise RuntimeError("No Ollama models installed")
