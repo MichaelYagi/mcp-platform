@@ -113,9 +113,29 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 ```json
 {
     "mcpServers": {
+        "code_assistant": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/code_assistant/server.py"]
+        },
         "code_review": {
             "command": "/path/to/mcp_a2a/.venv/bin/python",
             "args": ["/path/to/mcp_a2a/servers/code_review/server.py"]
+        },
+        "code_runner": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/code_runner/server.py"]
+        },
+        "github": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/github/server.py"]
+        },
+        "google": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/google/server.py"]
+        },
+        "image": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/image/server.py"]
         },
         "location": {
             "command": "/path/to/mcp_a2a/.venv/bin/python",
@@ -136,6 +156,10 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
         "text": {
             "command": "/path/to/mcp_a2a/.venv/bin/python",
             "args": ["/path/to/mcp_a2a/servers/text/server.py"]
+        },
+        "trilium": {
+            "command": "/path/to/mcp_a2a/.venv/bin/python",
+            "args": ["/path/to/mcp_a2a/servers/trilium/server.py"]
         }
     }
 }
