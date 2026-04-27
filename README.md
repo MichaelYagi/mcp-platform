@@ -114,52 +114,52 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 {
     "mcpServers": {
         "code_assistant": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/code_assistant/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/code_assistant/server.py"]
         },
         "code_review": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/code_review/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/code_review/server.py"]
         },
         "code_runner": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/code_runner/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/code_runner/server.py"]
         },
         "github": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/github/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/github/server.py"]
         },
         "google": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/google/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/google/server.py"]
         },
         "image": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/image/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/image/server.py"]
         },
         "location": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/location/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/location/server.py"]
         },
         "plex": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/plex/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/plex/server.py"]
         },
         "rag": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/rag/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/rag/server.py"]
         },
         "system": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/system_tools/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/system_tools/server.py"]
         },
         "text": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/text/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/text/server.py"]
         },
         "trilium": {
-            "command": "/path/to/mcp_a2a/.venv/bin/python",
-            "args": ["/path/to/mcp_a2a/servers/trilium/server.py"]
+            "command": "/path/to/mcp-platform/.venv/bin/python",
+            "args": ["/path/to/mcp-platform/servers/trilium/server.py"]
         }
     }
 }
@@ -167,7 +167,7 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 
 **Windows paths:**
 ```json
-"command": "C:\\path\\to\\mcp_a2a\\.venv\\Scripts\\python.exe"
+"command": "C:\\path\\to\\mcp-platform\\.venv\\Scripts\\python.exe"
 ```
 
 **Available servers:**
@@ -741,7 +741,7 @@ servers/
 
 ### Directory Structure
 ```
-mcp_a2a/
+mcp-platform/
 ├── servers/
 ├── a2a_server.py
 ├── client.py
