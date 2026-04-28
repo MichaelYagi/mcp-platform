@@ -171,17 +171,18 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 ```
 
 **Available servers:**
-- `code_assistant` - AI-powered code assistance
-- `code_review` - Code analysis (5 tools)
-- `github` - GitHub integration
-- `google` - Gmail + Google Calendar ⚠️ *Requires one-time OAuth setup — see [Google Setup](#google-setup)*
-- `image` - Image search, analysis, and AI generation ⚠️ *Requires `SERPER_API_KEY` for web image search; AI generation is free with no API key*
+- `code_assistant` - AI-powered code analysis, generation, and refactoring (12 tools)
+- `code_review` - Code review, search, and bug fixing (3 tools)
+- `code_runner` - Python/bash execution sandbox (4 tools)
+- `github` - GitHub repo clone, browse, and cleanup ⚠️ *Requires `GITHUB_TOKEN` for private repos; public repos work without it*
+- `google` - Gmail + Google Calendar (9 tools) ⚠️ *Requires one-time OAuth setup — see [Google Setup](#google-setup)*
+- `image` - Image search, analysis, and AI generation (6 tools) ⚠️ *Requires `SERPER_API_KEY` for web image search; AI generation is free with no API key*
 - `location` - Weather, time, location (3 tools)
-- `plex` - Media library + ML recommendations (17 tools) ⚠️ *Requires `PLEX_URL`, `PLEX_TOKEN`*
-- `rag` - Vector search (4 tools) ⚠️ *Requires Ollama + `bge-large`*
-- `system` - System info (4 tools)
-- `text` - Text processing (7 tools)
-- `trilium` - Trilium notes integration ⚠️ *Requires `TRILIUM_URL`, `TRILIUM_TOKEN`*
+- `plex` - Media library + ML recommendations (18 tools) ⚠️ *Requires `PLEX_URL`, `PLEX_TOKEN`*
+- `rag` - Vector search and management (7 tools) ⚠️ *Requires Ollama + `bge-large`*
+- `system` - System info and processes (3 tools)
+- `text` - Text processing and web search (8 tools)
+- `trilium` - Trilium notes integration (11 tools) ⚠️ *Requires `TRILIUM_URL`, `TRILIUM_TOKEN`*
 
 ---
 
@@ -291,7 +292,7 @@ Some features require additional setup before they will function. The table belo
 |---------|-------------------|------------------|
 | Gmail + Google Calendar | — | One-time Google OAuth setup — see [Google Setup](#google-setup) |
 | RAG ingestion & search | — | Ollama running + `bge-large` pulled |
-| RAG reranking (optional) | — | `bge-reranker-v2-m3` pulled — improves result ranking, falls back to cosine if absent |
+| RAG reranking (optional) | — | `cross-encoder/ms-marco-MiniLM-L-6-v2` pulled — improves result ranking, falls back to cosine if absent |
 | Plex media library | `PLEX_URL`, `PLEX_TOKEN` | Plex Media Server running |
 | Plex ingestion & recommendations | `PLEX_URL`, `PLEX_TOKEN` | Ollama running + `bge-large` pulled |
 | Ollama web search | `OLLAMA_TOKEN` | Ollama account + API key |
@@ -632,7 +633,7 @@ ES_MCPSERVER_API_KEY=your_api_key_here
 > **WSL2 note:** For stdio servers bridging to Windows, set `IJ_MCP_SERVER_HOST` in `env`
 > to the Windows host IP (`cat /etc/resolv.conf | grep nameserver`).
 
-### Step 6: Test & Deploy
+### Step 5: Test & Deploy
 ```bash
 python client.py   # restart to auto-discover new server
 ```
@@ -729,15 +730,20 @@ tests/
 
 ```
 servers/
-├── code_review/       5 tools  - Code analysis
-├── google/            7 tools  - Gmail + Google Calendar       [requires one-time OAuth setup]
+├── code_assistant/   12 tools  - AI-powered code analysis, generation, and refactoring
+├── code_review/       3 tools  - Code review, search, and bug fixing
+├── code_runner/       4 tools  - Python/bash execution sandbox
+├── github/            4 tools  - GitHub repo clone, browse, and cleanup
+├── google/            9 tools  - Gmail + Google Calendar       [requires one-time OAuth setup]
 ├── image/             6 tools  - Image search, analysis, AI generation  [requires SERPER_API_KEY for search; generation is free]
 ├── location/          3 tools  - Weather, time, location
-├── plex/             17 tools  - Media + ML recommendations    [requires PLEX_URL + PLEX_TOKEN]
-├── rag/               4 tools  - Vector search                 [requires Ollama + bge-large]
-├── system/            4 tools  - System info
-└── text/              7 tools  - Text processing
+├── plex/             18 tools  - Media + ML recommendations    [requires PLEX_URL + PLEX_TOKEN]
+├── rag/               7 tools  - Vector search and management  [requires Ollama + bge-large]
+├── system/            3 tools  - System info and processes
+├── text/              8 tools  - Text processing and web search
+└── trilium/          11 tools  - Trilium notes integration     [requires TRILIUM_URL + TRILIUM_TOKEN]
 ```
+Total: 88 tools across 12 servers
 
 ### Directory Structure
 ```
@@ -766,7 +772,7 @@ mcp-platform/
 
 ### Intent Patterns
 
-The client routes queries to the right tools without sending all 75+ tools to the LLM on every message. Routing is driven by the `triggers` you define in each tool's `@tool_meta` decorator — no manual pattern editing required.
+The client routes queries to the right tools without sending all 88 tools to the LLM on every message. Routing is driven by the `triggers` you define in each tool's `@tool_meta` decorator — no manual pattern editing required.
 
 Each intent has a priority — lower number wins when multiple patterns match. The static entries below cover the built-in servers. Any tool you add with `@tool_meta(triggers=[...])` is automatically included on startup.
 
