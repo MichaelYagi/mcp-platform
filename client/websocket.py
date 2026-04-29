@@ -31,6 +31,9 @@ try:
 except ImportError:
     SYSTEM_MONITOR_AVAILABLE = False
 
+import logging
+_logger = logging.getLogger("mcp_client")
+
 CONNECTED_WEBSOCKETS = set()
 SYSTEM_MONITOR_CLIENTS = set()
 # Per-session tracking: set of session_ids currently processing a query.
@@ -224,8 +227,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             # Persist before delivery
             if session_manager and session_id:
                 MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
-                model_name = "direct-answer"
-                msg_id = session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, model_name)
+                msg_id = session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "direct-answer")
                 _rag_store_turn(session_id, "assistant", response_text, msg_id)
 
             try:
@@ -317,7 +319,25 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         image_source = _candidate
                     else:
                         import urllib.parse as _up
-                        image_source = f"http://localhost:9000/image?path={_up.quote(_candidate)}"
+                        from pathlib import Path as _Path
+                        # Resolve to absolute path and verify it stays within
+                        # an expected root to prevent path traversal attacks.
+                        _ALLOWED_ROOTS = [
+                            _Path(os.getenv("MEDIA_ROOT", "/mnt/media")).resolve(),
+                            _Path(os.getenv("IMAGE_ROOT", "/tmp/images")).resolve(),
+                        ]
+                        try:
+                            _resolved = _Path(_candidate).resolve()
+                            _allowed = any(
+                                str(_resolved).startswith(str(root))
+                                for root in _ALLOWED_ROOTS
+                            )
+                            if _allowed:
+                                image_source = f"http://localhost:9000/image?path={_up.quote(str(_resolved))}"
+                            else:
+                                logger.warning(f"🚫 Blocked image_source outside allowed roots: {_candidate!r}")
+                        except Exception as _path_err:
+                            logger.warning(f"🚫 Could not resolve image_source path: {_path_err}")
 
             except Exception as parse_err:
                 logger.warning(f"🖼️ JSON parse failed: {parse_err}")
@@ -364,16 +384,16 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         import traceback
         traceback.print_exc()
 
-        await broadcast_message("error", {"text": str(e)})
+        await broadcast_message("error", {"text": "An error occurred processing your request."})
         await broadcast_message("complete", {"stopped": False})
     finally:
         if session_id:
             PROCESSING_SESSIONS.discard(session_id)
             SESSION_TASKS.pop(session_id, None)
             SESSION_TASK_CREATED.pop(session_id, None)
-            # Remove lock only if no task is pending — keep it if a new
-            # query already acquired it for this session.
-            SESSION_LOCKS.pop(session_id, None)
+            # Do NOT remove SESSION_LOCKS here — the handler may already have
+            # acquired it for a follow-up query. Lock lifetime is managed by
+            # TTL cleanup (_cleanup_stale_tasks) and session deletion only.
 
 async def websocket_handler(websocket, agent_ref, tools, logger, conversation_state, run_agent_fn,
                             models_module, model_name, system_prompt, orchestrator=None,
@@ -383,7 +403,6 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
     KEY: Long operations run as background tasks, allowing :stop to be processed immediately
     """
-    global json
     CONNECTED_WEBSOCKETS.add(websocket)
 
     # Track current background task (if any)
@@ -937,15 +956,15 @@ async def _cleanup_stale_tasks(max_age_seconds: int = 3600):
         for sid in stale:
             task = SESSION_TASKS.get(sid)
             if task and not task.done():
-                logger.warning(f"🧹 TTL cleanup: cancelling stale task for session {sid} "
-                               f"(age={(now - SESSION_TASK_CREATED[sid]):.0f}s)")
+                _logger.warning(f"🧹 TTL cleanup: cancelling stale task for session {sid} "
+                                f"(age={(now - SESSION_TASK_CREATED[sid]):.0f}s)")
                 task.cancel()
             SESSION_TASKS.pop(sid, None)
             SESSION_TASK_CREATED.pop(sid, None)
             SESSION_LOCKS.pop(sid, None)
             PROCESSING_SESSIONS.discard(sid)
         if stale:
-            logger.info(f"🧹 TTL cleanup removed {len(stale)} stale session entries")
+            _logger.info(f"🧹 TTL cleanup removed {len(stale)} stale session entries")
 
 
 async def start_websocket_server(agent, tools, logger, conversation_state, run_agent_fn, models_module,

@@ -136,9 +136,9 @@ User: "add to my todo due tomorrow, make breakfast"
 CORRECT: add_todo_item(title="make breakfast", due_by="[tomorrow date]")
 WRONG: rag_search_tool(query="make breakfast") ❌
 
-User: "remember that password is abc123"
-CORRECT: rag_add_tool(text="password is abc123", source="notes")
-WRONG: add_todo_item(title="password is abc123") ❌
+User: "remember that the server hostname is dev-box"
+CORRECT: rag_add_tool(text="server hostname is dev-box", source="notes")
+WRONG: add_todo_item(title="server hostname is dev-box") ❌
 
 VERIFICATION:
 - "add to my todo" = add_todo_item
@@ -355,10 +355,19 @@ async def verify_transport_reachable(host: str, port: int, timeout: float = 2.0)
 def resolve_env_placeholder(server_name: str, placeholder: str) -> str:
     """
     Resolve <$PLACEHOLDER> using ES_{SERVER_NAME_CAPS}_{PLACEHOLDER} convention.
-    Falls back to the placeholder as-is if env var not found.
+    Logs a warning and returns an empty string if the env var is not set,
+    rather than injecting the literal placeholder text into auth headers.
     """
     env_key = f"ES_{server_name.upper()}_{placeholder.upper()}"
-    return os.getenv(env_key, f"<${placeholder}>")
+    value = os.getenv(env_key)
+    if value is None:
+        import logging as _rl
+        _rl.getLogger("mcp_client").warning(
+            f"⚠️  Header placeholder <${placeholder}> for server '{server_name}' "
+            f"has no matching env var {env_key!r} — header value will be empty"
+        )
+        return ""
+    return value
 
 
 def resolve_headers(server_name: str, headers: dict) -> dict:
@@ -369,6 +378,7 @@ def resolve_headers(server_name: str, headers: dict) -> dict:
         def replacer(match):
             return resolve_env_placeholder(server_name, match.group(1))
         resolved[key] = re.sub(r'<\$([A-Z0-9_a-z]+)>', replacer, value)
+    return resolved
 
 async def auto_discover_servers(servers_dir: Path, logger):
     """
@@ -1938,7 +1948,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             try:
                 from pathlib import Path
 
-                last_model_file = Path(__file__).parent / "client/last_model.txt"
+                last_model_file = PROJECT_ROOT / "client" / "last_model.txt"
 
                 if last_model_file.exists():
                     expected_model = last_model_file.read_text().strip()
@@ -1978,8 +1988,27 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # ═══════════════════════════════════════════════════════════
         _last_b64 = conversation_state.get("_last_vision_b64")
         if _last_b64 and not explicit_tool:
-            logger.info("[vision follow-up] 🖼️ Last image in context — re-invoking vision")
-            if True:
+            # Only re-invoke vision when the message looks like a visual question.
+            # The old `if True:` here caused every subsequent message — including
+            # completely unrelated ones — to be routed to the vision model with
+            # the stale image, wasting time and returning nonsense answers.
+            _VISUAL_PHRASES = (
+                "what", "where", "who", "describe", "show", "tell me", "explain",
+                "how many", "is there", "is it", "are there", "can you see", "read",
+                "translate", "count", "color", "colour", "look", "identify",
+                "find in", "in the image", "in the photo", "in this", "background",
+                "foreground", "text in", "writing", "sign", "any ", "do you see",
+            )
+            _is_visual_followup = any(
+                p in user_message.lower() for p in _VISUAL_PHRASES
+            )
+            if not _is_visual_followup:
+                # Unrelated message — clear stale image so it doesn't linger
+                conversation_state.pop("_last_vision_b64", None)
+                conversation_state.pop("_last_vision_url", None)
+                conversation_state.pop("_last_vision_tool_result", None)
+            if _is_visual_followup:
+                logger.info("[vision follow-up] 🖼️ Visual question detected — re-invoking vision")
                 import httpx as _httpx_fu, base64 as _b64_fu, uuid as _uuid_fu, time as _time_fu
                 _fu_prompt = user_message
                 _fu_num_predict = 1000

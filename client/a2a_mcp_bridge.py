@@ -23,8 +23,10 @@ def make_a2a_tool(a2a_client: A2AClient, tool_def: Dict[str, Any]):
         f"Remote A2A tool: {remote_name}"
     )
 
-    # Extract input schema from the tool definition
-    input_schema = tool_def.get('inputSchema', {})
+    # Extract input schema from the tool definition.
+    # The A2A server serialises the schema under the key "schema"; fall back
+    # to "inputSchema" for any third-party A2A servers that use that spelling.
+    input_schema = tool_def.get('schema') or tool_def.get('inputSchema') or {}
     properties = input_schema.get('properties', {})
     required = input_schema.get('required', [])
 
