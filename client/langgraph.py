@@ -2225,7 +2225,52 @@ def create_langgraph_agent(llm_with_tools, tools):
                             "current_model": current_model
                         }
 
+                # ── Knowledge-gap detection via confidence check ──────────────
+                # Ask the model directly whether it had reliable knowledge to
+                # answer. One tiny call (YES/NO output) is more accurate than
+                # any phrase list — catches confident-sounding wrong answers and
+                # works regardless of language or phrasing.
+                # Only fires for general queries to avoid interfering with
+                # tool-routed intents (weather, RAG, Plex, etc.).
+                _is_hedging = False
+                if pattern_name == "general" and user_message:
+                    try:
+                        _confidence_check = await base_llm.ainvoke([
+                            SystemMessage(content="Reply with only YES or NO. No other text."),
+                            HumanMessage(content=(
+                                f"Did you have reliable, specific knowledge to answer "
+                                f"this question accurately?\n"
+                                f"Question: {user_message}\n"
+                                f"Your answer: {response.content[:300]}"
+                            ))
+                        ])
+                        _is_hedging = _confidence_check.content.strip().upper().startswith("N")
+                        logger.info(f"[LangGraph] 🔎 Confidence check: {'LOW — will search' if _is_hedging else 'OK'}")
+                    except Exception as _cc_err:
+                        logger.warning(f"[LangGraph] ⚠️ Confidence check failed: {_cc_err}")
 
+                if _is_hedging:
+                    logger.info("[LangGraph] 🔍 Low confidence detected — attempting web search fallback")
+                    _search_client = get_search_client()
+                    if _search_client.is_available():
+                        try:
+                            _search_result = await _search_client.search(user_message)
+                            if _search_result.get("success") and _search_result.get("results"):
+                                logger.info("[LangGraph] ✅ Web search fallback succeeded — retrying with context")
+                                _augmented = WEB_SEARCH_WITH_QUESTION.format(
+                                    search_context=_search_result["results"],
+                                    user_message=user_message,
+                                )
+                                response = await base_llm.ainvoke(
+                                    messages + [HumanMessage(content=_augmented)]
+                                )
+                                current_model = get_model_name(base_llm)
+                            else:
+                                logger.warning("[LangGraph] ⚠️ Web search fallback returned no results")
+                        except Exception as _hedge_err:
+                            logger.warning(f"[LangGraph] ⚠️ Web search fallback failed: {_hedge_err}")
+                    else:
+                        logger.warning("[LangGraph] ⚠️ Web search unavailable for hedge fallback")
 
             return {
                 "messages": [response],
