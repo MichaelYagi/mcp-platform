@@ -5378,3 +5378,14 @@
 [data-theme] #sessionsSidebar.open { border-right: 1px solid var(--chat-border) !important; }
 [data-theme] #toolsPanel.open { border-left: 1px solid var(--chat-border) !important; }
 [data-theme] #logPanel.open { border-left: 1px solid var(--chat-border) !important; }
+/* BATMAN */
+[data-theme="batman"] #header { background: #000000 !important; border-bottom: 3px solid #d6b100 !important; }
+[data-theme="batman"] #header h1 { color: #d6b100 !important; text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* SUPERMAN */
+[data-theme="superman"] #header { background: linear-gradient(135deg, #1c2f63, #2b4fa8) !important; border-bottom: 3px solid #FEEB00 !important; }
+[data-theme="superman"] #header h1 { color: #FEEB00 !important; font-weight: 700; }
+
+/* TMNT */
+[data-theme="TMNT"] #header { background: linear-gradient(180deg, #0a1a05, #071204) !important; border-bottom: 3px solid #06A569 !important; }
+[data-theme="TMNT"] #header h1 { color: #19A96F !important; font-weight: 700; }
