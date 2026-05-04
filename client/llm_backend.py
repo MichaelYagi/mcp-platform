@@ -61,7 +61,8 @@ class LLMBackendManager:
         backend = LLMBackendManager.get_backend_type()
 
         if backend == "ollama":
-            llm = ChatOllama(model=model_name, temperature=temperature, **kwargs)
+            ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+            llm = ChatOllama(model=model_name, temperature=temperature, base_url=ollama_base_url, **kwargs)
 
             # Save to cache
             _CURRENT_LLM = llm

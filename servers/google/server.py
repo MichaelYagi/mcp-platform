@@ -294,7 +294,7 @@ def gmail_get_unread(max_results: int = 25) -> str:
             import time as _time_mod
             _time_mod.sleep(1)
             import urllib.request as _urllib_req
-            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
             _model       = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
             _batch_lines = []
             for _i, _em in enumerate(emails, 1):
@@ -432,7 +432,7 @@ def gmail_get_recent(max_results: int = 10) -> str:
             import time as _time_mod
             _time_mod.sleep(1)
             import urllib.request as _urllib_req
-            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
             _model       = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
             _batch_lines = []
             for _i, _em in enumerate(emails, 1):

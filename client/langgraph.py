@@ -121,6 +121,29 @@ def _record_failure(kind: "FailureKind") -> None:
         metrics["failure_kinds"][kind.value] += 1
 
 
+async def llm_ainvoke(llm, messages, poll_interval: float = 0.5):
+    """
+    Cancellable wrapper around llm.ainvoke().
+    Polls is_stop_requested() every poll_interval seconds and cancels
+    the underlying task if a stop is requested, raising asyncio.CancelledError.
+    All LLM calls in this module should use this instead of llm.ainvoke() directly.
+    """
+    task = asyncio.create_task(llm.ainvoke(messages))
+    try:
+        while not task.done():
+            if is_stop_requested():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                raise asyncio.CancelledError("LLM call cancelled: stop requested")
+            await asyncio.sleep(poll_interval)
+        return await task
+    except asyncio.CancelledError:
+        if not task.done():
+            task.cancel()
+        raise
 
 
 class AgentState(TypedDict):
@@ -789,7 +812,7 @@ async def rag_node(state):
         ]
 
         llm = state.get("llm")
-        response = await llm.ainvoke(augmented_messages)
+        response = await llm_ainvoke(llm, augmented_messages)
 
         return {"messages": [response], "llm": state.get("llm")}
 
@@ -921,7 +944,7 @@ async def research_node(state):
         # ATTEMPT 1: Try with full content
         try:
             response = await asyncio.wait_for(
-                llm.ainvoke(augmented_messages),
+                llm_ainvoke(llm, augmented_messages),
                 timeout=600.0
             )
 
@@ -979,7 +1002,7 @@ async def research_node(state):
 
         try:
             summary_response = await asyncio.wait_for(
-                llm.ainvoke([HumanMessage(content=summary_prompt)]),
+                llm_ainvoke(llm, [HumanMessage(content=summary_prompt)]),
                 timeout=120.0
             )
             summarized_content = summary_response.content
@@ -1004,7 +1027,7 @@ async def research_node(state):
 
         try:
             response = await asyncio.wait_for(
-                llm.ainvoke(retry_messages),
+                llm_ainvoke(llm, retry_messages),
                 timeout=300.0
             )
 
@@ -1273,7 +1296,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     )
 
                     augmented_messages = messages + [HumanMessage(content=augmented_prompt)]
-                    response = await base_llm.ainvoke(augmented_messages)
+                    response = await llm_ainvoke(base_llm, augmented_messages)
 
                     # Add note about RAG ingestion
                     if rag_add_tool and ingested_count > 0:
@@ -1750,7 +1773,7 @@ def create_langgraph_agent(llm_with_tools, tools):
             start_time = time.time()
             try:
                 response = await asyncio.wait_for(
-                    base_llm.ainvoke(messages),
+                    llm_ainvoke(base_llm, messages),
                     timeout=300.0
                 )
                 duration = time.time() - start_time
@@ -1849,7 +1872,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                             )
 
                             augmented_messages = messages + [HumanMessage(content=augmented_prompt)]
-                            response = await base_llm.ainvoke(augmented_messages)
+                            response = await llm_ainvoke(base_llm, augmented_messages)
 
                             return {
                                 "messages": [response],
@@ -2152,17 +2175,17 @@ def create_langgraph_agent(llm_with_tools, tools):
                         )
 
                         retry_messages = messages + [HumanMessage(content=augmented_prompt)]
-                        response = await base_llm.ainvoke(retry_messages)
+                        response = await llm_ainvoke(base_llm, retry_messages)
                     else:
                         logger.warning("⚠️ Web search failed - using base LLM")
                         response = await asyncio.wait_for(
-                            base_llm.ainvoke(messages),
+                            llm_ainvoke(base_llm, messages),
                             timeout=300.0
                         )
                 else:
                     logger.warning("⚠️ Web search unavailable - using base LLM")
                     response = await asyncio.wait_for(
-                        base_llm.ainvoke(messages),
+                        llm_ainvoke(base_llm, messages),
                         timeout=300.0
                     )
 
@@ -2235,7 +2258,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 _is_hedging = False
                 if pattern_name == "general" and user_message:
                     try:
-                        _confidence_check = await base_llm.ainvoke([
+                        _confidence_check = await llm_ainvoke(base_llm, [
                             SystemMessage(content="Reply with only YES or NO. No other text."),
                             HumanMessage(content=(
                                 f"Did you have reliable, specific knowledge to answer "
@@ -2261,7 +2284,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                     search_context=_search_result["results"],
                                     user_message=user_message,
                                 )
-                                response = await base_llm.ainvoke(
+                                response = await llm_ainvoke(base_llm,
                                     messages + [HumanMessage(content=_augmented)]
                                 )
                                 current_model = get_model_name(base_llm)
