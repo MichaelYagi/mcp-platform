@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coverage Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+            color: white;
+            padding: 30px;
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .header .subtitle { opacity: 0.9; font-size: 14px; }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        .summary-card {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            border-left: 4px solid #06b6d4;
+        }
+        .summary-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        .summary-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .coverage-bar {
+            height: 40px;
+            background: #e5e7eb;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 20px 30px;
+            position: relative;
+        }
+        .coverage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .packages {
+            padding: 30px;
+        }
+        .packages h2 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #1f2937;
+        }
+        .package {
+            margin-bottom: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .package-header {
+            padding: 15px;
+            background: #f9fafb;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .package-name { color: #1f2937; }
+        .package-coverage {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .class-item {
+            padding: 12px 15px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .class-item:hover {
+            background: #f9fafb;
+        }
+        .class-name {
+            font-size: 14px;
+            color: #4b5563;
+        }
+        .class-coverage {
+            font-size: 13px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+        .coverage-high { background: #d1fae5; color: #065f46; }
+        .coverage-medium { background: #fef3c7; color: #92400e; }
+        .coverage-low { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Coverage Report</h1>
+            <div class="subtitle">Generated on 2026-05-04 10:10:11</div>
+        </div>
+
+        <div class="summary">
+            <div class="summary-card">
+                <div class="summary-label">Line Coverage</div>
+                <div class="summary-value">8.9%</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Lines Covered</div>
+                <div class="summary-value">569</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Total Lines</div>
+                <div class="summary-value">6417</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Branch Coverage</div>
+                <div class="summary-value">0.0%</div>
+            </div>
+        </div>
+
+        <div class="coverage-bar">
+            <div class="coverage-fill" style="width: 8.9%">
+                8.9% Covered
+            </div>
+        </div>
+
+        <div class="packages">
+            <h2>Packages (2)</h2>
+
+            <div class="package">
+                <div class="package-header">
+                    <span class="package-name">.</span>
+                    <span class="package-coverage">9.3% coverage</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">__init__.py</span>
+                    <span class="class-coverage coverage-high">100.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">a2a_client.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">a2a_mcp_bridge.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">capability_registry.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">cli.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">commands.py</span>
+                    <span class="class-coverage coverage-low">3.2%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">context_tracker.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">distributed_skills_manager.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">env_display.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">health.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">health_monitor.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">input_sanitizer.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">langgraph.py</span>
+                    <span class="class-coverage coverage-low">8.4%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">llm_backend.py</span>
+                    <span class="class-coverage coverage-low">22.2%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">logging_handler.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">message_router.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">metrics.py</span>
+                    <span class="class-coverage coverage-low">31.9%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">models.py</span>
+                    <span class="class-coverage coverage-low">33.5%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">multi_agent.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">negotiation_engine.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">ollama_lock.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">performance_metrics.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">query_patterns.py</span>
+                    <span class="class-coverage coverage-low">31.1%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">search_client.py</span>
+                    <span class="class-coverage coverage-low">18.5%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">session_manager.py</span>
+                    <span class="class-coverage coverage-medium">53.6%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">session_state.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">stop_signal.py</span>
+                    <span class="class-coverage coverage-low">48.5%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">tool_meta.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">tool_utils.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">utils.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">websocket.py</span>
+                    <span class="class-coverage coverage-low">17.0%</span>
+                </div>
+
+            </div>
+
+            <div class="package">
+                <div class="package-header">
+                    <span class="package-name">agents</span>
+                    <span class="package-coverage">0.0% coverage</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/__init__.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/analyst.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/base_agent.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/enhanced_base_agent.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/orchestrator.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/planner.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/plex_ingester.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/researcher.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+                <div class="class-item">
+                    <span class="class-name">agents/writer.py</span>
+                    <span class="class-coverage coverage-low">0.0%</span>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

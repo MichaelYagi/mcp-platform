@@ -1,24 +1,42 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from client import models
+
+
+def _make_httpx_response(model_names: list) -> MagicMock:
+    """Build a mock httpx response returning the given model names."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "models": [
+            {"name": name, "details": {"families": ["llm"]}}
+            for name in model_names
+        ]
+    }
+    return mock_resp
+
+
+MOCK_MODEL_NAMES = ["llama3.1:8b", "qwen2.5:7b", "mistral-nemo:latest"]
+
 
 @pytest.mark.unit
 class TestOllamaModels:
-    def test_get_ollama_models_success(self, mock_ollama_list):
+    def test_get_ollama_models_success(self):
         """Test getting Ollama models when available"""
-        with patch("subprocess.check_output", return_value=mock_ollama_list):
+        mock_resp = _make_httpx_response(MOCK_MODEL_NAMES)
+        with patch("httpx.get", return_value=mock_resp):
             model_list = models.get_ollama_models()
-            
+
             assert "llama3.1:8b" in model_list
             assert "qwen2.5:7b" in model_list
             assert len(model_list) == 3
-    
+
     def test_get_ollama_models_not_running(self):
         """Test getting models when Ollama not running"""
-        with patch("subprocess.check_output", side_effect=Exception("Connection refused")):
+        with patch("httpx.get", side_effect=Exception("Connection refused")):
             model_list = models.get_ollama_models()
             assert model_list == []
-    
+
     @pytest.mark.asyncio
     async def test_switch_model_ollama_to_ollama(self, mock_tools, mock_llm):
         """Test switching between Ollama models"""
@@ -31,21 +49,20 @@ class TestOllamaModels:
                     lambda llm, tools: MagicMock(),
                     None
                 )
-                
                 assert agent is not None
-    
+
     def test_detect_backend_ollama(self):
         """Test detecting Ollama backend"""
         with patch("client.models.get_ollama_models", return_value=["llama3.1:8b"]):
             backend = models.detect_backend("llama3.1:8b")
             assert backend == "ollama"
-    
+
     def test_detect_backend_gguf(self, mock_gguf_registry):
         """Test detecting GGUF backend"""
         with patch("client.models.get_ollama_models", return_value=[]):
             backend = models.detect_backend("tinyllama-merged")
             assert backend == "gguf"
-    
+
     def test_detect_backend_not_found(self):
         """Test detecting nonexistent model"""
         with patch("client.models.get_ollama_models", return_value=[]):
@@ -56,28 +73,24 @@ class TestOllamaModels:
 
 @pytest.mark.unit
 class TestGGUFModels:
-    def test_get_all_models_combined(self, mock_ollama_list, mock_gguf_registry):
+    def test_get_all_models_combined(self, mock_gguf_registry):
         """Test getting models from both backends"""
-        with patch("subprocess.check_output", return_value=mock_ollama_list):
+        mock_resp = _make_httpx_response(MOCK_MODEL_NAMES)
+        with patch("httpx.get", return_value=mock_resp):
             all_models = models.get_all_models()
-            
+
             ollama_models = [m for m in all_models if m["backend"] == "ollama"]
             gguf_models = [m for m in all_models if m["backend"] == "gguf"]
-            
+
             assert len(ollama_models) == 3
             assert len(gguf_models) == 2
-    
+
     def test_model_fallback_ollama_to_gguf(self, mock_gguf_registry):
         """Test fallback from Ollama to GGUF when Ollama unavailable"""
         with patch("client.models.get_ollama_models", return_value=[]):
-            backend = models.get_initial_backend()
-            
-            # Should still work if GGUF models available
             all_models = models.get_all_models()
             gguf_only = [m for m in all_models if m["backend"] == "gguf"]
-            
             if gguf_only:
-                # Fallback should have GGUF models
                 assert len(gguf_only) > 0
 
 
@@ -87,10 +100,9 @@ class TestModelPersistence:
         """Test saving and loading last used model"""
         with patch("client.models.MODEL_STATE_FILE", str(temp_dir / "last_model.txt")):
             models.save_last_model("qwen2.5:7b")
-            
             loaded = models.load_last_model()
             assert loaded == "qwen2.5:7b"
-    
+
     def test_load_last_model_not_exists(self, temp_dir):
         """Test loading when file doesn't exist"""
         with patch("client.models.MODEL_STATE_FILE", str(temp_dir / "nonexistent.txt")):

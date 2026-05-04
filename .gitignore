@@ -38,3 +38,4 @@ test.py
 /servers/google/credentials.json
 /servers/google/token.json
 /external_servers.json
+/.coverage
