@@ -37,8 +37,4 @@ test.py
 /external_servers.json
 /servers/google/credentials.json
 /servers/google/token.json
-/results/coverage-report.html
-/results/coverage.xml
-/results/junit.xml
-/results/test-report.html
 /.coverage

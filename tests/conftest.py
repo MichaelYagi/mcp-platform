@@ -33,10 +33,6 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 def pytest_configure(config):
     """Configure pytest environment"""
-    # Create results directory inside tests/
-    results_dir = Path(__file__).parent / "results"
-    results_dir.mkdir(exist_ok=True)
-
     # Set test markers
     config.addinivalue_line("markers", "unit: Unit tests")
     config.addinivalue_line("markers", "integration: Integration tests")
@@ -62,8 +58,8 @@ def pytest_collection_modifyitems(config, items):
 def pytest_sessionfinish(session, exitstatus):
     """Hook that runs after all tests complete - generate HTML from XML"""
     if exitstatus in [0, 1]:  # Success or test failures (but not collection errors)
-        # Results directory is at the project root
-        results_dir = Path(__file__).parent.parent / "results"
+        # Results directory is inside tests/
+        results_dir = Path(__file__).parent / "results"
         html_generator = results_dir / "generate_html.py"
 
         if html_generator.exists():
