@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main, master ]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -19,7 +22,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Cache virtualenv
+      - name: Cache pip
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
@@ -34,10 +37,10 @@ jobs:
           pip install -r tests/requirements.txt
 
       - name: Create results directory
-        run: mkdir -p results
+        run: mkdir -p tests/results
 
       - name: Run tests
-        run: python -m pytest --tb=short
+        run: python -m pytest
         env:
           TESTING: "true"
           LLM_BACKEND: "ollama"
@@ -49,7 +52,7 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: results/
+          path: tests/results/
           retention-days: 30
 
       - name: Notify on failure
