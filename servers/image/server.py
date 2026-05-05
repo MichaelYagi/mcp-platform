@@ -553,9 +553,17 @@ def generate_image_tool(
         seed (int, optional):     Fixed seed for reproducible results. If omitted,
                                   a random seed is generated so each call produces
                                   a unique image. Pass the logged seed to reproduce.
-        model (str, optional):    Pollinations model name (default: gptimage-large).
-                                  Free options: flux, zimage, gptimage, gptimage-large,
-                                  kontext, klein, qwen-image, wan-image
+        model (str, optional):    Pollinations model name (default: flux).
+                                  Available models:
+                                    flux            Flux Schnell — fast, high-quality (default)
+                                    kontext         FLUX.1 Kontext — in-context editing
+                                    gptimage        GPT Image 1 Mini — OpenAI image model
+                                    gptimage-large  GPT Image 1 — highest fidelity
+                                    zimage          Z-Image Turbo — fast Flux with 2x upscaling
+                                    wan-image       Wan 2.7 Image — up to 2K resolution
+                                    qwen-image      Qwen Image Plus — Alibaba text-to-image
+                                    klein           FLUX.2 Klein 4B — fast generation
+                                    ltx-2           LTX-2 — high-quality latent diffusion
 
     Returns:
         JSON string with success (bool), image_source (str), prompt (str),
@@ -568,7 +576,7 @@ def generate_image_tool(
     import urllib.parse as _urlparse
     import random as _random
 
-    _model = model or os.getenv("IMAGE_MODEL", "gptimage-large")
+    _model = model or os.getenv("IMAGE_MODEL", "flux")
     _seed = seed if seed is not None else _random.randint(1, 2**31)
     _encoded_prompt = _urlparse.quote(prompt)
 

@@ -376,15 +376,16 @@ async def handle_command(
                     if desc_line:
                         output.append(f"    {desc_line}")
                     if tool_name == "generate_image_tool":
-                        output.append(f"    Free models (Pollinations.ai):")
+                        output.append(f"    Models (Pollinations.ai — free, no key required):")
                         output.append(f"      flux            Flux Schnell — fast, high-quality (default)")
-                        output.append(f"      zimage          Z-Image Turbo — fast Flux with 2x upscaling")
-                        output.append(f"      gptimage        GPT Image 1 Mini — OpenAI image model")
-                        output.append(f"      gptimage-large  GPT Image 1.5 — highest fidelity")
                         output.append(f"      kontext         FLUX.1 Kontext — in-context editing")
-                        output.append(f"      klein           FLUX.2 Klein 4B — fast generation")
-                        output.append(f"      qwen-image      Qwen Image Plus — Alibaba text-to-image")
+                        output.append(f"      gptimage        GPT Image 1 Mini — OpenAI image model")
+                        output.append(f"      gptimage-large  GPT Image 1 — highest fidelity")
+                        output.append(f"      zimage          Z-Image Turbo — fast Flux with 2x upscaling")
                         output.append(f"      wan-image       Wan 2.7 Image — up to 2K resolution")
+                        output.append(f"      qwen-image      Qwen Image Plus — Alibaba text-to-image")
+                        output.append(f"      klein           FLUX.2 Klein 4B — fast generation")
+                        output.append(f"      ltx-2           LTX-2 — high-quality latent diffusion")
                     if tool_name == "improve_text_tool":
                         output.append(f"    Modes:")
                         output.append(f"      improve   Improve clarity and flow (default)")
