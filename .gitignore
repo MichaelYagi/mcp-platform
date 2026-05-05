@@ -39,3 +39,4 @@ test.py
 /servers/google/token.json
 /.coverage
 /node_modules/
+/tests/js-results/
