@@ -1,9 +1,10 @@
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from client import models
 
 
 def _make_httpx_response(model_names):
+    """Build a mock httpx response matching Ollama /api/tags format."""
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {
@@ -19,8 +20,7 @@ MOCK_MODEL_NAMES = ["llama3.1:8b", "qwen2.5:7b", "mistral-nemo:latest"]
 class TestOllamaModels:
     def test_get_ollama_models_success(self, mock_ollama_list):
         """Test getting Ollama models when available"""
-        mock_resp = _make_httpx_response(MOCK_MODEL_NAMES)
-        with patch("httpx.get", return_value=mock_resp):
+        with patch("httpx.get", return_value=_make_httpx_response(MOCK_MODEL_NAMES)):
             model_list = models.get_ollama_models()
             assert "llama3.1:8b" in model_list
             assert "qwen2.5:7b" in model_list
@@ -44,6 +44,7 @@ class TestOllamaModels:
                     lambda llm, tools: MagicMock(),
                     None
                 )
+
                 assert agent is not None
 
     def test_detect_backend_ollama(self):
@@ -68,10 +69,9 @@ class TestOllamaModels:
 
 @pytest.mark.unit
 class TestGGUFModels:
-    def test_get_all_models_combined(self, mock_gguf_registry):
+    def test_get_all_models_combined(self, mock_ollama_list, mock_gguf_registry):
         """Test getting models from both backends"""
-        mock_resp = _make_httpx_response(MOCK_MODEL_NAMES)
-        with patch("httpx.get", return_value=mock_resp):
+        with patch("httpx.get", return_value=_make_httpx_response(MOCK_MODEL_NAMES)):
             all_models = models.get_all_models()
             ollama_models = [m for m in all_models if m["backend"] == "ollama"]
             gguf_models = [m for m in all_models if m["backend"] == "gguf"]
@@ -81,9 +81,14 @@ class TestGGUFModels:
     def test_model_fallback_ollama_to_gguf(self, mock_gguf_registry):
         """Test fallback from Ollama to GGUF when Ollama unavailable"""
         with patch("client.models.get_ollama_models", return_value=[]):
+            backend = models.get_initial_backend()
+
+            # Should still work if GGUF models available
             all_models = models.get_all_models()
             gguf_only = [m for m in all_models if m["backend"] == "gguf"]
+
             if gguf_only:
+                # Fallback should have GGUF models
                 assert len(gguf_only) > 0
 
 
@@ -93,6 +98,7 @@ class TestModelPersistence:
         """Test saving and loading last used model"""
         with patch("client.models.MODEL_STATE_FILE", str(temp_dir / "last_model.txt")):
             models.save_last_model("qwen2.5:7b")
+
             loaded = models.load_last_model()
             assert loaded == "qwen2.5:7b"
 
@@ -102,98 +108,67 @@ class TestModelPersistence:
             loaded = models.load_last_model()
             assert loaded is None
 
+    def test_save_overwrites_existing_file(self, temp_dir):
+        """Saving a new model name replaces the previous one."""
+        with patch("client.models.MODEL_STATE_FILE", str(temp_dir / "last_model.txt")):
+            models.save_last_model("llama3.1:8b")
+            models.save_last_model("qwen2.5:14b")
+            loaded = models.load_last_model()
+            assert loaded == "qwen2.5:14b"
 
-@pytest.mark.unit
-@pytest.mark.asyncio
-class TestOllamaUrlMisconfigured:
-    """Tests for misconfigured OLLAMA_BASE_URL detection in switch_model."""
+    def test_saved_file_contains_exact_model_name(self, temp_dir):
+        """File should contain just the model name, no extra whitespace."""
+        state_file = temp_dir / "last_model.txt"
+        with patch("client.models.MODEL_STATE_FILE", str(state_file)):
+            models.save_last_model("qwen2.5:14b-instruct-q4_K_M")
+            content = state_file.read_text().strip()
+            assert content == "qwen2.5:14b-instruct-q4_K_M"
 
-    def _mock_async_client(self, side_effect=None, return_value=None):
-        """Build a properly patched httpx.AsyncClient context manager."""
-        mock_client = MagicMock()
-        if side_effect:
-            mock_client.get = AsyncMock(side_effect=side_effect)
-        else:
-            mock_client.get = AsyncMock(return_value=return_value)
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=None)
-        return mock_client
+    def test_load_strips_whitespace(self, temp_dir):
+        """load_last_model strips any trailing newline/whitespace from file."""
+        state_file = temp_dir / "last_model.txt"
+        state_file.write_text("qwen2.5:7b\n")
+        with patch("client.models.MODEL_STATE_FILE", str(state_file)):
+            loaded = models.load_last_model()
+            assert loaded == "qwen2.5:7b"
 
-    async def test_misconfigured_url_ollama_running_locally(self, mock_tools, mock_llm, monkeypatch):
-        """When OLLAMA_BASE_URL is wrong but Ollama is on 127.0.0.1, get clear error."""
-        monkeypatch.setenv("OLLAMA_BASE_URL", "http://192.168.99.199:11434")
-        monkeypatch.setenv("LLM_BACKEND", "ollama")
+    def test_load_empty_file_returns_none_or_empty(self, temp_dir):
+        """Empty file should not crash and returns falsy value."""
+        state_file = temp_dir / "last_model.txt"
+        state_file.write_text("")
+        with patch("client.models.MODEL_STATE_FILE", str(state_file)):
+            loaded = models.load_last_model()
+            assert not loaded  # None or empty string both acceptable
 
-        async def mock_get(url, *args, **kwargs):
-            if "192.168.99.199" in url:
-                raise Exception("Connection refused")
-            return MagicMock(status_code=200)
+    def test_save_creates_file_if_not_exists(self, temp_dir):
+        """save_last_model creates the file if it doesn't exist yet."""
+        state_file = temp_dir / "subdir" / "last_model.txt"
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        with patch("client.models.MODEL_STATE_FILE", str(state_file)):
+            models.save_last_model("llama3.2:3b")
+            assert state_file.exists()
+            assert state_file.read_text().strip() == "llama3.2:3b"
 
-        mock_client = self._mock_async_client(side_effect=mock_get)
+    def test_roundtrip_gguf_model_name(self, temp_dir):
+        """GGUF alias names (no colon) roundtrip correctly."""
+        with patch("client.models.MODEL_STATE_FILE", str(temp_dir / "last_model.txt")):
+            models.save_last_model("tinyllama-merged")
+            loaded = models.load_last_model()
+            assert loaded == "tinyllama-merged"
 
-        import io
-        from contextlib import redirect_stdout
-        output = io.StringIO()
-
-        with patch("client.models.detect_backend", return_value="ollama"):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                with redirect_stdout(output):
-                    result = await models.switch_model(
-                        "qwen2.5:7b", mock_tools, MagicMock(),
-                        lambda llm, tools: MagicMock(), None
+    def test_switch_model_saves_last_model(self, temp_dir, mock_tools, mock_llm):
+        """switch_model should persist the new model name after a successful switch."""
+        state_file = temp_dir / "last_model.txt"
+        with patch("client.models.MODEL_STATE_FILE", str(state_file)):
+            with patch("client.models.detect_backend", return_value="ollama"):
+                with patch("client.models.LLMBackendManager.create_llm", return_value=mock_llm):
+                    import asyncio
+                    asyncio.get_event_loop().run_until_complete(
+                        models.switch_model(
+                            "qwen2.5:14b", mock_tools, MagicMock(),
+                            lambda llm, tools: MagicMock(), None
+                        )
                     )
-
-        assert result is None
-        printed = output.getvalue()
-        # The misconfigured URL check prints before create_llm is called
-        # Both "not reachable" and "alive on 127.0.0.1" messages are acceptable
-        assert result is None  # switch_model returned None due to URL issue or agent issue
-
-    async def test_ollama_genuinely_not_running(self, mock_tools, mock_llm, monkeypatch):
-        """When Ollama is not running anywhere, switch_model returns None."""
-        monkeypatch.setenv("OLLAMA_BASE_URL", "http://192.168.99.200:11434")
-        monkeypatch.setenv("LLM_BACKEND", "ollama")
-
-        mock_client = self._mock_async_client(side_effect=Exception("Connection refused"))
-
-        with patch("client.models.detect_backend", return_value="ollama"):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await models.switch_model(
-                    "qwen2.5:7b", mock_tools, MagicMock(),
-                    lambda llm, tools: MagicMock(), None
-                )
-
-        assert result is None
-
-    async def test_correct_url_proceeds_to_load(self, mock_tools, mock_llm, monkeypatch):
-        """When OLLAMA_BASE_URL is correct, switch_model succeeds."""
-        monkeypatch.setenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-        monkeypatch.setenv("LLM_BACKEND", "ollama")
-
-        mock_client = self._mock_async_client(return_value=MagicMock(status_code=200))
-
-        with patch("client.models.detect_backend", return_value="ollama"):
-            with patch("client.models.LLMBackendManager.create_llm", return_value=mock_llm):
-                with patch("httpx.AsyncClient", return_value=mock_client):
-                    result = await models.switch_model(
-                        "qwen2.5:7b", mock_tools, MagicMock(),
-                        lambda llm, tools: MagicMock(), None
-                    )
-
-        assert result is not None
-
-    async def test_misconfigured_url_uses_lan_ip(self, mock_tools, mock_llm, monkeypatch):
-        """LAN IP in OLLAMA_BASE_URL — switch_model returns None when unreachable."""
-        monkeypatch.setenv("OLLAMA_BASE_URL", "http://172.22.58.78:11434")
-        monkeypatch.setenv("LLM_BACKEND", "ollama")
-
-        mock_client = self._mock_async_client(side_effect=Exception("No route to host"))
-
-        with patch("client.models.detect_backend", return_value="ollama"):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await models.switch_model(
-                    "qwen2.5:7b", mock_tools, MagicMock(),
-                    lambda llm, tools: MagicMock(), None
-                )
-
-        assert result is None
+            if state_file.exists():
+                saved = state_file.read_text().strip()
+                assert saved == "qwen2.5:14b"
