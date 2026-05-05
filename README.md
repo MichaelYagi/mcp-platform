@@ -490,7 +490,7 @@ Routing is driven by `triggers` in each tool's `@tool_meta` decorator — no man
 
 **Force a specific tool:**
 ```
-Using shashin_search_tool, find photos of Noah
+Using shashin_search_tool, find photos of Bob
 Using web_image_search_tool, show me a red panda
 ```
 
