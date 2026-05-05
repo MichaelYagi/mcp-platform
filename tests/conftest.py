@@ -33,6 +33,10 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 def pytest_configure(config):
     """Configure pytest environment"""
+    # Create results directory (relative to where pytest runs from)
+    results_dir = Path("results")
+    results_dir.mkdir(exist_ok=True)
+
     # Set test markers
     config.addinivalue_line("markers", "unit: Unit tests")
     config.addinivalue_line("markers", "integration: Integration tests")
@@ -58,8 +62,8 @@ def pytest_collection_modifyitems(config, items):
 def pytest_sessionfinish(session, exitstatus):
     """Hook that runs after all tests complete - generate HTML from XML"""
     if exitstatus in [0, 1]:  # Success or test failures (but not collection errors)
-        # Results directory is inside tests/
-        results_dir = Path(__file__).parent / "results"
+        # Results directory is wherever pytest was run from + results/
+        results_dir = Path("results").absolute()
         html_generator = results_dir / "generate_html.py"
 
         if html_generator.exists():
@@ -122,6 +126,22 @@ def temp_dir():
     """Temporary directory for test files"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
+
+
+@pytest.fixture(autouse=True)
+def protect_last_model_file(tmp_path):
+    """
+    Autouse fixture — patches MODEL_STATE_FILE for every test so no test
+    can accidentally write to the real last_model.txt and change the active
+    model in the running client.
+    """
+    fake_state_file = tmp_path / "last_model.txt"
+    try:
+        with patch("client.models.MODEL_STATE_FILE", str(fake_state_file)):
+            yield fake_state_file
+    except Exception:
+        # models.py may not be importable in all test contexts — fail silently
+        yield fake_state_file
 
 
 # ═══════════════════════════════════════════════════════════════════

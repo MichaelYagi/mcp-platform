@@ -156,19 +156,17 @@ class TestModelPersistence:
             loaded = models.load_last_model()
             assert loaded == "tinyllama-merged"
 
-    def test_switch_model_saves_last_model(self, temp_dir, mock_tools, mock_llm):
+    @pytest.mark.asyncio
+    async def test_switch_model_saves_last_model(self, temp_dir, mock_tools, mock_llm):
         """switch_model should persist the new model name after a successful switch."""
         state_file = temp_dir / "last_model.txt"
         with patch("client.models.MODEL_STATE_FILE", str(state_file)):
             with patch("client.models.detect_backend", return_value="ollama"):
                 with patch("client.models.LLMBackendManager.create_llm", return_value=mock_llm):
-                    import asyncio
-                    asyncio.get_event_loop().run_until_complete(
-                        models.switch_model(
-                            "qwen2.5:14b", mock_tools, MagicMock(),
-                            lambda llm, tools: MagicMock(), None
-                        )
+                    await models.switch_model(
+                        "qwen2.5:14b", mock_tools, MagicMock(),
+                        lambda llm, tools: MagicMock(), None
                     )
-            if state_file.exists():
-                saved = state_file.read_text().strip()
-                assert saved == "qwen2.5:14b"
+        # File must exist and contain exactly the model name
+        assert state_file.exists(), "switch_model did not write last_model.txt"
+        assert state_file.read_text().strip() == "qwen2.5:14b"
