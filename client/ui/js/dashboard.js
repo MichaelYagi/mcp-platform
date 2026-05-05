@@ -347,3 +347,21 @@ function connectWebSocket() {
 initCharts();
 setupResetButton();
 connectWebSocket();
+
+// ── Test exports (Node/Jest only — no effect in browser) ─────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        formatTimestamp,
+        hexToRgba,
+        fmtSec,
+        getThemeColors,
+        updateStatus,
+        updatePercentileCards,
+        updateFailureKinds,
+        renderHistogram,
+        buildMiniHistogram,
+        updateMetrics,
+        updateLineChart,
+        updateToolsDisplay,
+    };
+}

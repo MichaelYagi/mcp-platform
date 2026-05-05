@@ -1,0 +1,65 @@
+{
+  "name": "mcp-client-ui",
+  "version": "1.0.0",
+  "description": "JS tests for MCP Client UI",
+  "private": true,
+  "scripts": {
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --coverage --ci"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-junit": "^16.0.0",
+    "jest-html-reporter": "^3.10.2"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "<rootDir>/tests/js/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "client/ui/js/index.js",
+      "client/ui/js/dashboard.js"
+    ],
+    "coverageDirectory": "tests/js-results/coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/js/setup.js"
+    ],
+    "reporters": [
+      "default",
+      [
+        "jest-junit",
+        {
+          "outputDirectory": "tests/js-results",
+          "outputName": "junit.xml",
+          "classNameTemplate": "{classname}",
+          "titleTemplate": "{title}"
+        }
+      ],
+      [
+        "jest-html-reporter",
+        {
+          "outputPath": "tests/js-results/test-report.html",
+          "pageTitle": "MCP Client UI - JS Test Report",
+          "includeFailureMsg": true,
+          "includeSuiteFailure": true
+        }
+      ]
+    ],
+    "coverageThreshold": {
+      "global": {
+        "lines": 25
+      },
+      "./client/ui/js/dashboard.js": {
+        "lines": 75
+      }
+    }
+  }
+}

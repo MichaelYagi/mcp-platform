@@ -22,6 +22,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
       - name: Cache pip
         uses: actions/cache@v4
         with:
@@ -30,50 +36,147 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r tests/requirements.txt
 
-      - name: Create results directory
-        run: mkdir -p tests/results
+      - name: Install JS dependencies
+        run: npm ci
 
-      - name: Run tests
-        run: python -m pytest
+      - name: Create results directories
+        run: |
+          mkdir -p tests/results
+          mkdir -p tests/js-results
+
+      - name: Run Python tests
+        id: python_tests
+        run: python -m pytest 2>&1 | tee tests/results/pytest.log
         env:
           TESTING: "true"
           LLM_BACKEND: "ollama"
           OLLAMA_BASE_URL: "http://127.0.0.1:11434"
           DISABLED_TOOLS: ""
+        continue-on-error: true
 
-      - name: Upload test results
+      - name: Run JS tests
+        id: js_tests
+        run: npm test 2>&1 | tee tests/js-results/jest.log
+        continue-on-error: true
+
+      - name: Detect Python failure type
+        if: steps.python_tests.outcome == 'failure'
+        id: py_failure_type
+        run: |
+          if grep -q "FAILED tests/" tests/results/pytest.log; then
+            echo "type=test_failure" >> $GITHUB_OUTPUT
+          elif grep -q "Required test coverage" tests/results/pytest.log; then
+            echo "type=coverage_drop" >> $GITHUB_OUTPUT
+          else
+            echo "type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Detect JS failure type
+        if: steps.js_tests.outcome == 'failure'
+        id: js_failure_type
+        run: |
+          if grep -q "FAIL tests/js" tests/js-results/jest.log; then
+            echo "type=test_failure" >> $GITHUB_OUTPUT
+          elif grep -q "Jest: .* coverage threshold" tests/js-results/jest.log; then
+            echo "type=coverage_drop" >> $GITHUB_OUTPUT
+          else
+            echo "type=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload all test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: tests/results/
+          path: |
+            tests/results/
+            tests/js-results/
           retention-days: 30
 
-      - name: Notify on failure
-        if: failure()
+      - name: Notify — Python test failures
+        if: steps.py_failure_type.outputs.type == 'test_failure'
         uses: actions/github-script@v7
         with:
           script: |
-            const { owner, repo } = context.repo;
-            const run_url = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const log = require('fs').readFileSync('tests/results/pytest.log', 'utf8');
+            const failed = (log.match(/FAILED tests\/[^\n]+/g) || []).slice(0, 10).join('\n');
+            const run_url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             await github.rest.issues.create({
-              owner,
-              repo,
-              title: `❌ Tests failed on ${context.ref} (${context.sha.slice(0,7)})`,
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `❌ Python tests failed — ${context.ref} (${context.sha.slice(0,7)})`,
               body: [
-                `## Test Failure`,
-                ``,
-                `**Branch:** \`${context.ref}\``,
-                `**Commit:** \`${context.sha.slice(0,7)}\``,
-                `**Triggered by:** ${context.eventName}`,
-                ``,
+                `## Python Test Failures`,
+                `**Branch:** \`${context.ref}\`  **Commit:** \`${context.sha.slice(0,7)}\``,
+                `\`\`\`\n${failed || 'See run log for details'}\n\`\`\``,
                 `[View failed run](${run_url})`,
               ].join('\n'),
               labels: ['test-failure', 'bug']
             });
+
+      - name: Notify — Python coverage drop
+        if: steps.py_failure_type.outputs.type == 'coverage_drop'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const log = require('fs').readFileSync('tests/results/pytest.log', 'utf8');
+            const match = log.match(/Total coverage: [\d.]+%/);
+            const run_url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `📉 Python coverage dropped — ${context.ref} (${context.sha.slice(0,7)})`,
+              body: [
+                `## Python Coverage Regression`,
+                `All tests passed but **${match ? match[0] : 'coverage'}** fell below threshold.`,
+                `**Branch:** \`${context.ref}\`  **Commit:** \`${context.sha.slice(0,7)}\``,
+                `[View coverage report](${run_url})`,
+              ].join('\n'),
+              labels: ['coverage', 'needs-tests']
+            });
+
+      - name: Notify — JS test failures
+        if: steps.js_failure_type.outputs.type == 'test_failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const log = require('fs').readFileSync('tests/js-results/jest.log', 'utf8');
+            const failed = (log.match(/✕[^\n]+/g) || []).slice(0, 10).join('\n');
+            const run_url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `❌ JS tests failed — ${context.ref} (${context.sha.slice(0,7)})`,
+              body: [
+                `## JavaScript Test Failures`,
+                `**Branch:** \`${context.ref}\`  **Commit:** \`${context.sha.slice(0,7)}\``,
+                `\`\`\`\n${failed || 'See run log for details'}\n\`\`\``,
+                `[View failed run](${run_url})`,
+              ].join('\n'),
+              labels: ['test-failure', 'bug']
+            });
+
+      - name: Notify — JS coverage drop
+        if: steps.js_failure_type.outputs.type == 'coverage_drop'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run_url = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title: `📉 JS coverage dropped — ${context.ref} (${context.sha.slice(0,7)})`,
+              body: [
+                `## JavaScript Coverage Regression`,
+                `All JS tests passed but coverage fell below threshold.`,
+                `**Branch:** \`${context.ref}\`  **Commit:** \`${context.sha.slice(0,7)}\``,
+                `[View coverage report](${run_url})`,
+              ].join('\n'),
+              labels: ['coverage', 'needs-tests']
+            });
+
+      - name: Fail job if any tests failed
+        if: steps.python_tests.outcome == 'failure' || steps.js_tests.outcome == 'failure'
+        run: exit 1

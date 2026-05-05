@@ -2261,3 +2261,30 @@ if (_toolsCloseBtn) _toolsCloseBtn.addEventListener('click', toggleToolsPanel);
 
     syncCursor();
 })();
+
+// ── Test exports (Node/Jest only — no effect in browser) ─────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        themeIdToLabel,
+        discoverThemes,
+        applyTheme,
+        escapeHtml,
+        escapeAttr,
+        makeSnippet,
+        formatSessionDate,
+        loadMultiAgentSetting,
+        getFavorites,
+        setFavorites,
+        isFavorite,
+        toggleFavorite,
+        addFavorite,
+        removeFavorite,
+        buildToolPrompts,
+        getToolPrompt,
+        toggleSessionMenu,
+        addMessage,
+        updateProgressBar,
+        toggleLogFilter,
+        updateSystemStats,
+    };
+}

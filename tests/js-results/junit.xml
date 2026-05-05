@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="94" failures="0" errors="0" time="18.655">
+  <testsuite name="themeIdToLabel" errors="0" failures="0" skipped="0" timestamp="2026-05-05T01:22:40" time="4.585" tests="54">
+    <testcase classname="themeIdToLabel" name="returns override for known ids" time="0.17">
+    </testcase>
+    <testcase classname="themeIdToLabel" name="capitalises unknown ids" time="0.002">
+    </testcase>
+    <testcase classname="themeIdToLabel" name="handles single character" time="0.001">
+    </testcase>
+    <testcase classname="escapeHtml" name="escapes &lt; and &gt;" time="0.002">
+    </testcase>
+    <testcase classname="escapeHtml" name="escapes ampersand" time="0.001">
+    </testcase>
+    <testcase classname="escapeHtml" name="plain text unchanged" time="0">
+    </testcase>
+    <testcase classname="escapeAttr" name="escapes double quotes" time="0">
+    </testcase>
+    <testcase classname="escapeAttr" name="escapes single quotes" time="0.001">
+    </testcase>
+    <testcase classname="escapeAttr" name="leaves plain strings" time="0.001">
+    </testcase>
+    <testcase classname="escapeAttr" name="coerces non-string" time="0">
+    </testcase>
+    <testcase classname="escapeRegex" name="escapes dot" time="0.001">
+    </testcase>
+    <testcase classname="escapeRegex" name="escapes parens" time="0.001">
+    </testcase>
+    <testcase classname="escapeRegex" name="escapes brackets" time="0">
+    </testcase>
+    <testcase classname="escapeRegex" name="plain text unchanged" time="0.001">
+    </testcase>
+    <testcase classname="escapeRegex" name="escapes star" time="0">
+    </testcase>
+    <testcase classname="escapeRegex" name="escapes pipe" time="0.001">
+    </testcase>
+    <testcase classname="makeSnippet" name="highlights matching term" time="0.001">
+    </testcase>
+    <testcase classname="makeSnippet" name="case insensitive match" time="0.001">
+    </testcase>
+    <testcase classname="makeSnippet" name="truncates when no match" time="0">
+    </testcase>
+    <testcase classname="makeSnippet" name="adds ellipsis when context trimmed" time="0">
+    </testcase>
+    <testcase classname="makeSnippet" name="no match returns start of string" time="0.001">
+    </testcase>
+    <testcase classname="formatSessionDate" name="returns empty string for falsy" time="0.001">
+    </testcase>
+    <testcase classname="formatSessionDate" name="returns Today for current date" time="0.001">
+    </testcase>
+    <testcase classname="formatSessionDate" name="returns Yesterday for yesterday" time="0">
+    </testcase>
+    <testcase classname="formatSessionDate" name="returns formatted date for older" time="0.016">
+    </testcase>
+    <testcase classname="loadMultiAgentSetting" name="returns false when nothing saved" time="0.001">
+    </testcase>
+    <testcase classname="loadMultiAgentSetting" name="returns true when saved as &quot;true&quot;" time="0">
+    </testcase>
+    <testcase classname="loadMultiAgentSetting" name="returns false when saved as &quot;false&quot;" time="0">
+    </testcase>
+    <testcase classname="Favorites" name="isFavorite false for unknown tool" time="0.001">
+    </testcase>
+    <testcase classname="Favorites" name="toggleFavorite adds and returns true" time="0.001">
+    </testcase>
+    <testcase classname="Favorites" name="toggleFavorite removes and returns false" time="0">
+    </testcase>
+    <testcase classname="Favorites" name="addFavorite adds tool" time="0.001">
+    </testcase>
+    <testcase classname="Favorites" name="addFavorite is idempotent" time="0.001">
+    </testcase>
+    <testcase classname="Favorites" name="removeFavorite removes tool" time="0">
+    </testcase>
+    <testcase classname="Favorites" name="removeFavorite on unknown is safe" time="0.001">
+    </testcase>
+    <testcase classname="getToolPrompt" name="returns example when available" time="0">
+    </testcase>
+    <testcase classname="getToolPrompt" name="generates from params when no example" time="0.001">
+    </testcase>
+    <testcase classname="getToolPrompt" name="bare use command when no params" time="0.001">
+    </testcase>
+    <testcase classname="getToolPrompt" name="ignores tools without example" time="0.001">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="user message appended to chat" time="0.003">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="assistant message wrapped in msg-wrapper" time="0.003">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="skips [TextContent( prefix" time="0.002">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="skips empty text with no image" time="0.001">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="multi-agent assistant gets extra class" time="0.003">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="fallback model names shown as MCP" time="0.002">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="real model name shown as-is" time="0.002">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="image URL creates img element" time="0.002">
+    </testcase>
+    <testcase classname="addMessage (DOM)" name="messageId set on user message element" time="0.005">
+    </testcase>
+    <testcase classname="updateProgressBar (DOM)" name="sets width" time="0.001">
+    </testcase>
+    <testcase classname="updateProgressBar (DOM)" name="adds critical above 80%" time="0.001">
+    </testcase>
+    <testcase classname="updateProgressBar (DOM)" name="adds high between 60 and 80%" time="0.001">
+    </testcase>
+    <testcase classname="updateProgressBar (DOM)" name="no class below 60%" time="0.001">
+    </testcase>
+    <testcase classname="toggleLogFilter (DOM)" name="removes level from filters" time="0.003">
+    </testcase>
+    <testcase classname="toggleLogFilter (DOM)" name="adds level back when re-toggled" time="0.002">
+    </testcase>
+  </testsuite>
+  <testsuite name="formatTimestamp" errors="0" failures="0" skipped="0" timestamp="2026-05-05T01:22:40" time="4.913" tests="40">
+    <testcase classname="formatTimestamp" name="returns HH:MM:SS format" time="0.317">
+    </testcase>
+    <testcase classname="formatTimestamp" name="returns a string" time="0.014">
+    </testcase>
+    <testcase classname="hexToRgba" name="#3498db" time="0.012">
+    </testcase>
+    <testcase classname="hexToRgba" name="#ffffff" time="0.01">
+    </testcase>
+    <testcase classname="hexToRgba" name="#000000" time="0.011">
+    </testcase>
+    <testcase classname="hexToRgba" name="#e74c3c" time="0.011">
+    </testcase>
+    <testcase classname="fmtSec" name="dash for 0" time="0.012">
+    </testcase>
+    <testcase classname="fmtSec" name="dash for null" time="0.012">
+    </testcase>
+    <testcase classname="fmtSec" name="dash for undefined" time="0.012">
+    </testcase>
+    <testcase classname="fmtSec" name="1.5 → 1.50s" time="0.012">
+    </testcase>
+    <testcase classname="fmtSec" name="0.123 → 0.12s" time="0.012">
+    </testcase>
+    <testcase classname="fmtSec" name="120.999 → 121.00s" time="0.01">
+    </testcase>
+    <testcase classname="updateStatus (DOM)" name="connected adds class and sets text" time="0.012">
+    </testcase>
+    <testcase classname="updateStatus (DOM)" name="disconnected removes class and sets text" time="0.018">
+    </testcase>
+    <testcase classname="updatePercentileCards (DOM)" name="sets agent percentile values" time="0.008">
+    </testcase>
+    <testcase classname="updatePercentileCards (DOM)" name="sets llm percentile values" time="0.009">
+    </testcase>
+    <testcase classname="updatePercentileCards (DOM)" name="shows dash for zero values" time="0.011">
+    </testcase>
+    <testcase classname="updateFailureKinds (DOM)" name="shows no-data when empty" time="0.01">
+    </testcase>
+    <testcase classname="updateFailureKinds (DOM)" name="shows no-data when all zero" time="0.009">
+    </testcase>
+    <testcase classname="updateFailureKinds (DOM)" name="renders correct number of cards" time="0.016">
+    </testcase>
+    <testcase classname="updateFailureKinds (DOM)" name="sorts by count descending" time="0.012">
+    </testcase>
+    <testcase classname="updateFailureKinds (DOM)" name="shows correct percentage" time="0.013">
+    </testcase>
+    <testcase classname="updateFailureKinds (DOM)" name="uses correct color for retryable" time="0.011">
+    </testcase>
+    <testcase classname="renderHistogram (DOM)" name="renders correct number of bars" time="0.011">
+    </testcase>
+    <testcase classname="renderHistogram (DOM)" name="no-op when histogram is null" time="0.011">
+    </testcase>
+    <testcase classname="renderHistogram (DOM)" name="tallest bar gets 100% height" time="0.018">
+    </testcase>
+    <testcase classname="renderHistogram (DOM)" name="shows bar counts" time="0.008">
+    </testcase>
+    <testcase classname="renderHistogram (DOM)" name="uses provided bucket order" time="0.008">
+    </testcase>
+    <testcase classname="buildMiniHistogram" name="returns HTML string" time="0.006">
+    </testcase>
+    <testcase classname="buildMiniHistogram" name="wraps in mini-histogram div" time="0.008">
+    </testcase>
+    <testcase classname="buildMiniHistogram" name="correct number of bar groups" time="0.006">
+    </testcase>
+    <testcase classname="buildMiniHistogram" name="tallest bar is 100%" time="0.007">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="updates tool call count" time="0.014">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="updates LLM call count" time="0.009">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="updates agent run count" time="0.009">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="formats error rate" time="0.011">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="renders failure cards" time="0.015">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="renders histograms" time="0.011">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="no-data when no tools" time="0.01">
+    </testcase>
+    <testcase classname="updateMetrics (DOM)" name="renders tool cards" time="0.016">
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -24,6 +24,7 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 ## Prerequisites
 
 * Python 3.12+
+* Node.js 18+ (for JS tests)
 * 16GB+ RAM recommended
 * Ollama installed
 
@@ -311,60 +312,124 @@ A2A_EXPOSED_TOOLS=plex,location,text   # empty = expose all
 
 ## 6. Testing
 
-### Running Tests
+The project has two independent test suites — Python (pytest) and JavaScript (Jest) — with a single script to run both.
 
-Activate your virtualenv first, then run from the project root:
+### First-time setup
 
 ```bash
-source .venv/bin/activate        # Linux/macOS
-.venv\Scripts\activate           # Windows PowerShell
+# Python dependencies (if not already installed)
+source .venv/bin/activate
+pip install -r tests/requirements.txt
 
-python -m pytest                 # all tests
-python -m pytest -m unit         # fast unit tests only
-python -m pytest -m integration  # integration tests
-python -m pytest -m e2e          # end-to-end tests
+# JavaScript dependencies
+npm install
+
+# Make the run script executable (Linux/WSL2)
+chmod +x run_tests.sh
+```
+
+### Running tests
+
+```bash
+./run_tests.sh              # both Python + JS with coverage
+./run_tests.sh --py-only    # Python only
+./run_tests.sh --js-only    # JS only
+./run_tests.sh --no-coverage  # skip coverage (faster)
+```
+
+**Python tests directly:**
+```bash
+python -m pytest                 # all tests with coverage
 python -m pytest --no-cov        # skip coverage (faster)
+python -m pytest -m unit         # unit tests only
+python -m pytest -m integration  # integration tests only
+python -m pytest -m e2e          # end-to-end tests only
 python -m pytest -x              # stop on first failure
 python -m pytest -k "session"    # filter by name
 ```
 
-### Test Structure
+**JS tests directly:**
+```bash
+npm test           # all JS tests with coverage
+npm run test:watch # watch mode during development
+```
+
+### Test structure
 
 ```
 tests/
 ├── conftest.py
-├── pytest.ini
+├── js/
+│   ├── setup.js                  <- browser API mocks + shared helpers
+│   ├── test_index.test.js        <- tests for client/ui/js/index.js
+│   └── test_dashboard.test.js    <- tests for client/ui/js/dashboard.js
 ├── unit/
 │   ├── test_session_manager.py
+│   ├── test_session_manager_extended.py
 │   ├── test_models.py
 │   ├── test_context_tracker.py
 │   ├── test_intent_patterns.py
+│   ├── test_query_patterns.py
+│   ├── test_query_patterns_extended.py
+│   ├── test_commands.py
+│   ├── test_commands_extended.py
+│   ├── test_metrics.py
+│   ├── test_search_client.py
+│   ├── test_langgraph.py
+│   ├── test_websocket_extended.py
+│   ├── test_utils_extended.py
+│   ├── test_coverage_boost.py
+│   ├── test_coverage_final.py
 │   └── test_code_review_tools.py
 ├── integration/
 │   ├── test_websocket_flow.py
 │   └── test_langgraph_agent.py
-└── e2e/
-    └── test_full_conversation.py
+├── e2e/
+│   └── test_full_conversation.py
+└── results/                      <- generated after each Python test run
+    ├── junit.xml
+    ├── coverage.xml
+    ├── test-report.html
+    ├── coverage-report.html
+    └── generate_html.py
 
-results/                    <- generated after running tests
-├── junit.xml
-├── coverage.xml
-├── test-report.html
-├── coverage-report.html
-└── generate_html.py
+tests/js-results/                 <- generated after each JS test run
+    ├── junit.xml
+    ├── test-report.html
+    └── coverage/
+        └── lcov-report/
+            └── index.html        <- interactive line-by-line JS coverage
 ```
+
+### Coverage thresholds
+
+| Suite | Threshold | Notes |
+|-------|-----------|-------|
+| Python | 22% | Hard ceiling ~35% due to LLM-dependent graph nodes |
+| JavaScript | 30% | Pure functions and DOM logic |
+
+Coverage drops below threshold fail the CI build and open a GitHub Issue automatically.
 
 ### CI/CD
 
-Tests run automatically on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`). On failure, a GitHub Issue is opened automatically with a link to the failed run.
+Tests run automatically on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`).
+
+- **Test failure** → Issue opened with list of failed tests, labelled `test-failure`
+- **Coverage drop** → Issue opened with coverage total, labelled `coverage needs-tests`
+- Both Python and JS failures are detected and reported independently
 
 To upload coverage to Codecov, add to the workflow:
 
 ```yaml
-- name: Upload coverage
-  uses: codecov/codecov-action@v3
+- name: Upload Python coverage
+  uses: codecov/codecov-action@v4
   with:
-    files: results/coverage.xml
+    files: tests/results/coverage.xml
+
+- name: Upload JS coverage
+  uses: codecov/codecov-action@v4
+  with:
+    files: tests/js-results/coverage/lcov.info
 ```
 
 ---
@@ -400,12 +465,18 @@ mcp-platform/
 ├── client.py
 ├── client/
 │   ├── ui/
+│   │   └── js/
+│   │       ├── index.js        <- main chat UI
+│   │       └── dashboard.js    <- metrics dashboard
 │   ├── capability_registry.py  <- auto-populated from @tool_meta
 │   ├── langgraph.py
 │   ├── query_patterns.py       <- auto-populated from @tool_meta triggers
 │   ├── tool_meta.py            <- single source of truth for tool metadata
 │   ├── websocket.py
 │   └── ...
+├── tests/                      <- all tests + results
+├── package.json                <- JS test dependencies
+├── run_tests.sh                <- single script to run all tests
 └── tools/
 ```
 
@@ -438,7 +509,7 @@ Using web_image_search_tool, show me a red panda
   netsh interface portproxy add v4tov4 listenport=11434 listenaddress=0.0.0.0 connectport=11434 connectaddress=<WSL_IP>
   New-NetFirewallRule -DisplayName "WSL2 Ollama" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 11434
   ```
-- WSL2 IP changes on reboot — use `results/Update-WSL2Proxies.ps1` via Task Scheduler to keep proxies current
+- WSL2 IP changes on reboot — use `Update-WSL2Proxies.ps1` via Task Scheduler to keep proxies current
 
 **Ollama models not appearing:**
 - If `OLLAMA_BASE_URL` points to a LAN IP but Ollama is bound to `127.0.0.1` only, the model list will be empty
@@ -448,7 +519,7 @@ Using web_image_search_tool, show me a red panda
 **Web UI not accessible from LAN:**
 - HTTP server (port 9000) and WebSockets (8765, 8766) bind to `0.0.0.0` inside WSL2 automatically
 - Windows needs port proxies — same pattern as Ollama above, applied to ports 9000, 8765, 8766
-- Use `results/Update-WSL2Proxies.ps1` to keep proxies updated after reboots
+- Use `Update-WSL2Proxies.ps1` to keep proxies updated after reboots
 
 **Web UI won't load locally:**
 ```bash
