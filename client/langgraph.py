@@ -2800,6 +2800,9 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         if METRICS_AVAILABLE:
             metrics["agent_runs"] += 1
 
+        # Extract session_id from conversation_state (set by websocket.py before calling run_agent)
+        session_id = conversation_state.get("session_id")
+
         # STEP 1: Save the original SystemMessage (if it exists)
         original_system_msg = None
         has_system_msg = (
@@ -2809,9 +2812,17 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
         if has_system_msg:
             original_system_msg = conversation_state["messages"][0]
+            # Inject session_id into existing SystemMessage if not already present
+            if session_id and f"Current session ID: {session_id}" not in original_system_msg.content:
+                original_system_msg = SystemMessage(
+                    content=original_system_msg.content
+                    + f"\n\nCurrent session ID: {session_id}"
+                )
+                conversation_state["messages"][0] = original_system_msg
             logger.info("[LangGraph] Preserving existing SystemMessage")
         else:
-            original_system_msg = SystemMessage(content=system_prompt)
+            session_note = f"\n\nCurrent session ID: {session_id}" if session_id else ""
+            original_system_msg = SystemMessage(content=system_prompt + session_note)
             conversation_state["messages"].insert(0, original_system_msg)
             logger.info("[LangGraph] Created new SystemMessage from parameter")
 
@@ -2832,10 +2843,103 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             if not isinstance(msg, SystemMessage)
         ]
 
+        # ── STEP 2a: Ingest overflow conversation turns into RAG ──────────────
+        # Turns older than the window are dropped from LLM context but stored
+        # in RAG so they remain retrievable via semantic search.
+        tool_registry_pre = {tool.name: tool for tool in tools}
+        rag_add_tool = tool_registry_pre.get("rag_add_tool")
+
+        overflow_turns = (
+            non_system_msgs[:-LLM_MESSAGE_WINDOW]
+            if len(non_system_msgs) > LLM_MESSAGE_WINDOW
+            else []
+        )
+
+        if overflow_turns and rag_add_tool:
+            ingested_overflow = 0
+            i = 0
+            while i < len(overflow_turns):
+                turn = overflow_turns[i]
+                if isinstance(turn, HumanMessage):
+                    human_text = turn.content
+                    ai_text = ""
+                    if (
+                        i + 1 < len(overflow_turns)
+                        and isinstance(overflow_turns[i + 1], AIMessage)
+                    ):
+                        ai_text = overflow_turns[i + 1].content
+                        i += 2
+                    else:
+                        i += 1
+                    chunk = f"User: {human_text}"
+                    if ai_text:
+                        chunk += f"\nAssistant: {ai_text}"
+                    try:
+                        await rag_add_tool.ainvoke({
+                            "text": chunk,
+                            "source": (
+                                f"conversation_history_{session_id}"
+                                if session_id
+                                else "conversation_history"
+                            ),
+                        })
+                        ingested_overflow += 1
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to ingest overflow turn to RAG: {e}")
+                else:
+                    i += 1
+            if ingested_overflow:
+                logger.info(
+                    f"💾 Ingested {ingested_overflow} overflow conversation turn(s) into RAG"
+                )
+
+        # ── STEP 2b: Auto-retrieve relevant context from RAG ─────────────────
+        # Semantic search on every message so older turns (and any other
+        # ingested content) surface even when outside the window.
+        rag_search_tool_auto = tool_registry_pre.get("rag_search_tool")
+        auto_rag_msg = None
+
+        if rag_search_tool_auto:
+            try:
+                rag_result = await rag_search_tool_auto.ainvoke({"query": user_message})
+                if isinstance(rag_result, str):
+                    import json as _json
+                    try:
+                        rag_data = _json.loads(rag_result)
+                    except Exception:
+                        rag_data = {}
+                else:
+                    rag_data = rag_result if isinstance(rag_result, dict) else {}
+
+                rag_results = rag_data.get("results", [])
+                if rag_results:
+                    rag_lines = []
+                    for r in rag_results[:5]:
+                        text = r.get("text", "").strip()
+                        source = r.get("source", "")
+                        if text:
+                            source_note = f" [source: {source}]" if source else ""
+                            rag_lines.append(f"• {text}{source_note}")
+                    if rag_lines:
+                        rag_context = (
+                            "Relevant context from memory:\n" + "\n".join(rag_lines)
+                        )
+                        auto_rag_msg = SystemMessage(content=rag_context)
+                        logger.info(
+                            f"🔍 Auto-RAG: injected {len(rag_lines)} chunk(s) for query"
+                        )
+            except Exception as e:
+                logger.warning(f"⚠️ Auto-RAG search failed: {e}")
+
+        # Merge auto-RAG result with any existing RAG context messages
+        if auto_rag_msg:
+            rag_context_msgs = [auto_rag_msg] + rag_context_msgs
+
         # LLM sees: system prompt + RAG injections + last LLM_MESSAGE_WINDOW messages
         llm_messages = [system_msg] + rag_context_msgs + non_system_msgs[-LLM_MESSAGE_WINDOW:]
         logger.info(
-            f"🧠 LLM context: {len(llm_messages)} messages (window={LLM_MESSAGE_WINDOW}, rag={len(rag_context_msgs)})")
+            f"🧠 LLM context: {len(llm_messages)} messages "
+            f"(window={LLM_MESSAGE_WINDOW}, rag={len(rag_context_msgs)})")
 
         # STEP 3: Run the agent
         logger.info(f"🧠 Starting agent with {len(llm_messages)} messages")

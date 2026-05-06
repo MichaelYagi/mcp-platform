@@ -81,6 +81,166 @@ mcp = FastMCP("rag-server")
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
+@tool_meta(
+    tags=["read", "search", "rag", "session"],
+    triggers=[
+        "first prompt", "first message", "what did i ask",
+        "earlier in this session", "start of conversation",
+        "what did we discuss", "session history", "my previous messages",
+        "what did i say", "beginning of this chat", "recap this session",
+        "summarise this session", "summarize this session",
+    ],
+    idempotent=True,
+    example='use session_history_tool: session_id="" [limit="20"] [order="asc"]',
+)
+def session_history_tool(
+    session_id: str,
+    limit: int = 20,
+    order: str = "asc",
+) -> str:
+    """
+    Retrieve ordered message history for a session from the database.
+
+    Use this for temporal or structural questions about the conversation:
+      - 'What was my first prompt?'
+      - 'Summarise this session'
+      - 'What did I ask earlier?'
+      - 'What was discussed at the start of this chat?'
+
+    Use rag_search_tool instead for semantic/content questions like
+    'What did we discuss about X?' where meaning matters more than order.
+
+    The current session ID is always included in the system prompt — pass
+    it through directly when answering questions about the current session.
+
+    Args:
+        session_id (str): Session ID to retrieve history for.
+                          Use the session ID from the system prompt for the current session.
+        limit (int, optional): Maximum number of messages to return (default: 20).
+        order (str, optional): 'asc' for oldest-first, 'desc' for newest-first (default: 'asc').
+
+    Returns:
+        JSON string with ordered messages containing role, text, timestamp, and model.
+    """
+    if not session_id or not str(session_id).strip():
+        raise MCPToolError(
+            FailureKind.USER_ERROR,
+            "session_id is required. It is provided in the system prompt.",
+            {"tool": "session_history_tool"},
+        )
+
+    try:
+        session_id_int = int(session_id)
+    except (ValueError, TypeError):
+        raise MCPToolError(
+            FailureKind.USER_ERROR,
+            f"session_id must be an integer, got: {session_id!r}",
+            {"tool": "session_history_tool"},
+        )
+
+    try:
+        limit = int(limit) if limit is not None else 20
+        if limit < 1:
+            raise MCPToolError(
+                FailureKind.USER_ERROR,
+                f"limit must be >= 1, got {limit}",
+                {"tool": "session_history_tool"},
+            )
+    except MCPToolError:
+        raise
+    except (TypeError, ValueError):
+        raise MCPToolError(
+            FailureKind.USER_ERROR,
+            f"Invalid limit: {limit}",
+            {"tool": "session_history_tool"},
+        )
+
+    if order not in ("asc", "desc"):
+        raise MCPToolError(
+            FailureKind.USER_ERROR,
+            f"order must be 'asc' or 'desc', got: {order!r}",
+            {"tool": "session_history_tool"},
+        )
+
+    direction = "ASC" if order == "asc" else "DESC"
+
+    logger.info(
+        f"🛠 [server] session_history_tool called: session_id={session_id_int}, "
+        f"limit={limit}, order={order}"
+    )
+
+    try:
+        import sqlite3 as _sqlite3
+
+        sessions_db = str(PROJECT_ROOT / "data" / "sessions.db")
+        conn = _sqlite3.connect(sessions_db)
+        cursor = conn.cursor()
+
+        # Verify session exists
+        cursor.execute("SELECT id, name FROM sessions WHERE id = ?", (session_id_int,))
+        session_row = cursor.fetchone()
+        if not session_row:
+            conn.close()
+            raise MCPToolError(
+                FailureKind.USER_ERROR,
+                f"Session {session_id_int} not found.",
+                {"tool": "session_history_tool", "session_id": session_id_int},
+            )
+
+        session_name = session_row[1] or f"Session {session_id_int}"
+
+        # Fetch messages
+        cursor.execute(
+            f"""
+            SELECT id, role, content, model, created_at
+            FROM messages
+            WHERE session_id = ?
+            ORDER BY created_at {direction}
+            LIMIT ?
+            """,
+            (session_id_int, limit),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        messages = []
+        for i, row in enumerate(rows, 1):
+            messages.append({
+                "index":     i,
+                "id":        row[0],
+                "role":      row[1],
+                "text":      row[2],
+                "model":     row[3] or "unknown",
+                "timestamp": row[4],
+            })
+
+        # Build a brief readable summary for quick orientation
+        user_msgs = [m for m in messages if m["role"] == "user"]
+        first_prompt = user_msgs[0]["text"][:120] if user_msgs else None
+        last_prompt  = user_msgs[-1]["text"][:120] if user_msgs else None
+
+        return json.dumps({
+            "session_id":    session_id_int,
+            "session_name":  session_name,
+            "total_returned": len(messages),
+            "order":         order,
+            "first_user_prompt": first_prompt,
+            "last_user_prompt":  last_prompt,
+            "messages":      messages,
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except Exception as e:
+        logger.error(f"❌ session_history_tool failed: {e}", exc_info=True)
+        raise MCPToolError(
+            FailureKind.INTERNAL_ERROR,
+            f"Failed to retrieve session history: {e}",
+            {"tool": "session_history_tool", "session_id": session_id},
+        )
+
+@mcp.tool()
+@check_tool_enabled(category="rag")
 @tool_meta(tags=["write","rag"],triggers=["add to rag","ingest url","add document"],idempotent=False,example='use rag_add_tool: text="" [source=""] [chunk_size=""]')
 def rag_add_tool(text: str, source: str | None = None, chunk_size: int = 500) -> str:
     """

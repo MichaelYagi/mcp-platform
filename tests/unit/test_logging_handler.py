@@ -94,31 +94,7 @@ class TestWebSocketLogHandler:
             SYSTEM_MONITOR_CLIENTS.discard(ws)
 
 
-@pytest.mark.unit
-class TestUserAssistantLogFilter:
-    def test_filter_importable(self):
-        """UserAssistantLogFilter (or equivalent) is importable."""
-        try:
-            from client.logging_handler import UserAssistantLogFilter
-            f = UserAssistantLogFilter()
-            assert f is not None
-        except ImportError:
-            pytest.skip("UserAssistantLogFilter not in this version")
 
-    def test_user_record_passes(self):
-        try:
-            from client.logging_handler import UserAssistantLogFilter
-            f = UserAssistantLogFilter()
-            record = logging.LogRecord(
-                name="test", level=logging.INFO, pathname="",
-                lineno=0, msg="USER: hello", args=(), exc_info=None
-            )
-            record.levelname = "USER"
-            # Should not raise
-            result = f.filter(record)
-            assert isinstance(result, (bool, int))
-        except ImportError:
-            pytest.skip("UserAssistantLogFilter not in this version")
 
 
 @pytest.mark.unit

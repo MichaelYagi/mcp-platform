@@ -16,7 +16,8 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 - [5. Distributed Mode (A2A Protocol)](#5-distributed-mode-a2a-protocol)
 - [6. Testing](#6-testing)
 - [7. Architecture](#7-architecture)
-- [8. Intent Patterns & Troubleshooting](#8-intent-patterns--troubleshooting)
+- [8. RAG & Conversation Memory](#8-rag--conversation-memory)
+- [9. Intent Patterns & Troubleshooting](#9-intent-patterns--troubleshooting)
 - [License](#license)
 
 ---
@@ -24,7 +25,6 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 ## Prerequisites
 
 * Python 3.12+
-* Node.js 18+ (for JS tests)
 * 16GB+ RAM recommended
 * Ollama installed
 
@@ -312,124 +312,60 @@ A2A_EXPOSED_TOOLS=plex,location,text   # empty = expose all
 
 ## 6. Testing
 
-The project has two independent test suites — Python (pytest) and JavaScript (Jest) — with a single script to run both.
+### Running Tests
 
-### First-time setup
-
-```bash
-# Python dependencies (if not already installed)
-source .venv/bin/activate
-pip install -r tests/requirements.txt
-
-# JavaScript dependencies
-npm install
-
-# Make the run script executable (Linux/WSL2)
-chmod +x run_tests.sh
-```
-
-### Running tests
+Activate your virtualenv first, then run from the project root:
 
 ```bash
-./run_tests.sh              # both Python + JS with coverage
-./run_tests.sh --py-only    # Python only
-./run_tests.sh --js-only    # JS only
-./run_tests.sh --no-coverage  # skip coverage (faster)
-```
+source .venv/bin/activate        # Linux/macOS
+.venv\Scripts\activate           # Windows PowerShell
 
-**Python tests directly:**
-```bash
-python -m pytest                 # all tests with coverage
+python -m pytest                 # all tests
+python -m pytest -m unit         # fast unit tests only
+python -m pytest -m integration  # integration tests
+python -m pytest -m e2e          # end-to-end tests
 python -m pytest --no-cov        # skip coverage (faster)
-python -m pytest -m unit         # unit tests only
-python -m pytest -m integration  # integration tests only
-python -m pytest -m e2e          # end-to-end tests only
 python -m pytest -x              # stop on first failure
 python -m pytest -k "session"    # filter by name
 ```
 
-**JS tests directly:**
-```bash
-npm test           # all JS tests with coverage
-npm run test:watch # watch mode during development
-```
-
-### Test structure
+### Test Structure
 
 ```
 tests/
 ├── conftest.py
-├── js/
-│   ├── setup.js                  <- browser API mocks + shared helpers
-│   ├── test_index.test.js        <- tests for client/ui/js/index.js
-│   └── test_dashboard.test.js    <- tests for client/ui/js/dashboard.js
+├── pytest.ini
 ├── unit/
 │   ├── test_session_manager.py
-│   ├── test_session_manager_extended.py
 │   ├── test_models.py
 │   ├── test_context_tracker.py
 │   ├── test_intent_patterns.py
-│   ├── test_query_patterns.py
-│   ├── test_query_patterns_extended.py
-│   ├── test_commands.py
-│   ├── test_commands_extended.py
-│   ├── test_metrics.py
-│   ├── test_search_client.py
-│   ├── test_langgraph.py
-│   ├── test_websocket_extended.py
-│   ├── test_utils_extended.py
-│   ├── test_coverage_boost.py
-│   ├── test_coverage_final.py
 │   └── test_code_review_tools.py
 ├── integration/
 │   ├── test_websocket_flow.py
 │   └── test_langgraph_agent.py
-├── e2e/
-│   └── test_full_conversation.py
-└── results/                      <- generated after each Python test run
-    ├── junit.xml
-    ├── coverage.xml
-    ├── test-report.html
-    ├── coverage-report.html
-    └── generate_html.py
+└── e2e/
+    └── test_full_conversation.py
 
-tests/js-results/                 <- generated after each JS test run
-    ├── junit.xml
-    ├── test-report.html
-    └── coverage/
-        └── lcov-report/
-            └── index.html        <- interactive line-by-line JS coverage
+results/                    <- generated after running tests
+├── junit.xml
+├── coverage.xml
+├── test-report.html
+├── coverage-report.html
+└── generate_html.py
 ```
-
-### Coverage thresholds
-
-| Suite | Threshold | Notes |
-|-------|-----------|-------|
-| Python | 22% | Hard ceiling ~35% due to LLM-dependent graph nodes |
-| JavaScript | 30% | Pure functions and DOM logic |
-
-Coverage drops below threshold fail the CI build and open a GitHub Issue automatically.
 
 ### CI/CD
 
-Tests run automatically on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`).
-
-- **Test failure** → Issue opened with list of failed tests, labelled `test-failure`
-- **Coverage drop** → Issue opened with coverage total, labelled `coverage needs-tests`
-- Both Python and JS failures are detected and reported independently
+Tests run automatically on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`). On failure, a GitHub Issue is opened automatically with a link to the failed run.
 
 To upload coverage to Codecov, add to the workflow:
 
 ```yaml
-- name: Upload Python coverage
-  uses: codecov/codecov-action@v4
+- name: Upload coverage
+  uses: codecov/codecov-action@v3
   with:
-    files: tests/results/coverage.xml
-
-- name: Upload JS coverage
-  uses: codecov/codecov-action@v4
-  with:
-    files: tests/js-results/coverage/lcov.info
+    files: results/coverage.xml
 ```
 
 ---
@@ -448,13 +384,13 @@ servers/
 ├── image/             6 tools  - Image search, analysis, AI generation
 ├── location/          3 tools  - Weather, time, location
 ├── plex/             18 tools  - Media + ML recommendations    [requires PLEX_URL + PLEX_TOKEN]
-├── rag/               7 tools  - Vector search and management  [requires Ollama + bge-large]
+├── rag/               8 tools  - Vector search and management  [requires Ollama + bge-large]
 ├── system/            3 tools  - System info and processes
 ├── text/              8 tools  - Text processing and web search
 └── trilium/          11 tools  - Trilium notes integration     [requires TRILIUM_URL + TRILIUM_TOKEN]
 ```
 
-Total: 88 tools across 12 servers
+Total: 89 tools across 12 servers
 
 ### Directory Structure
 
@@ -465,24 +401,104 @@ mcp-platform/
 ├── client.py
 ├── client/
 │   ├── ui/
-│   │   └── js/
-│   │       ├── index.js        <- main chat UI
-│   │       └── dashboard.js    <- metrics dashboard
 │   ├── capability_registry.py  <- auto-populated from @tool_meta
 │   ├── langgraph.py
 │   ├── query_patterns.py       <- auto-populated from @tool_meta triggers
 │   ├── tool_meta.py            <- single source of truth for tool metadata
 │   ├── websocket.py
 │   └── ...
-├── tests/                      <- all tests + results
-├── package.json                <- JS test dependencies
-├── run_tests.sh                <- single script to run all tests
 └── tools/
 ```
 
 ---
 
-## 8. Intent Patterns & Troubleshooting
+## 8. RAG & Conversation Memory
+
+### How context works
+
+Every LLM call receives context in this order:
+
+```
+[System prompt + current session ID]
+[Auto-RAG: semantically relevant chunks from memory]
+[Last LLM_MESSAGE_WINDOW conversation turns]
+[Current user message]
+```
+
+### Conversation window (`LLM_MESSAGE_WINDOW`)
+
+Controls how many recent turns the LLM sees directly. Set in `.env`:
+
+```bash
+LLM_MESSAGE_WINDOW=12   # default: 6
+```
+
+### Overflow ingestion
+
+When history exceeds the window, older turns are automatically ingested into the RAG vector database as `Human + Assistant` pairs. They remain searchable via semantic similarity even after scrolling out of the window.
+
+### Auto-RAG retrieval
+
+On every message, a semantic search runs against the full RAG store using the current user message as the query. Matching chunks (from old conversation turns, ingested documents, Plex subtitles, or research) are injected into context automatically — no explicit `search rag` trigger needed.
+
+### What each retrieval method is good for
+
+| Query type | Best tool |
+|------------|-----------|
+| "What did we discuss about X?" | Auto-RAG (semantic) |
+| "What was my first prompt?" | `session_history_tool` (ordered DB) |
+| "Summarise this session" | `session_history_tool` |
+| "What was in that article we read?" | Auto-RAG |
+| "What did I ask 10 messages ago?" | `session_history_tool` |
+
+### `session_history_tool`
+
+Added to the `rag` server. Queries the session SQLite database directly for ordered, timestamped message history. The current session ID is always injected into the system prompt so the LLM can pass it through automatically.
+
+```
+use session_history_tool: session_id="<id>" [limit="20"] [order="asc"]
+```
+
+Triggers: `first prompt`, `what did I ask`, `earlier in this session`, `summarise this session`, `session history`
+
+### Applying the `langgraph.py` patch
+
+Three changes are required:
+
+**1. `langgraph.py` — function signature** (line ~2785):
+```python
+# Before
+async def run_agent(..., capability_registry=None):
+
+# After
+async def run_agent(..., capability_registry=None, session_id=None):
+```
+
+**2. `langgraph.py` — replace STEP 1 through STEP 3 setup**
+
+Replace the block from `# STEP 1: Save the original SystemMessage` through `tool_registry = {tool.name: tool for tool in tools}` with the contents of `langgraph_patch.py`.
+
+**3. `websocket.py` — pass session_id at the call site** (line ~250):
+```python
+# Before
+result = await run_agent_fn(
+    agent, conversation_state, prompt, logger, tools, system_prompt
+)
+
+# After
+result = await run_agent_fn(
+    agent, conversation_state, prompt, logger, tools, system_prompt,
+    session_id=session_id
+)
+```
+
+**4. `servers/rag/server.py` — add `session_history_tool`**
+
+Append the contents of `session_history_tool.py` to `server.py` after the existing `rag_search_tool` function.
+
+---
+
+## 9. Intent Patterns & Troubleshooting
 
 ### Intent Patterns
 
@@ -490,7 +506,7 @@ Routing is driven by `triggers` in each tool's `@tool_meta` decorator — no man
 
 **Force a specific tool:**
 ```
-Using shashin_search_tool, find photos of Bob
+Using shashin_search_tool, find photos of Noah
 Using web_image_search_tool, show me a red panda
 ```
 
@@ -509,7 +525,7 @@ Using web_image_search_tool, show me a red panda
   netsh interface portproxy add v4tov4 listenport=11434 listenaddress=0.0.0.0 connectport=11434 connectaddress=<WSL_IP>
   New-NetFirewallRule -DisplayName "WSL2 Ollama" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 11434
   ```
-- WSL2 IP changes on reboot — use `Update-WSL2Proxies.ps1` via Task Scheduler to keep proxies current
+- WSL2 IP changes on reboot — use `results/Update-WSL2Proxies.ps1` via Task Scheduler to keep proxies current
 
 **Ollama models not appearing:**
 - If `OLLAMA_BASE_URL` points to a LAN IP but Ollama is bound to `127.0.0.1` only, the model list will be empty
@@ -519,7 +535,7 @@ Using web_image_search_tool, show me a red panda
 **Web UI not accessible from LAN:**
 - HTTP server (port 9000) and WebSockets (8765, 8766) bind to `0.0.0.0` inside WSL2 automatically
 - Windows needs port proxies — same pattern as Ollama above, applied to ports 9000, 8765, 8766
-- Use `Update-WSL2Proxies.ps1` to keep proxies updated after reboots
+- Use `results/Update-WSL2Proxies.ps1` to keep proxies updated after reboots
 
 **Web UI won't load locally:**
 ```bash
@@ -534,6 +550,15 @@ netstat -an | grep LISTEN   # check ports 8765, 8766, 9000
 **RAG not working:**
 - Ensure Ollama is running: `ollama serve`
 - Pull bge-large if missing: `ollama pull bge-large`
+
+**Auto-RAG returning irrelevant context:**
+- Raise `min_score` threshold in `rag_search_tool` call inside `run_agent`
+- Check RAG store isn't polluted: `use rag_browse_tool`
+- Clear and re-ingest if needed: `use rag_clear_tool`
+
+**session_history_tool not finding messages:**
+- Confirm the session ID in the system prompt matches the active session
+- Check `data/sessions.db` exists and is writable
 
 **Plex tools returning errors:**
 ```bash
