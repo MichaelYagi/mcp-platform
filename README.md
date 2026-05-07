@@ -308,6 +308,8 @@ A2A_ENDPOINTS=http://localhost:8010,http://gpu-server:8020
 A2A_EXPOSED_TOOLS=plex,location,text   # empty = expose all
 ```
 
+All configured endpoints are discovered and registered concurrently at startup via `asyncio.gather()` — connection timeouts for unreachable endpoints no longer block each other.
+
 ---
 
 ## 6. Testing
@@ -391,6 +393,20 @@ servers/
 ```
 
 Total: 89 tools across 12 servers
+
+### Concurrency & Parallelism
+
+The platform uses `asyncio.gather()` at several layers to run non-LLM work concurrently:
+
+| Layer | What runs in parallel |
+|-------|-----------------------|
+| Startup — server discovery | TCP reachability checks and OAuth probes for all external servers |
+| Startup — A2A registration | All `A2A_ENDPOINTS` are discovered and registered simultaneously |
+| Multi-agent task execution | Independent tasks (no unmet dependencies) run as a concurrent batch each cycle |
+| A2A subtask execution | Same dependency-aware batched gather as multi-agent mode |
+| WebSocket broadcast | All connected clients receive messages via a single `gather()` call |
+
+**Hardware note:** LLM inference serialises at the Ollama GPU layer regardless of concurrency — one inference runs at a time on a single GPU. The parallelism benefit is in I/O-bound work: HTTP tool calls, database queries, and network requests. True parallel LLM execution would require multiple GPUs or cloud-hosted sub-agents.
 
 ### Directory Structure
 

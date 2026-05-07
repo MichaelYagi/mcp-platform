@@ -1,5 +1,11 @@
 """
 MCP Client - Main Entry Point (WITH MULTI-AGENT INTEGRATION + MULTI-A2A SUPPORT)
+NOW WITH asyncio.gather() FOR PARALLEL A2A ENDPOINT REGISTRATION
+
+Parallelism notes:
+- register_all_a2a_endpoints(): all A2A endpoint registrations run concurrently.
+- auto_discover_servers(): TCP reachability checks and OAuth probes already
+  use asyncio.gather() (unchanged).
 """
 
 import json
@@ -215,7 +221,11 @@ async def register_a2a_tools(mcp_agent, base_url: str, logger) -> bool:
     return tool_count > 0  # Return success if at least one tool was registered
 
 async def register_all_a2a_endpoints(mcp_agent, logger):
-    """Register tools from all A2A endpoints"""
+    """Register tools from all A2A endpoints concurrently via asyncio.gather().
+
+    All endpoint registrations run in parallel — network I/O for discovery and
+    tool registration on each endpoint no longer blocks the others.
+    """
     endpoints = parse_a2a_endpoints()
 
     if not endpoints:
@@ -227,35 +237,50 @@ async def register_all_a2a_endpoints(mcp_agent, logger):
             "total_tools_added": 0
         }
 
-    logger.info(f"🌐 Attempting to register {len(endpoints)} A2A endpoint(s)")
+    logger.info(f"🌐 Attempting to register {len(endpoints)} A2A endpoint(s) concurrently")
+
+    initial_tool_count = len(mcp_agent._tools)
+
+    # Serialise mcp_agent._tools mutations with a lock so concurrent
+    # registrations don't race when appending tools.
+    tools_lock = asyncio.Lock()
+
+    async def _register_one(i: int, endpoint: str) -> tuple:
+        """Register a single endpoint; return (endpoint, success)."""
+        logger.info(f"   [{i}/{len(endpoints)}] Connecting to: {endpoint}")
+        try:
+            a2a = A2AClient(endpoint)
+            capabilities = await a2a.discover()
+        except Exception as e:
+            logger.error(f"   ❌ [{i}/{len(endpoints)}] A2A connection failed: {e}")
+            return endpoint, False
+
+        tool_defs = capabilities.get("tools", [])
+        if not tool_defs:
+            logger.warning(f"   ❌ [{i}/{len(endpoints)}] No tools returned from {endpoint}")
+            return endpoint, False
+
+        new_tools = [make_a2a_tool(a2a, t) for t in tool_defs]
+        async with tools_lock:
+            mcp_agent._tools.extend(new_tools)
+
+        logger.info(f"   ✅ [{i}/{len(endpoints)}] Registered successfully (+{len(new_tools)} tools)")
+        return endpoint, True
+
+    registration_results = await asyncio.gather(
+        *[_register_one(i, ep) for i, ep in enumerate(endpoints, 1)],
+        return_exceptions=True
+    )
 
     successful = []
     failed = []
-    initial_tool_count = len(mcp_agent._tools)  # ← SAVE INITIAL COUNT (don't modify this)
+    for outcome in registration_results:
+        if isinstance(outcome, Exception):
+            logger.error(f"   ❌ Endpoint registration raised: {outcome}")
+            continue
+        endpoint, success = outcome
+        (successful if success else failed).append(endpoint)
 
-    for i, endpoint in enumerate(endpoints, 1):
-        logger.info(f"   [{i}/{len(endpoints)}] Connecting to: {endpoint}")
-
-        try:
-            tools_before_this = len(mcp_agent._tools)  # ← Track before THIS endpoint
-            success = await register_a2a_tools(mcp_agent, endpoint, logger)
-
-            if success:
-                successful.append(endpoint)
-                tools_after_this = len(mcp_agent._tools)
-                new_tools_this_endpoint = tools_after_this - tools_before_this
-                logger.info(f"   ✅ [{i}/{len(endpoints)}] Registered successfully (+{new_tools_this_endpoint} tools)")
-            else:
-                failed.append(endpoint)
-                logger.warning(f"   ❌ [{i}/{len(endpoints)}] Registration failed")
-
-        except Exception as e:
-            failed.append(endpoint)
-            logger.error(f"   ❌ [{i}/{len(endpoints)}] Error: {e}")
-            import traceback
-            traceback.print_exc()
-
-    # Calculate total new tools: current count - initial count
     final_tool_count = len(mcp_agent._tools)
     total_new_tools = final_tool_count - initial_tool_count
 
@@ -266,7 +291,6 @@ async def register_all_a2a_endpoints(mcp_agent, logger):
         "total_tools_added": total_new_tools
     }
 
-    # Summary
     logger.info("=" * 60)
     logger.info(f"🔌 A2A Registration Summary:")
     logger.info(f"   Total endpoints configured: {len(endpoints)}")

@@ -2,6 +2,15 @@
 Multi-Agent Execution System (Updated for LangChain 1.2.0)
 Uses LangChain create_agent for tool execution
 NOW WITH COMPREHENSIVE STOP SIGNAL HANDLING
+NOW WITH asyncio.gather() FOR PARALLEL TASK EXECUTION
+
+Parallelism strategy:
+- _execute_tasks(): dependency-aware batched gather (multi-agent mode)
+- execute_a2a(): dependency-aware batched gather (A2A mode)
+- Tasks with no unmet dependencies execute concurrently within each batch.
+- LLM inference still serialises at the Ollama GPU layer; parallelism
+  benefits non-LLM work (tool I/O, HTTP calls, DB queries) and any
+  future multi-GPU / cloud-LLM sub-agents.
 """
 
 import asyncio
@@ -466,86 +475,108 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
 
                 return result
 
-            # Step 2: Execute subtasks with tracking
-            self.logger.info(f"🎭 Executing {len(subtasks)} subtasks via A2A")
+            # Step 2: Execute subtasks with dependency-aware batched gather.
+            # Tasks whose dependencies are already satisfied run concurrently
+            # within each batch — same pattern used by _execute_tasks().
+            # At the Ollama GPU layer, LLM inference still serialises; the
+            # parallelism benefits non-LLM work (tool I/O, HTTP calls, etc.)
+            # and any future multi-GPU / cloud-LLM sub-agents.
+            self.logger.info(f"🎭 Executing {len(subtasks)} subtasks via A2A (batched gather)")
             results = {}
+            completed_ids: set = set()
 
-            for subtask in subtasks:
-                # Check stop before each subtask
-                if is_stop_requested():
-                    self.logger.warning("🛑 A2A execution stopped")
-                    break
-
+            async def _run_a2a_subtask(subtask: dict) -> tuple:
+                """Execute a single A2A subtask and return (task_id, result, metrics_tuple)."""
                 task_id = subtask["id"]
                 agent_role = subtask["agent"]
                 description = subtask["description"]
-                depends_on = subtask.get("depends_on", [])
 
-                # Build context from dependencies
+                # Build context from already-completed dependencies
                 context = {"user_request": user_request}
-                for dep_id in depends_on:
+                for dep_id in subtask.get("depends_on", []):
                     if dep_id in results:
                         context[f"result_{dep_id}"] = results[dep_id]
 
                 agent = self.a2a_agents.get(agent_role)
                 if not agent:
                     self.logger.warning(f"⚠️ Agent {agent_role} not found")
-                    results[task_id] = f"Agent {agent_role} not available"
-                    continue
+                    return task_id, f"Agent {agent_role} not available", None
 
-                # Execute task with tracking
                 self.logger.info(f"▶️  Executing {task_id} with {agent_role}")
                 task_start = time.time()
+                success = False
+                error = None
+                result = None
 
                 try:
                     result = await agent.execute_task(description, context)
-                    results[task_id] = result
                     success = True
-                    error = None
                     self.logger.info(f"✅ {task_id} completed")
-
                 except Exception as e:
-                    results[task_id] = f"Error: {str(e)}"
-                    success = False
+                    result = f"Error: {str(e)}"
                     error = str(e)
                     self.logger.error(f"❌ {task_id} failed: {e}")
-
-                    # Record error with health monitor
                     self.health_monitor.record_error(agent.agent_id, error)
 
                 task_end = time.time()
                 task_duration = task_end - task_start
+                metrics_tuple = (task_id, agent, agent_role, task_start, task_end, task_duration, success, error)
+                return task_id, result, metrics_tuple
 
-                # Record performance metrics
+            # Batch loop — each iteration runs all currently-ready tasks in parallel
+            while len(completed_ids) < len(subtasks):
+                if is_stop_requested():
+                    self.logger.warning("🛑 A2A execution stopped")
+                    break
+
+                ready = [
+                    s for s in subtasks
+                    if s["id"] not in completed_ids
+                    and all(dep in completed_ids for dep in s.get("depends_on", []))
+                ]
+
+                if not ready:
+                    self.logger.error("❌ A2A dependency deadlock detected")
+                    break
+
+                self.logger.info(f"⚙️ A2A batch: {len(ready)} task(s) running concurrently")
+                batch_results = await asyncio.gather(
+                    *[_run_a2a_subtask(s) for s in ready],
+                    return_exceptions=True
+                )
+
                 from client.performance_metrics import TaskMetrics
-                task_metrics = TaskMetrics(
-                    task_id=task_id,
-                    agent_id=agent.agent_id,
-                    task_type=agent_role,
-                    start_time=task_start,
-                    end_time=task_end,
-                    duration=task_duration,
-                    success=success,
-                    tools_used=list(agent.tools.keys()) if hasattr(agent, 'tools') else [],
-                    llm_calls=1,
-                    tokens_used=0,
-                    error=error
-                )
-                self.performance_metrics.record_task(task_metrics)
+                for outcome in batch_results:
+                    if isinstance(outcome, Exception):
+                        self.logger.error(f"❌ A2A batch task raised: {outcome}")
+                        continue
+                    task_id, result, metrics_tuple = outcome
+                    results[task_id] = result
+                    completed_ids.add(task_id)
 
-                # Record with health monitor
-                self.health_monitor.record_task_completion(
-                    agent.agent_id,
-                    task_duration,
-                    success
-                )
+                    if metrics_tuple:
+                        tid, agent, agent_role, t_start, t_end, t_dur, success, error = metrics_tuple
+                        task_metrics = TaskMetrics(
+                            task_id=tid,
+                            agent_id=agent.agent_id,
+                            task_type=agent_role,
+                            start_time=t_start,
+                            end_time=t_end,
+                            duration=t_dur,
+                            success=success,
+                            tools_used=list(agent.tools.keys()) if hasattr(agent, 'tools') else [],
+                            llm_calls=1,
+                            tokens_used=0,
+                            error=error
+                        )
+                        self.performance_metrics.record_task(task_metrics)
+                        self.health_monitor.record_task_completion(agent.agent_id, t_dur, success)
+                        queue_size = len(agent.message_history) if hasattr(agent, 'message_history') else 0
+                        self.health_monitor.update_resource_usage(agent.agent_id, queue_size=queue_size)
 
-                # Update resource usage
-                queue_size = len(agent.message_history) if hasattr(agent, 'message_history') else 0
-                self.health_monitor.update_resource_usage(
-                    agent.agent_id,
-                    queue_size=queue_size
-                )
+                if is_stop_requested():
+                    self.logger.warning("🛑 A2A stop detected after batch")
+                    break
 
             # Step 3: Aggregate results
             if is_stop_requested():
