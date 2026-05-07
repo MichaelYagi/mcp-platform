@@ -87,6 +87,11 @@ class MultiAgentOrchestrator:
         # Create specialized agent executors
         self.agent_executors = self._create_agent_executors()
 
+        # Alternate executors with RAG tools stripped — used for general-knowledge tasks.
+        # Physical tool removal is the only reliable guard against the model looping on
+        # fruitless RAG searches regardless of what the system prompt says.
+        self.no_rag_executors = self._create_no_rag_executors()
+
         # Task management
         self.tasks: Dict[str, AgentTask] = {}
         self.task_results: Dict[str, Any] = {}
@@ -109,6 +114,7 @@ class MultiAgentOrchestrator:
 
         # Recreate all agent executors with new LLM
         self.agent_executors = self._create_agent_executors()
+        self.no_rag_executors = self._create_no_rag_executors()
 
         # Log which model we're using
         if hasattr(new_llm, 'model'):
@@ -289,6 +295,58 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
                 available_tools.append(tool)
 
         return available_tools
+
+    # ── No-RAG guard constants ────────────────────────────────────────────────
+    _NO_RAG_ROLES = frozenset([
+        AgentRole.RESEARCHER, AgentRole.WRITER,
+        AgentRole.ANALYST,    AgentRole.CODER,
+    ])
+    _RAG_TOOL_NAMES = frozenset([
+        "rag_search_tool", "search_entries", "search_semantic",
+        "semantic_media_search_text",
+    ])
+    _RAG_SIGNAL_PHRASES = (
+        "my notes", "what did i", "what have i", "from my", "i stored",
+        "in my rag", "knowledge base", "past conversation", "i ingested",
+        "i saved", "my research", "i wrote", "i mentioned",
+        "personal notes", "user's notes", "user saved", "stored in",
+    )
+
+    def _is_rag_query(self, text: str) -> bool:
+        """True only when the task explicitly targets personal/ingested content."""
+        lower = text.lower()
+        return any(phrase in lower for phrase in self._RAG_SIGNAL_PHRASES)
+
+    def _create_no_rag_executors(self) -> Dict:
+        """Build alternate executors for _NO_RAG_ROLES with RAG tools stripped.
+
+        Called at init and on every update_llm() so the no-RAG executors always
+        stay in sync with the main executors after a model switch.
+        """
+        no_rag = {}
+        for role in self._NO_RAG_ROLES:
+            info = self.agent_executors.get(role)
+            if not info:
+                continue
+            filtered = [t for t in info["tools"]
+                        if getattr(t, "name", "") not in self._RAG_TOOL_NAMES]
+            try:
+                agent = create_agent(self.base_llm, filtered)
+                no_rag[role] = {
+                    "agent": agent,
+                    "system_prompt": info["system_prompt"],
+                    "tools": filtered,
+                }
+                suppressed = len(info["tools"]) - len(filtered)
+                self.logger.info(
+                    f"✅ no-RAG executor for {role.value} "
+                    f"({len(filtered)} tools, {suppressed} RAG tool(s) suppressed)"
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"❌ Failed to create no-RAG executor for {role.value}: {e}"
+                )
+        return no_rag
 
     def enable_a2a(self):
         """Enable Agent-to-Agent communication with advanced features"""
@@ -980,6 +1038,17 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
         try:
             agent_info = self.agent_executors.get(task.role)
 
+            # ── No-RAG guard ─────────────────────────────────────────────────
+            # For general-knowledge tasks, swap to the no-RAG executor so the
+            # model physically cannot call RAG tools regardless of instructions.
+            if (task.role in self._NO_RAG_ROLES
+                    and not self._is_rag_query(task.description)
+                    and task.role in self.no_rag_executors):
+                agent_info = self.no_rag_executors[task.role]
+                self.logger.info(
+                    f"🔬 {task.role.value}: general-knowledge task — using no-RAG executor"
+                )
+
             # Build context from previous results
             context_info = ""
             for dep_id in task.dependencies:
@@ -1062,7 +1131,13 @@ Complete this task using your available tools."""
             raise
 
     async def _aggregate_results(self, user_request: str, results: Dict[str, Any], session_id: int = None, rag_search_fn=None) -> str:
-        """Aggregate results from all agents"""
+        """Aggregate results from all agents.
+
+        Short-circuit: if there is exactly one substantive result from a
+        terminal role (writer, analyst, researcher) and no RAG context to
+        inject, skip the extra LLM synthesis call and return directly.
+        Saves ~60-100s on simple 2-task runs.
+        """
 
         self.logger.info("📊 Aggregating results...")
 
@@ -1074,6 +1149,25 @@ Complete this task using your available tools."""
         if is_stop_requested():
             self.logger.warning("🛑 Stop requested - skipping result aggregation")
             return "Result aggregation stopped by user."
+
+        # ── Short-circuit ─────────────────────────────────────────────────────
+        _TERMINAL_ROLES = {AgentRole.WRITER, AgentRole.ANALYST, AgentRole.RESEARCHER}
+        real_results = {k: v for k, v in results.items() if not k.startswith("_")}
+
+        if len(real_results) == 1:
+            task_id, result = next(iter(real_results.items()))
+            task = self.tasks.get(task_id)
+            if (task
+                    and task.role in _TERMINAL_ROLES
+                    and isinstance(result, str)
+                    and len(result.strip()) > 200
+                    and not (session_id and rag_search_fn)):
+                self.logger.info(
+                    f"⚡ Aggregation short-circuit: single {task.role.value} result "
+                    f"({len(result)} chars) — skipping synthesis LLM call"
+                )
+                return result.strip()
+        # ─────────────────────────────────────────────────────────────────────
 
         results_summary = ""
         for task_id, result in results.items():
