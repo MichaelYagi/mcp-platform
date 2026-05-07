@@ -1083,6 +1083,8 @@ ws.onmessage = (event) => {
         currentSessionId = data.session_id;
         localStorage.setItem(CURRENT_SESSION_KEY, currentSessionId);
         data.messages.forEach(msg => addMessage(msg.text, msg.role, false, false, msg.model, msg.timestamp, msg.image||null, msg.image_url||null, msg.id||null));
+        chat.scrollTop = chat.scrollHeight;
+        chat.querySelectorAll('img').forEach(img => { if (!img.complete) img.addEventListener('load', () => { chat.scrollTop = chat.scrollHeight; }, { once: true }); });
         renderSessions(allSessions);
         // If the last message is from the user, a response is still in-flight.
         // Show the thinking indicator so the user knows to wait.
