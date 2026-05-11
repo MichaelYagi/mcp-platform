@@ -21,8 +21,15 @@ from .rag_utils import load_rag_db, cosine_similarity
 
 logger = logging.getLogger("mcp_server")
 
+import os as _os
+
+def _make_embeddings_model():
+    """Construct OllamaEmbeddings respecting OLLAMA_BASE_URL from .env."""
+    base_url = _os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    return OllamaEmbeddings(model="bge-large", base_url=base_url)
+
 # Embeddings model — required; RAG is disabled upstream if this is unavailable
-embeddings_model = OllamaEmbeddings(model="bge-large")
+embeddings_model = _make_embeddings_model()
 
 # Reranker config
 # Uses sentence-transformers CrossEncoder — runs locally on CPU, no Ollama needed.

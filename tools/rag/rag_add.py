@@ -249,8 +249,10 @@ def _generate_embeddings_threaded(texts: List[str]) -> List[tuple]:
     """
     from langchain_ollama import OllamaEmbeddings
     from concurrent.futures import ThreadPoolExecutor
+    import os as _os
 
-    embeddings_model = OllamaEmbeddings(model="bge-large")
+    base_url = _os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    embeddings_model = OllamaEmbeddings(model="bge-large", base_url=base_url)
 
     def embed_one(args: tuple) -> tuple:
         text, index = args

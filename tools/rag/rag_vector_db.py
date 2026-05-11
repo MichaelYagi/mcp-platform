@@ -13,8 +13,15 @@ from .rag_utils import load_rag_db, save_rag_db, get_connection
 
 logger = logging.getLogger("mcp_server")
 
+import os as _os
+
+def _make_embeddings_model():
+    """Construct OllamaEmbeddings respecting OLLAMA_BASE_URL from .env."""
+    base_url = _os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+    return OllamaEmbeddings(model="bge-large", base_url=base_url)
+
 # Initialize embeddings model
-embeddings_model = OllamaEmbeddings(model="bge-large")
+embeddings_model = _make_embeddings_model()
 
 # In-memory cache to avoid loading/saving on every chunk
 _db_cache = None

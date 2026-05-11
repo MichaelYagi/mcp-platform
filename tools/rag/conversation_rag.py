@@ -32,8 +32,10 @@ _embeddings_model = None
 def _get_embeddings_model():
     global _embeddings_model
     if _embeddings_model is None:
+        import os
         from langchain_ollama import OllamaEmbeddings
-        _embeddings_model = OllamaEmbeddings(model="bge-large")
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        _embeddings_model = OllamaEmbeddings(model="bge-large", base_url=base_url)
     return _embeddings_model
 
 def _embed_text(text: str) -> Optional[List[float]]:
@@ -43,66 +45,6 @@ def _embed_text(text: str) -> Optional[List[float]]:
     except Exception as e:
         logger.error(f"❌ conversation_rag: embedding failed: {e}")
         return None
-
-
-def store_turn(session_id: int, role: str, content: str, message_id: int) -> bool:
-    """
-    Embed a single conversation turn and store it in the RAG database,
-    tagged with session_id and message_id for reliable text retrieval.
-
-    Text is NOT stored in rag_database.db. At retrieval time, message_id
-    is used to fetch content directly from sessions.db messages table.
-
-    Args:
-        session_id: Integer session ID from session_manager
-        role:       'user' or 'assistant'
-        content:    Message text (used only for embedding, not persisted here)
-        message_id: messages.id PK from sessions.db — stored as FK in RAG DB
-
-    Returns:
-        True if stored successfully, False otherwise
-    """
-    from tools.rag.rag_utils import get_connection
-
-    if not content or not content.strip():
-        return False
-
-    prefix = ROLE_PREFIX.get(role, f"{role}: ")
-    text_to_embed = prefix + content[:MAX_TURN_CHARS]
-
-    embedding = _embed_text(text_to_embed)
-    if embedding is None:
-        return False
-
-    import numpy as np
-    embedding_bytes = np.array(embedding, dtype=np.float32).tobytes()
-
-    doc_id = str(uuid.uuid4())
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO documents (id, embedding, source, session_id, message_id)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            doc_id,
-            embedding_bytes,
-            "conversation",
-            str(session_id),
-            message_id,
-        ))
-        conn.commit()
-        logger.debug(
-            f"💬 Stored {role} turn for session {session_id} "
-            f"(doc {doc_id[:8]}, message_id={message_id})"
-        )
-        return True
-
-    except Exception as e:
-        logger.error(f"❌ conversation_rag.store_turn failed: {e}")
-        return False
-    finally:
-        conn.close()
 
 
 def store_turn(session_id: int, role: str, content: str, message_id: int) -> bool:
