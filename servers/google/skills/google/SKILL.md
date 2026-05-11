@@ -42,7 +42,7 @@ Interact with Gmail and Google Calendar through a single server.
 3. **Create event** — add a new timed or all-day event
 
 **Briefing:**
-1. **Day briefing** — weather, unread emails, and today's calendar in one call
+1. **Day briefing** — weather, unread emails, and calendar in one call; supports `date_offset` for today (0) or tomorrow (1)
 
 **Authentication:** OAuth2 via `credentials.json` (downloaded from Google Cloud Console). A `token.json` is written on first authorization and silently refreshed afterwards. See ⚙️ Configuration below.
 
@@ -205,9 +205,11 @@ calendar_create_event(
 ### Day briefing
 
 ```python
-get_day_briefing()                                              # today's weather + 10 unread emails + today's calendar
-get_day_briefing(max_emails=5, forecast_days=2)                 # include tomorrow's weather too
-get_day_briefing(max_emails=5, forecast_days=2, calendar_days=3)  # 3 days of calendar events
+get_day_briefing()                                                        # today's weather + 10 unread emails + today's calendar
+get_day_briefing(date_offset=1)                                           # tomorrow's briefing
+get_day_briefing(max_emails=5, forecast_days=2)                           # include tomorrow's weather too
+get_day_briefing(max_emails=5, forecast_days=2, calendar_days=3)          # 3 days of calendar events
+get_day_briefing(date_offset=1, max_emails=5, forecast_days=2)            # tomorrow + 2-day forecast
 ```
 
 **Returns:**
@@ -215,11 +217,13 @@ get_day_briefing(max_emails=5, forecast_days=2, calendar_days=3)  # 3 days of ca
 {
   "weather":  { ... },
   "email":    { "total_unread": 3, "emails": [ ... ] },
-  "calendar": { "date": "2025-06-20", "count": 2, "events": [ ... ] }
+  "calendar": { "date": "2025-06-21", "count": 1, "events": [ ... ] }
 }
 ```
 
 Each section fails independently — a Gmail auth issue won't break the weather result.
+
+> **`date_offset`**: Integer day offset from today. `0` = today (default), `1` = tomorrow. The calendar window starts at midnight of the offset day and spans `calendar_days` days forward. Email is always current unread regardless of offset.
 
 ---
 
@@ -313,7 +317,7 @@ Subject: 'Updated wireframes' (Tuesday 4:22 PM)"
 | `calendar_get_this_week` | This week's events | — |
 | `calendar_create_event` | Create a calendar event | `summary`, `start`, `end`, `attendees`, `all_day` |
 | `gmail_reply_tool` | Reply to an existing email | `message_id`, `body`, `cc` |
-| `get_day_briefing` | Weather + unread email + calendar in one call | `max_emails`, `forecast_days`, `calendar_days` |
+| `get_day_briefing` | Weather + unread email + calendar in one call | `max_emails`, `forecast_days`, `calendar_days`, `date_offset` |
 
 ---
 
