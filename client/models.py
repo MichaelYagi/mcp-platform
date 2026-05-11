@@ -148,29 +148,10 @@ async def switch_model(model_name, tools, logger, create_agent_fn, a2a_state=Non
                 async with httpx.AsyncClient(timeout=1.0) as client:
                     await client.get(f"{base_url}/api/tags")
             except Exception:
-                # Check if Ollama is actually running on the default address,
-                # which would mean OLLAMA_BASE_URL is misconfigured rather than
-                # Ollama being down.
-                ollama_running_locally = False
-                configured_url = os.getenv("OLLAMA_BASE_URL", "")
-                if configured_url and "127.0.0.1:11434" not in configured_url:
-                    try:
-                        import httpx as _httpx
-                        async with _httpx.AsyncClient(timeout=1.0) as _client:
-                            await _client.get("http://127.0.0.1:11434/api/tags")
-                            ollama_running_locally = True
-                    except Exception:
-                        pass
-
-                if ollama_running_locally:
-                    logger.error(f"❌ Ollama unreachable at {configured_url} (but is running on 127.0.0.1:11434)")
-                    print(f"\n❌ Ollama is running but not reachable at the configured URL:")
-                    print(f"   OLLAMA_BASE_URL={configured_url}")
-                    print(f"   Check your .env — Ollama is alive on 127.0.0.1:11434\n")
-                else:
-                    logger.error("❌ Ollama not running")
-                    print("\n❌ Ollama not running")
-                    print("   Start with: ollama serve\n")
+                configured_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+                logger.error(f"❌ Ollama unreachable at {configured_url}")
+                print(f"\n❌ Ollama not reachable at {configured_url}")
+                print(f"   Check OLLAMA_BASE_URL in .env and that Ollama is running.\n")
                 os.environ["LLM_BACKEND"] = current_backend  # Revert
                 return None
 

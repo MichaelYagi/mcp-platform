@@ -1179,7 +1179,8 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         max_emails (int, optional):    Max unread emails to include (default: 10)
         forecast_days (int, optional): Days of weather forecast (default: 1 = today only)
         calendar_days (int, optional): Days of calendar events to include (default: 1 = today only)
-        date_offset (int, optional):   Day offset from today (default: 0 = today, 1 = tomorrow)
+        date_offset (int, optional):   Day offset from today (default: 0 = today, 1 = tomorrow).
+                                       Use 1 when the user asks about tomorrow, next day, or the day after today.
 
     Returns:
         JSON with:
