@@ -817,10 +817,11 @@ function togglePromptNavigator() {
         setTimeout(buildObserver, 50);
     };
 
-    // Allow external code to reset the active index so index 0 re-highlights
-    window.resetNavHighlight = function() {
+    // Allow external code to reset the active index.
+    // Pass targetIndex to jump to a specific item (defaults to 0).
+    window.resetNavHighlight = function(targetIndex) {
         activeNavIndex = -1;
-        setTimeout(() => setNavHighlight(0), 150);
+        setTimeout(() => setNavHighlight(targetIndex !== undefined ? targetIndex : 0), 150);
     };
 
     // Also rebuild when a session loads (chat gets repopulated)
@@ -1093,8 +1094,8 @@ ws.onmessage = (event) => {
             showThinking(); isProcessing = true;
             sendBtn.disabled = true; status.textContent = 'Processing…';
         }
-        // Reset nav highlight so first item is highlighted on session switch
-        if (window.resetNavHighlight) window.resetNavHighlight();
+        // Reset nav highlight to the last prompt, matching chat scroll-to-bottom
+        if (window.resetNavHighlight) window.resetNavHighlight(messageIndex.length - 1);
         // Consume any pending search scroll
         if (_pendingScrollMessageId !== null) {
             const mid = _pendingScrollMessageId;
