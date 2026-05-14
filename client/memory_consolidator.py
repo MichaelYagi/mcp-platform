@@ -218,14 +218,16 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
     llm_fn: async callable(system: str, user: str) -> str
     Returns number of memories written.
     """
+    logger.info(f"🧠 consolidate() called for session {session_id}")
     _ensure_db()
 
     if _is_consolidated(session_id):
-        logger.debug(f"🧠 Session {session_id} already consolidated — skipping")
+        logger.info(f"🧠 Session {session_id} already consolidated — skipping (consolidated_at is set)")
         return 0
 
     # Fetch transcript from sessions.db via session_manager or direct query
     transcript = _get_transcript(session_id, session_manager)
+    logger.info(f"🧠 Transcript length for session {session_id}: {len(transcript)} chars")
     if not transcript or len(transcript) < 100:
         logger.debug(f"🧠 Session {session_id} too short to consolidate")
         _mark_consolidated(session_id)
@@ -279,8 +281,9 @@ def _get_transcript(session_id: str, session_manager=None) -> str:
     if session_manager:
         try:
             messages = session_manager.get_session_messages(str(session_id))
-        except Exception:
-            pass
+            logger.info(f"🧠 Got {len(messages)} messages from session_manager for session {session_id}")
+        except Exception as e:
+            logger.warning(f"🧠 session_manager.get_session_messages failed: {e}")
 
     if not messages and SESSIONS_DB_PATH.exists():
         try:
@@ -679,13 +682,28 @@ def _consolidate_now(session_id: Optional[str], llm_fn, session_manager=None) ->
             "Use :sessions to list available sessions."
         )
 
+    # Always clear consolidated_at for manual runs — user explicitly wants a re-run
+    if SESSIONS_DB_PATH.exists():
+        try:
+            with _sess_conn() as conn:
+                conn.execute(
+                    "UPDATE sessions SET consolidated_at = NULL WHERE id = ?",
+                    (session_id,)
+                )
+        except Exception as e:
+            logger.warning(f"🧠 Could not clear consolidated_at for session {session_id}: {e}")
+
     # Run async consolidate in the running event loop
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # We're inside an async context — schedule as a task and return immediately
-            # The result will be delivered via a follow-up (fire-and-forget pattern)
-            asyncio.ensure_future(consolidate(session_id, llm_fn, session_manager))
+            async def _run_and_log():
+                try:
+                    count = await consolidate(session_id, llm_fn, session_manager)
+                    logger.info(f"🧠 Manual consolidation complete: {count} memories written for session {session_id}")
+                except Exception as e:
+                    logger.error(f"🧠 Manual consolidation failed for session {session_id}: {e}", exc_info=True)
+            asyncio.ensure_future(_run_and_log())
             return (
                 f"Consolidation started for session {session_id}.\n"
                 f"Run :memory in a few seconds to see the results."
