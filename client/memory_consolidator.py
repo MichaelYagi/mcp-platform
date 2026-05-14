@@ -472,6 +472,11 @@ async def run_nightly_promotion():
 
 # ── Inactivity watcher ────────────────────────────────────────────────────────
 
+# Module-level reference set by InactivityWatcher.__init__ so
+# handle_memory_command can access llm_fn and session_manager
+_active_watcher: "InactivityWatcher | None" = None
+
+
 class InactivityWatcher:
     """
     Watches per-session last-activity timestamps.
@@ -486,10 +491,12 @@ class InactivityWatcher:
     """
 
     def __init__(self, llm_fn, session_manager=None):
+        global _active_watcher
         self._llm_fn = llm_fn
         self._session_manager = session_manager
         self._last_activity: dict[str, float] = {}
         self._consolidating: set[str] = set()
+        _active_watcher = self
 
     def touch(self, session_id: str):
         import time
@@ -530,7 +537,7 @@ class InactivityWatcher:
 
 # ── :memory colon command ─────────────────────────────────────────────────────
 
-def handle_memory_command(raw: str) -> str:
+def handle_memory_command(raw: str, llm_fn=None, session_manager=None) -> str:
     """
     :memory                       — list all memories
     :memory semantic              — list only semantic (permanent) memories
@@ -538,6 +545,8 @@ def handle_memory_command(raw: str) -> str:
     :memory forget <id>           — delete a memory by ID
     :memory clear                 — delete all episodic memories
     :memory clear session <id>    — delete all memories from a specific session
+    :memory consolidate           — extract memories from current session now
+    :memory consolidate <id>      — extract memories from a specific session now
     """
     _ensure_db()
     tokens = raw.strip().split(None, 3)
@@ -558,6 +567,9 @@ def handle_memory_command(raw: str) -> str:
                 return "Usage: :memory clear session <session_id>"
             return _clear_session_memories(session_id)
         return _clear_episodic()
+    elif verb == "consolidate":
+        session_id = tokens[2].strip() if len(tokens) > 2 else None
+        return _consolidate_now(session_id, llm_fn, session_manager)
     else:
         return (
             "Unknown :memory subcommand. Available:\n"
@@ -567,6 +579,8 @@ def handle_memory_command(raw: str) -> str:
             "  :memory forget <id>         — delete one memory\n"
             "  :memory clear               — delete all episodic memories\n"
             "  :memory clear session <id>  — delete memories from one session\n"
+            "  :memory consolidate         — extract memories from current session now\n"
+            "  :memory consolidate <id>    — extract memories from a specific session\n"
         )
 
 
@@ -640,3 +654,49 @@ def _clear_session_memories(session_id: str) -> str:
             return f"No memories found for session {session_id}."
         conn.execute("DELETE FROM memories WHERE source_session = ?", (session_id,))
     return f"Cleared {n} memory/memories from session {session_id}."
+
+
+def _consolidate_now(session_id: Optional[str], llm_fn, session_manager=None) -> str:
+    """
+    Synchronous wrapper around consolidate() for use in the command handler.
+    Falls back to _active_watcher's llm_fn if none provided.
+    """
+    # Fall back to watcher's references if not explicitly passed
+    if llm_fn is None and _active_watcher is not None:
+        llm_fn = _active_watcher._llm_fn
+        if session_manager is None:
+            session_manager = _active_watcher._session_manager
+
+    if llm_fn is None:
+        return (
+            "Memory consolidation requires the LLM to be available.\n"
+            "Try again after startup completes."
+        )
+
+    if not session_id:
+        return (
+            "Please provide a session ID: :memory consolidate <id>\n"
+            "Use :sessions to list available sessions."
+        )
+
+    # Run async consolidate in the running event loop
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're inside an async context — schedule as a task and return immediately
+            # The result will be delivered via a follow-up (fire-and-forget pattern)
+            asyncio.ensure_future(consolidate(session_id, llm_fn, session_manager))
+            return (
+                f"Consolidation started for session {session_id}.\n"
+                f"Run :memory in a few seconds to see the results."
+            )
+        else:
+            count = loop.run_until_complete(consolidate(session_id, llm_fn, session_manager))
+            if count == 0:
+                return (
+                    f"No new memories extracted from session {session_id}.\n"
+                    "The session may already be consolidated, too short, or contain no memorable content."
+                )
+            return f"Extracted {count} memory/memories from session {session_id}. Run :memory to see them."
+    except Exception as e:
+        return f"Consolidation failed: {e}"
