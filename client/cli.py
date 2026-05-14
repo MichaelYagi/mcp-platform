@@ -12,6 +12,8 @@ from queue import Queue
 from client.websocket import broadcast_message
 from client.commands import handle_command, get_commands_list, handle_a2a_commands, handle_multi_agent_commands
 from client.stop_signal import request_stop
+from client.proactive_agent import handle_jobs_command
+from client.memory_consolidator import handle_memory_command
 
 
 def list_commands():
@@ -98,6 +100,19 @@ async def cli_input_loop(agent, logger, tools, model_name, conversation_state, r
                     if result:
                         print(result)
                         await broadcast_message("assistant_message", {"text": result})
+                    continue
+
+                # Handle :jobs and :memory — deterministic, bypass LLM entirely
+                if query.startswith(":jobs"):
+                    response = handle_jobs_command(query)
+                    print(response)
+                    await broadcast_message("assistant_message", {"text": response, "model": "system"})
+                    continue
+
+                if query.startswith(":memory"):
+                    response = handle_memory_command(query)
+                    print(response)
+                    await broadcast_message("assistant_message", {"text": response, "model": "system"})
                     continue
 
                 # Handle other commands

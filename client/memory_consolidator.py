@@ -1,0 +1,642 @@
+"""
+client/memory_consolidator.py
+==============================
+Persistent memory layer for mcp-platform.
+
+Three memory tiers:
+  - episodic : significant events/decisions/outcomes from sessions
+  - semantic  : distilled facts/preferences/patterns (promoted from episodic)
+  - (working  : current session context — already handled by conversation_state)
+
+Flow:
+  1. Session ends (or 15min inactivity) → consolidate(session_id)
+  2. LLM extracts structured memories from the transcript
+  3. Memories written to memory.db with embeddings (optional)
+  4. On new session → inject_into_system_prompt() prepends relevant memories
+
+DB lives at data/memory.db alongside sessions.db.
+Schema migration (add consolidated_at to sessions) runs automatically.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import re
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+logger = logging.getLogger("mcp_client")
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+MEMORY_DB_PATH = _PROJECT_ROOT / "data" / "memory.db"
+SESSIONS_DB_PATH = _PROJECT_ROOT / "data" / "sessions.db"
+
+# Inactivity threshold before auto-consolidation fires
+INACTIVITY_SECONDS = 15 * 60  # 15 minutes
+
+# ── Schema ───────────────────────────────────────────────────────────────────
+
+_MEMORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS memories (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    tier         TEXT    NOT NULL CHECK(tier IN ('episodic','semantic')),
+    content      TEXT    NOT NULL,
+    embedding    BLOB,
+    source_session TEXT,
+    importance   REAL    NOT NULL DEFAULT 0.5,
+    access_count INTEGER NOT NULL DEFAULT 0,
+    last_accessed TEXT,
+    created_at   TEXT    NOT NULL,
+    promoted_at  TEXT
+);
+
+CREATE TABLE IF NOT EXISTS memory_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"""
+
+_SESSIONS_MIGRATION = """
+ALTER TABLE sessions ADD COLUMN consolidated_at TEXT;
+"""
+
+
+# ── DB helpers ───────────────────────────────────────────────────────────────
+
+def _ensure_db():
+    """Create memory.db and run sessions.db migration if needed."""
+    MEMORY_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    # Memory DB
+    with sqlite3.connect(MEMORY_DB_PATH) as conn:
+        conn.executescript(_MEMORY_SCHEMA)
+        # Migration: add embedding column if upgrading from schema without it
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(memories)").fetchall()]
+        if "embedding" not in cols:
+            conn.execute("ALTER TABLE memories ADD COLUMN embedding BLOB")
+            logger.info("💾 memory.db migrated: added embedding column")
+
+    # Sessions DB migration — add consolidated_at if missing
+    if SESSIONS_DB_PATH.exists():
+        try:
+            with sqlite3.connect(SESSIONS_DB_PATH) as conn:
+                cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
+                if "consolidated_at" not in cols:
+                    conn.execute(_SESSIONS_MIGRATION)
+                    logger.info("💾 sessions.db migrated: added consolidated_at column")
+        except Exception as e:
+            logger.warning(f"⚠️ sessions.db migration skipped: {e}")
+
+
+def _mem_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(MEMORY_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _sess_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(SESSIONS_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+# ── Embedding helpers (same bge-large pipeline as conversation_rag) ───────────
+
+_embeddings_model = None
+
+def _get_embeddings_model():
+    global _embeddings_model
+    if _embeddings_model is None:
+        import os
+        from langchain_ollama import OllamaEmbeddings
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+        _embeddings_model = OllamaEmbeddings(model="bge-large", base_url=base_url)
+    return _embeddings_model
+
+
+def _embed(text: str) -> Optional[bytes]:
+    """Embed text and return as raw float32 bytes, or None on failure."""
+    try:
+        import numpy as np
+        vec = _get_embeddings_model().embed_query(text)
+        return np.array(vec, dtype=np.float32).tobytes()
+    except Exception as e:
+        logger.warning(f"🧠 Memory embedding failed: {e}")
+        return None
+
+
+def _cosine(a_bytes: bytes, b_bytes: bytes) -> float:
+    """Cosine similarity between two float32 byte blobs."""
+    import numpy as np
+    a = np.frombuffer(a_bytes, dtype=np.float32)
+    b = np.frombuffer(b_bytes, dtype=np.float32)
+    denom = (np.linalg.norm(a) * np.linalg.norm(b))
+    if denom == 0:
+        return 0.0
+    return float(np.dot(a, b) / denom)
+
+
+# ── Consolidation guard ──────────────────────────────────────────────────────
+
+def _is_consolidated(session_id: str) -> bool:
+    if not SESSIONS_DB_PATH.exists():
+        return False
+    try:
+        with _sess_conn() as conn:
+            row = conn.execute(
+                "SELECT consolidated_at FROM sessions WHERE id = ?", (session_id,)
+            ).fetchone()
+            return row is not None and row["consolidated_at"] is not None
+    except Exception:
+        return False
+
+
+def _mark_consolidated(session_id: str):
+    if not SESSIONS_DB_PATH.exists():
+        return
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        with _sess_conn() as conn:
+            conn.execute(
+                "UPDATE sessions SET consolidated_at = ? WHERE id = ?",
+                (now, session_id)
+            )
+    except Exception as e:
+        logger.warning(f"⚠️ Could not mark session {session_id} consolidated: {e}")
+
+
+# ── LLM extraction prompt ─────────────────────────────────────────────────────
+
+_EXTRACT_PROMPT = """You are a memory extraction system for an AI assistant platform.
+
+Analyse the conversation transcript below and extract memorable facts, preferences,
+decisions, and outcomes that would be useful to remember in future sessions.
+
+Focus on:
+- User preferences and working style ("prefers diffs over full rewrites")
+- Technical facts about the user's environment ("WSL2 at 192.168.0.185")
+- Outcomes and solutions that worked ("OLLAMA_KEEP_ALIVE=-1 fixed cold-load latency")
+- Ongoing projects and their current state
+- Things the user explicitly asked to remember
+- Patterns in what the user asks for
+
+DO NOT extract:
+- Trivial chit-chat
+- Things already obvious from context
+- Duplicate facts already in existing memories
+
+Existing memories (do not duplicate):
+{existing}
+
+Transcript:
+{transcript}
+
+Return ONLY a JSON array of memory objects. Each object:
+{{
+  "content": "concise fact in plain English (max 120 chars)",
+  "tier": "episodic",
+  "importance": 0.0-1.0
+}}
+
+If nothing memorable, return an empty array: []
+Return ONLY the JSON. No preamble, no markdown fences."""
+
+
+# ── Core consolidation ────────────────────────────────────────────────────────
+
+async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
+    """
+    Extract memories from a session transcript and persist them.
+
+    llm_fn: async callable(system: str, user: str) -> str
+    Returns number of memories written.
+    """
+    _ensure_db()
+
+    if _is_consolidated(session_id):
+        logger.debug(f"🧠 Session {session_id} already consolidated — skipping")
+        return 0
+
+    # Fetch transcript from sessions.db via session_manager or direct query
+    transcript = _get_transcript(session_id, session_manager)
+    if not transcript or len(transcript) < 100:
+        logger.debug(f"🧠 Session {session_id} too short to consolidate")
+        _mark_consolidated(session_id)
+        return 0
+
+    # Load existing semantic memories to avoid duplication
+    existing = _get_recent_memories(limit=30)
+    existing_text = "\n".join(f"- {m['content']}" for m in existing) or "None yet."
+
+    system = "You are a memory extraction system. Return only valid JSON."
+    user = _EXTRACT_PROMPT.format(existing=existing_text, transcript=transcript)
+
+    try:
+        raw = await llm_fn(system, user)
+    except Exception as e:
+        logger.error(f"🧠 Memory LLM call failed for session {session_id}: {e}")
+        return 0
+
+    memories = _parse_memories(raw)
+    if not memories:
+        _mark_consolidated(session_id)
+        return 0
+
+    now = datetime.now(timezone.utc).isoformat()
+    written = 0
+    with _mem_conn() as conn:
+        for m in memories:
+            content = m.get("content", "").strip()
+            if not content or len(content) < 10:
+                continue
+            importance = float(m.get("importance", 0.5))
+            importance = max(0.0, min(1.0, importance))
+            embedding = _embed(content)
+            conn.execute(
+                """INSERT INTO memories
+                   (tier, content, embedding, source_session, importance, created_at)
+                   VALUES ('episodic', ?, ?, ?, ?, ?)""",
+                (content, embedding, str(session_id), importance, now)
+            )
+            written += 1
+
+    _mark_consolidated(session_id)
+    logger.info(f"🧠 Consolidated session {session_id}: {written} memories written")
+    return written
+
+
+def _get_transcript(session_id: str, session_manager=None) -> str:
+    """Build a plain-text transcript from session messages."""
+    messages = []
+
+    if session_manager:
+        try:
+            messages = session_manager.get_session_messages(str(session_id))
+        except Exception:
+            pass
+
+    if not messages and SESSIONS_DB_PATH.exists():
+        try:
+            with _sess_conn() as conn:
+                rows = conn.execute(
+                    "SELECT role, content FROM messages WHERE session_id = ? ORDER BY id",
+                    (session_id,)
+                ).fetchall()
+                messages = [{"role": r["role"], "text": r["content"]} for r in rows]
+        except Exception as e:
+            logger.warning(f"🧠 Could not fetch transcript for {session_id}: {e}")
+
+    lines = []
+    for m in messages:
+        role = m.get("role", "unknown").upper()
+        text = (m.get("text") or m.get("content") or "").strip()
+        if text and role in ("USER", "ASSISTANT"):
+            lines.append(f"{role}: {text[:500]}")  # cap per-message length
+
+    return "\n\n".join(lines)
+
+
+def _parse_memories(raw: str) -> list[dict]:
+    clean = re.sub(r"```(?:json)?|```", "", raw).strip()
+    # Find JSON array
+    m = re.search(r"\[.*\]", clean, re.DOTALL)
+    if not m:
+        return []
+    try:
+        data = json.loads(m.group(0))
+        return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        logger.warning(f"🧠 Memory parse failed: {clean[:200]!r}")
+        return []
+
+
+# ── Memory retrieval ──────────────────────────────────────────────────────────
+
+def _get_recent_memories(limit: int = 50) -> list[dict]:
+    if not MEMORY_DB_PATH.exists():
+        return []
+    try:
+        with _mem_conn() as conn:
+            rows = conn.execute(
+                """SELECT id, tier, content, importance, access_count
+                   FROM memories
+                   ORDER BY importance DESC, created_at DESC
+                   LIMIT ?""",
+                (limit,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+def _touch_memories(ids: list[int]):
+    """Update access_count and last_accessed for retrieved memories."""
+    if not ids or not MEMORY_DB_PATH.exists():
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        with _mem_conn() as conn:
+            conn.execute(
+                f"""UPDATE memories
+                    SET access_count = access_count + 1, last_accessed = ?
+                    WHERE id IN ({','.join('?' * len(ids))})""",
+                [now] + ids
+            )
+    except Exception:
+        pass
+
+
+def inject_into_system_prompt(system_prompt: str, query: str = "",
+                              max_memories: int = 20,
+                              min_score: float = 0.35) -> str:
+    """
+    Prepend relevant persistent memories to the system prompt.
+    Uses vector similarity when a query is provided; falls back to
+    importance-sorted top-N when no query is given (e.g. cold startup).
+    Called on every new session load.
+    """
+    if not MEMORY_DB_PATH.exists():
+        return system_prompt
+
+    if query:
+        memories = _search_memories(query, top_k=max_memories, min_score=min_score)
+    else:
+        memories = _get_recent_memories(limit=max_memories)
+
+    if not memories:
+        return system_prompt
+
+    _touch_memories([m["id"] for m in memories])
+
+    lines = ["## Persistent Memory (from past sessions)\n"]
+    for m in memories:
+        tier_tag = "◆" if m["tier"] == "semantic" else "○"
+        lines.append(f"{tier_tag} {m['content']}")
+
+    memory_block = "\n".join(lines) + "\n\n---\n\n"
+    return memory_block + system_prompt
+
+
+def _search_memories(query: str, top_k: int = 20,
+                     min_score: float = 0.35) -> list[dict]:
+    """Vector similarity search over memory embeddings."""
+    if not MEMORY_DB_PATH.exists():
+        return []
+
+    query_bytes = _embed(query)
+    if query_bytes is None:
+        # Embedding failed — fall back to importance sort
+        return _get_recent_memories(limit=top_k)
+
+    try:
+        with _mem_conn() as conn:
+            rows = conn.execute(
+                "SELECT id, tier, content, embedding, importance, access_count "
+                "FROM memories WHERE embedding IS NOT NULL"
+            ).fetchall()
+    except Exception:
+        return _get_recent_memories(limit=top_k)
+
+    if not rows:
+        # No embeddings yet (e.g. first run after migration) — fall back
+        return _get_recent_memories(limit=top_k)
+
+    scored = []
+    for r in rows:
+        score = _cosine(query_bytes, r["embedding"])
+        if score >= min_score:
+            scored.append({
+                "id":           r["id"],
+                "tier":         r["tier"],
+                "content":      r["content"],
+                "importance":   r["importance"],
+                "access_count": r["access_count"],
+                "score":        score,
+            })
+
+    # Sort by similarity score, break ties by importance
+    scored.sort(key=lambda x: (x["score"], x["importance"]), reverse=True)
+    return scored[:top_k]
+
+
+# ── Nightly consolidation / promotion ────────────────────────────────────────
+
+async def run_nightly_promotion():
+    """
+    Promote frequently-accessed episodic memories to semantic.
+    Runs once daily. Schedule via AgentScheduler or asyncio.create_task loop.
+    """
+    if not MEMORY_DB_PATH.exists():
+        return
+    threshold = int(os.getenv("MEMORY_PROMOTE_THRESHOLD", "3"))
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        with _mem_conn() as conn:
+            promoted = conn.execute(
+                """UPDATE memories
+                   SET tier = 'semantic', promoted_at = ?
+                   WHERE tier = 'episodic'
+                     AND access_count >= ?
+                   RETURNING id, content""",
+                (now, threshold)
+            ).fetchall()
+            if promoted:
+                logger.info(f"🧠 Promoted {len(promoted)} episodic → semantic memories")
+    except Exception as e:
+        # RETURNING not available in SQLite < 3.35 — fallback
+        try:
+            with _mem_conn() as conn:
+                rows = conn.execute(
+                    """SELECT id FROM memories
+                       WHERE tier = 'episodic' AND access_count >= ?""",
+                    (threshold,)
+                ).fetchall()
+                ids = [r["id"] for r in rows]
+                if ids:
+                    conn.execute(
+                        f"""UPDATE memories SET tier = 'semantic', promoted_at = ?
+                            WHERE id IN ({','.join('?' * len(ids))})""",
+                        [now] + ids
+                    )
+                    logger.info(f"🧠 Promoted {len(ids)} episodic → semantic memories")
+        except Exception as e2:
+            logger.warning(f"🧠 Nightly promotion failed: {e2}")
+
+
+# ── Inactivity watcher ────────────────────────────────────────────────────────
+
+class InactivityWatcher:
+    """
+    Watches per-session last-activity timestamps.
+    After INACTIVITY_SECONDS of silence, fires consolidation.
+
+    Usage:
+        watcher = InactivityWatcher(llm_fn, session_manager)
+        asyncio.create_task(watcher.run())
+
+        # Call on every user/assistant message:
+        watcher.touch(session_id)
+    """
+
+    def __init__(self, llm_fn, session_manager=None):
+        self._llm_fn = llm_fn
+        self._session_manager = session_manager
+        self._last_activity: dict[str, float] = {}
+        self._consolidating: set[str] = set()
+
+    def touch(self, session_id: str):
+        import time
+        self._last_activity[str(session_id)] = time.monotonic()
+
+    def forget(self, session_id: str):
+        """Call when a session is deleted."""
+        self._last_activity.pop(str(session_id), None)
+        self._consolidating.discard(str(session_id))
+
+    async def consolidate_now(self, session_id: str):
+        """Explicitly trigger consolidation (e.g. on session close)."""
+        sid = str(session_id)
+        if sid in self._consolidating:
+            return
+        self._consolidating.add(sid)
+        try:
+            await consolidate(sid, self._llm_fn, self._session_manager)
+        finally:
+            self._consolidating.discard(sid)
+
+    async def run(self):
+        import time
+        logger.info("🧠 InactivityWatcher started")
+        while True:
+            await asyncio.sleep(60)  # check every minute
+            now = time.monotonic()
+            stale = [
+                sid for sid, last in list(self._last_activity.items())
+                if (now - last) >= INACTIVITY_SECONDS
+                and sid not in self._consolidating
+            ]
+            for sid in stale:
+                logger.info(f"🧠 Inactivity consolidation triggered for session {sid}")
+                self._last_activity.pop(sid, None)
+                asyncio.create_task(self.consolidate_now(sid))
+
+
+# ── :memory colon command ─────────────────────────────────────────────────────
+
+def handle_memory_command(raw: str) -> str:
+    """
+    :memory                       — list all memories
+    :memory semantic              — list only semantic (permanent) memories
+    :memory episodic              — list only episodic memories
+    :memory forget <id>           — delete a memory by ID
+    :memory clear                 — delete all episodic memories
+    :memory clear session <id>    — delete all memories from a specific session
+    """
+    _ensure_db()
+    tokens = raw.strip().split(None, 3)
+    verb = tokens[1].lower() if len(tokens) > 1 else "list"
+
+    if verb in ("list", "all"):
+        return _format_memory_list()
+    elif verb == "semantic":
+        return _format_memory_list(tier="semantic")
+    elif verb == "episodic":
+        return _format_memory_list(tier="episodic")
+    elif verb == "forget" and len(tokens) > 2:
+        return _forget_memory(tokens[2])
+    elif verb == "clear":
+        if len(tokens) > 2 and tokens[2].lower() == "session":
+            session_id = tokens[3].strip() if len(tokens) > 3 else ""
+            if not session_id:
+                return "Usage: :memory clear session <session_id>"
+            return _clear_session_memories(session_id)
+        return _clear_episodic()
+    else:
+        return (
+            "Unknown :memory subcommand. Available:\n"
+            "  :memory                     — list all\n"
+            "  :memory semantic            — permanent memories only\n"
+            "  :memory episodic            — session-derived memories\n"
+            "  :memory forget <id>         — delete one memory\n"
+            "  :memory clear               — delete all episodic memories\n"
+            "  :memory clear session <id>  — delete memories from one session\n"
+        )
+
+
+def _format_memory_list(tier: Optional[str] = None) -> str:
+    if not MEMORY_DB_PATH.exists():
+        return "No memory database yet. Memories are created after sessions end."
+
+    with _mem_conn() as conn:
+        query = "SELECT * FROM memories"
+        params = []
+        if tier:
+            query += " WHERE tier = ?"
+            params.append(tier)
+        query += " ORDER BY importance DESC, created_at DESC"
+        rows = conn.execute(query, params).fetchall()
+
+    if not rows:
+        label = f"{tier} " if tier else ""
+        return f"No {label}memories stored yet."
+
+    tier_label = f" ({tier})" if tier else ""
+    lines = [f"PERSISTENT MEMORY{tier_label}\n" + "─" * 48]
+    for r in rows:
+        tier_tag = "◆ semantic" if r["tier"] == "semantic" else "○ episodic"
+        accessed = f"accessed {r['access_count']}x" if r["access_count"] else "never accessed"
+        lines.append(
+            f"[{r['id']}] {r['content']}\n"
+            f"    {tier_tag}  |  importance: {r['importance']:.1f}  |  {accessed}"
+        )
+
+    lines.append("─" * 48)
+    lines.append(f"{len(rows)} memory/memories total")
+    return "\n".join(lines)
+
+
+def _forget_memory(id_str: str) -> str:
+    try:
+        mem_id = int(id_str.strip())
+    except ValueError:
+        return f"Invalid memory ID: {id_str!r}"
+
+    if not MEMORY_DB_PATH.exists():
+        return "No memory database found."
+
+    with _mem_conn() as conn:
+        row = conn.execute("SELECT content FROM memories WHERE id = ?", (mem_id,)).fetchone()
+        if not row:
+            return f"No memory with ID {mem_id}."
+        conn.execute("DELETE FROM memories WHERE id = ?", (mem_id,))
+        return f"Memory [{mem_id}] deleted: \"{row['content'][:80]}\""
+
+
+def _clear_episodic() -> str:
+    if not MEMORY_DB_PATH.exists():
+        return "No memory database found."
+    with _mem_conn() as conn:
+        n = conn.execute("SELECT COUNT(*) FROM memories WHERE tier = 'episodic'").fetchone()[0]
+        conn.execute("DELETE FROM memories WHERE tier = 'episodic'")
+    return f"Cleared {n} episodic memory/memories."
+
+
+def _clear_session_memories(session_id: str) -> str:
+    """Delete all memories extracted from a specific session."""
+    if not MEMORY_DB_PATH.exists():
+        return "No memory database found."
+    with _mem_conn() as conn:
+        n = conn.execute(
+            "SELECT COUNT(*) FROM memories WHERE source_session = ?", (session_id,)
+        ).fetchone()[0]
+        if n == 0:
+            return f"No memories found for session {session_id}."
+        conn.execute("DELETE FROM memories WHERE source_session = ?", (session_id,))
+    return f"Cleared {n} memory/memories from session {session_id}."

@@ -14,6 +14,13 @@ from langchain_core.messages import ToolMessage
 from client.commands import handle_command, handle_a2a_commands
 from client.langgraph import create_langgraph_agent
 from client.stop_signal import request_stop
+from client.proactive_agent import (
+    handle_jobs_command, looks_like_scheduling_request,
+    ScheduleParser, ConfirmationTracker, create_job, AgentScheduler,
+)
+from client.memory_consolidator import (
+    handle_memory_command, inject_into_system_prompt, InactivityWatcher,
+)
 
 try:
     from tools.rag.conversation_rag import store_turn_async as _rag_store_turn, purge_session as _rag_purge_session, retrieve_context as _rag_search_turns
@@ -52,6 +59,12 @@ SESSION_LOCKS: dict = {}
 # Timestamp of when each task was created — used by TTL cleanup.
 SESSION_TASK_CREATED: dict = {}
 
+# Proactive agent singletons — initialised in start_websocket_server()
+_agent_scheduler: "AgentScheduler | None" = None
+_schedule_parser: "ScheduleParser | None" = None
+_confirmation_tracker: ConfirmationTracker = ConfirmationTracker()
+_inactivity_watcher: "InactivityWatcher | None" = None
+
 
 async def broadcast_message(message_type, data):
     """Broadcast a message to all connected WebSocket clients"""
@@ -61,6 +74,30 @@ async def broadcast_message(message_type, data):
             *[ws.send(message) for ws in CONNECTED_WEBSOCKETS],
             return_exceptions=True
         )
+
+
+async def broadcast_proactive_result(data: dict):
+    """
+    Deliver a proactive agent result (scheduled job output) to all clients.
+    Called by AgentScheduler._fire_job via broadcast_fn.
+    """
+    if data.get("type") == "scheduled_result":
+        label = data.get("label", "Scheduled job")
+        result = data.get("result", "")
+        text = f"**[{label}]**\n{result}"
+        await broadcast_message("assistant_message", {
+            "text": text,
+            "model": "proactive",
+            "multi_agent": False,
+            "a2a": False,
+        })
+    elif data.get("type") == "scheduled_error":
+        label = data.get("label", "Scheduled job")
+        error = data.get("error", "unknown error")
+        await broadcast_message("assistant_message", {
+            "text": f"⚠️ Scheduled job **{label}** failed: {error}",
+            "model": "system",
+        })
 
 
 async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools,
@@ -83,6 +120,89 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # Add session_id to conversation_state for context tracking
         if session_id and "session_id" not in conversation_state:
             conversation_state["session_id"] = session_id
+
+        # ═══════════════════════════════════════════════════════════════
+        # PROACTIVE: :jobs command — deterministic, no LLM
+        # ═══════════════════════════════════════════════════════════════
+        if prompt.startswith(":jobs"):
+            response_text = handle_jobs_command(prompt)
+            if session_manager and session_id:
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "system")
+            await broadcast_message("assistant_message", {"text": response_text, "model": "system"})
+            await broadcast_message("complete", {"stopped": False})
+            return
+
+        # ═══════════════════════════════════════════════════════════════
+        # PROACTIVE: :memory command — deterministic, no LLM
+        # ═══════════════════════════════════════════════════════════════
+        if prompt.startswith(":memory"):
+            response_text = handle_memory_command(prompt)
+            if session_manager and session_id:
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "system")
+            await broadcast_message("assistant_message", {"text": response_text, "model": "system"})
+            await broadcast_message("complete", {"stopped": False})
+            return
+
+        # ═══════════════════════════════════════════════════════════════
+        # PROACTIVE: Pending schedule confirmation (user said yes/no)
+        # ═══════════════════════════════════════════════════════════════
+        if session_id and _confirmation_tracker.get_pending(session_id):
+            if _confirmation_tracker.is_confirmation(prompt):
+                pending = _confirmation_tracker.get_pending(session_id)
+                if _confirmation_tracker.is_yes(prompt):
+                    job_id = create_job(
+                        label=pending.label,
+                        tool=pending.tool,
+                        trigger_type=pending.trigger_type,
+                        cron=pending.cron,
+                        tool_args=pending.tool_args,
+                        timezone=pending.timezone,
+                        condition_tool=pending.condition_tool,
+                        condition_expr=pending.condition_expr,
+                        condition_cron=pending.condition_cron,
+                    )
+                    if _agent_scheduler:
+                        _agent_scheduler.add_job(job_id)
+                    _confirmation_tracker.clear(session_id)
+                    response_text = (
+                        f"Scheduled: **{pending.label}**\n"
+                        f"  {pending.human_schedule}\n"
+                        f"  Job ID: {job_id}  |  Use `:jobs` to manage."
+                    )
+                else:
+                    _confirmation_tracker.clear(session_id)
+                    response_text = "Scheduling cancelled. Let me know if you'd like to set it up differently."
+                if session_manager and session_id:
+                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                    session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "system")
+                await broadcast_message("assistant_message", {"text": response_text, "model": "system"})
+                await broadcast_message("complete", {"stopped": False})
+                return
+
+        # ═══════════════════════════════════════════════════════════════
+        # PROACTIVE: Natural language schedule request
+        # ═══════════════════════════════════════════════════════════════
+        if _schedule_parser and looks_like_scheduling_request(prompt):
+            parsed = await _schedule_parser.parse(prompt)
+            response_text = parsed.render()
+            if hasattr(parsed, 'cron') or hasattr(parsed, 'condition_tool'):
+                # ScheduleConfirmation — hold pending yes/no
+                if session_id:
+                    _confirmation_tracker.set_pending(session_id, parsed)
+            if session_manager and session_id:
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "system")
+            await broadcast_message("assistant_message", {"text": response_text, "model": "system"})
+            await broadcast_message("complete", {"stopped": False})
+            return
+
+        # ═══════════════════════════════════════════════════════════════
+        # MEMORY: Touch inactivity watcher on every message
+        # ═══════════════════════════════════════════════════════════════
+        if session_id and _inactivity_watcher:
+            _inactivity_watcher.touch(session_id)
 
         # ═══════════════════════════════════════════════════════════════
         # WORKAROUND: Intercept history questions for weaker models (7B)
@@ -361,6 +481,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             model_name = result.get("current_model", "unknown")
             msg_id = session_manager.add_message(session_id, "assistant", assistant_text, MAX_MESSAGE_HISTORY, model_name)
             _rag_store_turn(session_id, "assistant", assistant_text, msg_id)
+            if _inactivity_watcher:
+                _inactivity_watcher.touch(session_id)
             if image_source:
                 session_manager.set_message_image_source(msg_id, image_source)
 
@@ -536,6 +658,10 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 if session_id:
                     session_manager.delete_session(session_id)
                     _rag_purge_session(session_id)
+                    if _inactivity_watcher:
+                        _inactivity_watcher.forget(session_id)
+                    from client.memory_consolidator import _clear_session_memories
+                    _clear_session_memories(str(session_id))
                     await websocket.send(json.dumps({
                         "type": "session_deleted",
                         "session_id": session_id
@@ -845,6 +971,25 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 else:
                     prompt = sanitize_user_input(prompt, preserve_markdown=True)
 
+                # ── :jobs and :memory — deterministic, bypass LLM entirely ──
+                if prompt.startswith(":jobs"):
+                    response = handle_jobs_command(prompt)
+                    if session_manager and current_session_id:
+                        MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                        session_manager.add_message(current_session_id, "assistant", response, MAX_MESSAGE_HISTORY, "system")
+                    await broadcast_message("assistant_message", {"text": response, "model": "system"})
+                    await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                    continue
+
+                if prompt.startswith(":memory"):
+                    response = handle_memory_command(prompt)
+                    if session_manager and current_session_id:
+                        MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                        session_manager.add_message(current_session_id, "assistant", response, MAX_MESSAGE_HISTORY, "system")
+                    await broadcast_message("assistant_message", {"text": response, "model": "system"})
+                    await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                    continue
+
                 if prompt.startswith(":a2a"):
                     result = await handle_a2a_commands(prompt, orchestrator)
                     if result:
@@ -970,8 +1115,16 @@ async def _cleanup_stale_tasks(max_age_seconds: int = 3600):
 async def start_websocket_server(agent, tools, logger, conversation_state, run_agent_fn, models_module,
                                  model_name, system_prompt, orchestrator=None, multi_agent_state=None,
                                  a2a_state=None, mcp_agent=None, session_manager=None, host="0.0.0.0", port=8765,
-                                 session_state_registry=None, capability_registry=None):
+                                 session_state_registry=None, capability_registry=None,
+                                 proactive_agent=None, inactivity_watcher=None):
     """Start the WebSocket server for chat (WITH MULTI-AGENT STATE + A2A + SESSIONS)"""
+
+    global _agent_scheduler, _schedule_parser, _inactivity_watcher
+    if proactive_agent:
+        _agent_scheduler = proactive_agent.get("scheduler")
+        _schedule_parser = proactive_agent.get("parser")
+    if inactivity_watcher:
+        _inactivity_watcher = inactivity_watcher
 
     async def handler(websocket):
         try:

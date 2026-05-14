@@ -1,6 +1,6 @@
 # MCP Platform
 
-Local MCP runtime with multi-agent orchestration, distributed tool servers, and ML-powered media recommendations.
+Local MCP runtime with multi-agent orchestration, distributed tool servers, ML-powered media recommendations, persistent cross-session memory, and a proactive agent scheduler.
 
 ⚠️ **Experimental** — intended for personal and experimental use only, not for production deployment.
 
@@ -17,7 +17,8 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 - [6. Testing](#6-testing)
 - [7. Architecture](#7-architecture)
 - [8. RAG & Conversation Memory](#8-rag--conversation-memory)
-- [9. Intent Patterns & Troubleshooting](#9-intent-patterns--troubleshooting)
+- [9. Persistent Memory & Proactive Agents](#9-persistent-memory--proactive-agents)
+- [10. Intent Patterns & Troubleshooting](#10-intent-patterns--troubleshooting)
 - [License](#license)
 
 ---
@@ -27,6 +28,7 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, and 
 * Python 3.12+
 * 16GB+ RAM recommended
 * Ollama installed
+* `apscheduler` (`pip install apscheduler`) — required for proactive agent scheduler
 
 ---
 
@@ -137,6 +139,7 @@ DISABLED_TOOLS=plex:*
 DEFAULT_CITY=Vancouver
 DEFAULT_STATE=BC
 DEFAULT_COUNTRY=Canada
+DEFAULT_TIMEZONE=America/Vancouver
 ```
 
 ### Recommended Setup
@@ -173,6 +176,18 @@ SERPER_API_KEY=<key>
 ### Available Commands
 
 ```
+:jobs                  - List all scheduled jobs
+:jobs pause <label>    - Pause a scheduled job
+:jobs enable <label>   - Resume a scheduled job
+:jobs cancel <label>   - Delete a scheduled job
+:jobs info <label>     - Show full job detail
+:memory                - List all persistent memories
+:memory                        - List all memories
+:memory semantic               - List permanent memories only
+:memory episodic               - List session-derived memories
+:memory forget <id>            - Delete a memory by ID
+:memory clear                  - Clear all episodic memories
+:memory clear session <id>     - Delete memories from one session
 :commands              - List all available commands
 :clear sessions        - Clear all chat history
 :clear session <id>    - Clear session
@@ -419,10 +434,16 @@ mcp-platform/
 │   ├── ui/
 │   ├── capability_registry.py  <- auto-populated from @tool_meta
 │   ├── langgraph.py
+│   ├── memory_consolidator.py  <- persistent cross-session memory
+│   ├── proactive_agent.py      <- scheduler + condition triggers
 │   ├── query_patterns.py       <- auto-populated from @tool_meta triggers
 │   ├── tool_meta.py            <- single source of truth for tool metadata
 │   ├── websocket.py
 │   └── ...
+├── data/
+│   ├── sessions.db             <- session + message history
+│   ├── memory.db               <- persistent memory (created on first run)
+│   └── scheduler.db            <- scheduled jobs (created on first run)
 └── tools/
 ```
 
@@ -514,7 +535,79 @@ Append the contents of `session_history_tool.py` to `server.py` after the existi
 
 ---
 
-## 9. Intent Patterns & Troubleshooting
+## 9. Persistent Memory & Proactive Agents
+
+### Persistent Memory
+
+The platform remembers facts, preferences, and outcomes across sessions. After a session ends (or after 15 minutes of inactivity), the LLM extracts memorable information from the transcript and stores it in `data/memory.db`. On every new session, relevant memories are injected into the system prompt automatically — no re-explaining required.
+
+**Two memory tiers:**
+
+| Tier | Description |
+|------|-------------|
+| `episodic` | Extracted from individual sessions — working facts and recent outcomes |
+| `semantic` | Promoted from episodic after repeated access — permanent long-term knowledge |
+
+Promotion runs nightly: episodic memories accessed 3+ times are promoted to semantic. Threshold is configurable via `MEMORY_PROMOTE_THRESHOLD` in `.env`.
+
+**Memory commands:**
+```
+:memory                        — list all memories
+:memory semantic               — permanent memories only
+:memory episodic               — session-derived memories
+:memory forget <id>            — delete one memory by ID
+:memory clear                  — delete all episodic memories
+:memory clear session <id>     — delete all memories from one session
+```
+
+### Proactive Agent Scheduler
+
+Agents can run on a schedule or when a condition becomes true — without any prompt from you.
+
+**Scheduling via natural language:**
+```
+do a day briefing every day at 5:30am
+run a Gmail summary every weekday at 8am
+alert me when Gmail unread count is over 10
+check the weather every morning at 7am
+```
+
+The platform parses the request, shows you exactly what it understood (tool, schedule, cron expression), and waits for confirmation before writing anything. Ambiguous requests are clarified with a question rather than guessed.
+
+**Two trigger types:**
+
+| Type | How it works |
+|------|-------------|
+| `cron` | Fires at a fixed time — "every day at 5:30am" |
+| `condition` | Polls a check tool on an interval; fires the action tool only when the condition is true |
+
+**Job management commands:**
+```
+:jobs                    — list all scheduled jobs
+:jobs pause <label>      — pause a job
+:jobs enable <label>     — resume a paused job
+:jobs cancel <label>     — delete a job
+:jobs info <label>       — full job detail
+```
+
+**New files (drop into `client/`):**
+- `client/memory_consolidator.py` — memory extraction, storage, injection, and `:memory` commands
+- `client/proactive_agent.py` — scheduler, condition triggers, schedule parser, and `:jobs` commands
+
+**Required dependency:**
+```bash
+pip install apscheduler
+```
+
+**New data files (created automatically on first run):**
+```
+data/memory.db      — persistent memory store
+data/scheduler.db   — scheduled jobs store
+```
+
+---
+
+## 10. Intent Patterns & Troubleshooting
 
 ### Intent Patterns
 

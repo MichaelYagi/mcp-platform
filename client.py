@@ -765,6 +765,62 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     session_manager = SessionManager()
     logger.info("💾 Session manager initialized")
 
+    # ─── Persistent Memory ───────────────────────────────────────────────────
+    from client.memory_consolidator import (
+        InactivityWatcher, inject_into_system_prompt, run_nightly_promotion,
+    )
+
+    async def _llm_fn_for_memory(system: str, user: str) -> str:
+        """Thin wrapper — calls the same Ollama LLM used by the agent."""
+        from langchain_core.messages import SystemMessage, HumanMessage
+        msgs = [SystemMessage(content=system), HumanMessage(content=user)]
+        response = await llm.ainvoke(msgs)
+        return response.content if hasattr(response, "content") else str(response)
+
+    inactivity_watcher = InactivityWatcher(_llm_fn_for_memory, session_manager)
+    asyncio.create_task(inactivity_watcher.run())
+
+    # Inject existing memories into the system prompt before agent starts
+    # Use empty query on cold start — falls back to importance-sorted top-N
+    SYSTEM_PROMPT = inject_into_system_prompt(SYSTEM_PROMPT)
+    logger.info("🧠 Persistent memory layer initialized")
+
+    # Nightly memory promotion loop
+    async def _nightly_promotion_loop():
+        while True:
+            await asyncio.sleep(24 * 60 * 60)
+            await run_nightly_promotion()
+    asyncio.create_task(_nightly_promotion_loop())
+
+    # ─── Proactive Agent Scheduler ───────────────────────────────────────────
+    from client.proactive_agent import AgentScheduler, ScheduleParser
+    from client.websocket import broadcast_proactive_result
+
+    async def _tool_executor(tool_name: str, args: dict) -> str:
+        """Execute a named tool by finding it in the loaded tools list."""
+        for tool in tools:
+            if tool.name == tool_name:
+                try:
+                    result = await tool.ainvoke(args)
+                    return str(result)
+                except Exception as e:
+                    return f"Tool {tool_name} error: {e}"
+        return f"Tool '{tool_name}' not found."
+
+    agent_scheduler = AgentScheduler(
+        execute_fn=_tool_executor,
+        broadcast_fn=broadcast_proactive_result,
+    )
+    await agent_scheduler.start()
+
+    tool_names = [t.name for t in mcp_agent._tools]
+    schedule_parser = ScheduleParser(
+        llm_fn=_llm_fn_for_memory,
+        available_tools=tool_names,
+        default_timezone=os.getenv("DEFAULT_TIMEZONE", "America/Vancouver"),
+    )
+    logger.info("⏰ Proactive agent scheduler initialized")
+
     from client.session_state import SessionStateRegistry
     session_state_registry = SessionStateRegistry()
     logger.info("🗂️  Session state registry initialized")
@@ -2286,6 +2342,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         session_manager=session_manager,
         session_state_registry=session_state_registry,
         capability_registry=capability_registry,
+        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser},
+        inactivity_watcher=inactivity_watcher,
         host="0.0.0.0",
         port=8765
     )

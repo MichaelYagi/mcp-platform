@@ -34,7 +34,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 def pytest_configure(config):
     """Configure pytest environment"""
     # Create results directory (relative to where pytest runs from)
-    results_dir = Path("results")
+    results_dir = Path("tests/results")
     results_dir.mkdir(exist_ok=True)
 
     # Set test markers
@@ -63,7 +63,7 @@ def pytest_sessionfinish(session, exitstatus):
     """Hook that runs after all tests complete - generate HTML from XML"""
     if exitstatus in [0, 1]:  # Success or test failures (but not collection errors)
         # Results directory is wherever pytest was run from + results/
-        results_dir = Path("results").absolute()
+        results_dir = Path("tests/results").absolute()
         html_generator = results_dir / "generate_html.py"
 
         if html_generator.exists():
