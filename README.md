@@ -550,7 +550,7 @@ The platform has three layers of context, each serving a different purpose:
 |-------|-----------|-------|--------------------------|
 | **Message window** | Last N turns in direct LLM context | Current session | No |
 | **Conversation RAG** | Older turns ingested as vectors | Per session | No |
-| **Persistent memory** | Distilled facts extracted by LLM | All sessions | Yes |
+| **Persistent memory** | Distilled facts extracted by LLM | All sessions | Yes — survives session deletion |
 
 **What this means in practice:** If you tell the platform your son's name and ask about it 3 messages later, the message window handles it. If you ask 20 messages later, RAG handles it (usually). If you start a new session tomorrow, only persistent memory has it.
 
@@ -614,10 +614,16 @@ For example: if you said "My son Sam plays accordion" and later ask "What instru
 
 | Tier | How it's created | Persists |
 |------|-----------------|---------|
-| `episodic` | Auto-extracted from sessions | Until manually deleted or session cleared |
+| `episodic` | Auto-extracted from sessions | Permanent — survives session deletion |
 | `semantic` | Promoted from episodic (3+ accesses) or added via `:memory add` | Permanent |
 
 Promotion threshold is configurable: `MEMORY_PROMOTE_THRESHOLD=3` in `.env`.
+
+**Deleting a session does not delete its memories.** RAG chunks are purged, but extracted facts remain. To remove memories from a specific session before deleting it:
+
+```
+:memory clear session <id>
+```
 
 ### Reading :memory output
 

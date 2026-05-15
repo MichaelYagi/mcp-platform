@@ -669,8 +669,6 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     _rag_purge_session(session_id)
                     if _inactivity_watcher:
                         _inactivity_watcher.forget(session_id)
-                    from client.memory_consolidator import _clear_session_memories
-                    _clear_session_memories(str(session_id))
                     await websocket.send(json.dumps({
                         "type": "session_deleted",
                         "session_id": session_id
