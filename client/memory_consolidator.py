@@ -174,24 +174,38 @@ def _mark_consolidated(session_id: str):
 
 # ── LLM extraction prompt ─────────────────────────────────────────────────────
 
-_EXTRACT_PROMPT = """You are a memory extraction system for an AI assistant platform.
+_EXTRACT_PROMPT = """You are a memory extraction system. Your job is to extract EVERY fact about the user from the conversation below.
 
-Analyse the conversation transcript below and extract memorable facts, preferences,
-decisions, and outcomes that would be useful to remember in future sessions.
+Be AGGRESSIVE. Extract anything personal, technical, or factual. When in doubt, extract it.
 
-Focus on:
-- User's name and identity ("The user's name is Mike")
-- User preferences and working style ("prefers diffs over full rewrites")
-- Technical facts about the user's environment ("WSL2 at 192.168.0.185")
-- Outcomes and solutions that worked ("OLLAMA_KEEP_ALIVE=-1 fixed cold-load latency")
-- Ongoing projects and their current state
-- Things the user explicitly asked to remember
-- Patterns in what the user asks for
+ALWAYS extract these categories if present:
+- Full name, nicknames
+- Family members and their details (spouse, children, parents, siblings — names, ages, jobs, hobbies, where they're from)
+- Where the user was born, grew up, lives now
+- Education (schools, degrees, fields of study)
+- Career (job title, employer, past jobs, career changes)
+- Hobbies and interests (past and present)
+- Technical environment (hardware, software, tools, config)
+- Projects they work on
+- Preferences and working style
+- Solved problems and outcomes
 
-DO NOT extract:
-- Trivial chit-chat
-- Things already obvious from context
-- Duplicate facts already in existing memories
+EXAMPLES of good extractions:
+- "Mike's wife is Ryuko, a dental hygienist who plays piano"
+- "Mike's son Noah is 11 years old"
+- "Noah plays cello but doesn't enjoy it"
+- "Noah excels at swimming and enjoys manga and video games"
+- "Mike was born in Richmond BC"
+- "Ryuko is from Chigasaki Japan"
+- "Noah was born in Ottawa Ontario"
+- "Mike studied music (violin) at University of Ottawa"
+- "Mike and Ryuko met at University of Ottawa"
+- "Mike switched to computer science at Carleton University"
+- "Mike's family moved to Surrey BC in 2015"
+
+DO NOT skip personal facts just because they seem unrelated to tech. Family, origins, education are all important.
+
+DO NOT extract facts already in existing memories (check below).
 
 Existing memories (do not duplicate):
 {existing}
@@ -199,15 +213,17 @@ Existing memories (do not duplicate):
 Transcript:
 {transcript}
 
-Return ONLY a JSON array of memory objects. Each object:
+Return ONLY a JSON array. Each object:
 {{
   "content": "concise fact in plain English (max 120 chars)",
   "tier": "episodic",
   "importance": 0.0-1.0
 }}
 
-If nothing memorable, return an empty array: []
-Return ONLY the JSON. No preamble, no markdown fences."""
+Importance guide: identity/family = 0.9, location/education = 0.8, technical facts = 0.7, preferences = 0.8, outcomes = 0.6
+
+If nothing new to extract, return [].
+Return ONLY the JSON array. No preamble, no markdown fences."""
 
 
 # ── Core consolidation ────────────────────────────────────────────────────────
@@ -221,10 +237,6 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
     """
     logger.info(f"🧠 consolidate() called for session {session_id}")
     _ensure_db()
-
-    if _is_consolidated(session_id):
-        logger.info(f"🧠 Session {session_id} already consolidated — skipping (consolidated_at is set)")
-        return 0
 
     # Fetch transcript from sessions.db via session_manager or direct query
     transcript = _get_transcript(session_id, session_manager)
