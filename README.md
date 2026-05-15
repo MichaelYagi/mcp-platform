@@ -556,7 +556,7 @@ The platform has three layers of context, each serving a different purpose:
 
 ### The memory workflow
 
-**Step 1 — Have a conversation.** Tell the platform things you want it to remember: your name, your family, your projects, your preferences. The more declarative the better ("My wife's name is Ryuko" vs "what's my wife's name?").
+**Step 1 — Have a conversation.** Tell the platform things you want it to remember: your name, your family, your projects, your preferences. The more declarative the better ("My wife's name is Suzy" vs "what's my wife's name?").
 
 **Step 2 — Memory extracts automatically.** After 15 minutes of inactivity, the `InactivityWatcher` fires and runs the LLM over your session transcript. It extracts facts and stores them in `data/memory.db` with vector embeddings.
 
@@ -568,9 +568,9 @@ Re-consolidation is smart: it tracks message count at last consolidation and onl
 ## Persistent Memory (from past sessions)
 The following facts are KNOWN and TRUE. Use them to answer directly.
 
-◆ The user's name is Mike
-○ Mike's wife is Ryuko, a dental hygienist who plays piano
-○ Mike's son Noah is 11, plays cello, excels at swimming
+◆ The user's name is Bob
+○ Bob's wife is Suzy, a nurse and excellent cook
+○ Bob's son Sam is 11, plays accordion, excels at hockey
 ...
 ```
 
@@ -608,7 +608,7 @@ Increase `LLM_MESSAGE_WINDOW` in `.env`. The default of 6 is too tight — 15 is
 
 Once a turn scrolls out of the window it moves into **Conversation RAG** — it's still there, but now retrieved by semantic similarity rather than direct context. This means the query phrasing needs to be close enough to the original content for the reranker to surface it. If the LLM still can't find something that was said earlier in the same session, try rephrasing the question to use the same keywords as the original statement.
 
-For example: if you said "My son Noah plays cello" and later ask "What instrument does my son play?", the semantic match is strong. But "How about Noah?" is too vague for RAG to confidently return the cello fact — be specific.
+For example: if you said "My son Sam plays accordion" and later ask "What instrument does my son play?", the semantic match is strong. But "How about Sam?" is too vague for RAG to confidently return the accordion fact — be specific.
 
 ### Two memory tiers
 
@@ -618,6 +618,34 @@ For example: if you said "My son Noah plays cello" and later ask "What instrumen
 | `semantic` | Promoted from episodic (3+ accesses) or added via `:memory add` | Permanent |
 
 Promotion threshold is configurable: `MEMORY_PROMOTE_THRESHOLD=3` in `.env`.
+
+### Reading :memory output
+
+```
+PERSISTENT MEMORY
+────────────────────────────────────────────────
+[11] The user's name is Bob
+    ◆ semantic  |  importance: 1.0  |  accessed 163x
+[22] Bob's wife Suzy is a nurse and an excellent cook.
+    ○ episodic  |  importance: 0.9  |  accessed 89x
+```
+
+Each entry shows:
+
+- **`[id]`** — the memory ID, used with `:memory forget <id>` to delete it
+- **Content** — the extracted fact, written in plain English
+- **`◆ semantic` / `○ episodic`** — tier: semantic (permanent) or episodic (session-derived)
+- **`importance`** — score assigned by the LLM at extraction time (0.0–1.0). Higher = retrieved first
+- **`accessed Nx`** — how many times this memory was returned in a retrieval search. High access count drives promotion from episodic → semantic
+
+**Memories are sorted by retrieval score** (combination of vector similarity and importance), not by ID or creation date. The most relevant memories for your last query appear first.
+
+**Duplicate memories** can appear when the same session is consolidated multiple times, or when two sessions contain similar facts. They don't cause errors — the LLM sees both — but they waste context space. Clean them up with:
+
+```
+:memory dedup        — removes exact duplicates, keeps highest importance copy
+:memory forget <id>  — removes near-duplicates manually (same fact, different wording)
+```
 
 ### Persistent Memory
 
@@ -678,7 +706,7 @@ Routing is driven by `triggers` in each tool's `@tool_meta` decorator — no man
 
 **Force a specific tool:**
 ```
-Using shashin_search_tool, find photos of Noah
+Using shashin_search_tool, find photos of Sam
 Using web_image_search_tool, show me a red panda
 ```
 
