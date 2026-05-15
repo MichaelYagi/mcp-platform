@@ -188,6 +188,9 @@ SERPER_API_KEY=<key>
 :memory forget <id>            - Delete a memory by ID
 :memory clear                  - Clear all episodic memories
 :memory clear session <id>     - Delete memories from one session
+:memory consolidate <id>       - Extract memories from a session now
+:memory add <fact>             - Manually add a permanent memory
+:memory dedup                  - Remove duplicate memories
 :commands              - List all available commands
 :clear sessions        - Clear all chat history
 :clear session <id>    - Clear session
@@ -467,8 +470,10 @@ Every LLM call receives context in this order:
 Controls how many recent turns the LLM sees directly. Set in `.env`:
 
 ```bash
-LLM_MESSAGE_WINDOW=12   # default: 6
+LLM_MESSAGE_WINDOW=15   # default: 6, recommended: 15
 ```
+
+A window of 6 is too tight for normal conversation — information shared early in a session scrolls out before you can ask about it. 15 covers a full back-and-forth without hitting token limits on qwen2.5:14b. If you share something and the LLM seems to forget it a few messages later, increase this value.
 
 ### Overflow ingestion
 
@@ -537,28 +542,86 @@ Append the contents of `session_history_tool.py` to `server.py` after the existi
 
 ## 9. Persistent Memory & Proactive Agents
 
-### Persistent Memory
+### How memory and context work together
 
-The platform remembers facts, preferences, and outcomes across sessions. After a session ends (or after 15 minutes of inactivity), the LLM extracts memorable information from the transcript and stores it in `data/memory.db`. On every new session, relevant memories are injected into the system prompt automatically — no re-explaining required.
+The platform has three layers of context, each serving a different purpose:
 
-**Two memory tiers:**
+| Layer | What it is | Scope | Survives session delete? |
+|-------|-----------|-------|--------------------------|
+| **Message window** | Last N turns in direct LLM context | Current session | No |
+| **Conversation RAG** | Older turns ingested as vectors | Per session | No |
+| **Persistent memory** | Distilled facts extracted by LLM | All sessions | Yes |
 
-| Tier | Description |
-|------|-------------|
-| `episodic` | Extracted from individual sessions — working facts and recent outcomes |
-| `semantic` | Promoted from episodic after repeated access — permanent long-term knowledge |
+**What this means in practice:** If you tell the platform your son's name and ask about it 3 messages later, the message window handles it. If you ask 20 messages later, RAG handles it (usually). If you start a new session tomorrow, only persistent memory has it.
 
-Promotion runs nightly: episodic memories accessed 3+ times are promoted to semantic. Threshold is configurable via `MEMORY_PROMOTE_THRESHOLD` in `.env`.
+### The memory workflow
 
-**Memory commands:**
+**Step 1 — Have a conversation.** Tell the platform things you want it to remember: your name, your family, your projects, your preferences. The more declarative the better ("My wife's name is Ryuko" vs "what's my wife's name?").
+
+**Step 2 — Memory extracts automatically.** After 15 minutes of inactivity, the `InactivityWatcher` fires and runs the LLM over your session transcript. It extracts facts and stores them in `data/memory.db` with vector embeddings.
+
+Re-consolidation is smart: it tracks message count at last consolidation and only re-runs if new messages have been added since. Going idle overnight triggers one extraction, not dozens.
+
+**Step 3 — Memories inject on every query.** On each new message, a vector search finds the most relevant memories and prepends them to the system prompt:
+
 ```
-:memory                        — list all memories
+## Persistent Memory (from past sessions)
+The following facts are KNOWN and TRUE. Use them to answer directly.
+
+◆ The user's name is Mike
+○ Mike's wife is Ryuko, a dental hygienist who plays piano
+○ Mike's son Noah is 11, plays cello, excels at swimming
+...
+```
+
+**Step 4 — Memories accumulate over time.** Episodic memories accessed 3+ times are promoted to semantic (permanent) tier nightly. The platform gets more useful the longer you use it.
+
+### When memory doesn't fire automatically
+
+The inactivity watcher fires 15 minutes after your last message. If you need memories extracted immediately:
+
+```
+:memory consolidate <session_id>
+```
+
+Use `:sessions` to find the session ID. The command clears the consolidation flag and re-runs extraction regardless of message count.
+
+### Memory commands
+
+```
+:memory                        — list all memories (sorted by relevance)
 :memory semantic               — permanent memories only
 :memory episodic               — session-derived memories
 :memory forget <id>            — delete one memory by ID
 :memory clear                  — delete all episodic memories
-:memory clear session <id>     — delete all memories from one session
+:memory clear session <id>     — delete memories from one session
+:memory consolidate <id>       — extract memories from a session now
+:memory add <fact>             — manually add a permanent memory
+:memory dedup                  — remove duplicate memories
 ```
+
+Manually added memories (`:memory add`) are stored as `semantic` tier with importance 1.0 — they always rank first in retrieval.
+
+### If the LLM forgets something mid-session
+
+Increase `LLM_MESSAGE_WINDOW` in `.env`. The default of 6 is too tight — 15 is recommended. Information shared early in a session scrolls out of the window before you can ask about it.
+
+Once a turn scrolls out of the window it moves into **Conversation RAG** — it's still there, but now retrieved by semantic similarity rather than direct context. This means the query phrasing needs to be close enough to the original content for the reranker to surface it. If the LLM still can't find something that was said earlier in the same session, try rephrasing the question to use the same keywords as the original statement.
+
+For example: if you said "My son Noah plays cello" and later ask "What instrument does my son play?", the semantic match is strong. But "How about Noah?" is too vague for RAG to confidently return the cello fact — be specific.
+
+### Two memory tiers
+
+| Tier | How it's created | Persists |
+|------|-----------------|---------|
+| `episodic` | Auto-extracted from sessions | Until manually deleted or session cleared |
+| `semantic` | Promoted from episodic (3+ accesses) or added via `:memory add` | Permanent |
+
+Promotion threshold is configurable: `MEMORY_PROMOTE_THRESHOLD=3` in `.env`.
+
+### Persistent Memory
+
+The platform remembers facts, preferences, and outcomes across sessions. After a session ends (or after 15 minutes of inactivity), the LLM extracts memorable information from the transcript and stores it in `data/memory.db`. On every new session, relevant memories are injected into the system prompt automatically — no re-explaining required.
 
 ### Proactive Agent Scheduler
 

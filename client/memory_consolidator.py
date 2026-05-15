@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS memory_meta (
 
 _SESSIONS_MIGRATION = """
 ALTER TABLE sessions ADD COLUMN consolidated_at TEXT;
+ALTER TABLE sessions ADD COLUMN consolidated_msg_count INTEGER;
 """
 
 
@@ -89,8 +90,11 @@ def _ensure_db():
             with sqlite3.connect(SESSIONS_DB_PATH) as conn:
                 cols = [r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()]
                 if "consolidated_at" not in cols:
-                    conn.execute(_SESSIONS_MIGRATION)
+                    conn.execute("ALTER TABLE sessions ADD COLUMN consolidated_at TEXT")
                     logger.info("💾 sessions.db migrated: added consolidated_at column")
+                if "consolidated_msg_count" not in cols:
+                    conn.execute("ALTER TABLE sessions ADD COLUMN consolidated_msg_count INTEGER")
+                    logger.info("💾 sessions.db migrated: added consolidated_msg_count column")
         except Exception as e:
             logger.warning(f"⚠️ sessions.db migration skipped: {e}")
 
@@ -145,15 +149,36 @@ def _cosine(a_bytes: bytes, b_bytes: bytes) -> float:
 
 # ── Consolidation guard ──────────────────────────────────────────────────────
 
+def _get_session_msg_count(session_id: str) -> int:
+    """Return current message count for a session."""
+    if not SESSIONS_DB_PATH.exists():
+        return 0
+    try:
+        with _sess_conn() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM messages WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            return row[0] if row else 0
+    except Exception:
+        return 0
+
+
 def _is_consolidated(session_id: str) -> bool:
+    """True if session has been consolidated and no new messages since last run."""
     if not SESSIONS_DB_PATH.exists():
         return False
     try:
         with _sess_conn() as conn:
             row = conn.execute(
-                "SELECT consolidated_at FROM sessions WHERE id = ?", (session_id,)
+                "SELECT consolidated_at, consolidated_msg_count FROM sessions WHERE id = ?",
+                (session_id,)
             ).fetchone()
-            return row is not None and row["consolidated_at"] is not None
+            if row is None or row["consolidated_at"] is None:
+                return False
+            last_count = row["consolidated_msg_count"] or 0
+            current_count = _get_session_msg_count(session_id)
+            # Re-consolidate if new messages have been added
+            return current_count <= last_count
     except Exception:
         return False
 
@@ -163,10 +188,11 @@ def _mark_consolidated(session_id: str):
         return
     try:
         now = datetime.now(timezone.utc).isoformat()
+        msg_count = _get_session_msg_count(session_id)
         with _sess_conn() as conn:
             conn.execute(
-                "UPDATE sessions SET consolidated_at = ? WHERE id = ?",
-                (now, session_id)
+                "UPDATE sessions SET consolidated_at = ?, consolidated_msg_count = ? WHERE id = ?",
+                (now, msg_count, session_id)
             )
     except Exception as e:
         logger.warning(f"⚠️ Could not mark session {session_id} consolidated: {e}")
@@ -237,6 +263,10 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
     """
     logger.info(f"🧠 consolidate() called for session {session_id}")
     _ensure_db()
+
+    if _is_consolidated(session_id):
+        logger.debug(f"🧠 Session {session_id} already consolidated and no new messages — skipping")
+        return 0
 
     # Fetch transcript from sessions.db via session_manager or direct query
     transcript = _get_transcript(session_id, session_manager)
@@ -612,8 +642,8 @@ def handle_memory_command(raw: str, llm_fn=None, session_manager=None) -> str:
         return _consolidate_now(session_id, llm_fn, session_manager)
     elif verb == "dedup":
         return _dedup_memories()
-    elif verb == "add" and len(tokens) > 2:
-        content = raw.strip().split(None, 2)[2] if len(raw.strip().split(None, 2)) > 2 else ""
+    elif verb == "add":
+        content = raw.strip().split(None, 2)[2] if len(tokens) > 2 else ""
         return _add_memory(content)
     else:
         return (
