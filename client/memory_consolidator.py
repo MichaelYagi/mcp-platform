@@ -180,6 +180,7 @@ Analyse the conversation transcript below and extract memorable facts, preferenc
 decisions, and outcomes that would be useful to remember in future sessions.
 
 Focus on:
+- User's name and identity ("The user's name is Mike")
 - User preferences and working style ("prefers diffs over full rewrites")
 - Technical facts about the user's environment ("WSL2 at 192.168.0.185")
 - Outcomes and solutions that worked ("OLLAMA_KEEP_ALIVE=-1 fixed cold-load latency")
@@ -254,9 +255,16 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
     now = datetime.now(timezone.utc).isoformat()
     written = 0
     with _mem_conn() as conn:
+        existing_contents = {
+            r[0].lower().strip()
+            for r in conn.execute("SELECT content FROM memories").fetchall()
+        }
         for m in memories:
             content = m.get("content", "").strip()
             if not content or len(content) < 10:
+                continue
+            if content.lower().strip() in existing_contents:
+                logger.debug(f"🧠 Skipping duplicate memory: {content[:60]}")
                 continue
             importance = float(m.get("importance", 0.5))
             importance = max(0.0, min(1.0, importance))
@@ -267,6 +275,7 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
                    VALUES ('episodic', ?, ?, ?, ?, ?)""",
                 (content, embedding, str(session_id), importance, now)
             )
+            existing_contents.add(content.lower().strip())
             written += 1
 
     _mark_consolidated(session_id)
@@ -358,7 +367,7 @@ def _touch_memories(ids: list[int]):
 
 def inject_into_system_prompt(system_prompt: str, query: str = "",
                               max_memories: int = 20,
-                              min_score: float = 0.35) -> str:
+                              min_score: float = 0.2) -> str:
     """
     Prepend relevant persistent memories to the system prompt.
     Uses vector similarity when a query is provided; falls back to
@@ -378,7 +387,11 @@ def inject_into_system_prompt(system_prompt: str, query: str = "",
 
     _touch_memories([m["id"] for m in memories])
 
-    lines = ["## Persistent Memory (from past sessions)\n"]
+    lines = [
+        "## Persistent Memory (from past sessions)",
+        "The following facts are KNOWN and TRUE. Use them to answer questions directly without searching or asking.",
+        ""
+    ]
     for m in memories:
         tier_tag = "◆" if m["tier"] == "semantic" else "○"
         lines.append(f"{tier_tag} {m['content']}")
@@ -388,7 +401,7 @@ def inject_into_system_prompt(system_prompt: str, query: str = "",
 
 
 def _search_memories(query: str, top_k: int = 20,
-                     min_score: float = 0.35) -> list[dict]:
+                     min_score: float = 0.2) -> list[dict]:
     """Vector similarity search over memory embeddings."""
     if not MEMORY_DB_PATH.exists():
         return []
@@ -426,6 +439,8 @@ def _search_memories(query: str, top_k: int = 20,
 
     # Sort by similarity score, break ties by importance
     scored.sort(key=lambda x: (x["score"], x["importance"]), reverse=True)
+    top_score = scored[0]["score"] if scored else 0.0
+    logger.info(f"🧠 Memory search '{query[:40]}': {len(scored)} above threshold, top score={top_score:.3f}")
     return scored[:top_k]
 
 
@@ -573,6 +588,11 @@ def handle_memory_command(raw: str, llm_fn=None, session_manager=None) -> str:
     elif verb == "consolidate":
         session_id = tokens[2].strip() if len(tokens) > 2 else None
         return _consolidate_now(session_id, llm_fn, session_manager)
+    elif verb == "dedup":
+        return _dedup_memories()
+    elif verb == "add" and len(tokens) > 2:
+        content = raw.strip().split(None, 2)[2] if len(raw.strip().split(None, 2)) > 2 else ""
+        return _add_memory(content)
     else:
         return (
             "Unknown :memory subcommand. Available:\n"
@@ -582,8 +602,9 @@ def handle_memory_command(raw: str, llm_fn=None, session_manager=None) -> str:
             "  :memory forget <id>         — delete one memory\n"
             "  :memory clear               — delete all episodic memories\n"
             "  :memory clear session <id>  — delete memories from one session\n"
-            "  :memory consolidate         — extract memories from current session now\n"
-            "  :memory consolidate <id>    — extract memories from a specific session\n"
+            "  :memory consolidate <id>    — extract memories from a session now\n"
+            "  :memory dedup               — remove duplicate memories\n"
+            "  :memory add <fact>          — manually add a memory\n"
         )
 
 
@@ -659,12 +680,60 @@ def _clear_session_memories(session_id: str) -> str:
     return f"Cleared {n} memory/memories from session {session_id}."
 
 
+def _dedup_memories() -> str:
+    """Delete duplicate memories, keeping the highest importance copy of each."""
+    if not MEMORY_DB_PATH.exists():
+        return "No memory database found."
+    with _mem_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, content, importance FROM memories ORDER BY importance DESC, id ASC"
+        ).fetchall()
+        seen = {}
+        to_delete = []
+        for r in rows:
+            key = r["content"].lower().strip()
+            if key in seen:
+                to_delete.append(r["id"])
+            else:
+                seen[key] = r["id"]
+        if not to_delete:
+            return "No duplicates found."
+        conn.execute(
+            f"DELETE FROM memories WHERE id IN ({','.join('?' * len(to_delete))})",
+            to_delete
+        )
+    return f"Removed {len(to_delete)} duplicate memory/memories."
+
+
+def _add_memory(content: str) -> str:
+    """Manually insert a single memory as semantic (permanent) tier."""
+    if not content or len(content.strip()) < 3:
+        return "Usage: :memory add <fact to remember>"
+    _ensure_db()
+    content = content.strip()
+    now = datetime.now(timezone.utc).isoformat()
+    embedding = _embed(content)
+    with _mem_conn() as conn:
+        existing = conn.execute(
+            "SELECT id FROM memories WHERE LOWER(content) = ?",
+            (content.lower(),)
+        ).fetchone()
+        if existing:
+            return f"Memory already exists: \"{content}\""
+        conn.execute(
+            """INSERT INTO memories
+               (tier, content, embedding, source_session, importance, created_at)
+               VALUES ('semantic', ?, ?, 'manual', 1.0, ?)""",
+            (content, embedding, now)
+        )
+    return f"Memory added: \"{content}\""
+
+
 def _consolidate_now(session_id: Optional[str], llm_fn, session_manager=None) -> str:
     """
     Synchronous wrapper around consolidate() for use in the command handler.
     Falls back to _active_watcher's llm_fn if none provided.
     """
-    # Fall back to watcher's references if not explicitly passed
     if llm_fn is None and _active_watcher is not None:
         llm_fn = _active_watcher._llm_fn
         if session_manager is None:

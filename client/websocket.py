@@ -364,6 +364,15 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             return  # Exit early - don't call LLM
 
         # ═══════════════════════════════════════════════════════════════
+        # MEMORY: Inject relevant memories into system prompt per-query
+        # ═══════════════════════════════════════════════════════════════
+        enriched_system_prompt = inject_into_system_prompt(system_prompt, query=prompt)
+        if enriched_system_prompt != system_prompt:
+            logger.info(f"🧠 Memory injected into system prompt for query: {prompt[:60]}")
+        else:
+            logger.debug(f"🧠 No relevant memories found for query: {prompt[:60]}")
+
+        # ═══════════════════════════════════════════════════════════════
         # Normal flow - Run agent (langgraph will preserve SystemMessage)
         # ═══════════════════════════════════════════════════════════════
         msgs_before = len(conversation_state["messages"])
@@ -373,7 +382,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             prompt,
             logger,
             tools,
-            system_prompt
+            enriched_system_prompt
         )
 
         # ═══════════════════════════════════════════════════════════════

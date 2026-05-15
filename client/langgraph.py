@@ -2257,20 +2257,30 @@ def create_langgraph_agent(llm_with_tools, tools):
                 # tool-routed intents (weather, RAG, Plex, etc.).
                 _is_hedging = False
                 if pattern_name == "general" and user_message:
-                    try:
-                        _confidence_check = await llm_ainvoke(base_llm, [
-                            SystemMessage(content="Reply with only YES or NO. No other text."),
-                            HumanMessage(content=(
-                                f"Did you have reliable, specific knowledge to answer "
-                                f"this question accurately?\n"
-                                f"Question: {user_message}\n"
-                                f"Your answer: {response.content[:300]}"
-                            ))
-                        ])
-                        _is_hedging = _confidence_check.content.strip().upper().startswith("N")
-                        logger.info(f"[LangGraph] 🔎 Confidence check: {'LOW — will search' if _is_hedging else 'OK'}")
-                    except Exception as _cc_err:
-                        logger.warning(f"[LangGraph] ⚠️ Confidence check failed: {_cc_err}")
+                    # Skip confidence check if persistent memory was injected —
+                    # the system prompt already contains the answer, web search
+                    # would only overwrite it with irrelevant results.
+                    _sys_content = next(
+                        (m.content for m in messages if isinstance(m, SystemMessage)), ""
+                    )
+                    _has_memory = "## Persistent Memory" in _sys_content
+                    if _has_memory:
+                        logger.info("[LangGraph] 🧠 Skipping confidence check — persistent memory present")
+                    else:
+                        try:
+                            _confidence_check = await llm_ainvoke(base_llm, [
+                                SystemMessage(content="Reply with only YES or NO. No other text."),
+                                HumanMessage(content=(
+                                    f"Did you have reliable, specific knowledge to answer "
+                                    f"this question accurately?\n"
+                                    f"Question: {user_message}\n"
+                                    f"Your answer: {response.content[:300]}"
+                                ))
+                            ])
+                            _is_hedging = _confidence_check.content.strip().upper().startswith("N")
+                            logger.info(f"[LangGraph] 🔎 Confidence check: {'LOW — will search' if _is_hedging else 'OK'}")
+                        except Exception as _cc_err:
+                            logger.warning(f"[LangGraph] ⚠️ Confidence check failed: {_cc_err}")
 
                 if _is_hedging:
                     logger.info("[LangGraph] 🔍 Low confidence detected — attempting web search fallback")

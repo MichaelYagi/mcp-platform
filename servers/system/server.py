@@ -81,7 +81,7 @@ mcp = FastMCP("system-server")
 
 @mcp.tool()
 @check_tool_enabled(category="system")
-@tool_meta(tags=["read","system"],triggers=["hardware","specs","cpu","gpu","ram","system specs"],idempotent=True,example="use get_hardware_specs_tool")
+@tool_meta(tags=["read","system"],triggers=["hardware","specs","cpu","gpu","ram","system specs","graphics card","graphics","vram","processor"],intent_category="hardware",idempotent=True,example="use get_hardware_specs_tool")
 def get_hardware_specs_tool() -> str:
     """
     Get detailed hardware specifications including CPU, GPU, and RAM.
@@ -111,7 +111,7 @@ def get_hardware_specs_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="system")
-@tool_meta(tags=["read","system"],triggers=["system info","os info","hostname","uptime"],idempotent=False,example="use get_system_info")
+@tool_meta(tags=["read","system"],triggers=["system info","os info","hostname","uptime","cpu usage","memory usage","disk usage","system health","system performance","system status"],intent_category="system_health",idempotent=False,example="use get_system_info")
 def get_system_info() -> str:
     """
     Retrieve current system health and resource usage.
