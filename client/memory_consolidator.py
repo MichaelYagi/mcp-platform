@@ -402,13 +402,12 @@ def inject_into_system_prompt(system_prompt: str, query: str = "",
 
 def _search_memories(query: str, top_k: int = 20,
                      min_score: float = 0.2) -> list[dict]:
-    """Vector similarity search over memory embeddings."""
+    """Vector similarity search over memory embeddings, with optional reranking."""
     if not MEMORY_DB_PATH.exists():
         return []
 
     query_bytes = _embed(query)
     if query_bytes is None:
-        # Embedding failed — fall back to importance sort
         return _get_recent_memories(limit=top_k)
 
     try:
@@ -421,7 +420,6 @@ def _search_memories(query: str, top_k: int = 20,
         return _get_recent_memories(limit=top_k)
 
     if not rows:
-        # No embeddings yet (e.g. first run after migration) — fall back
         return _get_recent_memories(limit=top_k)
 
     scored = []
@@ -435,12 +433,24 @@ def _search_memories(query: str, top_k: int = 20,
                 "importance":   r["importance"],
                 "access_count": r["access_count"],
                 "score":        score,
+                "text":         r["content"],  # _rerank expects a 'text' key
             })
 
-    # Sort by similarity score, break ties by importance
     scored.sort(key=lambda x: (x["score"], x["importance"]), reverse=True)
     top_score = scored[0]["score"] if scored else 0.0
     logger.info(f"🧠 Memory search '{query[:40]}': {len(scored)} above threshold, top score={top_score:.3f}")
+
+    # Rerank if available — same pipeline as conversation_rag
+    try:
+        from tools.rag.rag_search import _reranker_available, RERANK_CANDIDATES, _rerank
+        if _reranker_available and scored:
+            candidates = scored[:RERANK_CANDIDATES]
+            logger.debug(f"🧠 Reranking {len(candidates)} memory candidates")
+            candidates = _rerank(query, candidates)
+            scored = candidates + scored[RERANK_CANDIDATES:]
+    except Exception as e:
+        logger.debug(f"🧠 Reranker unavailable, using cosine order: {e}")
+
     return scored[:top_k]
 
 
