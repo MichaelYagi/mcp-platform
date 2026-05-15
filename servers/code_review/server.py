@@ -79,7 +79,7 @@ mcp = FastMCP("code-review-server")
 
 @mcp.tool()
 @check_tool_enabled(category="code_reviewer")
-@tool_meta(tags=["read","code","ai"],triggers=["review code","check code","audit code","code quality"],idempotent=True,example='use review_code: path="" [max_bytes=""]',intent_category="code")
+@tool_meta(tags=["read","code","ai"],triggers=["review code","check code","audit code","code quality","code review","analyze code quality","check my code","look at my code"],idempotent=True,example='use review_code: path="" [max_bytes=""]',intent_category="code")
 def review_code(path: str, max_bytes: Optional[int] = 200_000) -> str:
     """
     Perform comprehensive code review and static analysis on a Python file or directory.
@@ -131,7 +131,7 @@ def review_code(path: str, max_bytes: Optional[int] = 200_000) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="code_reviewer")
-@tool_meta(tags=["read","search","code"],triggers=["search code","find in code","grep code","search codebase"],idempotent=True,example='use search_code_in_directory: query="" [extension=""] [directory=""]',intent_category="code")
+@tool_meta(tags=["read","search","code"],triggers=["search code","find in code","grep code","search codebase","find function","find class","search for pattern","find in codebase","grep for"],idempotent=True,example='use search_code_in_directory: query="" [extension=""] [directory=""]',intent_category="code")
 def search_code_in_directory(
         query: str,
         extension: Optional[str] = None,
@@ -170,7 +170,7 @@ def search_code_in_directory(
 
 @mcp.tool()
 @check_tool_enabled(category="code_reviewer")
-@tool_meta(tags=["read","code","ai"],triggers=["debug","fix bug","fix error","analyze error"],idempotent=True,example='use debug_fix: error_message="" [stack_trace=""] [code_snippet=""] [environment=""]',intent_category="code")
+@tool_meta(tags=["read","code","ai"],triggers=["debug","fix bug","fix error","analyze error","help debug","fix this error","what's wrong with this code","troubleshoot","diagnose error","why is this failing"],idempotent=True,example='use debug_fix: error_message="" [stack_trace=""] [code_snippet=""] [environment=""]',intent_category="code")
 def debug_fix(error_message: str,
               stack_trace: Optional[str] = None,
               code_snippet: Optional[str] = None,

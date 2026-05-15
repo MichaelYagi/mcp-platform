@@ -132,7 +132,7 @@ def parse_github_url(url: str) -> Dict[str, str]:
 
 @mcp.tool()
 @check_tool_enabled(category="github")
-@tool_meta(tags=["write","external","code"],triggers=["clone repo","clone github","download repo","get repo"],idempotent=False,example='use github_clone_repo: url="" [branch=""] [depth=""]',intent_category="github_review")
+@tool_meta(tags=["write","external","code"],triggers=["clone repo","clone github","download repo","get repo","pull repo","fetch repository","grab repo","clone repository"],idempotent=False,example='use github_clone_repo: url="" [branch=""] [depth=""]',intent_category="github_review")
 def github_clone_repo(
         url: str,
         branch: Optional[str] = None,
@@ -207,7 +207,7 @@ def github_clone_repo(
 
 @mcp.tool()
 @check_tool_enabled(category="github")
-@tool_meta(tags=["read","external","code"],triggers=["list files in repo","repo files","show repo files"],idempotent=True,example='use github_list_files: local_path="" [extensions=""] [exclude_dirs=""]',intent_category="github_review")
+@tool_meta(tags=["read","external","code"],triggers=["list files in repo","repo files","show repo files","files in repo","what files in repo","list repository files"],idempotent=True,example='use github_list_files: local_path="" [extensions=""] [exclude_dirs=""]',intent_category="github_review")
 def github_list_files(
         local_path: str,
         extensions: Optional[List[str]] = None,
@@ -264,7 +264,7 @@ def github_list_files(
 
 @mcp.tool()
 @check_tool_enabled(category="github")
-@tool_meta(tags=["read","external","code"],triggers=["get file from repo","read repo file","show file in repo"],idempotent=True,example='use github_get_file_content: local_path="" file_path=""',intent_category="github_review")
+@tool_meta(tags=["read","external","code"],triggers=["get file from repo","read repo file","show file in repo","open repo file","view file in repo","read file from repo"],idempotent=True,example='use github_get_file_content: local_path="" file_path=""',intent_category="github_review")
 def github_get_file_content(
         local_path: str,
         file_path: str
@@ -303,7 +303,7 @@ def github_get_file_content(
 
 @mcp.tool()
 @check_tool_enabled(category="github")
-@tool_meta(tags=["destructive","external","code"],triggers=["cleanup repo","delete cloned repo","remove repo"],idempotent=False,example='use github_cleanup_repo: local_path=""',intent_category="github_review")
+@tool_meta(tags=["destructive","external","code"],triggers=["cleanup repo","delete cloned repo","remove repo","remove cloned repo","clean up repo","delete repo clone"],idempotent=False,example='use github_cleanup_repo: local_path=""',intent_category="github_review")
 def github_cleanup_repo(local_path: str) -> str:
     """
     Delete a cloned repository to free up disk space.

@@ -83,7 +83,7 @@ mcp = FastMCP("location-server")
 
 @mcp.tool()
 @check_tool_enabled(category="location")
-@tool_meta(tags=["read","external"],triggers=["my location","where am i","current location","where do i live"],idempotent=True,example='use get_location_tool [city=""] [state=""] [country=""]')
+@tool_meta(tags=["read","external"],triggers=["my location","where am i","current location","where do i live","location of","where is","geolocate","find location"],idempotent=True,example='use get_location_tool [city=""] [state=""] [country=""]')
 def get_location_tool(city: str | None = None, state: str | None = None, country: str | None = None) -> str:
     """
     Retrieve structured geographic information for any location.
@@ -137,7 +137,7 @@ def get_location_tool(city: str | None = None, state: str | None = None, country
 
 @mcp.tool()
 @check_tool_enabled(category="location")
-@tool_meta(tags=["read","external"],triggers=["what time","current time","what date","time now"],idempotent=False,example='use get_time_tool [city=""] [state=""] [country=""]')
+@tool_meta(tags=["read","external"],triggers=["what time","current time","what date","time now","what's the time","time in","current date","what time is it"],idempotent=False,example='use get_time_tool [city=""] [state=""] [country=""]')
 def get_time_tool(city: str | None = None, state: str | None = None, country: str | None = None) -> str:
     """
     Get the current local time for any city in the world.
@@ -191,7 +191,7 @@ def get_time_tool(city: str | None = None, state: str | None = None, country: st
 
 @mcp.tool()
 @check_tool_enabled(category="location")
-@tool_meta(tags=["read","external"],triggers=["weather","temperature","forecast","rain","snow","wind"],idempotent=False,example='use get_weather_tool [city=""] [state=""] [country=""] [forecast_days=""]')
+@tool_meta(tags=["read","external"],triggers=["weather","temperature","forecast","rain","snow","wind","will it rain","is it cold","weather today","weather tomorrow","what's the weather","how cold is it"],idempotent=False,example='use get_weather_tool [city=""] [state=""] [country=""] [forecast_days=""]')
 def get_weather_tool(
         city: str | None = None,
         state: str | None = None,

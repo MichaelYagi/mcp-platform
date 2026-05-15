@@ -284,13 +284,7 @@ def run_python(
 
 @mcp.tool()
 @check_tool_enabled(category="code_runner")
-@tool_meta(
-    tags=["read", "code"],
-    triggers=["run file", "execute file", "run script", "run python file"],
-    idempotent=False,
-    example='use run_python_file: file_path="" [args=""]',
-    intent_category="code_runner"
-)
+@tool_meta(tags=["read","code"],triggers=["run file","execute file","run script","run python file","execute script","run .py file","execute python script"],idempotent=False,example='use run_python_file: file_path="" [args=""]',intent_category="code_runner")
 def run_python_file(
     file_path: str,
     args: Optional[str] = None,
@@ -358,13 +352,7 @@ def run_python_file(
 
 @mcp.tool()
 @check_tool_enabled(category="code_runner")
-@tool_meta(
-    tags=["read", "system"],
-    triggers=["run bash", "run shell", "shell command", "bash command", "run command"],
-    idempotent=False,
-    example='use run_bash: command="" [cwd=""]',
-    intent_category="code_runner"
-)
+@tool_meta(tags=["read","system"],triggers=["run bash","run shell","shell command","bash command","run command","terminal command","execute bash","run in terminal","run terminal command"],idempotent=False,example='use run_bash: command="" [cwd=""]',intent_category="code_runner")
 def run_bash(
     command: str,
     cwd: Optional[str] = None,
@@ -439,13 +427,7 @@ def run_bash(
 
 @mcp.tool()
 @check_tool_enabled(category="code_runner")
-@tool_meta(
-    tags=["write", "code", "system"],
-    triggers=["install package", "pip install", "install library", "install module"],
-    idempotent=False,
-    example='use pip_install: package=""',
-    intent_category="code_runner"
-)
+@tool_meta(tags=["write","code","system"],triggers=["install package","pip install","install library","install module","add package","install dependency","install python package"],idempotent=False,example='use pip_install: package=""',intent_category="code_runner")
 def pip_install(
     package: str,
     upgrade: Optional[bool] = False,

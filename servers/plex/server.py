@@ -75,7 +75,7 @@ mcp = FastMCP("plex-server")
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["read","rag"],triggers=["rag diagnose","rag problems","missing subtitles","plex rag issues"],idempotent=True,example="use rag_diagnose_plex_tool")
+@tool_meta(tags=["read","rag"],triggers=["rag diagnose","rag problems","missing subtitles","plex rag issues","plex ingestion issues","plex rag problems"],idempotent=True,example="use rag_diagnose_plex_tool")
 def rag_diagnose_plex_tool() -> str:
     """
     Diagnose RAG database for incomplete or problematic entries.
@@ -106,7 +106,7 @@ def rag_diagnose_plex_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","search","media"],triggers=["find movie","search film","movies about","films with","show me","plex search"],idempotent=True,example='use semantic_media_search_text: query="" [limit=""]',intent_category="plex_search")
+@tool_meta(tags=["read","search","media"],triggers=["find movie","search film","movies about","films with","show me","plex search","search tv show","find show","look for movie","search media","find tv show","find series"],idempotent=True,example='use semantic_media_search_text: query="" [limit=""]',intent_category="plex_search")
 def semantic_media_search_text(query: str, limit: int = 10) -> Dict[str, Any]:
     """
     Search for movies and TV shows in the Plex library by title, genre, actor, or description.
@@ -141,7 +141,7 @@ def semantic_media_search_text(query: str, limit: int = 10) -> Dict[str, Any]:
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","search","media"],triggers=["find scene","locate scene","scene where","scene with"],idempotent=True,example='use scene_locator_tool: media_id="" query="" [limit=""]',intent_category="plex_search")
+@tool_meta(tags=["read","search","media"],triggers=["find scene","locate scene","scene where","scene with","scene from","find moment","timestamp for","find clip"],idempotent=True,example='use scene_locator_tool: media_id="" query="" [limit=""]',intent_category="plex_search")
 def scene_locator_tool(media_id: str, query: str, limit: int = 5):
     """
     Find specific scenes within a movie or TV show using subtitle search.
@@ -174,7 +174,7 @@ def scene_locator_tool(media_id: str, query: str, limit: int = 5):
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","search","media"],triggers=["find scene in","scene from movie"],idempotent=True,example='use find_scene_by_title: movie_title="" scene_query="" [limit=""]',intent_category="plex_search")
+@tool_meta(tags=["read","search","media"],triggers=["find scene in","scene from movie","where in movie","find clip in","scene in film"],idempotent=True,example='use find_scene_by_title: movie_title="" scene_query="" [limit=""]',intent_category="plex_search")
 def find_scene_by_title(movie_title: str, scene_query: str, limit: int = 5):
     """
     Find a specific scene in a movie - convenience tool combining search and scene location.
@@ -286,7 +286,7 @@ def plex_find_unprocessed(limit: int = 5, rescan_no_subtitles: bool = False) -> 
 # TOOL 2: Ingest Multiple Items in Parallel (Batch Processing)
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media","rag"],triggers=["ingest items","ingest these"],idempotent=False,example='use plex_ingest_items: item_ids=""',intent_category="ingest")
+@tool_meta(tags=["write","media","rag"],triggers=["ingest items","ingest these","process these items","ingest plex items"],idempotent=False,example='use plex_ingest_items: item_ids=""',intent_category="ingest")
 async def plex_ingest_items(item_ids: str) -> str:
     """
     Ingest multiple Plex items in parallel (ASYNC) with STOP SIGNAL support.
@@ -807,7 +807,7 @@ def import_plex_history(limit: int = 50) -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","ai"],triggers=["auto train","train from plex"],idempotent=False,example='use auto_train_from_plex [import_limit=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["write","ai"],triggers=["auto train","train from plex","train recommender from plex","auto train recommender"],idempotent=False,example='use auto_train_from_plex [import_limit=""]',intent_category="ml_recommendation")
 def auto_train_from_plex(import_limit: int = 50) -> dict:
     """
     ONE-CLICK: Import Plex history AND train the model automatically
@@ -873,7 +873,7 @@ Import more history or wait until you've watched more!
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media"],triggers=["record viewing","i watched","mark as watched"],idempotent=False,example='use record_viewing: title="" genre="" year="" rating="" runtime="" [finished=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["write","media"],triggers=["record viewing","i watched","mark as watched","log that i watched","add to watch history","record that i watched"],idempotent=False,example='use record_viewing: title="" genre="" year="" rating="" runtime="" [finished=""]',intent_category="ml_recommendation")
 def record_viewing(
         title: str,
         genre: str,
@@ -958,7 +958,7 @@ Keep recording what you watch with record_viewing()!
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","ai"],triggers=["recommend","get recommendations","what should i watch"],idempotent=False,example="use recommend_content",intent_category="ml_recommendation")
+@tool_meta(tags=["read","ai"],triggers=["recommend","get recommendations","what should i watch","suggest something to watch","movie recommendations","film recommendations","suggest a movie"],idempotent=False,example="use recommend_content",intent_category="ml_recommendation")
 def recommend_content(
         available_items: list[dict]
 ) -> dict:
@@ -1005,7 +1005,7 @@ def recommend_content(
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","ai"],triggers=["recommender stats","recommendation stats"],idempotent=False,example="use get_recommender_stats",intent_category="ml_recommendation")
+@tool_meta(tags=["read","ai"],triggers=["recommender stats","recommendation stats","recommendation system stats","how is my recommender doing"],idempotent=False,example="use get_recommender_stats",intent_category="ml_recommendation")
 def get_recommender_stats() -> dict:
     """
     Get statistics about your recommendation system
@@ -1064,7 +1064,7 @@ def reset_recommender() -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","ai"],triggers=["auto recommend","recommend from plex","my best unwatched"],idempotent=False,example='use auto_recommend_from_plex [limit=""] [genre_filter=""] [min_rating=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["read","ai"],triggers=["auto recommend","recommend from plex","my best unwatched","best unwatched","what to watch next","suggest from plex"],idempotent=False,example='use auto_recommend_from_plex [limit=""] [genre_filter=""] [min_rating=""]',intent_category="ml_recommendation")
 def auto_recommend_from_plex(
         limit: int = 20,
         genre_filter: str = "",

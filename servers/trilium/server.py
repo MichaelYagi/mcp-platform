@@ -256,7 +256,7 @@ def search_notes(query: str, limit: Optional[int] = 50, include_content: Optiona
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","search","notes"],triggers=["notes tagged","notes with label","find notes by tag"],idempotent=True,example='use search_by_label: label="" [value=""] [limit=""]')
+@tool_meta(tags=["read","search","notes"],triggers=["notes tagged","notes with label","find notes by tag","find notes tagged","notes labeled","notes with tag"],idempotent=True,example='use search_by_label: label="" [value=""] [limit=""]')
 def search_by_label(label: str, value: Optional[str] = None, limit: Optional[int] = 50) -> str:
     """
     Search notes by label (attribute).
@@ -295,7 +295,7 @@ def search_by_label(label: str, value: Optional[str] = None, limit: Optional[int
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["get note","open note","show note"],idempotent=True,example='use get_note_by_id: note_id=""',text_fields=["content"])
+@tool_meta(tags=["read","notes"],triggers=["get note","open note","show note","note by id","fetch note","retrieve note"],idempotent=True,example='use get_note_by_id: note_id=""',text_fields=["content"])
 def get_note_by_id(note_id: str) -> str:
     """
     Get full details of a specific note by ID.
@@ -393,7 +393,7 @@ def create_note(
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["update note","edit note","change note content"],idempotent=False,example='use update_note_content: note_id="" content=""')
+@tool_meta(tags=["write","notes"],triggers=["update note","edit note","change note content","modify note","rewrite note","update note body"],idempotent=False,example='use update_note_content: note_id="" content=""')
 def update_note_content(note_id: str, content: str) -> str:
     """
     Update the content of an existing note.
@@ -445,7 +445,7 @@ def update_note_content(note_id: str, content: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["rename note","update note title"],idempotent=False,example='use update_note_title: note_id="" title=""')
+@tool_meta(tags=["write","notes"],triggers=["rename note","update note title","change note name","rename note title"],idempotent=False,example='use update_note_title: note_id="" title=""')
 def update_note_title(note_id: str, title: str) -> str:
     """
     Update the title of an existing note.
@@ -513,7 +513,7 @@ def delete_note(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["add label to note","tag note"],idempotent=False,example='use add_label_to_note: note_id="" label="" [value=""]')
+@tool_meta(tags=["write","notes"],triggers=["add label to note","tag note","label note","add tag to note","tag this note"],idempotent=False,example='use add_label_to_note: note_id="" label="" [value=""]')
 def add_label_to_note(note_id: str, label: str, value: Optional[str] = None) -> str:
     """
     Add a label (attribute) to a note.
@@ -602,7 +602,7 @@ def get_note_labels(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["note children","child notes","sub notes"],idempotent=True,example='use get_note_children: note_id=""')
+@tool_meta(tags=["read","notes"],triggers=["note children","child notes","sub notes","subnotes","notes under","notes inside"],idempotent=True,example='use get_note_children: note_id=""')
 def get_note_children(note_id: str) -> str:
     """
     Get child notes of a parent note.
@@ -649,7 +649,7 @@ def get_note_children(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["recent notes","latest notes","new notes"],idempotent=False,example="use get_recent_notes")
+@tool_meta(tags=["read","notes"],triggers=["recent notes","latest notes","new notes","recently modified notes","recently updated notes"],idempotent=False,example="use get_recent_notes")
 def get_recent_notes(limit: Optional[int] = 20) -> str:
     """
     Get recently modified notes.

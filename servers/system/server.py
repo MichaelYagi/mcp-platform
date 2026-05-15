@@ -139,7 +139,7 @@ def get_system_info() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="system")
-@tool_meta(tags=["read","system"],triggers=["processes","running processes","what is running","top processes"],idempotent=False,example='use list_system_processes [top_n=""]')
+@tool_meta(tags=["read","system"],triggers=["processes","running processes","what is running","top processes","active processes","list processes","show processes","what's running"],idempotent=False,example='use list_system_processes [top_n=""]')
 def list_system_processes(top_n: Optional[int] = 10) -> str:
     """
     List active system processes sorted by resource usage.
