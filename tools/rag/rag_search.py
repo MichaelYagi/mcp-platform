@@ -123,9 +123,14 @@ def _rerank(query: str, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]
         return candidates
 
 
-# Probe on module load so the warning appears at startup, not on first search.
-# CrossEncoder itself is lazy-loaded on first actual rerank call.
+# Probe and eagerly load at import time so the model is warm before first query.
+# This runs once when the RAG server subprocess starts and persists for its lifetime.
 _check_reranker()
+if _reranker_available:
+    try:
+        _get_cross_encoder()
+    except Exception as _e:
+        logger.warning(f"⚠️ Cross-encoder eager load failed: {_e}")
 
 
 def rag_search(query: str, top_k: int = 5, min_score: float = 0.3) -> Dict[str, Any]:
