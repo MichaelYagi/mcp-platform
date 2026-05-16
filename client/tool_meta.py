@@ -14,7 +14,7 @@ Usage
         triggers=["rag", "search my knowledge", "what do you know about"],
         rate_limit="100/hour",
         idempotent=True,
-        example='use rag_search_tool: query=""',
+        template='use rag_search_tool: query=""',
         text_fields=["preview"],
     )
     def rag_search_tool(query: str) -> str:
@@ -39,7 +39,7 @@ rate_limit (str | None, optional)
 idempotent (bool, optional, default True)
     True if calling twice with the same args has no side effects.
 
-example (str, optional)
+template (str, optional)
     Pre-fill text for the tools panel UI. Defaults to auto-generated
     use <tool_name>: param1='' param2=''.
 
@@ -69,7 +69,7 @@ def tool_meta(
     triggers: list[str] | None = None,
     rate_limit: str | None = None,
     idempotent: bool = True,
-    example: str | None = None,
+    template: str | None = None,
     text_fields: list[str] | None = None,
     intent_category: str | None = None,
     web_search: bool = False,
@@ -90,7 +90,7 @@ def tool_meta(
             "triggers":        triggers or [],
             "rate_limit":      rate_limit,
             "idempotent":      idempotent,
-            "example":         example,
+            "template":        template,
             "text_fields":     text_fields or [],
             "intent_category": intent_category,
             "web_search":      web_search,
@@ -101,11 +101,11 @@ def tool_meta(
         # Do NOT set __wrapped__ — a self-referential __wrapped__ = fn
         # causes inspect.signature() to loop forever when mcp.run() introspects tools.
 
-        # Encode example and triggers into the docstring so they survive the MCP
+        # Encode template and triggers into the docstring so they survive the MCP
         # process boundary. capability_registry.py extracts them from tool.description.
         doc_suffix = ""
-        if example:
-            doc_suffix += f"\n\n__example__: {example}"
+        if template:
+            doc_suffix += f"\n\n__template__: {template}"
         if triggers:
             doc_suffix += f"\n\n__triggers__: {','.join(triggers)}"
         if intent_category:

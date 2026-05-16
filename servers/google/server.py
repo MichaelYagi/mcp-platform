@@ -225,7 +225,7 @@ def _extract_body(payload: dict) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","search","email","external"],triggers=["unread emails","new emails","check email","do i have mail"],idempotent=False,example="use gmail_get_unread",intent_category="google",text_fields=["text"])
+@tool_meta(tags=["read","search","email","external"],triggers=["unread emails","new emails","check email","do i have mail"],idempotent=False,template="use gmail_get_unread",intent_category="google",text_fields=["text"])
 def gmail_get_unread(max_results: int = 25) -> str:
     """
     Fetch all unread emails from Gmail inbox.
@@ -357,7 +357,7 @@ def gmail_get_unread(max_results: int = 25) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","search","email","external"],triggers=["recent emails","my inbox","show emails","latest emails","show my inbox","last emails","recent messages","inbox"],idempotent=False,example="use gmail_get_recent",intent_category="google",text_fields=["text"])
+@tool_meta(tags=["read","search","email","external"],triggers=["recent emails","my inbox","show emails","latest emails","show my inbox","last emails","recent messages","inbox"],idempotent=False,template="use gmail_get_recent",intent_category="google",text_fields=["text"])
 def gmail_get_recent(max_results: int = 10) -> str:
     """
     Fetch the most recent emails from Gmail inbox (read and unread).
@@ -495,7 +495,7 @@ def gmail_get_recent(max_results: int = 10) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","email","external"],triggers=["read email","open email","show email","get email","view email","email details","email content"],idempotent=True,example='use gmail_get_email: message_id=""',intent_category="google",text_fields=["body"])
+@tool_meta(tags=["read","email","external"],triggers=["read email","open email","show email","get email","view email","email details","email content"],idempotent=True,template='use gmail_get_email: message_id=""',intent_category="google",text_fields=["body"])
 def gmail_get_email(message_id: str) -> str:
     """
     Read the full content of a specific Gmail message.
@@ -565,7 +565,7 @@ def gmail_get_email(message_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,example='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google")
+@tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,template='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google")
 def gmail_send_email(
         to: str,
         subject: str,
@@ -737,7 +737,7 @@ def _format_event(event: dict, include_id: bool = False) -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","calendar","external"],triggers=["calendar today","schedule today","meetings today","whats on today","what's on today","what do i have today","today's events","what's happening today","anything today"],idempotent=False,example="use calendar_get_today",intent_category="google",text_fields=["text"])
+@tool_meta(tags=["read","calendar","external"],triggers=["calendar today","schedule today","meetings today","whats on today","what's on today","what do i have today","today's events","what's happening today","anything today"],idempotent=False,template="use calendar_get_today",intent_category="google",text_fields=["text"])
 def calendar_get_today() -> str:
     """
     Get all calendar events for today.
@@ -840,7 +840,7 @@ def calendar_get_today() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","calendar","external"],triggers=["this week calendar","weekly schedule","meetings this week","whats on this week","week ahead","week's events","schedule this week","what's happening this week"],idempotent=False,example="use calendar_get_this_week",intent_category="google",text_fields=["text"])
+@tool_meta(tags=["read","calendar","external"],triggers=["this week calendar","weekly schedule","meetings this week","whats on this week","week ahead","week's events","schedule this week","what's happening this week"],idempotent=False,template="use calendar_get_this_week",intent_category="google",text_fields=["text"])
 def calendar_get_this_week() -> str:
     """
     Get all calendar events for the current week (Monday–Sunday).
@@ -964,7 +964,7 @@ def calendar_get_this_week() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","calendar","external"],triggers=["create event","schedule meeting","add to calendar","book appointment","new event","put on calendar","add meeting","schedule event"],idempotent=False,example='use calendar_create_event: summary="" start="" end="" [description=""] [location=""] [attendees=""] [all_day=""]',intent_category="google")
+@tool_meta(tags=["write","calendar","external"],triggers=["create event","schedule meeting","add to calendar","book appointment","new event","put on calendar","add meeting","schedule event"],idempotent=False,template='use calendar_create_event: summary="" start="" end="" [description=""] [location=""] [attendees=""] [all_day=""]',intent_category="google")
 def calendar_create_event(
         summary: str,
         start: str,
@@ -1075,7 +1075,7 @@ def calendar_create_event(
 # SKILL MANAGEMENT
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","email","external"],triggers=["reply to email","reply to this email","respond to email","write a reply","respond to this","reply back"],idempotent=False,example='use gmail_reply_tool: message_id="" body="" [cc=""]',intent_category="google")
+@tool_meta(tags=["write","email","external"],triggers=["reply to email","reply to this email","respond to email","write a reply","respond to this","reply back"],idempotent=False,template='use gmail_reply_tool: message_id="" body="" [cc=""]',intent_category="google")
 def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> str:
     """
     Reply to an existing Gmail message, threading it correctly.
@@ -1174,7 +1174,7 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
               "tomorrow's briefing","what's on tomorrow","tomorrow's schedule",
               "day summary","get day briefing"],
     idempotent=False,
-    example='use get_day_briefing [date_offset=""] [max_emails=""] [forecast_days=""] [calendar_days=""]',
+    template='use get_day_briefing: [date_offset=""] [max_emails=""] [forecast_days=""] [calendar_days=""]',
     intent_category="google",
     text_fields=["weather.text","email.text","calendar.text"]
 )

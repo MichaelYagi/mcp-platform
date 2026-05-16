@@ -182,7 +182,7 @@ def _shashin_get(path: str) -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","vision","ai"],triggers=["analyze image","describe image","what is in this image","look at image","what's in this image","image analysis","vision analysis","what does this image show"],idempotent=True,example='use analyze_image_tool: [image_url=""] [image_file_path=""] [image_base64=""] [query=""]')
+@tool_meta(tags=["read","vision","ai"],triggers=["analyze image","describe image","what is in this image","look at image","what's in this image","image analysis","vision analysis","what does this image show"],idempotent=True,template='use analyze_image_tool: [image_url=""] [image_file_path=""] [image_base64=""] [query=""]')
 def analyze_image_tool(
     image_url: Optional[str] = None,
     image_file_path: Optional[str] = None,
@@ -238,7 +238,7 @@ def analyze_image_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","search","media"],triggers=["find photos","search photos","my photos","show photos","photos of","search gallery","find images","photos from","search shashin"],idempotent=True,example='use shashin_search_tool: term="" [page=""]',text_fields=["tags"],intent_category="shashin_search")
+@tool_meta(tags=["read","search","media"],triggers=["find photos","search photos","my photos","show photos","photos of","search gallery","find images","photos from","search shashin"],idempotent=True,template='use shashin_search_tool: term="" [page=""]',text_fields=["tags"],intent_category="shashin_search")
 def shashin_search_tool(
     term: str,
     page: Optional[int] = 0,
@@ -325,7 +325,7 @@ def shashin_search_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","media"],triggers=["random photo","surprise me","show me a random"],idempotent=False,example="use shashin_random_tool",intent_category="shashin_random")
+@tool_meta(tags=["read","media"],triggers=["random photo","surprise me","show me a random"],idempotent=False,template="use shashin_random_tool",intent_category="shashin_random")
 def shashin_random_tool() -> str:
     """
     Fetch metadata for a random image from the Shashin gallery.
@@ -376,7 +376,7 @@ def shashin_random_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","vision","media","ai"],triggers=["analyze photo","describe photo","what is in this photo","what's in this photo","photo details","analyze shashin photo"],idempotent=True,example='use shashin_analyze_tool: image_id="" [query=""] [use_thumbnail=""]',intent_category="shashin_analyze")
+@tool_meta(tags=["read","vision","media","ai"],triggers=["analyze photo","describe photo","what is in this photo","what's in this photo","photo details","analyze shashin photo"],idempotent=True,template='use shashin_analyze_tool: image_id="" [query=""] [use_thumbnail=""]',intent_category="shashin_analyze")
 def shashin_analyze_tool(
     image_id: str,
     use_thumbnail: bool = True,
@@ -438,7 +438,7 @@ def shashin_analyze_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","what does it look like","find image of","image search","find a photo of","show picture of","search for image","find photo"],idempotent=True,example='use web_image_search_tool: query=""',intent_category="web_image_search")
+@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","what does it look like","find image of","image search","find a photo of","show picture of","search for image","find photo"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search")
 def web_image_search_tool(query: str) -> str:
     """
     Search the web for images using Google Images (via Serper).
@@ -528,7 +528,7 @@ def web_image_search_tool(query: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","draw","image of","generate a picture","ai image","create artwork","make art","illustrate","make a picture"],idempotent=False,example='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]')
+@tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","draw","image of","generate a picture","ai image","create artwork","make art","illustrate","make a picture"],idempotent=False,template='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]')
 def generate_image_tool(
     prompt: str,
     width: Optional[int] = 1024,

@@ -1573,8 +1573,8 @@ function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false 
     const previewDesc = fullDesc.split(/\.\s+/)[0].replace(/\n.*/s, '').trim();
     const params = tool.required_params || [];
     const optionalParams = [];
-    if (tool.example) {
-        const optMatches = tool.example.matchAll(/\[(\w+)=["'][^"']*["']\]/g);
+    if (tool.template) {
+        const optMatches = tool.template.matchAll(/\[(\w+)=["'][^"']*["']\]/g);
         for (const m of optMatches) optionalParams.push(m[1]);
     }
     const paramsHtml = (params.length || optionalParams.length)
@@ -1805,10 +1805,10 @@ function renderToolsPanel(tools) {
 let _toolPrompts = {};
 function buildToolPrompts(tools) {
     _toolPrompts = {};
-    tools.forEach(t => { if (t.example) _toolPrompts[t.name] = t.example; });
+    tools.forEach(t => { if (t.template) _toolPrompts[t.name] = t.template; });
 }
 function getToolPrompt(toolName, params) {
-    // Prefer @tool_meta example — has bracket notation for optional params
+    // Prefer @tool_meta template — has bracket notation for optional params
     if (_toolPrompts[toolName]) return _toolPrompts[toolName];
     // Fall back to generating from required params only
     if (params && params.length > 0) {

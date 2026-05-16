@@ -170,7 +170,7 @@ def make_request(method: str, endpoint: str, data: Optional[dict] = None, params
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","search","notes"],triggers=["search notes","find notes","look up notes","my notes"],idempotent=True,example='use search_notes: query="" [limit=""] [include_content=""]',text_fields=["contentPreview"])
+@tool_meta(tags=["read","search","notes"],triggers=["search notes","find notes","look up notes","my notes"],idempotent=True,template='use search_notes: query="" [limit=""] [include_content=""]',text_fields=["contentPreview"])
 def search_notes(query: str, limit: Optional[int] = 50, include_content: Optional[bool] = True) -> str:
     """
     Search Trilium notes using full-text search.
@@ -256,7 +256,7 @@ def search_notes(query: str, limit: Optional[int] = 50, include_content: Optiona
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","search","notes"],triggers=["notes tagged","notes with label","find notes by tag","find notes tagged","notes labeled","notes with tag"],idempotent=True,example='use search_by_label: label="" [value=""] [limit=""]')
+@tool_meta(tags=["read","search","notes"],triggers=["notes tagged","notes with label","find notes by tag","find notes tagged","notes labeled","notes with tag"],idempotent=True,template='use search_by_label: label="" [value=""] [limit=""]')
 def search_by_label(label: str, value: Optional[str] = None, limit: Optional[int] = 50) -> str:
     """
     Search notes by label (attribute).
@@ -295,7 +295,7 @@ def search_by_label(label: str, value: Optional[str] = None, limit: Optional[int
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["get note","open note","show note","note by id","fetch note","retrieve note"],idempotent=True,example='use get_note_by_id: note_id=""',text_fields=["content"])
+@tool_meta(tags=["read","notes"],triggers=["get note","open note","show note","note by id","fetch note","retrieve note"],idempotent=True,template='use get_note_by_id: note_id=""',text_fields=["content"])
 def get_note_by_id(note_id: str) -> str:
     """
     Get full details of a specific note by ID.
@@ -342,7 +342,7 @@ def get_note_by_id(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["create note","new note","add note"],idempotent=False,example='use create_note: parent_note_id="" title="" [content=""] [note_type=""]')
+@tool_meta(tags=["write","notes"],triggers=["create note","new note","add note"],idempotent=False,template='use create_note: parent_note_id="" title="" [content=""] [note_type=""]')
 def create_note(
     parent_note_id: str,
     title: str,
@@ -393,7 +393,7 @@ def create_note(
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["update note","edit note","change note content","modify note","rewrite note","update note body"],idempotent=False,example='use update_note_content: note_id="" content=""')
+@tool_meta(tags=["write","notes"],triggers=["update note","edit note","change note content","modify note","rewrite note","update note body"],idempotent=False,template='use update_note_content: note_id="" content=""')
 def update_note_content(note_id: str, content: str) -> str:
     """
     Update the content of an existing note.
@@ -445,7 +445,7 @@ def update_note_content(note_id: str, content: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["rename note","update note title","change note name","rename note title"],idempotent=False,example='use update_note_title: note_id="" title=""')
+@tool_meta(tags=["write","notes"],triggers=["rename note","update note title","change note name","rename note title"],idempotent=False,template='use update_note_title: note_id="" title=""')
 def update_note_title(note_id: str, title: str) -> str:
     """
     Update the title of an existing note.
@@ -477,7 +477,7 @@ def update_note_title(note_id: str, title: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["destructive","notes"],triggers=["delete note","remove note"],idempotent=False,example='use delete_note: note_id=""')
+@tool_meta(tags=["destructive","notes"],triggers=["delete note","remove note"],idempotent=False,template='use delete_note: note_id=""')
 def delete_note(note_id: str) -> str:
     """
     Delete a note (move to trash).
@@ -513,7 +513,7 @@ def delete_note(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["write","notes"],triggers=["add label to note","tag note","label note","add tag to note","tag this note"],idempotent=False,example='use add_label_to_note: note_id="" label="" [value=""]')
+@tool_meta(tags=["write","notes"],triggers=["add label to note","tag note","label note","add tag to note","tag this note"],idempotent=False,template='use add_label_to_note: note_id="" label="" [value=""]')
 def add_label_to_note(note_id: str, label: str, value: Optional[str] = None) -> str:
     """
     Add a label (attribute) to a note.
@@ -559,7 +559,7 @@ def add_label_to_note(note_id: str, label: str, value: Optional[str] = None) -> 
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["note labels","note tags","get labels"],idempotent=True,example='use get_note_labels: note_id=""')
+@tool_meta(tags=["read","notes"],triggers=["note labels","note tags","get labels"],idempotent=True,template='use get_note_labels: note_id=""')
 def get_note_labels(note_id: str) -> str:
     """
     Get all labels (attributes) for a note.
@@ -602,7 +602,7 @@ def get_note_labels(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["note children","child notes","sub notes","subnotes","notes under","notes inside"],idempotent=True,example='use get_note_children: note_id=""')
+@tool_meta(tags=["read","notes"],triggers=["note children","child notes","sub notes","subnotes","notes under","notes inside"],idempotent=True,template='use get_note_children: note_id=""')
 def get_note_children(note_id: str) -> str:
     """
     Get child notes of a parent note.
@@ -649,7 +649,7 @@ def get_note_children(note_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read","notes"],triggers=["recent notes","latest notes","new notes","recently modified notes","recently updated notes"],idempotent=False,example="use get_recent_notes")
+@tool_meta(tags=["read","notes"],triggers=["recent notes","latest notes","new notes","recently modified notes","recently updated notes"],idempotent=False,template="use get_recent_notes")
 def get_recent_notes(limit: Optional[int] = 20) -> str:
     """
     Get recently modified notes.
@@ -746,7 +746,7 @@ def read_skill(skill_name: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="trilium")
-@tool_meta(tags=["read"],triggers=["list capabilities","what can you do"],idempotent=True,example="use list_capabilities",intent_category="trilium")
+@tool_meta(tags=["read"],triggers=["list capabilities","what can you do"],idempotent=True,template="use list_capabilities",intent_category="trilium")
 def list_capabilities(filter_tags: Optional[str] = None) -> str:
     """
     Return the full capability schema for every tool on this server.

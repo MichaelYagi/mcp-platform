@@ -81,7 +81,7 @@ mcp = FastMCP("system-server")
 
 @mcp.tool()
 @check_tool_enabled(category="system")
-@tool_meta(tags=["read","system"],triggers=["hardware","specs","cpu","gpu","ram","system specs","graphics card","graphics","vram","processor"],intent_category="hardware",idempotent=True,example="use get_hardware_specs_tool")
+@tool_meta(tags=["read","system"],triggers=["hardware","specs","cpu","gpu","ram","system specs","graphics card","graphics","vram","processor"],intent_category="hardware",idempotent=True,template="use get_hardware_specs_tool")
 def get_hardware_specs_tool() -> str:
     """
     Get detailed hardware specifications including CPU, GPU, and RAM.
@@ -111,7 +111,7 @@ def get_hardware_specs_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="system")
-@tool_meta(tags=["read","system"],triggers=["system info","os info","hostname","uptime","cpu usage","memory usage","disk usage","system health","system performance","system status"],intent_category="system_health",idempotent=False,example="use get_system_info")
+@tool_meta(tags=["read","system"],triggers=["system info","os info","hostname","uptime","cpu usage","memory usage","disk usage","system health","system performance","system status"],intent_category="system_health",idempotent=False,template="use get_system_info")
 def get_system_info() -> str:
     """
     Retrieve current system health and resource usage.
@@ -139,7 +139,7 @@ def get_system_info() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="system")
-@tool_meta(tags=["read","system"],triggers=["processes","running processes","what is running","top processes","active processes","list processes","show processes","what's running"],idempotent=False,example='use list_system_processes [top_n=""]')
+@tool_meta(tags=["read","system"],triggers=["processes","running processes","what is running","top processes","active processes","list processes","show processes","what's running"],idempotent=False,template='use list_system_processes [top_n=""]')
 def list_system_processes(top_n: Optional[int] = 10) -> str:
     """
     List active system processes sorted by resource usage.
@@ -171,7 +171,7 @@ def list_system_processes(top_n: Optional[int] = 10) -> str:
 
 # @mcp.tool()
 # @check_tool_enabled(category="system")
-# @tool_meta(tags=["write","destructive","system"],triggers=["kill process","terminate","stop process"],idempotent=False,example='use terminate_process: pid=""')
+# @tool_meta(tags=["write","destructive","system"],triggers=["kill process","terminate","stop process"],idempotent=False,template='use terminate_process: pid=""')
 # def terminate_process(pid: int) -> str:
 #     """
 #     Terminate a process by its process ID (PID).

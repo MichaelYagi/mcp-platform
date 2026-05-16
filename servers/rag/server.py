@@ -91,7 +91,7 @@ mcp = FastMCP("rag-server")
         "summarise this session", "summarize this session",
     ],
     idempotent=True,
-    example='use session_history_tool: session_id="" [limit="20"] [order="asc"]',
+    template='use session_history_tool: session_id="" [limit="20"] [order="asc"]',
 )
 def session_history_tool(
     session_id: str,
@@ -241,7 +241,7 @@ def session_history_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["write","rag"],triggers=["add to rag","ingest url","add document","store in rag","save to rag","add content to rag","ingest document"],idempotent=False,example='use rag_add_tool: text="" [source=""] [chunk_size=""]')
+@tool_meta(tags=["write","rag"],triggers=["add to rag","ingest url","add document","store in rag","save to rag","add content to rag","ingest document"],idempotent=False,template='use rag_add_tool: text="" [source=""] [chunk_size=""]')
 def rag_add_tool(text: str, source: str | None = None, chunk_size: int = 500) -> str:
     """
     Add text to the RAG vector database.
@@ -286,7 +286,7 @@ def rag_add_tool(text: str, source: str | None = None, chunk_size: int = 500) ->
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["read","search","rag"],triggers=["search rag","find in rag","what do you know about","search my knowledge","lookup rag","search documents","rag lookup"],idempotent=True,example='use rag_search_tool: [query=""] [top_k=""] [min_score=""]',text_fields=["preview"])
+@tool_meta(tags=["read","search","rag"],triggers=["search rag","find in rag","what do you know about","search my knowledge","lookup rag","search documents","rag lookup"],idempotent=True,template='use rag_search_tool: [query=""] [top_k=""] [min_score=""]',text_fields=["preview"])
 def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: float = 0.3) -> str:
     """
     Search the RAG database using semantic similarity.
@@ -394,7 +394,7 @@ def rag_search_tool(query: str = "", text: str = "", top_k: int = 5, min_score: 
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["read","rag"],triggers=["rag status","rag stats","how many ingested","rag info","rag database info","rag database status"],idempotent=False,example="use rag_status_tool")
+@tool_meta(tags=["read","rag"],triggers=["rag status","rag stats","how many ingested","rag info","rag database info","rag database status"],idempotent=False,template="use rag_status_tool")
 def rag_status_tool() -> str:
     """
     Get quick status of RAG database.
@@ -445,7 +445,7 @@ def rag_status_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["read","rag"],triggers=["browse rag","show rag","list rag","rag contents","whats in rag"],idempotent=False,example="use rag_browse_tool",text_fields=["preview"])
+@tool_meta(tags=["read","rag"],triggers=["browse rag","show rag","list rag","rag contents","whats in rag"],idempotent=False,template="use rag_browse_tool",text_fields=["preview"])
 def rag_browse_tool(limit: int = 10) -> str:
     """
     Browse recent documents in the RAG database with previews.
@@ -526,7 +526,7 @@ def rag_browse_tool(limit: int = 10) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["read","rag"],triggers=["rag sources","list sources","what sources in rag","show rag sources","list rag sources"],idempotent=True,example="use rag_list_sources_tool")
+@tool_meta(tags=["read","rag"],triggers=["rag sources","list sources","what sources in rag","show rag sources","list rag sources"],idempotent=True,template="use rag_list_sources_tool")
 def rag_list_sources_tool() -> str:
     """
     List all unique sources stored in the RAG database with document counts.
@@ -598,7 +598,7 @@ def rag_list_sources_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["destructive","rag"],triggers=["delete from rag","remove from rag","delete rag source","remove rag source"],idempotent=False,example='use rag_delete_source_tool: source=""')
+@tool_meta(tags=["destructive","rag"],triggers=["delete from rag","remove from rag","delete rag source","remove rag source"],idempotent=False,template='use rag_delete_source_tool: source=""')
 def rag_delete_source_tool(source: str) -> str:
     """
     Delete all documents from a specific source from the RAG database.
@@ -663,7 +663,7 @@ def rag_delete_source_tool(source: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["destructive","rag"],triggers=["delete rag document","remove rag document","delete document by id"],idempotent=False,example='use rag_delete_document_tool: document_id=""')
+@tool_meta(tags=["destructive","rag"],triggers=["delete rag document","remove rag document","delete document by id"],idempotent=False,template='use rag_delete_document_tool: document_id=""')
 def rag_delete_document_tool(document_id: str) -> str:
     """
     Delete a single document from the RAG database by its ID.

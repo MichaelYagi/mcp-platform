@@ -106,7 +106,7 @@ mcp = FastMCP("code-assistant-server")
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["analyze code","check code file","inspect code","code analysis","analyze this file","check this file","inspect this file"],idempotent=True,example='use analyze_code_file: file_path="" [language=""] [deep_analysis=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["analyze code","check code file","inspect code","code analysis","analyze this file","check this file","inspect this file"],idempotent=True,template='use analyze_code_file: file_path="" [language=""] [deep_analysis=""]',intent_category="code_assistant")
 def analyze_code_file(file_path: str, language: str = "auto", deep_analysis: bool = True) -> str:
     """
     Analyze a code file for bugs, anti-patterns, and issues.
@@ -148,7 +148,7 @@ def analyze_code_file(file_path: str, language: str = "auto", deep_analysis: boo
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["write","code","ai"],triggers=["fix code","fix file","auto fix","fix this file","repair code","correct code","fix issues in file"],idempotent=False,example='use fix_code_file: file_path="" [auto_fix=""] [backup=""] [dry_run=""]',intent_category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["fix code","fix file","auto fix","fix this file","repair code","correct code","fix issues in file"],idempotent=False,template='use fix_code_file: file_path="" [auto_fix=""] [backup=""] [dry_run=""]',intent_category="code_assistant")
 def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dry_run: bool = True) -> str:
     """
     Automatically fix detected issues in a code file.
@@ -200,7 +200,7 @@ def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dr
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["suggest improvements","code suggestions","improve code","how to improve code","code improvements","better code","improve this file"],idempotent=True,example='use suggest_improvements: file_path="" [context=""] [focus=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["suggest improvements","code suggestions","improve code","how to improve code","code improvements","better code","improve this file"],idempotent=True,template='use suggest_improvements: file_path="" [context=""] [focus=""]',intent_category="code_assistant")
 def suggest_improvements(file_path: str, context: str = "", focus: str = "all") -> str:
     """
     Suggest code improvements and best practices.
@@ -248,7 +248,7 @@ def suggest_improvements(file_path: str, context: str = "", focus: str = "all") 
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["explain code","what does this code do","explain file","explain this file","walk me through this code","how does this code work","explain this function"],idempotent=True,example='use explain_code: file_path="" [line_start=""] [line_end=""] [detail_level=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["explain code","what does this code do","explain file","explain this file","walk me through this code","how does this code work","explain this function"],idempotent=True,template='use explain_code: file_path="" [line_start=""] [line_end=""] [detail_level=""]',intent_category="code_assistant")
 def explain_code(file_path: str, line_start: Optional[int] = None, line_end: Optional[int] = None, detail_level: str = "medium") -> str:
     """
     Explain what code does in natural language.
@@ -293,7 +293,7 @@ def explain_code(file_path: str, line_start: Optional[int] = None, line_end: Opt
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["generate tests","write tests","create tests","make tests","add unit tests","test coverage","write unit tests","create unit tests"],idempotent=True,example='use generate_tests: file_path="" [test_framework=""] [coverage_target=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["generate tests","write tests","create tests","make tests","add unit tests","test coverage","write unit tests","create unit tests"],idempotent=True,template='use generate_tests: file_path="" [test_framework=""] [coverage_target=""]',intent_category="code_assistant")
 def generate_tests(file_path: str, test_framework: str = "auto", coverage_target: str = "functions") -> str:
     """
     Generate unit tests for code.
@@ -338,7 +338,7 @@ def generate_tests(file_path: str, test_framework: str = "auto", coverage_target
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["write","code","ai"],triggers=["refactor","modernize code","simplify code","refactor this","clean up code","restructure code","refactor this file"],idempotent=False,example='use refactor_code: file_path="" refactor_type="" [target=""] [preview=""]',intent_category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["refactor","modernize code","simplify code","refactor this","clean up code","restructure code","refactor this file"],idempotent=False,template='use refactor_code: file_path="" refactor_type="" [target=""] [preview=""]',intent_category="code_assistant")
 def refactor_code(
     file_path: str,
     refactor_type: str,
@@ -400,7 +400,7 @@ def refactor_code(
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["generate code","write code","create function","create class","code for me","write a function","write a class","generate a function","code this"],idempotent=True,example='use generate_code: description="" [language=""] [style=""] [include_tests=""] [include_docstrings=""] [framework=""] [output_file=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["generate code","write code","create function","create class","code for me","write a function","write a class","generate a function","code this"],idempotent=True,template='use generate_code: description="" [language=""] [style=""] [include_tests=""] [include_docstrings=""] [framework=""] [output_file=""]',intent_category="code_assistant")
 def generate_code(
     description: str,
     language: str = "python",
@@ -573,7 +573,7 @@ def generate_code(
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["analyze project","tech stack","project structure","what languages","dependencies"],idempotent=True,example='use analyze_project [project_path=""] [include_dependencies=""] [include_structure=""] [max_depth=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["analyze project","tech stack","project structure","what languages","dependencies"],idempotent=True,template='use analyze_project [project_path=""] [include_dependencies=""] [include_structure=""] [max_depth=""]',intent_category="code_assistant")
 def analyze_project(
         project_path: str = ".",
         include_dependencies: bool = True,
@@ -780,7 +780,7 @@ def _get_ollama_llm(temperature: float = 0.1):
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["write","code","ai"],triggers=["extend code","add to file","add function","add tool","add method","follow pattern","extend this file","add to this server","add to this file"],idempotent=False,example='use extend_code: file_path="" description="" [write=""]',intent_category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["extend code","add to file","add function","add tool","add method","follow pattern","extend this file","add to this server","add to this file"],idempotent=False,template='use extend_code: file_path="" description="" [write=""]',intent_category="code_assistant")
 def extend_code(file_path: str, description: str, write: bool = False) -> str:
     """
     Add new code to an existing file that follows its conventions and patterns.
@@ -916,7 +916,7 @@ def extend_code(file_path: str, description: str, write: bool = False) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["detect inconsistencies","convention drift","inconsistent patterns","check consistency","audit servers"],idempotent=True,example='use detect_inconsistencies: paths="" [category=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["detect inconsistencies","convention drift","inconsistent patterns","check consistency","audit servers"],idempotent=True,template='use detect_inconsistencies: paths="" [category=""]',intent_category="code_assistant")
 def detect_inconsistencies(paths: str, category: str = "all") -> str:
     """
     Scan multiple files for convention drift and inconsistent patterns.
@@ -1060,7 +1060,7 @@ def detect_inconsistencies(paths: str, category: str = "all") -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["explain architecture","how does this work","how do these files connect","system design","data flow","architecture of","how is this structured","explain system design"],idempotent=True,example='use explain_architecture: paths="" [focus=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["explain architecture","how does this work","how do these files connect","system design","data flow","architecture of","how is this structured","explain system design"],idempotent=True,template='use explain_architecture: paths="" [focus=""]',intent_category="code_assistant")
 def explain_architecture(paths: str, focus: str = "all") -> str:
     """
     Explain how multiple files fit together as a system.
@@ -1182,7 +1182,7 @@ def explain_architecture(paths: str, focus: str = "all") -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["change impact","what will break","impact analysis","safe to change","ripple effect","what breaks if","impact of changing","will this break anything"],idempotent=True,example='use explain_change_impact: file_path="" [description=""] [change=""] [scan_path=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["change impact","what will break","impact analysis","safe to change","ripple effect","what breaks if","impact of changing","will this break anything"],idempotent=True,template='use explain_change_impact: file_path="" [description=""] [change=""] [scan_path=""]',intent_category="code_assistant")
 def explain_change_impact(
     file_path: str,
     description: str = "",

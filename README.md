@@ -248,7 +248,7 @@ mcp = FastMCP("my-tool-server")
 @tool_meta(
     tags=["read", "search"],
     triggers=["my keyword", "my phrase"],
-    example='use my_function: arg1=""',
+    template='use my_function: arg1=""',
 )
 def my_function(arg1: str) -> str:
     """Short description."""
@@ -262,14 +262,14 @@ Restart the client and the tool is live — routed, badged, and registered autom
 
 ### `@tool_meta` field reference
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `tags` | ✅ | Capability tags |
-| `triggers` | ✅ | Natural language phrases that route to this tool |
-| `example` | recommended | Pre-fill text shown in tools panel |
-| `text_fields` | if needed | Response fields containing main text |
-| `rate_limit` | no | `"100/hour"`, `"10/day"`, `"ollama"`, or `None` |
-| `idempotent` | no | `True` if side-effect free (default: `True`) |
+| Field             | Required | Description |
+|-------------------|----------|-------------|
+| `tags`            | ✅ | Capability tags |
+| `triggers`        | ✅ | Natural language phrases that route to this tool |
+| `template`        | recommended | Pre-fill text shown in tools panel |
+| `text_fields`     | if needed | Response fields containing main text |
+| `rate_limit`      | no | `"100/hour"`, `"10/day"`, `"ollama"`, or `None` |
+| `idempotent`      | no | `True` if side-effect free (default: `True`) |
 | `intent_category` | no | Override routing group name |
 
 ### Tag vocabulary

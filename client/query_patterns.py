@@ -60,7 +60,7 @@ INTENT_CATALOG = [
             "github_cleanup_repo", "analyze_project", "analyze_code_file",
             "review_code", "scan_project_structure"
         ],
-        "examples": {
+        "templates": {
             "github_clone_repo": "use github_clone_repo: ",
             "github_list_files": "use github_list_files: ",
             "github_get_file_content": "use github_get_file_content: ",
@@ -85,7 +85,7 @@ INTENT_CATALOG = [
             r'|\b(insights?\s+into|analys[ei]\s+my|analyze\s+my|summarize\s+my)\b.*\bfile\b'
         ),
         "tools": ["read_file_tool_handler"],
-        "examples": {
+        "templates": {
             "read_file_tool_handler": "use read_file_tool_handler: "
         },
         "priority": 2,
@@ -125,7 +125,7 @@ INTENT_CATALOG = [
             "suggest_improvements", "explain_code", "generate_tests",
             "refactor_code", "generate_code"
         ],
-        "examples": {
+        "templates": {
             "analyze_project": "use analyze_project: ",
             "analyze_code_file": "use analyze_code_file: ",
             "fix_code_file": "use fix_code_file: ",
@@ -155,7 +155,7 @@ INTENT_CATALOG = [
             r'|\banalyze\b.*(image|photo|picture)\b.*(/mnt/|/home/|/tmp/|https?://)'
         ),
         "tools": ["analyze_image_tool"],
-        "examples": {
+        "templates": {
             "analyze_image_tool": "use analyze_image_tool: "
         },
         "priority": 1,
@@ -172,7 +172,7 @@ INTENT_CATALOG = [
             r'|\brandom\s+shashin\b|\bshashin.*random\b'
         ),
         "tools": ["shashin_random_tool"],
-        "examples": {
+        "templates": {
             "shashin_random_tool": "use shashin_random_tool"
         },
         "priority": 1,
@@ -190,7 +190,7 @@ INTENT_CATALOG = [
         ),
         "exclude_pattern": r'\bmy\b|\bshashin\b|\bphoto\s+of\s+[a-f0-9\-]{36}\b',
         "tools": ["web_image_search_tool"],
-        "examples": {
+        "templates": {
             "web_image_search_tool": "use web_image_search_tool: "
         },
         "priority": 1,
@@ -210,7 +210,7 @@ INTENT_CATALOG = [
         ),
         "exclude_pattern": r'(/mnt/|/home/|/tmp/|https?://|\.(jpg|jpeg|png|gif|webp|bmp|heic)\b)',
         "tools": ["shashin_search_tool", "shashin_analyze_tool"],
-        "examples": {
+        "templates": {
             "shashin_search_tool": "use shashin_search_tool: ",
             "shashin_analyze_tool": "use shashin_analyze_tool: "
         },
@@ -228,7 +228,7 @@ INTENT_CATALOG = [
             r'|\b(browse|list)\b.*(photos?|images?|gallery)\b'
         ),
         "tools": ["shashin_search_tool"],
-        "examples": {
+        "templates": {
             "shashin_search_tool": "use shashin_search_tool: "
         },
         "priority": 2,
@@ -251,7 +251,7 @@ INTENT_CATALOG = [
             "rag_search_tool", "semantic_media_search_text",
             "scene_locator_tool", "find_scene_by_title"
         ],
-        "examples": {
+        "templates": {
             "semantic_media_search_text": "use semantic_media_search_text: ",
             "scene_locator_tool": "use scene_locator_tool: ",
             "find_scene_by_title": "use find_scene_by_title: "
@@ -286,7 +286,7 @@ INTENT_CATALOG = [
             "rag_search_tool", "rag_status_tool", "rag_list_sources_tool",
             "rag_browse_tool", "rag_diagnose_tool", "rag_add_tool"
         ],
-        "examples": {
+        "templates": {
             "rag_search_tool": "use rag_search_tool: ",
             "rag_status_tool": "use rag_status_tool",
             "rag_list_sources_tool": "use rag_list_sources_tool",
@@ -332,7 +332,7 @@ INTENT_CATALOG = [
             "gmail_send_email",
             "calendar_get_today", "calendar_get_this_week", "calendar_create_event"
         ],
-        "examples": {
+        "templates": {
             "gmail_get_unread":      "use gmail_get_unread",
             "gmail_get_recent":      "use gmail_get_recent",
             "gmail_get_email":       "use gmail_get_email: ",
@@ -363,7 +363,7 @@ INTENT_CATALOG = [
             "delete_note", "add_label_to_note", "get_note_labels",
             "get_note_children", "get_recent_notes"
         ],
-        "examples": {
+        "templates": {
             "search_notes": "use search_notes: ",
             "search_by_label": "use search_by_label: ",
             "get_note_by_id": "use get_note_by_id: ",
@@ -387,7 +387,7 @@ INTENT_CATALOG = [
             r'|\brain\b|\bsnow\b|\bwind\b|\bconditions\b'
         ),
         "tools": ["get_location_tool", "get_weather_tool"],
-        "examples": {
+        "templates": {
             "get_weather_tool": "use get_weather_tool: "
         },
         "priority": 3,
@@ -401,7 +401,7 @@ INTENT_CATALOG = [
             r'|\bwhere\s+am\s+i\b|\bcurrent\s+location\b|\bwhere\s+do\s+i\s+live\b'
         ),
         "tools": ["get_location_tool"],
-        "examples": {
+        "templates": {
             "get_location_tool": "use get_location_tool"
         },
         "priority": 3,
@@ -415,7 +415,7 @@ INTENT_CATALOG = [
             r'|\bcurrent\s+date\b|\btime\s+now\b|\btime\s+is\s+it\b'
         ),
         "tools": ["get_location_tool", "get_time_tool"],
-        "examples": {
+        "templates": {
             "get_location_tool": "use get_location_tool",
             "get_time_tool": "use get_time_tool"
         },
@@ -434,7 +434,7 @@ INTENT_CATALOG = [
             "get_hardware_specs_tool", "get_system_info",
             "list_system_processes", "terminate_process"
         ],
-        "examples": {
+        "templates": {
             "get_hardware_specs_tool": "use get_hardware_specs_tool",
             "get_system_info": "use get_system_info",
             "list_system_processes": "use list_system_processes",
@@ -461,7 +461,7 @@ INTENT_CATALOG = [
             "get_recommender_stats", "import_plex_history", "auto_train_from_plex",
             "reset_recommender", "auto_recommend_from_plex"
         ],
-        "examples": {
+        "templates": {
             "record_viewing": "use record_viewing: ",
             "train_recommender": "use train_recommender",
             "recommend_content": "use recommend_content",
@@ -485,7 +485,7 @@ INTENT_CATALOG = [
             "review_code", "search_code_in_directory",
             "scan_code_directory", "summarize_code", "debug_fix"
         ],
-        "examples": {
+        "templates": {
             "review_code": "use review_code: ",
             "search_code_in_directory": "use search_code_in_directory: ",
             "scan_code_directory": "use scan_code_directory: ",
@@ -508,7 +508,7 @@ INTENT_CATALOG = [
             r'|\bsummarize\s+content.*https?://'
         ),
         "tools": ["summarize_url_tool"],
-        "examples": {
+        "templates": {
             "summarize_url_tool": "use summarize_url_tool: "
         },
         "priority": 2,
@@ -524,7 +524,7 @@ INTENT_CATALOG = [
             "concept_contextualizer_tool",
             "explain_simplified_tool",
         ],
-        "examples": {
+        "templates": {
             "summarize_text_tool": "use summarize_text_tool: ",
             "concept_contextualizer_tool": "use concept_contextualizer_tool: ",
             "explain_simplified_tool": "use explain_simplified_tool: ",
@@ -541,7 +541,7 @@ INTENT_CATALOG = [
             r'|\bprocess\s+subtitles?\b|\bextract\s+subtitles?\b'
         ),
         "tools": ["plex_ingest_batch", "plex_find_unprocessed", "plex_ingest_items", "plex_ingest_single"],
-        "examples": {
+        "templates": {
             "plex_ingest_batch": "use plex_ingest_batch",
             "plex_find_unprocessed": "use plex_find_unprocessed",
             "plex_ingest_items": "use plex_ingest_items: ",
@@ -559,7 +559,7 @@ INTENT_CATALOG = [
             r'|\buse\s+remote\s+agent\b|\bconnect\s+to\s+agent\b'
         ),
         "tools": ["send_a2a*", "discover_a2a"],
-        "examples": {
+        "templates": {
             "send_a2a*": "use send_a2a to send to remote agent: ",
             "discover_a2a": "use discover_a2a"
         },
@@ -575,7 +575,7 @@ INTENT_CATALOG = [
             r'|\bin\s+the\s+news\b'
         ),
         "tools": ["web_search_tool", "summarize_url_tool"],
-        "examples": {
+        "templates": {
             "web_search_tool": "use web_search_tool: ",
             "summarize_url_tool": "use summarize_url_tool: ",
         },
@@ -587,7 +587,7 @@ INTENT_CATALOG = [
         "name": "stock_price",
         "pattern": r'\b(stock|share)\s+price\b|\btrading\s+at\b|\bmarket\s+cap\b',
         "tools": ["web_search_tool"],
-        "examples": {
+        "templates": {
             "web_search_tool": "use web_search_tool: ",
         },
         "priority": 3,
@@ -649,7 +649,7 @@ def register_tool_meta(
     tags: list[str],
     triggers: list[str],
     intent_category: str | None = None,
-    example: str | None = None,
+    template: str | None = None,
     web_search: bool = False,
     skills: bool = False,
     priority: int = 2,
@@ -664,7 +664,7 @@ def register_tool_meta(
         "tags":            tags,
         "triggers":        triggers,
         "intent_category": intent_category,
-        "example":         example,
+        "template":         template,
         "web_search":      web_search,
         "skills":          skills,
         "priority":        priority,
@@ -711,7 +711,7 @@ def build_intent_catalog() -> list[dict]:
             groups[cat] = {
                 "name":       cat,
                 "tools":      [],
-                "examples":   {},
+                "templates":   {},
                 "triggers":   [],
                 "web_search": reg.get("web_search", False),
                 "skills":     reg.get("skills", False),
@@ -719,8 +719,8 @@ def build_intent_catalog() -> list[dict]:
             }
 
         groups[cat]["tools"].append(tool_name)
-        if reg.get("example"):
-            groups[cat]["examples"][tool_name] = reg["example"]
+        if reg.get("template"):
+            groups[cat]["templates"][tool_name] = reg["template"]
         groups[cat]["triggers"].extend(reg.get("triggers", []))
 
     if not groups:
@@ -750,7 +750,7 @@ def build_intent_catalog() -> list[dict]:
             "pattern":          pattern,
             "_compiled":        re.compile(pattern, re.IGNORECASE),
             "tools":            g["tools"],
-            "examples":         g["examples"],
+            "templates":         g["templates"],
             "priority":         g["priority"],
             "web_search":       g["web_search"],
             "skills":           g["skills"],

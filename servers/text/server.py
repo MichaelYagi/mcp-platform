@@ -68,7 +68,7 @@ mcp = FastMCP("text-server")
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","ai"],triggers=["summarize","summarise","summary","tldr","tl;dr","give me a summary","sum up","summarize this"],idempotent=True,example='use summarize_text_tool: [text=""] [file_path=""] [style=""]',text_fields=["summary"])
+@tool_meta(tags=["read","ai"],triggers=["summarize","summarise","summary","tldr","tl;dr","give me a summary","sum up","summarize this"],idempotent=True,template='use summarize_text_tool: [text=""] [file_path=""] [style=""]',text_fields=["summary"])
 def summarize_text_tool(text: Optional[str] = None,
                         file_path: Optional[str] = None,
                         style: Optional[str] = "medium") -> str:
@@ -98,7 +98,7 @@ def summarize_text_tool(text: Optional[str] = None,
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","ai"],triggers=["explain what is","explain how","explain the concept","explain the term","simplify","break down","eli5","explain in simple","explain in depth"],idempotent=True,example='use explain_simplified_tool: concept=""')
+@tool_meta(tags=["read","ai"],triggers=["explain what is","explain how","explain the concept","explain the term","simplify","break down","eli5","explain in simple","explain in depth"],idempotent=True,template='use explain_simplified_tool: concept=""')
 def explain_simplified_tool(concept: str) -> str:
     """
     Explain complex concepts using the Ladder of Abstraction.
@@ -122,7 +122,7 @@ def explain_simplified_tool(concept: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","ai"],triggers=["contextualize","what is","explain concept","tell me about","define","background on","give context on"],idempotent=True,example='use concept_contextualizer_tool: concept=""')
+@tool_meta(tags=["read","ai"],triggers=["contextualize","what is","explain concept","tell me about","define","background on","give context on"],idempotent=True,template='use concept_contextualizer_tool: concept=""')
 def concept_contextualizer_tool(concept: str) -> str:
     """
     Provide comprehensive context and background for a concept.
@@ -148,7 +148,7 @@ def concept_contextualizer_tool(concept: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read"],triggers=["read file","open file","load file","analyze file","show file contents","display file","file contents"],idempotent=True,example='use read_file_tool_handler: file_path=""',text_fields=["content"])
+@tool_meta(tags=["read"],triggers=["read file","open file","load file","analyze file","show file contents","display file","file contents"],idempotent=True,template='use read_file_tool_handler: file_path=""',text_fields=["content"])
 def read_file_tool_handler(file_path: str) -> str:
     """
     Read any local file and return its contents for analysis or summarization.
@@ -197,7 +197,7 @@ def read_file_tool_handler(file_path: str) -> str:
         "make it longer", "clean up", "polish", "proofread",
     ],
     idempotent=True,
-    example='use improve_text_tool: text="" mode="improve" [instruction=""]',
+    template='use improve_text_tool: text="" mode="improve" [instruction=""]',
     text_fields=["result"],
 )
 def improve_text_tool(
@@ -235,7 +235,7 @@ skill_registry = None
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","search","external"],triggers=["search web","google","look up","find online","web search","search for","find information","research","look up online"],idempotent=True,example='use web_search_tool: query=""',text_fields=["snippet"])
+@tool_meta(tags=["read","search","external"],triggers=["search web","google","look up","find online","web search","search for","find information","research","look up online"],idempotent=True,template='use web_search_tool: query=""',text_fields=["snippet"])
 def web_search_tool(query: str) -> str:
     """
     Search the web for current information using Ollama's web search API.
@@ -310,7 +310,7 @@ def web_search_tool(query: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","external"],triggers=["fetch url","get page","read website","open url","browse url","visit url","fetch page"],idempotent=True,example='use web_fetch_tool: url=""')
+@tool_meta(tags=["read","external"],triggers=["fetch url","get page","read website","open url","browse url","visit url","fetch page"],idempotent=True,template='use web_fetch_tool: url=""')
 def web_fetch_tool(url: str) -> str:
     """
     Fetch and return the clean text content of a web page.
@@ -358,7 +358,7 @@ def web_fetch_tool(url: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","external","ai"],triggers=["summarize url","summarize this page","tldr url","summarize link","sum up this page","summarize webpage"],idempotent=True,example='use summarize_url_tool: url="" [style=""]',text_fields=["summary"])
+@tool_meta(tags=["read","external","ai"],triggers=["summarize url","summarize this page","tldr url","summarize link","sum up this page","summarize webpage"],idempotent=True,template='use summarize_url_tool: url="" [style=""]',text_fields=["summary"])
 def summarize_url_tool(url: str, style: Optional[str] = "medium") -> str:
     """
     Fetch and summarize the content of a web page in a single step.
@@ -419,7 +419,7 @@ def summarize_url_tool(url: str, style: Optional[str] = "medium") -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read"],triggers=["list capabilities","what can you do"],idempotent=True,example="use list_capabilities",intent_category="text")
+@tool_meta(tags=["read"],triggers=["list capabilities","what can you do"],idempotent=True,template="use list_capabilities",intent_category="text")
 def list_capabilities(filter_tags: Optional[str] = None) -> str:
     """
     Return the full capability schema for every tool on this server.

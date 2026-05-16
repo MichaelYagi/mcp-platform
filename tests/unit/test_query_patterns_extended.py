@@ -41,7 +41,7 @@ class TestRegisterToolMeta:
             tags=["search", "external"],
             triggers=["find", "search for"],
             intent_category="my_category",
-            example='use my_tool: q=""',
+            template='use my_tool: q=""',
             web_search=True,
             skills=False,
             priority=1,

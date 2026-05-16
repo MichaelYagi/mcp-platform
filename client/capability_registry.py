@@ -257,7 +257,7 @@ class ToolCapability:
     enabled: bool
     source_server: str
     external: bool
-    example: str
+    template: str
     # Output schema is freeform text for now — LLMs read the description
     output_description: str = ""
 
@@ -408,7 +408,7 @@ class CapabilityRegistry:
                     return desc.split(sentinel, 1)[1].split("\n\n__")[0].strip()
                 return ""
 
-            _example_from_desc         = _extract_sentinel(_desc, "example")
+            _template_from_desc         = _extract_sentinel(_desc, "template")
             _triggers_from_desc_raw    = _extract_sentinel(_desc, "triggers")
             _intent_cat_from_desc      = _extract_sentinel(_desc, "intent_category")
             _tags_from_desc_raw        = _extract_sentinel(_desc, "tags")
@@ -421,7 +421,7 @@ class CapabilityRegistry:
                                   else _TOOL_RATE_LIMITS.get(name)
                 idempotent      = meta.get("idempotent") if meta.get("idempotent") is not None \
                                   else _TOOL_IDEMPOTENT.get(name, True)
-                example         = meta.get("example") or _example_from_desc or ""
+                template         = meta.get("template") or _template_from_desc or ""
                 triggers        = meta.get("triggers") or _triggers_from_desc or []
                 intent_category = (meta.get("intent_category") or _intent_cat_from_desc
                                    or _TOOL_INTENT_CATEGORY.get(name))
@@ -429,7 +429,7 @@ class CapabilityRegistry:
                 tags            = _tags_from_desc or _TOOL_TAGS.get(name, [])
                 rate_limit      = _TOOL_RATE_LIMITS.get(name)
                 idempotent      = _TOOL_IDEMPOTENT.get(name, True)
-                example         = _example_from_desc or ""
+                template         = _template_from_desc or ""
                 triggers        = _triggers_from_desc
                 intent_category = (_intent_cat_from_desc
                                    or _TOOL_INTENT_CATEGORY.get(name))
@@ -444,7 +444,7 @@ class CapabilityRegistry:
                 enabled=enabled,
                 source_server=source,
                 external=source in external_servers,
-                example=example,
+                template=template,
             )
 
             # Store triggers and intent_category on the live tool's metadata
@@ -496,7 +496,7 @@ class CapabilityRegistry:
                         tags=meta.get("tags", []),
                         triggers=meta["triggers"],
                         intent_category=meta.get("intent_category"),
-                        example=meta.get("example"),
+                        template=meta.get("template"),
                         web_search=meta.get("web_search", False),
                         skills=meta.get("skills", False),
                         priority=meta.get("priority", 2),
@@ -575,7 +575,7 @@ class CapabilityRegistry:
             "enabled":       cap.enabled,
             "source_server": cap.source_server,
             "external":      cap.external,
-            "example":       cap.example,
+            "template":       cap.template,
         }
 
     def server_to_dict(self, srv: ServerCapability) -> dict:
