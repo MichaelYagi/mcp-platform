@@ -276,13 +276,21 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         # Normal flow - Run agent (langgraph will preserve SystemMessage)
         # ═══════════════════════════════════════════════════════════════
         msgs_before = len(conversation_state["messages"])
+
+        # Inject persistent memories into system prompt for this query
+        try:
+            from client.memory_consolidator import inject_into_system_prompt
+            enriched_system_prompt = inject_into_system_prompt(system_prompt, query=prompt)
+        except Exception:
+            enriched_system_prompt = system_prompt
+
         result = await run_agent_fn(
             agent,
             conversation_state,
             prompt,
             logger,
             tools,
-            system_prompt
+            enriched_system_prompt
         )
 
         # ═══════════════════════════════════════════════════════════════
