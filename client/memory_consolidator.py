@@ -390,24 +390,6 @@ def _get_recent_memories(limit: int = 50) -> list[dict]:
         return []
 
 
-def _get_top_memories(limit: int = 5) -> list[dict]:
-    """Return the top memories by importance — always injected regardless of query relevance."""
-    if not MEMORY_DB_PATH.exists():
-        return []
-    try:
-        with _mem_conn() as conn:
-            rows = conn.execute(
-                """SELECT id, tier, content, importance, access_count
-                   FROM memories
-                   ORDER BY importance DESC, access_count DESC
-                   LIMIT ?""",
-                (limit,)
-            ).fetchall()
-            return [dict(r) for r in rows]
-    except Exception:
-        return []
-
-
 def _touch_memories(ids: list[int]):
     """Update access_count and last_accessed for retrieved memories."""
     if not ids or not MEMORY_DB_PATH.exists():
@@ -427,30 +409,18 @@ def _touch_memories(ids: list[int]):
 
 def inject_into_system_prompt(system_prompt: str, query: str = "",
                               max_memories: int = 20,
-                              min_score: float = 0.2,
-                              always_top: int = 5) -> str:
+                              min_score: float = 0.2) -> str:
     """
     Prepend relevant persistent memories to the system prompt.
-
-    Always injects the top `always_top` highest-importance memories regardless
-    of query relevance — this ensures core facts (name, family, preferences)
-    are never lost when outside the message window.
-
-    Then fills remaining slots with query-relevant memories via vector search.
-    Falls back to importance-sorted top-N when no query is given.
+    Uses vector similarity when a query is provided; falls back to
+    importance-sorted top-N when no query is given (e.g. cold startup).
+    Called on every new session load.
     """
     if not MEMORY_DB_PATH.exists():
         return system_prompt
 
-    # Always-inject: top memories by importance, regardless of query score
-    anchor_memories = _get_top_memories(limit=always_top)
-    anchor_ids = {m["id"] for m in anchor_memories}
-
     if query:
-        # Query-relevant memories — exclude already-anchored ones
-        relevant = _search_memories(query, top_k=max_memories, min_score=min_score)
-        relevant = [m for m in relevant if m["id"] not in anchor_ids]
-        memories = anchor_memories + relevant[:max_memories - len(anchor_memories)]
+        memories = _search_memories(query, top_k=max_memories, min_score=min_score)
     else:
         memories = _get_recent_memories(limit=max_memories)
 
@@ -512,16 +482,11 @@ def _search_memories(query: str, top_k: int = 20,
     top_score = scored[0]["score"] if scored else 0.0
     logger.info(f"🧠 Memory search '{query[:40]}': {len(scored)} above threshold, top score={top_score:.3f}")
 
-    # Rerank if available — same pipeline as conversation_rag
-    try:
-        from tools.rag.rag_search import _reranker_available, RERANK_CANDIDATES, _rerank
-        if _reranker_available and scored:
-            candidates = scored[:RERANK_CANDIDATES]
-            logger.debug(f"🧠 Reranking {len(candidates)} memory candidates")
-            candidates = _rerank(query, candidates)
-            scored = candidates + scored[RERANK_CANDIDATES:]
-    except Exception as e:
-        logger.debug(f"🧠 Reranker unavailable, using cosine order: {e}")
+    # Memory candidates are already sorted by cosine similarity + importance.
+    # We skip cross-encoder reranking here intentionally — the reranker runs
+    # in the RAG MCP server subprocess and loading it in the client process too
+    # doubles GPU/CPU overhead on every query. Cosine order is sufficient for
+    # the small number of memory candidates (typically < 20).
 
     return scored[:top_k]
 
