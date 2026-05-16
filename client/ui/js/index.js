@@ -1062,6 +1062,160 @@ document.addEventListener('visibilitychange', () => {
 
 connectMainWS();
 
+// ============================================================
+// RESPONSE NOTIFICATION MANAGER
+// Fallback chain:
+//   1. Notification API  — requires localhost or HTTPS
+//   2. document.title flash + favicon badge — LAN IP fallback
+// Only fires when the page is not focused (user is on another tab).
+// ============================================================
+const _notif = (() => {
+    const STORAGE_KEY        = 'mcp_notifications_enabled';
+    const ORIGINAL_TITLE     = document.title;
+    let _mode                = 'none';   // 'native' | 'fallback'
+    let _enabled             = localStorage.getItem(STORAGE_KEY) === 'true'; // default off
+    let _badgeFaviconUrl     = null;
+    let _titleFlashInterval  = null;
+    let _activeNotif         = null;
+
+    // ── Favicon helpers ──────────────────────────────────────────────────
+    function _getFaviconEl() {
+        return document.querySelector("link[rel~='icon']");
+    }
+    const _originalFaviconHref = (() => { const el = _getFaviconEl(); return el ? el.href : null; })();
+
+    function _setFavicon(href) {
+        let el = _getFaviconEl();
+        if (!el) { el = document.createElement('link'); el.rel = 'icon'; document.head.appendChild(el); }
+        el.href = href;
+    }
+
+    function _buildBadgeFavicon(baseHref) {
+        return new Promise(resolve => {
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const draw = () => {
+                ctx.beginPath();
+                ctx.arc(24, 8, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ef4444';
+                ctx.fill();
+                resolve(canvas.toDataURL('image/png'));
+            };
+            if (baseHref) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => { ctx.drawImage(img, 0, 0, 32, 32); draw(); };
+                img.onerror = () => { ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, 32, 32); draw(); };
+                img.src = baseHref;
+            } else {
+                ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, 32, 32); draw();
+            }
+        });
+    }
+
+    // ── Title flash ──────────────────────────────────────────────────────
+    function _startTitleFlash(msg) {
+        _stopTitleFlash();
+        let visible = false;
+        _titleFlashInterval = setInterval(() => {
+            document.title = visible ? ORIGINAL_TITLE : `${msg} 🟢`;
+            visible = !visible;
+        }, 1000);
+    }
+    function _stopTitleFlash() {
+        if (_titleFlashInterval) { clearInterval(_titleFlashInterval); _titleFlashInterval = null; }
+        document.title = ORIGINAL_TITLE;
+    }
+
+    // ── Clear all visual state ───────────────────────────────────────────
+    function clear() {
+        _stopTitleFlash();
+        if (_originalFaviconHref) _setFavicon(_originalFaviconHref);
+        if (_activeNotif) { _activeNotif.close(); _activeNotif = null; }
+    }
+
+    window.addEventListener('focus', clear);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) clear(); });
+
+    // ── Init ─────────────────────────────────────────────────────────────
+    async function init() {
+        _badgeFaviconUrl = await _buildBadgeFavicon(_originalFaviconHref);
+        // Check existing permission state without prompting
+        if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+                _mode = 'native';
+            } else {
+                _mode = 'fallback'; // will upgrade to native on first toggle-on
+            }
+        } else {
+            _mode = 'fallback';
+        }
+        _updateButton();
+    }
+
+    // ── Toggle ───────────────────────────────────────────────────────────
+    async function toggle() {
+        _enabled = !_enabled;
+        localStorage.setItem(STORAGE_KEY, String(_enabled));
+        if (!_enabled) { clear(); _updateButton(); return _enabled; }
+        // Only request permission when user explicitly turns on — satisfies browser gesture requirement
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            try {
+                const perm = await Notification.requestPermission();
+                _mode = (perm === 'granted') ? 'native' : 'fallback';
+            } catch { _mode = 'fallback'; }
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+            _mode = 'native';
+        }
+        _updateButton();
+        return _enabled;
+    }
+
+    function _updateButton() {
+        const btn = document.getElementById('notifToggle');
+        if (!btn) return;
+        const modeLabel = _mode === 'native'
+            ? 'Browser notifications on'
+            : 'Tab notifications on (title + favicon)';
+        if (_enabled) {
+            btn.textContent = '🔔';
+            btn.classList.add('active');
+            btn.title = `${modeLabel} — click to disable`;
+        } else {
+            btn.textContent = '🔕';
+            btn.classList.remove('active');
+            btn.title = 'Notifications off — click to enable';
+        }
+    }
+
+    // ── Fire ─────────────────────────────────────────────────────────────
+    function notify(title, body = '') {
+        if (!_enabled) return;
+        if (!document.hidden) return;
+        if (_mode === 'native') {
+            if (_activeNotif) { _activeNotif.close(); _activeNotif = null; }
+            const n = new Notification(title, {
+                body: body ? body.slice(0, 200) : '',
+                icon: _originalFaviconHref || undefined,
+                tag:  'mcp-response',
+            });
+            n.onclick = () => { window.focus(); n.close(); };
+            _activeNotif = n;
+        } else {
+            _startTitleFlash(title);
+            if (_badgeFaviconUrl) _setFavicon(_badgeFaviconUrl);
+        }
+    }
+
+    return { init, toggle, notify, clear };
+})();
+
+_notif.init().then(() => {
+    const btn = document.getElementById('notifToggle');
+    if (btn) btn.addEventListener('click', () => _notif.toggle());
+});
+
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     if (data.type==='system_stats')                              { updateSystemStats(data); return; }
@@ -1154,6 +1308,7 @@ ws.onmessage = (event) => {
         addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString(),data.image||null,data.image_url||null);
         const modelLabel = data.model ? `[${data.model}] ` : '';
         addLocalLogEntry('ASSISTANT', modelLabel+data.text);
+        _notif.notify('Response ready', data.text);
         isProcessing=false; sendBtn.style.display='flex'; sendBtn.disabled=false; sendBtn.style.opacity='1'; sendBtn.style.cursor="pointer";
         updateStatusWithMode(); return;
     }

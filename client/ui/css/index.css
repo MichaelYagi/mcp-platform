@@ -523,11 +523,30 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 #themeWrapper {
     position: relative;
     grid-column: 2;
+    display: flex;
+    align-items: center;
     justify-content: center;
-    align-items: flex-start;
+    gap: 0.25rem;
     margin-top: 0.5rem;
     margin-bottom: 1rem;
 }
+
+#notifToggle {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.25rem;
+    border-radius: 4px;
+    line-height: 1;
+    opacity: 0.35;
+    transition: opacity 0.2s, filter 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+#notifToggle:hover  { opacity: 0.65; }
+#notifToggle.active { opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
 
 #status {
     font-style: italic; color: var(--status-color); min-height: 1.5rem;

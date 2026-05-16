@@ -1167,7 +1167,17 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["read","search","email","external"],triggers=["unread emails","new emails","check email","do i have mail","any new mail","inbox unread","unread messages","any unread"],idempotent=False,example="use gmail_get_unread",intent_category="google",text_fields=["text"])
+@tool_meta(
+    tags=["read","email","calendar","external"],
+    triggers=["my day","day briefing","morning briefing","today's summary",
+              "how's my day","daily briefing","brief me","start of day",
+              "tomorrow's briefing","what's on tomorrow","tomorrow's schedule",
+              "day summary","get day briefing"],
+    idempotent=False,
+    example='use get_day_briefing [max_emails=""] [forecast_days=""] [calendar_days=""] [date_offset=""]',
+    intent_category="google",
+    text_fields=["weather.text","email.text","calendar.text"]
+)
 def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int] = 1, calendar_days: Optional[int] = 1, date_offset: Optional[int] = 0) -> str:
     """
     Get a combined briefing for a given day: weather, unread emails, and calendar events.
