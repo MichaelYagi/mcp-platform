@@ -1258,3 +1258,20 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     80%  { outline: 2px solid var(--user-bubble, #4da3ff); outline-offset: 2px; }
     100% { outline: none; }
 }
+/* Notification button — text mode for matrix and te themes */
+[data-theme="matrix"] #notifToggle,
+[data-theme="te"] #notifToggle {
+    width: auto;
+    font-size: 0.78rem;
+    padding: 0.25rem 0.5rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    color: #00ff41;
+}
+
+[data-theme="te"] #notifToggle {
+    font-family: 'Inter', 'Helvetica Neue', sans-serif;
+    color: var(--label-color, #ccc);
+    letter-spacing: 0.05em;
+}

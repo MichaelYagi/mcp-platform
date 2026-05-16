@@ -1175,15 +1175,17 @@ const _notif = (() => {
     function _updateButton() {
         const btn = document.getElementById('notifToggle');
         if (!btn) return;
+        const theme = document.documentElement.getAttribute('data-theme');
+        const isText = theme === 'matrix' || theme === 'te';
         const modeLabel = _mode === 'native'
             ? 'Browser notifications on'
             : 'Tab notifications on (title + favicon)';
         if (_enabled) {
-            btn.textContent = '🔔';
+            btn.textContent = isText ? 'Notifications On' : '🔔';
             btn.classList.add('active');
             btn.title = `${modeLabel} — click to disable`;
         } else {
-            btn.textContent = '🔕';
+            btn.textContent = isText ? 'Notifications Off' : '🔕';
             btn.classList.remove('active');
             btn.title = 'Notifications off — click to enable';
         }
@@ -1208,13 +1210,16 @@ const _notif = (() => {
         }
     }
 
-    return { init, toggle, notify, clear };
+    return { init, toggle, notify, clear, updateButton: _updateButton };
 })();
 
 _notif.init().then(() => {
     const btn = document.getElementById('notifToggle');
     if (btn) btn.addEventListener('click', () => _notif.toggle());
 });
+
+new MutationObserver(() => _notif.updateButton())
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
