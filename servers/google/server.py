@@ -1174,7 +1174,7 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
               "tomorrow's briefing","what's on tomorrow","tomorrow's schedule",
               "day summary","get day briefing"],
     idempotent=False,
-    example='use get_day_briefing [max_emails=""] [forecast_days=""] [calendar_days=""] [date_offset=""]',
+    example='use get_day_briefing [date_offset=""] [max_emails=""] [forecast_days=""] [calendar_days=""]',
     intent_category="google",
     text_fields=["weather.text","email.text","calendar.text"]
 )
