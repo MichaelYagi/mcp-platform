@@ -390,6 +390,24 @@ def _get_recent_memories(limit: int = 50) -> list[dict]:
         return []
 
 
+def _get_top_memories(limit: int = 5) -> list[dict]:
+    """Return the top memories by importance — always injected regardless of query relevance."""
+    if not MEMORY_DB_PATH.exists():
+        return []
+    try:
+        with _mem_conn() as conn:
+            rows = conn.execute(
+                """SELECT id, tier, content, importance, access_count
+                   FROM memories
+                   ORDER BY importance DESC, access_count DESC
+                   LIMIT ?""",
+                (limit,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
 def _touch_memories(ids: list[int]):
     """Update access_count and last_accessed for retrieved memories."""
     if not ids or not MEMORY_DB_PATH.exists():
@@ -409,18 +427,30 @@ def _touch_memories(ids: list[int]):
 
 def inject_into_system_prompt(system_prompt: str, query: str = "",
                               max_memories: int = 20,
-                              min_score: float = 0.2) -> str:
+                              min_score: float = 0.2,
+                              always_top: int = 5) -> str:
     """
     Prepend relevant persistent memories to the system prompt.
-    Uses vector similarity when a query is provided; falls back to
-    importance-sorted top-N when no query is given (e.g. cold startup).
-    Called on every new session load.
+
+    Always injects the top `always_top` highest-importance memories regardless
+    of query relevance — this ensures core facts (name, family, preferences)
+    are never lost when outside the message window.
+
+    Then fills remaining slots with query-relevant memories via vector search.
+    Falls back to importance-sorted top-N when no query is given.
     """
     if not MEMORY_DB_PATH.exists():
         return system_prompt
 
+    # Always-inject: top memories by importance, regardless of query score
+    anchor_memories = _get_top_memories(limit=always_top)
+    anchor_ids = {m["id"] for m in anchor_memories}
+
     if query:
-        memories = _search_memories(query, top_k=max_memories, min_score=min_score)
+        # Query-relevant memories — exclude already-anchored ones
+        relevant = _search_memories(query, top_k=max_memories, min_score=min_score)
+        relevant = [m for m in relevant if m["id"] not in anchor_ids]
+        memories = anchor_memories + relevant[:max_memories - len(anchor_memories)]
     else:
         memories = _get_recent_memories(limit=max_memories)
 

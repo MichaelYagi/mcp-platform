@@ -456,14 +456,41 @@ mcp-platform/
 
 ### How context works
 
-Every LLM call receives context in this order:
+Every LLM call receives context assembled in this exact order:
 
 ```
-[System prompt + current session ID]
-[Auto-RAG: semantically relevant chunks from memory]
-[Last LLM_MESSAGE_WINDOW conversation turns]
-[Current user message]
+System prompt
+  ├─ Persistent memory — top 5 by importance (always injected)
+  ├─ Persistent memory — query-relevant (vector search, above threshold)
+  └─ Original system instructions + session ID
+
+Conversation RAG — turns that scrolled out of the window (if relevant)
+
+Message window — last LLM_MESSAGE_WINDOW turns (always injected)
+
+Current user message
 ```
+
+**Lookup chain — what happens on every query:**
+
+1. **Persistent memory (always)** — top 5 highest-importance memories are injected unconditionally into the system prompt, regardless of query relevance. This ensures core facts (your name, family, preferences) are never lost even when no query scores well. Additional query-relevant memories are added on top via vector search.
+
+2. **Message window (always)** — the last `LLM_MESSAGE_WINDOW` turns of the current session are included directly as conversation history.
+
+3. **Conversation RAG (always)** — a semantic search runs against turns that have scrolled out of the window. Results above the reranker threshold are injected between the system prompt and history.
+
+4. **LLM generates response** using all of the above.
+
+**When does each layer save you:**
+
+| Situation | What helps |
+|-----------|-----------|
+| Asked about something from 3 messages ago | Message window |
+| Asked about something from 20 messages ago, same session | Conversation RAG |
+| Asked about your name in a new session | Persistent memory (anchor) |
+| Asked a specific fact from an old session | Persistent memory (query-relevant) |
+| Asked about a specific document or article | Conversation RAG |
+| Fact not yet consolidated into memory | Nothing — tell the platform again |
 
 ### Conversation window (`LLM_MESSAGE_WINDOW`)
 
@@ -562,7 +589,7 @@ The platform has three layers of context, each serving a different purpose:
 
 Re-consolidation is smart: it tracks message count at last consolidation and only re-runs if new messages have been added since. Going idle overnight triggers one extraction, not dozens.
 
-**Step 3 — Memories inject on every query.** On each new message, a vector search finds the most relevant memories and prepends them to the system prompt:
+**Step 3 — Memories inject on every query.** On each new message, two things happen: the top 5 highest-importance memories are always injected into the system prompt unconditionally (so your name, family, and key preferences are never forgotten), then a vector search finds additional query-relevant memories and adds them on top. The combined block looks like this:
 
 ```
 ## Persistent Memory (from past sessions)
