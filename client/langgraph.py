@@ -2711,13 +2711,21 @@ def create_langgraph_agent(llm_with_tools, tools):
                         reason = feedback.get("reason", "Tool suggested improvement")
                         suggestions = feedback.get("suggestions", [])
 
-                        # Build feedback message
-                        feedback_text = f"[Tool Feedback: {tool_msg.name}] {reason}"
-                        if suggestions:
-                            feedback_text += "\n\nSuggestions:\n" + "\n".join(f"  • {s}" for s in suggestions[:3])
-
-                        feedback_message = feedback_text
-                        logger.info(f"🔄 Tool {tool_msg.name} requested improvement: {reason}")
+                        # If RAG came up empty, explicitly tell the LLM to use web search
+                        if tool_msg.name == "rag_search_tool":
+                            feedback_message = (
+                                "[Tool Feedback: rag_search_tool] No relevant results found in the local knowledge base. "
+                                "You MUST now use web_search_tool to answer the user's question. "
+                                "Do NOT call rag_search_tool again."
+                            )
+                            logger.info("🔄 rag_search_tool returned low quality — directing LLM to web_search_tool")
+                        else:
+                            # Build feedback message
+                            feedback_text = f"[Tool Feedback: {tool_msg.name}] {reason}"
+                            if suggestions:
+                                feedback_text += "\n\nSuggestions:\n" + "\n".join(f"  • {s}" for s in suggestions[:3])
+                            feedback_message = feedback_text
+                            logger.info(f"🔄 Tool {tool_msg.name} requested improvement: {reason}")
                         break
             except (json.JSONDecodeError, AttributeError):
                 # Not JSON or doesn't have content - skip
@@ -2921,8 +2929,9 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                 else:
                     rag_data = rag_result if isinstance(rag_result, dict) else {}
 
+                rag_status = rag_data.get("status", "")
                 rag_results = rag_data.get("results", [])
-                if rag_results:
+                if rag_results and rag_status not in ("needs_improvement", "low_quality"):
                     rag_lines = []
                     for r in rag_results[:5]:
                         text = r.get("text", "").strip()
@@ -2938,6 +2947,24 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                         logger.info(
                             f"🔍 Auto-RAG: injected {len(rag_lines)} chunk(s) for query"
                         )
+                else:
+                    # RAG came up empty — fall back to web search immediately
+                    logger.info("🔍 Auto-RAG: low quality results, trying web search fallback")
+                    try:
+                        _search_client = get_search_client()
+                        if _search_client.is_available():
+                            _web_result = await _search_client.search(user_message)
+                            if _web_result.get("success") and _web_result.get("results"):
+                                auto_rag_msg = SystemMessage(
+                                    content="Relevant context from web search:\n" + str(_web_result["results"])
+                                )
+                                logger.info("🌐 Auto-RAG web fallback: injected web search results")
+                            else:
+                                logger.warning("⚠️ Auto-RAG web fallback: no results")
+                        else:
+                            logger.warning("⚠️ Auto-RAG web fallback: search client unavailable")
+                    except Exception as _web_err:
+                        logger.warning(f"⚠️ Auto-RAG web fallback failed: {_web_err}")
             except Exception as e:
                 logger.warning(f"⚠️ Auto-RAG search failed: {e}")
 
