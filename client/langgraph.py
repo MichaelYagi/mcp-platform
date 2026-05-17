@@ -158,6 +158,7 @@ class AgentState(TypedDict):
     session_state: object  # SessionState | None — scoped per session, never shared
     capability_registry: object  # CapabilityRegistry | None — read-only, shared across sessions
     rag_fallback: bool  # True when RAG returned low quality — skip trigger matching, use all tools
+    context_sufficient: bool  # True when classifier says context/memory already has the answer
 
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
@@ -2036,6 +2037,12 @@ def create_langgraph_agent(llm_with_tools, tools):
                 logger.info("🌐 rag_fallback=True — skipping trigger matching, binding all tools")
                 llm_to_use = base_llm.bind_tools(all_tools)
                 pattern_name = "rag_fallback"
+            elif state.get("context_sufficient"):
+                # Classifier determined context/memory is sufficient — skip trigger matching
+                # and bind no tools so the LLM just reads the system prompt and answers
+                logger.info("🧠 context_sufficient=True — skipping trigger matching, answering from context")
+                llm_to_use = base_llm.bind_tools([])
+                pattern_name = "context_sufficient"
             else:
                 llm_to_use, pattern_name = match_intent(
                     user_message,
@@ -2270,7 +2277,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                 _skip_confidence_patterns = {
                     "analyze_image", "shashin_analyze", "explicit_tool",
                     "ingest", "research", "rag", "weather", "calendar",
-                    "email", "plex", "code_assistant", "rag_fallback",
+                    "email", "plex", "code_assistant", "rag_fallback", "context_sufficient",
                 }
                 _is_hedging = False
                 if user_message and pattern_name not in _skip_confidence_patterns:
@@ -2335,7 +2342,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "ingest_completed": state.get("ingest_completed", False),
                 "stopped": state.get("stopped", False),
                 "current_model": current_model,
-                "rag_fallback": False  # clear after agent has run with full tool pool
+                "rag_fallback": False,  # clear after agent has run
+                "context_sufficient": False  # clear after agent has answered from context
             }
 
         except asyncio.TimeoutError:
@@ -2772,7 +2780,8 @@ def create_langgraph_agent(llm_with_tools, tools):
             "current_model": state.get("current_model"),
             "session_state": session_state,
             "capability_registry": state.get("capability_registry"),
-            "rag_fallback": state.get("rag_fallback", False)  # propagate so call_model sees it
+            "rag_fallback": state.get("rag_fallback", False),  # propagate so call_model sees it
+            "context_sufficient": state.get("context_sufficient", False)
         }
 
     # Build graph:
@@ -2950,27 +2959,37 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         # conversation history? Skip RAG entirely for follow-ups — RAG will
         # always fail on them and may incorrectly set rag_fallback=True.
         _needs_rag = True
+        _context_sufficient = False
         _prior_ai_msgs = [m for m in non_system_msgs if isinstance(m, AIMessage)]
-        if user_message and _prior_ai_msgs and llm:
-            # Only bother classifying if there's prior conversation to refer back to
-            _recent_history = "\n".join(
-                f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
-                for m in non_system_msgs[-4:]
-            )
+        if user_message and llm:
+            _base_llm = llm.bound if hasattr(llm, "bound") else llm
+            # Include recent conversation history if available
+            _recent_history = ""
+            if _prior_ai_msgs:
+                _recent_history = "\n".join(
+                    f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
+                    for m in non_system_msgs[-4:]
+                )
+            # Memory is prepended to the system prompt — take the first 1500 chars
+            # to capture it for the classifier
+            _sys_snippet = ""
+            if system_msg and system_msg.content:
+                _sys_snippet = system_msg.content[:1500]
             try:
-                _base_llm = llm.bound if hasattr(llm, "bound") else llm
                 _classify = await llm_ainvoke(_base_llm, [
                     SystemMessage(content="Reply with only YES or NO. No other text."),
                     HumanMessage(content=(
-                        f"Given this conversation history:\n{_recent_history}\n\n"
-                        f"Does the new query require looking up external knowledge (web search or database), "
-                        f"or can it be answered from the conversation history above?\n"
-                        f"New query: {user_message}\n"
-                        f"Reply YES if external lookup is needed, NO if conversation history is sufficient."
+                        f"You are deciding whether a query needs an external lookup (web search or database).\n\n"
+                        f"Available context already known (no lookup needed for this):\n{_sys_snippet}\n\n"
+                        + (f"Recent conversation:\n{_recent_history}\n\n" if _recent_history else "")
+                        + f"New query: {user_message}\n\n"
+                        f"Reply YES if external lookup is needed.\n"
+                        f"Reply NO if the query can be answered from the available context or conversation above."
                     ))
                 ])
                 _needs_rag = not _classify.content.strip().upper().startswith("N")
-                logger.info(f"🔍 Auto-RAG classification: {'needs lookup' if _needs_rag else 'follow-up — skipping RAG'}")
+                _context_sufficient = not _needs_rag
+                logger.info(f"🔍 Auto-RAG classification: {'needs lookup' if _needs_rag else 'skipping RAG — answerable from context'}")
             except Exception as _ce:
                 logger.warning(f"⚠️ Auto-RAG classification failed, defaulting to RAG: {_ce}")
 
@@ -3040,7 +3059,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "research_source": "web",
             "session_state": session_state,
             "capability_registry": capability_registry,
-            "rag_fallback": preflight_rag_failed  # skip trigger matching if RAG already failed
+            "rag_fallback": preflight_rag_failed,  # skip trigger matching if RAG already failed
+            "context_sufficient": _context_sufficient  # skip trigger matching if classifier says context is enough
         })
 
         # STEP 4: Update conversation state
