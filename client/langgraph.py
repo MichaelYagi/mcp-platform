@@ -157,6 +157,7 @@ class AgentState(TypedDict):
     research_source: str
     session_state: object  # SessionState | None — scoped per session, never shared
     capability_registry: object  # CapabilityRegistry | None — read-only, shared across sessions
+    rag_fallback: bool  # True when RAG returned low quality — skip trigger matching, use all tools
 
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
@@ -2026,14 +2027,21 @@ def create_langgraph_agent(llm_with_tools, tools):
         if user_message:
             all_tools = list(state.get("tools", {}).values())
             _cap_reg = state.get("capability_registry")
-            llm_to_use, pattern_name = match_intent(
-                user_message,
-                all_tools,
-                base_llm,
-                logger,
-                state,
-                capability_registry=_cap_reg
-            )
+            if state.get("rag_fallback"):
+                # RAG already failed — skip trigger matching and give the LLM all tools
+                # so it can reach web_search_tool
+                logger.info("🌐 rag_fallback=True — skipping trigger matching, binding all tools")
+                llm_to_use = base_llm.bind_tools(all_tools)
+                pattern_name = "rag_fallback"
+            else:
+                llm_to_use, pattern_name = match_intent(
+                    user_message,
+                    all_tools,
+                    base_llm,
+                    logger,
+                    state,
+                    capability_registry=_cap_reg
+                )
         else:
             llm_to_use = llm_with_tools
 
@@ -2253,10 +2261,16 @@ def create_langgraph_agent(llm_with_tools, tools):
                 # answer. One tiny call (YES/NO output) is more accurate than
                 # any phrase list — catches confident-sounding wrong answers and
                 # works regardless of language or phrasing.
-                # Only fires for general queries to avoid interfering with
-                # tool-routed intents (weather, RAG, Plex, etc.).
+                # Fires for general queries AND any pattern where the LLM
+                # answered from context instead of calling a tool. Skipped
+                # for intents that never need web search (images, ingest, etc).
+                _skip_confidence_patterns = {
+                    "analyze_image", "shashin_analyze", "explicit_tool",
+                    "ingest", "research", "rag", "weather", "calendar",
+                    "email", "plex", "code_assistant", "rag_fallback",
+                }
                 _is_hedging = False
-                if pattern_name == "general" and user_message:
+                if user_message and pattern_name not in _skip_confidence_patterns:
                     # Skip confidence check if persistent memory was injected —
                     # the system prompt already contains the answer, web search
                     # would only overwrite it with irrelevant results.
@@ -2264,8 +2278,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                         (m.content for m in messages if isinstance(m, SystemMessage)), ""
                     )
                     _has_memory = "## Persistent Memory" in _sys_content
-                    if _has_memory:
-                        logger.info("[LangGraph] 🧠 Skipping confidence check — persistent memory present")
+                    # Only skip if memory is present AND no tools were run
+                    # (if tools ran and failed, we still want to web search)
+                    _tool_ran = any(
+                        "rag_search_tool" in (getattr(m, "name", "") or "")
+                        for m in messages
+                    )
+                    if _has_memory and not _tool_ran:
+                        logger.info("[LangGraph] 🧠 Skipping confidence check — persistent memory present, no tools ran")
                     else:
                         try:
                             _confidence_check = await llm_ainvoke(base_llm, [
@@ -2311,7 +2331,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "llm": state.get("llm"),
                 "ingest_completed": state.get("ingest_completed", False),
                 "stopped": state.get("stopped", False),
-                "current_model": current_model
+                "current_model": current_model,
+                "rag_fallback": False  # clear after agent has run with full tool pool
             }
 
         except asyncio.TimeoutError:
@@ -2711,16 +2732,18 @@ def create_langgraph_agent(llm_with_tools, tools):
                         reason = feedback.get("reason", "Tool suggested improvement")
                         suggestions = feedback.get("suggestions", [])
 
-                        # If RAG came up empty, explicitly tell the LLM to use web search
+                        # If RAG came up empty, set rag_fallback flag and tell the LLM to use web search
                         if tool_msg.name == "rag_search_tool":
+                            needs_improvement = True  # ensure flag propagates
                             feedback_message = (
                                 "[Tool Feedback: rag_search_tool] No relevant results found in the local knowledge base. "
-                                "You MUST now use web_search_tool to answer the user's question. "
+                                "You MUST now use web_search_tool to answer the user question. "
                                 "Do NOT call rag_search_tool again."
                             )
-                            logger.info("🔄 rag_search_tool returned low quality — directing LLM to web_search_tool")
+                            logger.info("🔄 rag_search_tool low quality — setting rag_fallback, directing LLM to web_search_tool")
+                            # Signal call_model to skip trigger matching next turn
+                            state["rag_fallback"] = True
                         else:
-                            # Build feedback message
                             feedback_text = f"[Tool Feedback: {tool_msg.name}] {reason}"
                             if suggestions:
                                 feedback_text += "\n\nSuggestions:\n" + "\n".join(f"  • {s}" for s in suggestions[:3])
@@ -2745,7 +2768,8 @@ def create_langgraph_agent(llm_with_tools, tools):
             "stopped": state.get("stopped", False),
             "current_model": state.get("current_model"),
             "session_state": session_state,
-            "capability_registry": state.get("capability_registry")
+            "capability_registry": state.get("capability_registry"),
+            "rag_fallback": state.get("rag_fallback", False)  # propagate so call_model sees it
         }
 
     # Build graph:
@@ -2916,8 +2940,38 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         # ingested content) surface even when outside the window.
         rag_search_tool_auto = tool_registry_pre.get("rag_search_tool")
         auto_rag_msg = None
+        preflight_rag_failed = False
 
-        if rag_search_tool_auto:
+        # Before running pre-flight RAG, do a cheap YES/NO classification:
+        # does this query need external knowledge, or can it be answered from
+        # conversation history? Skip RAG entirely for follow-ups — RAG will
+        # always fail on them and may incorrectly set rag_fallback=True.
+        _needs_rag = True
+        _prior_ai_msgs = [m for m in non_system_msgs if isinstance(m, AIMessage)]
+        if user_message and _prior_ai_msgs and llm:
+            # Only bother classifying if there's prior conversation to refer back to
+            _recent_history = "\n".join(
+                f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
+                for m in non_system_msgs[-4:]
+            )
+            try:
+                _base_llm = llm.bound if hasattr(llm, "bound") else llm
+                _classify = await llm_ainvoke(_base_llm, [
+                    SystemMessage(content="Reply with only YES or NO. No other text."),
+                    HumanMessage(content=(
+                        f"Given this conversation history:\n{_recent_history}\n\n"
+                        f"Does the new query require looking up external knowledge (web search or database), "
+                        f"or can it be answered from the conversation history above?\n"
+                        f"New query: {user_message}\n"
+                        f"Reply YES if external lookup is needed, NO if conversation history is sufficient."
+                    ))
+                ])
+                _needs_rag = not _classify.content.strip().upper().startswith("N")
+                logger.info(f"🔍 Auto-RAG classification: {'needs lookup' if _needs_rag else 'follow-up — skipping RAG'}")
+            except Exception as _ce:
+                logger.warning(f"⚠️ Auto-RAG classification failed, defaulting to RAG: {_ce}")
+
+        if rag_search_tool_auto and _needs_rag:
             try:
                 rag_result = await rag_search_tool_auto.ainvoke({"query": user_message})
                 if isinstance(rag_result, str):
@@ -2931,7 +2985,10 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
 
                 rag_status = rag_data.get("status", "")
                 rag_results = rag_data.get("results", [])
-                if rag_results and rag_status not in ("needs_improvement", "low_quality"):
+                if rag_status in ("needs_improvement", "low_quality") or not rag_results:
+                    preflight_rag_failed = True
+                    logger.info("🔍 Auto-RAG: low quality — will set rag_fallback=True for agent")
+                else:
                     rag_lines = []
                     for r in rag_results[:5]:
                         text = r.get("text", "").strip()
@@ -2947,24 +3004,6 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                         logger.info(
                             f"🔍 Auto-RAG: injected {len(rag_lines)} chunk(s) for query"
                         )
-                else:
-                    # RAG came up empty — fall back to web search immediately
-                    logger.info("🔍 Auto-RAG: low quality results, trying web search fallback")
-                    try:
-                        _search_client = get_search_client()
-                        if _search_client.is_available():
-                            _web_result = await _search_client.search(user_message)
-                            if _web_result.get("success") and _web_result.get("results"):
-                                auto_rag_msg = SystemMessage(
-                                    content="Relevant context from web search:\n" + str(_web_result["results"])
-                                )
-                                logger.info("🌐 Auto-RAG web fallback: injected web search results")
-                            else:
-                                logger.warning("⚠️ Auto-RAG web fallback: no results")
-                        else:
-                            logger.warning("⚠️ Auto-RAG web fallback: search client unavailable")
-                    except Exception as _web_err:
-                        logger.warning(f"⚠️ Auto-RAG web fallback failed: {_web_err}")
             except Exception as e:
                 logger.warning(f"⚠️ Auto-RAG search failed: {e}")
 
@@ -2997,7 +3036,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "current_model": "unknown",
             "research_source": "web",
             "session_state": session_state,
-            "capability_registry": capability_registry
+            "capability_registry": capability_registry,
+            "rag_fallback": preflight_rag_failed  # skip trigger matching if RAG already failed
         })
 
         # STEP 4: Update conversation state
