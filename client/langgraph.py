@@ -159,6 +159,7 @@ class AgentState(TypedDict):
     capability_registry: object  # CapabilityRegistry | None — read-only, shared across sessions
     rag_fallback: bool  # True when RAG returned low quality — skip trigger matching, use all tools
     context_sufficient: bool  # True when classifier says context/memory already has the answer
+    llm_tool_decision: dict  # Structured routing decision from LLM classifier
 
 # Direct source URLs for known sites
 DIRECT_SOURCE_URLS = {
@@ -2033,13 +2034,10 @@ def create_langgraph_agent(llm_with_tools, tools):
             _cap_reg = state.get("capability_registry")
             if state.get("rag_fallback"):
                 # RAG already failed — skip trigger matching and give the LLM all tools
-                # so it can reach web_search_tool. Inject a topic reminder so the LLM
-                # doesn't lose track of the conversation subject when all tools are bound.
                 logger.info("🌐 rag_fallback=True — skipping trigger matching, binding all tools")
                 llm_to_use = base_llm.bind_tools(all_tools)
                 pattern_name = "rag_fallback"
-                # Build a brief topic reminder from the last assistant message so the LLM
-                # knows what it was just discussing when it calls a tool
+                # Inject a topic reminder so the LLM knows what it was discussing
                 _last_ai = next(
                     (m for m in reversed(messages) if isinstance(m, AIMessage) and m.content),
                     None
@@ -2052,12 +2050,49 @@ def create_langgraph_agent(llm_with_tools, tools):
                     ))
                     messages = list(messages) + [_topic_hint]
             elif state.get("context_sufficient"):
-                # Classifier determined context/memory is sufficient — skip trigger matching
-                # and bind no tools so the LLM just reads the system prompt and answers
+                # Classifier determined context/memory is sufficient — no tools needed
                 logger.info("🧠 context_sufficient=True — skipping trigger matching, answering from context")
                 llm_to_use = base_llm.bind_tools([])
                 pattern_name = "context_sufficient"
+            elif state.get("llm_tool_decision"):
+                # Use the structured routing decision from the LLM classifier
+                _decision = state["llm_tool_decision"]
+                _tags = _decision.get("tool_tags", [])
+                _needs_web = _decision.get("needs_web_search", False)
+
+                if _tags or _needs_web:
+                    # Build tool pool from tags + web search if needed
+                    _tag_set = set(_tags)
+                    _matched = []
+                    for _t in all_tools:
+                        _tmeta = _get_tool_meta(_t)
+                        _ttags = set(_tmeta.get("tags", []) if _tmeta else [])
+                        # Also check capability_registry tags
+                        if _cap_reg:
+                            _cap = _cap_reg.get_tool(_t.name)
+                            if _cap:
+                                _ttags.update(_cap.tags or [])
+                        if _ttags & _tag_set:
+                            _matched.append(_t)
+                        elif _needs_web and hasattr(_t, "name") and _t.name == "web_search_tool":
+                            _matched.append(_t)
+                    if _matched:
+                        _tag_str = ",".join(sorted(_tag_set)) or "web"
+                        logger.info(f"🎯 LLM routing → tags={list(_tag_set)}, {len(_matched)} tools bound")
+                        llm_to_use = base_llm.bind_tools(_matched)
+                        pattern_name = f"llm_routed:{_tag_str}"
+                    else:
+                        # Tags specified but no matching tools found — bind all as fallback
+                        logger.info(f"🎯 LLM routing → tags={list(_tag_set)} but no tool match, binding all")
+                        llm_to_use = base_llm.bind_tools(all_tools)
+                        pattern_name = "llm_routed:fallback"
+                else:
+                    # No tools needed per classifier — answer from context
+                    logger.info("🎯 LLM routing → no tools needed, answering from context")
+                    llm_to_use = base_llm.bind_tools([])
+                    pattern_name = "llm_routed:context"
             else:
+                # No classifier decision — fall back to trigger-based match_intent
                 llm_to_use, pattern_name = match_intent(
                     user_message,
                     all_tools,
@@ -2292,6 +2327,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                     "analyze_image", "shashin_analyze", "explicit_tool",
                     "ingest", "research", "rag", "weather", "calendar",
                     "email", "plex", "code_assistant", "rag_fallback", "context_sufficient",
+                    "llm_routed:context",  # LLM classifier said no tools needed
+                    "context_sufficient",
                 }
                 _is_hedging = False
                 if user_message and pattern_name not in _skip_confidence_patterns:
@@ -2357,7 +2394,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                 "stopped": state.get("stopped", False),
                 "current_model": current_model,
                 "rag_fallback": False,  # clear after agent has run
-                "context_sufficient": False  # clear after agent has answered from context
+                "context_sufficient": False,  # clear after agent has answered from context
+                "llm_tool_decision": {}  # clear after agent has run
             }
 
         except asyncio.TimeoutError:
@@ -2795,7 +2833,8 @@ def create_langgraph_agent(llm_with_tools, tools):
             "session_state": session_state,
             "capability_registry": state.get("capability_registry"),
             "rag_fallback": state.get("rag_fallback", False),  # propagate so call_model sees it
-            "context_sufficient": state.get("context_sufficient", False)
+            "context_sufficient": state.get("context_sufficient", False),
+            "llm_tool_decision": state.get("llm_tool_decision", {})
         }
 
     # Build graph:
@@ -2974,6 +3013,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         # always fail on them and may incorrectly set rag_fallback=True.
         _needs_rag = True
         _context_sufficient = False
+        _llm_tool_decision: dict = {}
         _prior_ai_msgs = [m for m in non_system_msgs if isinstance(m, AIMessage)]
         if user_message and llm:
             _base_llm = llm.bound if hasattr(llm, "bound") else llm
@@ -2985,27 +3025,57 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                     for m in non_system_msgs[-6:]
                 )
             # Memory is prepended to the system prompt — take the first 1500 chars
-            # to capture it for the classifier
             _sys_snippet = ""
             if system_msg and system_msg.content:
                 _sys_snippet = system_msg.content[:1500]
             try:
                 _classify = await llm_ainvoke(_base_llm, [
-                    SystemMessage(content="Reply with only YES or NO. No other text."),
+                    SystemMessage(content=(
+                        "You are a routing classifier. Reply ONLY with a JSON object. No preamble, no markdown."
+                    )),
                     HumanMessage(content=(
-                        f"You are deciding whether a query needs an external lookup (web search or database).\n\n"
-                        f"Available context already known (no lookup needed for this):\n{_sys_snippet}\n\n"
+                        f"Decide how to route this query. Available context is shown below.\n\n"
+                        f"Known context (memory + system prompt):\n{_sys_snippet}\n\n"
                         + (f"Recent conversation:\n{_recent_history}\n\n" if _recent_history else "")
                         + f"New query: {user_message}\n\n"
-                        f"Reply YES if external lookup is needed.\n"
-                        f"Reply NO if the query can be answered from the available context or conversation above."
+                        f"Reply with this JSON object:\n"
+                        f"{{\n"
+                        f'  "context_sufficient": true/false,  // true if answerable from context above without any tool\n'
+                        f'  "needs_rag": true/false,           // true if local knowledge base search needed\n'
+                        f'  "needs_web_search": true/false,    // true if web search needed\n'
+                        f'  "tool_tags": []                    // list of tool tag categories needed, e.g. ["weather"], ["email"], ["calendar"], ["media"], ["code"], ["notes"], ["rag"], ["external"]\n'
+                        f"}}\n\n"
+                        f"Tool tag guide:\n"
+                        f"- weather/location queries → [\"weather\"]\n"
+                        f"- email queries → [\"email\"]\n"
+                        f"- calendar queries → [\"calendar\"]\n"
+                        f"- photo/image/gallery queries → [\"media\"]\n"
+                        f"- code/project queries → [\"code\"]\n"
+                        f"- notes queries → [\"notes\"]\n"
+                        f"- web search/current events/recent info → [\"external\"] and set needs_web_search=true\n"
+                        f"- questions answerable from memory or conversation → context_sufficient=true, tool_tags=[]\n"
+                        f"- math, writing, general knowledge in training data → context_sufficient=true, tool_tags=[]"
                     ))
                 ])
-                _needs_rag = not _classify.content.strip().upper().startswith("N")
-                _context_sufficient = not _needs_rag
-                logger.info(f"🔍 Auto-RAG classification: {'needs lookup' if _needs_rag else 'skipping RAG — answerable from context'}")
+                # Parse the JSON routing decision
+                import json as _json
+                import re as _re
+                _raw = _classify.content.strip()
+                _json_match = _re.search(r"\{.*\}", _raw, _re.DOTALL)
+                if _json_match:
+                    _decision = _json.loads(_json_match.group(0))
+                    _context_sufficient = bool(_decision.get("context_sufficient", False))
+                    _needs_rag = bool(_decision.get("needs_rag", True)) and not _context_sufficient
+                    _llm_tool_decision = _decision
+                    _tags = _decision.get("tool_tags", [])
+                    logger.info(f"🔍 LLM routing: context_sufficient={_context_sufficient}, needs_rag={_needs_rag}, needs_web={_decision.get('needs_web_search')}, tags={_tags}")
+                else:
+                    # Fallback: treat non-JSON as YES/NO
+                    _needs_rag = not _raw.upper().startswith("N")
+                    _context_sufficient = not _needs_rag
+                    logger.info(f"🔍 Auto-RAG classification (fallback): {'needs lookup' if _needs_rag else 'skipping RAG — answerable from context'}")
             except Exception as _ce:
-                logger.warning(f"⚠️ Auto-RAG classification failed, defaulting to RAG: {_ce}")
+                logger.warning(f"⚠️ Routing classification failed, defaulting to RAG: {_ce}")
 
         if rag_search_tool_auto and _needs_rag:
             try:
@@ -3074,7 +3144,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "session_state": session_state,
             "capability_registry": capability_registry,
             "rag_fallback": preflight_rag_failed,  # skip trigger matching if RAG already failed
-            "context_sufficient": _context_sufficient  # skip trigger matching if classifier says context is enough
+            "context_sufficient": _context_sufficient,  # skip trigger matching if classifier says context is enough
+            "llm_tool_decision": _llm_tool_decision  # full routing decision from LLM classifier
         })
 
         # STEP 4: Update conversation state
