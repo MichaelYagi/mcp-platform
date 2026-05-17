@@ -671,6 +671,10 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 await websocket.send(json.dumps({"type": "unsubscribed", "subscription": "system_stats"}))
                 continue
 
+            if data.get("type") == "ping":
+                await websocket.send(json.dumps({"type": "pong"}))
+                continue
+
             if data.get("type") == "list_models":
                 all_models = models_module.get_all_models()
                 model_names = [m["name"] for m in all_models]

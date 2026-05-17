@@ -2033,10 +2033,24 @@ def create_langgraph_agent(llm_with_tools, tools):
             _cap_reg = state.get("capability_registry")
             if state.get("rag_fallback"):
                 # RAG already failed — skip trigger matching and give the LLM all tools
-                # so it can reach web_search_tool
+                # so it can reach web_search_tool. Inject a topic reminder so the LLM
+                # doesn't lose track of the conversation subject when all tools are bound.
                 logger.info("🌐 rag_fallback=True — skipping trigger matching, binding all tools")
                 llm_to_use = base_llm.bind_tools(all_tools)
                 pattern_name = "rag_fallback"
+                # Build a brief topic reminder from the last assistant message so the LLM
+                # knows what it was just discussing when it calls a tool
+                _last_ai = next(
+                    (m for m in reversed(messages) if isinstance(m, AIMessage) and m.content),
+                    None
+                )
+                if _last_ai and user_message:
+                    _topic_hint = HumanMessage(content=(
+                        f"[Context: the conversation so far covers the following topic — "
+                        f"{_last_ai.content[:300]}... — "
+                        f"Now answer this follow-up using a tool if needed: {user_message}]"
+                    ))
+                    messages = list(messages) + [_topic_hint]
             elif state.get("context_sufficient"):
                 # Classifier determined context/memory is sufficient — skip trigger matching
                 # and bind no tools so the LLM just reads the system prompt and answers
@@ -2967,8 +2981,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             _recent_history = ""
             if _prior_ai_msgs:
                 _recent_history = "\n".join(
-                    f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
-                    for m in non_system_msgs[-4:]
+                    f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:800]}"
+                    for m in non_system_msgs[-6:]
                 )
             # Memory is prepended to the system prompt — take the first 1500 chars
             # to capture it for the classifier

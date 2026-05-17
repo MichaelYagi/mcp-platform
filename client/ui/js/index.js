@@ -996,6 +996,20 @@ let ws;
 let _wsHasConnected = false;
 let _wsReconnectTimer = null;
 let _wsReconnectDelay = 1000;
+let _wsPingTimer = null;
+
+function startWsPing() {
+    stopWsPing();
+    _wsPingTimer = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "ping" }));
+        }
+    }, 25000); // ping every 25s — under server's 30s ping_interval
+}
+
+function stopWsPing() {
+    if (_wsPingTimer) { clearInterval(_wsPingTimer); _wsPingTimer = null; }
+}
 
 function connectMainWS() {
     if (_wsReconnectTimer) { clearTimeout(_wsReconnectTimer); _wsReconnectTimer = null; }
@@ -1007,6 +1021,7 @@ function connectMainWS() {
     ws.onerror = () => { status.textContent = "WebSocket error"; hideThinking(); };
 
     ws.onclose = () => {
+        stopWsPing();
         status.textContent = "Disconnected";
         sendBtn.disabled = true;
         hideThinking();
@@ -1016,6 +1031,7 @@ function connectMainWS() {
     ws.onopen = () => {
         sendBtn.disabled = false;
         _wsReconnectDelay = 1000;
+        startWsPing();
         updateStatusWithMode();
         ws.send(JSON.stringify({ type:"list_models" }));
         ws.send(JSON.stringify({ type:"list_tools" }));
@@ -1056,6 +1072,12 @@ document.addEventListener('visibilitychange', () => {
         if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
             _wsReconnectDelay = 1000;
             connectMainWS();
+        }
+    } else {
+        // Tab going to background — close cleanly so the server gets a proper close frame
+        // instead of detecting a dead connection via ping timeout
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close(1000, 'tab hidden');
         }
     }
 });
