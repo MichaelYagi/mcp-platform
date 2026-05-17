@@ -376,8 +376,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         except Exception as _path_err:
                             logger.warning(f"🚫 Could not resolve image_source path: {_path_err}")
 
+            except (json.JSONDecodeError, ValueError):
+                # Plain-text tool results (e.g. web_search_tool) are not JSON — expected, not an error
+                pass
             except Exception as parse_err:
-                logger.warning(f"🖼️ JSON parse failed: {parse_err}")
+                logger.warning(f"🖼️ Unexpected error scanning ToolMessage: {parse_err}")
 
         logger.info(f"🖼️ image_b64={'yes' if image_b64 else 'None'}, image_url={image_source or 'None'}, place={place_name}")
 

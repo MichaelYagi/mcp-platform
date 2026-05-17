@@ -1410,7 +1410,10 @@ def create_langgraph_agent(llm_with_tools, tools):
                         tool_data = json.loads(raw)
                     except json.JSONDecodeError:
                         tool_data = None
-                    logger.info(f"[LangGraph] 🖼️ Unwrapped TextContent, keys={list(tool_data.keys()) if isinstance(tool_data, dict) else 'parse failed'}")
+                    if isinstance(tool_data, dict):
+                        logger.info(f"[LangGraph] 🖼️ Unwrapped TextContent, keys={list(tool_data.keys())}")
+                    else:
+                        logger.debug("[LangGraph] 🖼️ TextContent is not JSON — skipping image/location scan")
                 else:
                     try:
                         tool_data = json.loads(raw)
