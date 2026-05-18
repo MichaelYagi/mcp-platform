@@ -1211,6 +1211,10 @@ const _notif = (() => {
     function notify(title, body = '') {
         if (!_enabled) return;
         if (!document.hidden) return;
+        // Always flash the tab title and favicon badge
+        _startTitleFlash(title);
+        if (_badgeFaviconUrl) _setFavicon(_badgeFaviconUrl);
+        // Also fire native notification if available
         if (_mode === 'native') {
             if (_activeNotif) { _activeNotif.close(); _activeNotif = null; }
             const n = new Notification(title, {
@@ -1220,9 +1224,6 @@ const _notif = (() => {
             });
             n.onclick = () => { window.focus(); n.close(); };
             _activeNotif = n;
-        } else {
-            _startTitleFlash(title);
-            if (_badgeFaviconUrl) _setFavicon(_badgeFaviconUrl);
         }
     }
 
