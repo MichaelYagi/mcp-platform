@@ -549,6 +549,22 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "model": "system"
                         }))
                         await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                elif messages and messages[-1]["role"] == "assistant":
+                    if session_id not in PROCESSING_SESSIONS:
+                        # Task completed while socket was dead — replay the last response
+                        # to the newly connected socket so the UI shows it.
+                        # This covers both: (a) task finished before reconnect, and
+                        # (b) task finished just after reconnect but broadcast was missed.
+                        last_msg = messages[-1]
+                        last_text = last_msg.get("text") or last_msg.get("content", "")
+                        if last_text:
+                            logger.info(f"🔁 Session {session_id}: replaying last assistant message to reconnected socket")
+                            await websocket.send(json.dumps({
+                                "type": "assistant_message",
+                                "text": last_text,
+                                "model": last_msg.get("model", "system")
+                            }))
+                            await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                 continue
 
             if data.get("type") == "new_session":
@@ -1042,7 +1058,7 @@ async def start_websocket_server(agent, tools, logger, conversation_state, run_a
     # ping_interval keeps the TCP connection alive through sleep/idle.
     # ping_timeout gives the client 60s to respond before dropping.
     server = await websockets.serve(handler, host, port,
-                                    ping_interval=30, ping_timeout=60)
+                                    ping_interval=15, ping_timeout=30)
     asyncio.create_task(_cleanup_stale_tasks())
 
     try:
