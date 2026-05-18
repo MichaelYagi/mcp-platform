@@ -2050,10 +2050,27 @@ def create_langgraph_agent(llm_with_tools, tools):
                     ))
                     messages = list(messages) + [_topic_hint]
             elif state.get("context_sufficient"):
-                # Classifier determined context/memory is sufficient — no tools needed
+                # Classifier determined context/memory is sufficient — no tools needed.
+                # Re-inject memory block as HumanMessage so the model attends to it.
                 logger.info("🧠 context_sufficient=True — skipping trigger matching, answering from context")
                 llm_to_use = base_llm.bind_tools([])
                 pattern_name = "context_sufficient"
+                _sys_content = next(
+                    (m.content for m in messages if isinstance(m, SystemMessage)), ""
+                )
+                if "## Persistent Memory" in _sys_content:
+                    _mem_start = _sys_content.find("## Persistent Memory")
+                    _mem_end = _sys_content.find("\n\n---\n\n", _mem_start)
+                    _mem_block = (
+                        _sys_content[_mem_start:_mem_end]
+                        if _mem_end > _mem_start
+                        else _sys_content[_mem_start:_mem_start + 2000]
+                    )
+                    if _mem_block:
+                        messages = list(messages) + [HumanMessage(content=(
+                            f"[Memory context — use this to answer the question below]\n{_mem_block}"
+                        ))]
+                        logger.info("🧠 Injected memory block as HumanMessage reminder")
             elif state.get("llm_tool_decision"):
                 # Use the structured routing decision from the LLM classifier
                 _decision = state["llm_tool_decision"]
@@ -2086,11 +2103,48 @@ def create_langgraph_agent(llm_with_tools, tools):
                         logger.info(f"🎯 LLM routing → tags={list(_tag_set)} but no tool match, binding all")
                         llm_to_use = base_llm.bind_tools(all_tools)
                         pattern_name = "llm_routed:fallback"
+                    # Inject recent conversation history as context so the LLM can
+                    # resolve pronouns and references before formulating search queries.
+                    # Include the last 4 exchanges (8 messages) truncated per message.
+                    if _needs_web:
+                        _recent_exchanges = [
+                            m for m in messages
+                            if isinstance(m, (HumanMessage, AIMessage)) and m.content
+                        ][-8:]
+                        if _recent_exchanges and user_message:
+                            _history_lines = []
+                            for _m in _recent_exchanges:
+                                _role = "User" if isinstance(_m, HumanMessage) else "Assistant"
+                                _history_lines.append(f"{_role}: {_m.content[:300]}")
+                            _history_text = "\n".join(_history_lines)
+                            messages = list(messages) + [HumanMessage(content=(
+                                f"[Recent conversation context — use this to resolve any ambiguous "
+                                f"names, pronouns, or references in the follow-up question]\n"
+                                f"{_history_text}\n\n"
+                                f"Follow-up question: {user_message}"
+                            ))]
+                            logger.info("🧠 Injected recent conversation context for web search follow-up")
                 else:
                     # No tools needed per classifier — answer from context
                     logger.info("🎯 LLM routing → no tools needed, answering from context")
                     llm_to_use = base_llm.bind_tools([])
                     pattern_name = "llm_routed:context"
+                    _sys_content = next(
+                        (m.content for m in messages if isinstance(m, SystemMessage)), ""
+                    )
+                    if "## Persistent Memory" in _sys_content:
+                        _mem_start = _sys_content.find("## Persistent Memory")
+                        _mem_end = _sys_content.find("\n\n---\n\n", _mem_start)
+                        _mem_block = (
+                            _sys_content[_mem_start:_mem_end]
+                            if _mem_end > _mem_start
+                            else _sys_content[_mem_start:_mem_start + 2000]
+                        )
+                        if _mem_block:
+                            messages = list(messages) + [HumanMessage(content=(
+                                f"[Memory context — use this to answer the question below]\n{_mem_block}"
+                            ))]
+                            logger.info("🧠 Injected memory block as HumanMessage reminder (llm_routed:context)")
             else:
                 # No classifier decision — fall back to trigger-based match_intent
                 llm_to_use, pattern_name = match_intent(
@@ -2345,7 +2399,11 @@ def create_langgraph_agent(llm_with_tools, tools):
                         "rag_search_tool" in (getattr(m, "name", "") or "")
                         for m in messages
                     )
-                    if _has_memory and not _tool_ran:
+                    # Never skip if the LLM classifier said web search was needed —
+                    # the LLM may have ignored its own routing and answered from
+                    # training data instead, which could be wrong or hallucinated
+                    _web_needed = state.get("llm_tool_decision", {}).get("needs_web_search", False)
+                    if _has_memory and not _tool_ran and not _web_needed:
                         logger.info("[LangGraph] 🧠 Skipping confidence check — persistent memory present, no tools ran")
                     else:
                         try:
@@ -2368,7 +2426,29 @@ def create_langgraph_agent(llm_with_tools, tools):
                     _search_client = get_search_client()
                     if _search_client.is_available():
                         try:
-                            _search_result = await _search_client.search(user_message)
+                            # Generate a proper search query rather than using the raw user message
+                            _recent_ctx = "\n".join(
+                                f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
+                                for m in messages[-6:]
+                                if isinstance(m, (HumanMessage, AIMessage)) and m.content
+                            )
+                            try:
+                                from datetime import date as _date
+                                _today = _date.today().strftime("%B %Y")
+                                _query_gen = await llm_ainvoke(base_llm, [
+                                    SystemMessage(content="Reply with only a short web search query (5-10 words). No other text."),
+                                    HumanMessage(content=(
+                                        f"Today is {_today}.\n"
+                                        f"Given this conversation:\n{_recent_ctx}\n\n"
+                                        f"Generate a web search query to answer: {user_message}\n"
+                                        f"If the question is about a recent event, include the date or year in the query."
+                                    ))
+                                ])
+                                _search_query = _query_gen.content.strip().strip('"').strip("'")
+                                logger.info(f"[LangGraph] 🔍 Generated search query: {_search_query}")
+                            except Exception:
+                                _search_query = user_message
+                            _search_result = await _search_client.search(_search_query)
                             if _search_result.get("success") and _search_result.get("results"):
                                 logger.info("[LangGraph] ✅ Web search fallback succeeded — retrying with context")
                                 _augmented = WEB_SEARCH_WITH_QUESTION.format(
@@ -2385,6 +2465,18 @@ def create_langgraph_agent(llm_with_tools, tools):
                             logger.warning(f"[LangGraph] ⚠️ Web search fallback failed: {_hedge_err}")
                     else:
                         logger.warning("[LangGraph] ⚠️ Web search unavailable for hedge fallback")
+
+            # Repetition detection — truncate if the LLM got stuck in a loop
+            if response.content and len(response.content) > 500:
+                _chunk = response.content[-200:]
+                _rep_count = response.content.count(_chunk)
+                if _rep_count > 2:
+                    # Find the first occurrence and truncate there
+                    _first = response.content.find(_chunk)
+                    _truncated = response.content[:_first + len(_chunk)]
+                    logger.warning(f"⚠️ Repetition loop detected — truncating response from {len(response.content)} to {len(_truncated)} chars")
+                    from langchain_core.messages import AIMessage as _AIMessage
+                    response = _AIMessage(content=_truncated, tool_calls=getattr(response, "tool_calls", []))
 
             return {
                 "messages": [response],
@@ -2917,19 +3009,20 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                 and isinstance(conversation_state["messages"][0], SystemMessage)
         )
 
+        from datetime import date as _date
+        _date_note = (
+            f"\n\nToday's date: {_date.today().strftime('%A, %B %d, %Y')}. "
+            f"When searching for recent events, include the current month and year in your search query."
+        )
         if has_system_msg:
-            original_system_msg = conversation_state["messages"][0]
-            # Inject session_id into existing SystemMessage if not already present
-            if session_id and f"Current session ID: {session_id}" not in original_system_msg.content:
-                original_system_msg = SystemMessage(
-                    content=original_system_msg.content
-                    + f"\n\nCurrent session ID: {session_id}"
-                )
-                conversation_state["messages"][0] = original_system_msg
-            logger.info("[LangGraph] Preserving existing SystemMessage")
+            # Always replace with fresh enriched system_prompt so memory is current each turn
+            session_note = f"\n\nCurrent session ID: {session_id}" if session_id and f"Current session ID: {session_id}" not in system_prompt else ""
+            original_system_msg = SystemMessage(content=system_prompt + session_note + _date_note)
+            conversation_state["messages"][0] = original_system_msg
+            logger.info("[LangGraph] Updated SystemMessage with fresh enriched prompt")
         else:
             session_note = f"\n\nCurrent session ID: {session_id}" if session_id else ""
-            original_system_msg = SystemMessage(content=system_prompt + session_note)
+            original_system_msg = SystemMessage(content=system_prompt + session_note + _date_note)
             conversation_state["messages"].insert(0, original_system_msg)
             logger.info("[LangGraph] Created new SystemMessage from parameter")
 

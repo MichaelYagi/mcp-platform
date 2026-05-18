@@ -663,7 +663,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     llm = LLMBackendManager.create_llm(
         model_name,
         temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
-        num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "2048"))
+        num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "2048")), num_predict=int(os.getenv("OLLAMA_NUM_PREDICT", "2048")), repeat_penalty=float(os.getenv("OLLAMA_REPEAT_PENALTY", "1.1"))
     )
 
     mcp_agent = MCPAgent(
@@ -1298,7 +1298,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     active_llm = LLMBackendManager.create_llm(
                         _current_model,
                         temperature=float(os.getenv('LLM_TEMPERATURE', '0.3')),
-                        num_ctx=int(os.getenv('OLLAMA_NUM_CTX', '2048'))
+                        num_ctx=int(os.getenv('OLLAMA_NUM_CTX', '2048')), num_predict=int(os.getenv('OLLAMA_NUM_PREDICT', '2048')), repeat_penalty=float(os.getenv('OLLAMA_REPEAT_PENALTY', '1.1'))
                     )
                 else:
                     active_llm = orchestrator.base_llm if orchestrator and hasattr(orchestrator, 'base_llm') else llm
@@ -2051,7 +2051,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         fresh_llm = LLMBackendManager.create_llm(
                             expected_model,
                             temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
-                            num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "2048"))
+                            num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "2048")), num_predict=int(os.getenv("OLLAMA_NUM_PREDICT", "2048")), repeat_penalty=float(os.getenv("OLLAMA_REPEAT_PENALTY", "1.1"))
                         )
 
                         if hasattr(orchestrator, 'update_llm'):
