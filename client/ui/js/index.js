@@ -1073,12 +1073,6 @@ document.addEventListener('visibilitychange', () => {
             _wsReconnectDelay = 1000;
             connectMainWS();
         }
-    } else {
-        // Tab going to background — close cleanly so the server gets a proper close frame
-        // instead of detecting a dead connection via ping timeout
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.close(1000, 'tab hidden');
-        }
     }
 });
 

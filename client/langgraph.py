@@ -2963,42 +2963,46 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         )
 
         if overflow_turns and rag_add_tool:
-            ingested_overflow = 0
-            i = 0
-            while i < len(overflow_turns):
-                turn = overflow_turns[i]
-                if isinstance(turn, HumanMessage):
-                    human_text = turn.content
-                    ai_text = ""
-                    if (
-                        i + 1 < len(overflow_turns)
-                        and isinstance(overflow_turns[i + 1], AIMessage)
-                    ):
-                        ai_text = overflow_turns[i + 1].content
-                        i += 2
+            # Run overflow ingestion as a background task so it doesn't block
+            # the async event loop and cause WebSocket disconnects
+            async def _ingest_overflow():
+                ingested_overflow = 0
+                i = 0
+                while i < len(overflow_turns):
+                    turn = overflow_turns[i]
+                    if isinstance(turn, HumanMessage):
+                        human_text = turn.content
+                        ai_text = ""
+                        if (
+                            i + 1 < len(overflow_turns)
+                            and isinstance(overflow_turns[i + 1], AIMessage)
+                        ):
+                            ai_text = overflow_turns[i + 1].content
+                            i += 2
+                        else:
+                            i += 1
+                        chunk = f"User: {human_text}"
+                        if ai_text:
+                            chunk += f"\nAssistant: {ai_text}"
+                        try:
+                            await rag_add_tool.ainvoke({
+                                "text": chunk,
+                                "source": (
+                                    f"conversation_history_{session_id}"
+                                    if session_id
+                                    else "conversation_history"
+                                ),
+                            })
+                            ingested_overflow += 1
+                        except Exception as e:
+                            logger.warning(f"⚠️ Failed to ingest overflow turn to RAG: {e}")
                     else:
                         i += 1
-                    chunk = f"User: {human_text}"
-                    if ai_text:
-                        chunk += f"\nAssistant: {ai_text}"
-                    try:
-                        await rag_add_tool.ainvoke({
-                            "text": chunk,
-                            "source": (
-                                f"conversation_history_{session_id}"
-                                if session_id
-                                else "conversation_history"
-                            ),
-                        })
-                        ingested_overflow += 1
-                    except Exception as e:
-                        logger.warning(f"⚠️ Failed to ingest overflow turn to RAG: {e}")
-                else:
-                    i += 1
-            if ingested_overflow:
-                logger.info(
-                    f"💾 Ingested {ingested_overflow} overflow conversation turn(s) into RAG"
-                )
+                if ingested_overflow:
+                    logger.info(
+                        f"💾 Ingested {ingested_overflow} overflow conversation turn(s) into RAG"
+                    )
+            asyncio.create_task(_ingest_overflow())
 
         # ── STEP 2b: Auto-retrieve relevant context from RAG ─────────────────
         # Semantic search on every message so older turns (and any other
@@ -3052,14 +3056,9 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                         f"- photo/image/gallery queries → [\"media\"]\n"
                         f"- code/project queries → [\"code\"]\n"
                         f"- notes queries → [\"notes\"]\n"
-                        f"- current events, recent news, prices, scores, latest versions → [\"external\"] and set needs_web_search=true\n"
+                        f"- web search/current events/recent info → [\"external\"] and set needs_web_search=true\n"
                         f"- questions answerable from memory or conversation → context_sufficient=true, tool_tags=[]\n"
-                        f"- math, writing, creative tasks → context_sufficient=false, needs_web_search=false, tool_tags=[]\n"
-                        f"- stable historical facts (e.g. who painted X, when did Y happen, what is Z) → context_sufficient=false, needs_web_search=false, tool_tags=[]\n"
-                        f"- science, geography, definitions, well-known people → context_sufficient=false, needs_web_search=false, tool_tags=[]\n"
-                        f"\n"
-                        f"IMPORTANT: Only set needs_web_search=true for things that change over time or happened recently.\n"
-                        f"DO NOT web search for: historical facts, scientific constants, famous artworks, classic literature, geography, math."
+                        f"- math, writing, general knowledge in training data → context_sufficient=true, tool_tags=[]"
                     ))
                 ])
                 # Parse the JSON routing decision
