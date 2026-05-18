@@ -62,6 +62,14 @@ class LLMBackendManager:
 
         if backend == "ollama":
             ollama_base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+            # Extract Ollama-specific generation options and pass via options dict
+            # to ensure they're properly forwarded to the Ollama API
+            ollama_options = {}
+            for opt_key in ("num_predict", "repeat_penalty", "repeat_last_n", "top_k", "top_p"):
+                if opt_key in kwargs:
+                    ollama_options[opt_key] = kwargs.pop(opt_key)
+            if ollama_options:
+                kwargs["model_kwargs"] = {**kwargs.pop("model_kwargs", {}), **ollama_options}
             llm = ChatOllama(model=model_name, temperature=temperature, base_url=ollama_base_url, **kwargs)
 
             # Save to cache
