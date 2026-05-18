@@ -2050,10 +2050,30 @@ def create_langgraph_agent(llm_with_tools, tools):
                     ))
                     messages = list(messages) + [_topic_hint]
             elif state.get("context_sufficient"):
-                # Classifier determined context/memory is sufficient — no tools needed
+                # Classifier determined context/memory is sufficient — no tools needed.
+                # Extract the memory block from the system prompt and inject it as a
+                # HumanMessage reminder so the model attends to it (qwen2.5 attention
+                # falls off for content at the top of long system prompts).
                 logger.info("🧠 context_sufficient=True — skipping trigger matching, answering from context")
                 llm_to_use = base_llm.bind_tools([])
                 pattern_name = "context_sufficient"
+                _sys_content = next(
+                    (m.content for m in messages if isinstance(m, SystemMessage)), ""
+                )
+                if "## Persistent Memory" in _sys_content:
+                    _mem_start = _sys_content.find("## Persistent Memory")
+                    _mem_end = _sys_content.find("\n\n---\n\n", _mem_start)
+                    _mem_block = (
+                        _sys_content[_mem_start:_mem_end]
+                        if _mem_end > _mem_start
+                        else _sys_content[_mem_start:_mem_start + 2000]
+                    )
+                    if _mem_block:
+                        _mem_reminder = HumanMessage(content=(
+                            f"[Memory context — use this to answer the question below]\n{_mem_block}"
+                        ))
+                        messages = list(messages) + [_mem_reminder]
+                        logger.info("🧠 Injected memory block as HumanMessage reminder")
             elif state.get("llm_tool_decision"):
                 # Use the structured routing decision from the LLM classifier
                 _decision = state["llm_tool_decision"]
@@ -2091,6 +2111,23 @@ def create_langgraph_agent(llm_with_tools, tools):
                     logger.info("🎯 LLM routing → no tools needed, answering from context")
                     llm_to_use = base_llm.bind_tools([])
                     pattern_name = "llm_routed:context"
+                    # Inject memory as reminder so model attends to it
+                    _sys_content = next(
+                        (m.content for m in messages if isinstance(m, SystemMessage)), ""
+                    )
+                    if "## Persistent Memory" in _sys_content:
+                        _mem_start = _sys_content.find("## Persistent Memory")
+                        _mem_end = _sys_content.find("\n\n---\n\n", _mem_start)
+                        _mem_block = (
+                            _sys_content[_mem_start:_mem_end]
+                            if _mem_end > _mem_start
+                            else _sys_content[_mem_start:_mem_start + 2000]
+                        )
+                        if _mem_block:
+                            messages = list(messages) + [HumanMessage(content=(
+                                f"[Memory context — use this to answer the question below]\n{_mem_block}"
+                            ))]
+                            logger.info("🧠 Injected memory block as HumanMessage reminder (llm_routed:context)")
             else:
                 # No classifier decision — fall back to trigger-based match_intent
                 llm_to_use, pattern_name = match_intent(
@@ -2918,15 +2955,13 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         )
 
         if has_system_msg:
-            original_system_msg = conversation_state["messages"][0]
-            # Inject session_id into existing SystemMessage if not already present
-            if session_id and f"Current session ID: {session_id}" not in original_system_msg.content:
-                original_system_msg = SystemMessage(
-                    content=original_system_msg.content
-                    + f"\n\nCurrent session ID: {session_id}"
-                )
-                conversation_state["messages"][0] = original_system_msg
-            logger.info("[LangGraph] Preserving existing SystemMessage")
+            # Always update the SystemMessage with the enriched system_prompt (which
+            # contains fresh memory injected by inject_into_system_prompt in websocket.py).
+            # Preserving the old one would mean memory only appears on the first message.
+            session_note = f"\n\nCurrent session ID: {session_id}" if session_id and f"Current session ID: {session_id}" not in system_prompt else ""
+            original_system_msg = SystemMessage(content=system_prompt + session_note)
+            conversation_state["messages"][0] = original_system_msg
+            logger.info("[LangGraph] Updated SystemMessage with fresh enriched prompt")
         else:
             session_note = f"\n\nCurrent session ID: {session_id}" if session_id else ""
             original_system_msg = SystemMessage(content=system_prompt + session_note)
