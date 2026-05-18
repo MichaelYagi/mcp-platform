@@ -2441,7 +2441,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                                         f"Today is {_today}.\n"
                                         f"Given this conversation:\n{_recent_ctx}\n\n"
                                         f"Generate a web search query to answer: {user_message}\n"
-                                        f"If the question is about a recent event, include the date or year in the query."
+                                        f"IMPORTANT: Do NOT include any specific year in the query. "
+                                        f"Use open-ended queries that return the most current results."
                                     ))
                                 ])
                                 _search_query = _query_gen.content.strip().strip('"').strip("'")
@@ -3012,7 +3013,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         from datetime import date as _date
         _date_note = (
             f"\n\nToday's date: {_date.today().strftime('%A, %B %d, %Y')}. "
-            f"When searching for recent events, include the current month and year in your search query."
+            f"When generating web search queries, do NOT include specific years — use open-ended queries to get the most current results."
         )
         if has_system_msg:
             # Always replace with fresh enriched system_prompt so memory is current each turn
