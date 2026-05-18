@@ -131,6 +131,23 @@ You: [uses same project path from context]
 - Fetch page: `web_fetch_tool(url)`
 - Keywords: search the web, look up, current news, latest, web search
 
+**CRITICAL — generating web search queries:**
+When writing a search query for current events, people, products, or anything that changes over time:
+- NEVER include a specific year from your training data in the query
+- NEVER assume the current year based on your training cutoff
+- Use open-ended queries that will surface the most recent results
+
+```
+WRONG: "most recent canadian federal election 2023 winner"  ❌
+RIGHT: "most recent canadian federal election winner"       ✅
+
+WRONG: "latest iPhone model 2023"  ❌
+RIGHT: "latest iPhone model"        ✅
+
+WRONG: "Elon Musk latest company purchase 2023"  ❌
+RIGHT: "Elon Musk latest company purchase"        ✅
+```
+
 **CRITICAL — web_search_tool output format:**
 The tool result is a `TextContent` object. The ONLY thing that matters is the `text` field inside it.
 Do NOT describe the TextContent object, its type, annotations, or meta fields.
