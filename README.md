@@ -106,7 +106,12 @@ Create `.env` in project root:
 OLLAMA_BASE_URL=http://127.0.0.1:11434  # Use 127.0.0.1 for local; LAN IP requires OLLAMA_HOST=0.0.0.0 on the server
 OLLAMA_VISION_MODEL=qwen3-vl:8b-instruct
 MAX_MESSAGE_HISTORY=30
+LLM_MESSAGE_WINDOW=15        # Sliding window of messages sent to LLM; older turns fall into Conversation RAG
 LLM_TEMPERATURE=0.3
+OLLAMA_NUM_CTX=8192          # KV cache / context window size
+OLLAMA_NUM_PREDICT=4096      # Max tokens the LLM will generate per response
+OLLAMA_REPEAT_PENALTY=1.1    # Penalise token repetition (1.0 = disabled)
+IMAGE_MODEL=gptimage-large   # Model used for AI image generation
 
 # === GGUF Configuration ===
 GGUF_GPU_LAYERS=-1
