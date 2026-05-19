@@ -16,97 +16,57 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 # utils.py — QuietHTTPRequestHandler image serving
 # ═══════════════════════════════════════════════════════════════════
 
+@pytest.fixture(scope="module")
+def http_server_port():
+    """Start the image HTTP server once for the whole module and return its port."""
+    import time
+    import socket
+
+    # Find a free port
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+
+    from client.utils import start_http_server
+    start_http_server(port=port)
+    time.sleep(0.2)
+    return port
+
+
 @pytest.mark.unit
 class TestQuietHTTPRequestHandler:
-    """Test the image handler inside start_http_server via direct class instantiation."""
+    """Test the image HTTP server via real HTTP requests against a single shared server."""
 
-    def _make_handler(self, path, temp_dir):
-        """Build a handler instance with a mocked socket/server."""
-        from client.utils import start_http_server
-        import io
-
-        # Extract the inner class by starting a server and inspecting
-        # Instead, test via HTTP directly since the server is a daemon thread
-        # We test the logic by calling do_GET via a mock
-        from http.server import BaseHTTPRequestHandler
-        from socketserver import TCPServer
-        from client.utils import start_http_server
-        import client.utils as utils_module
-        import inspect, textwrap
-
-        # Re-extract QuietHTTPRequestHandler by starting server on unused port
-        # and inspecting — instead we test it by making real HTTP requests
-        return None
-
-    def test_image_served_successfully(self, temp_dir):
-        """Test that a real image file is served via the HTTP server."""
+    def _get(self, port, path):
         import http.client
-        import time
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            conn.request("GET", path)
+            return conn.getresponse()
+        finally:
+            conn.close()
 
-        # Create a fake PNG file
-        img = temp_dir / "test.png"
+    def test_image_served_successfully(self, tmp_path, http_server_port):
+        img = tmp_path / "test.png"
         img.write_bytes(b'\x89PNG\r\n\x1a\n' + b'\x00' * 100)
-
-        from client.utils import start_http_server
-        start_http_server(port=19877)
-        time.sleep(0.1)  # let server start
-
-        conn = http.client.HTTPConnection("127.0.0.1", 19877)
-        conn.request("GET", f"/image?path={img}")
-        resp = conn.getresponse()
+        resp = self._get(http_server_port, f"/image?path={img}")
         assert resp.status == 200
         assert "image" in resp.getheader("Content-Type", "")
-        conn.close()
 
-    def test_image_missing_path_param_returns_400(self, temp_dir):
-        """Test that /image with no path returns 400."""
-        import http.client
-        import time
-
-        from client.utils import start_http_server
-        start_http_server(port=19878)
-        time.sleep(0.1)
-
-        conn = http.client.HTTPConnection("127.0.0.1", 19878)
-        conn.request("GET", "/image")
-        resp = conn.getresponse()
+    def test_image_missing_path_param_returns_400(self, http_server_port):
+        resp = self._get(http_server_port, "/image")
         assert resp.status == 400
-        conn.close()
 
-    def test_image_nonexistent_file_returns_404(self, temp_dir):
-        """Test that /image with a nonexistent path returns 404."""
-        import http.client
-        import time
-
-        from client.utils import start_http_server
-        start_http_server(port=19879)
-        time.sleep(0.1)
-
-        conn = http.client.HTTPConnection("127.0.0.1", 19879)
-        conn.request("GET", "/image?path=/nonexistent/file.png")
-        resp = conn.getresponse()
+    def test_image_nonexistent_file_returns_404(self, http_server_port):
+        resp = self._get(http_server_port, "/image?path=/nonexistent/file.png")
         assert resp.status == 404
-        conn.close()
 
-    def test_non_image_file_served_as_jpeg(self, temp_dir):
-        """Test that a file with unknown MIME type gets image/jpeg fallback."""
-        import http.client
-        import time
-
-        weird = temp_dir / "test.xyz"
-        weird.write_bytes(b'\xff\xd8\xff' + b'\x00' * 100)  # JPEG magic bytes
-
-        from client.utils import start_http_server
-        start_http_server(port=19880)
-        time.sleep(0.1)
-
-        conn = http.client.HTTPConnection("127.0.0.1", 19880)
-        conn.request("GET", f"/image?path={weird}")
-        resp = conn.getresponse()
-        # Should serve with image/jpeg fallback
+    def test_non_image_file_served_as_jpeg(self, tmp_path, http_server_port):
+        weird = tmp_path / "test.xyz"
+        weird.write_bytes(b'\xff\xd8\xff' + b'\x00' * 100)
+        resp = self._get(http_server_port, f"/image?path={weird}")
         assert resp.status == 200
         assert resp.getheader("Content-Type") == "image/jpeg"
-        conn.close()
 
 
 # ═══════════════════════════════════════════════════════════════════
