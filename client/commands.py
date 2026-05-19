@@ -29,8 +29,26 @@ def get_commands_list():
         ":a2a on - Enable agent-to-agent mode",
         ":a2a off - Disable agent-to-agent mode",
         ":a2a status - Check A2A system status",
+        ":multi on - Enable multi-agent mode",
+        ":multi off - Disable multi-agent mode",
+        ":multi status - Show multi-agent mode status",
+        ":metrics - Show LLM and agent performance metrics",
+        ":metrics comparative - Show comparative metrics across models",
+        ":routing - Show current query routing statistics",
+        ":routing reset - Reset routing statistics",
+        ":sync - Sync tools and capabilities",
         ":health - Health overview of all servers and tools",
-        ":env - Show environment configuration"
+        ":env - Show environment configuration",
+        ":memory - List all persistent memories",
+        ":memory semantic - Show permanent memories only",
+        ":memory episodic - Show session-derived memories",
+        ":memory forget <id> - Delete one memory",
+        ":memory clear - Delete all episodic memories",
+        ":memory clear session <id> - Delete memories from one session",
+        ":memory consolidate - Extract memories from current session now",
+        ":memory consolidate <id> - Extract memories from a specific session",
+        ":memory dedup - Remove duplicate memories",
+        ":memory add <fact> - Manually add a memory",
     ]
 
 

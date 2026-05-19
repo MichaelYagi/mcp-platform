@@ -26,11 +26,26 @@ import logging
 import os
 import re
 import sqlite3
+import struct
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger("mcp_client")
+
+
+def cosine_similarity(a: bytes, b: bytes) -> float:
+    """Cosine similarity between two float32 byte blobs."""
+    try:
+        n = len(a) // 4
+        va = struct.unpack(f"{n}f", a)
+        vb = struct.unpack(f"{n}f", b)
+        dot = sum(x * y for x, y in zip(va, vb))
+        na  = sum(x * x for x in va) ** 0.5
+        nb  = sum(x * x for x in vb) ** 0.5
+        return dot / (na * nb) if na and nb else 0.0
+    except Exception:
+        return 0.0
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 
@@ -200,9 +215,9 @@ def _mark_consolidated(session_id: str):
 
 # ── LLM extraction prompt ─────────────────────────────────────────────────────
 
-_EXTRACT_PROMPT = """You are a memory extraction system. Your job is to extract EVERY fact about the user from the conversation below.
+_EXTRACT_PROMPT = """You are a memory extraction system. Your job is to extract durable facts about the user from the conversation below.
 
-Be AGGRESSIVE. Extract anything personal, technical, or factual. When in doubt, extract it.
+Extract facts that will still be true weeks or months from now. Focus on who the user is, not what they did today.
 
 ALWAYS extract these categories if present:
 - Full name, nicknames
@@ -214,6 +229,7 @@ ALWAYS extract these categories if present:
 - Technical environment (hardware, software, tools, config)
 - Projects they work on
 - Preferences and working style
+- Health conditions and physical limitations
 - Solved problems and outcomes
 
 EXAMPLES of good extractions:
@@ -231,7 +247,13 @@ EXAMPLES of good extractions:
 
 DO NOT skip personal facts just because they seem unrelated to tech. Family, origins, education are all important.
 
-DO NOT extract facts already in existing memories (check below).
+DO NOT extract time-bound or transient events — these will become stale and are not worth storing:
+- Calendar events, meetings, appointments (e.g. "Mike has PTO from May 14-16")
+- One-time tasks or reminders
+- Current news or recent events discussed in the session
+- Anything with a specific date that will have passed
+
+DO NOT extract facts already covered by existing memories. Check carefully — if an existing memory says "Ryuko is a dental hygienist who plays piano", do not add "Ryuko is Mike's wife, a dental hygienist who plays piano" as a separate entry. Prefer to update the existing memory than create a near-duplicate.
 
 Existing memories (do not duplicate):
 {existing}
@@ -246,7 +268,7 @@ Return ONLY a JSON array. Each object:
   "importance": 0.0-1.0
 }}
 
-Importance guide: identity/family = 0.9, location/education = 0.8, technical facts = 0.7, preferences = 0.8, outcomes = 0.6
+Importance guide: identity/family = 0.9, location/education = 0.8, technical facts = 0.7, preferences = 0.8, health = 0.9, outcomes = 0.6
 
 If nothing new to extract, return [].
 Return ONLY the JSON array. No preamble, no markdown fences."""
@@ -301,16 +323,31 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
             r[0].lower().strip()
             for r in conn.execute("SELECT content FROM memories").fetchall()
         }
+        # Load embeddings for semantic near-duplicate detection
+        existing_embeddings = conn.execute(
+            "SELECT content, embedding FROM memories WHERE embedding IS NOT NULL"
+        ).fetchall()
+
         for m in memories:
             content = m.get("content", "").strip()
             if not content or len(content) < 10:
                 continue
+            # Exact match check
             if content.lower().strip() in existing_contents:
                 logger.debug(f"🧠 Skipping duplicate memory: {content[:60]}")
                 continue
             importance = float(m.get("importance", 0.5))
             importance = max(0.0, min(1.0, importance))
             embedding = _embed(content)
+            # Semantic near-duplicate check (catches typo variants and rephrasing)
+            if embedding:
+                is_near_dup = any(
+                    existing_emb and cosine_similarity(embedding, existing_emb) > 0.92
+                    for _, existing_emb in existing_embeddings
+                )
+                if is_near_dup:
+                    logger.debug(f"🧠 Skipping near-duplicate memory (semantic): {content[:60]}")
+                    continue
             conn.execute(
                 """INSERT INTO memories
                    (tier, content, embedding, source_session, importance, created_at)
@@ -318,6 +355,8 @@ async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
                 (content, embedding, str(session_id), importance, now)
             )
             existing_contents.add(content.lower().strip())
+            if embedding:
+                existing_embeddings.append((content, embedding))
             written += 1
 
     _mark_consolidated(session_id)
