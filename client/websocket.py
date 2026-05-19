@@ -551,20 +551,31 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                 elif messages and messages[-1]["role"] == "assistant":
                     if session_id not in PROCESSING_SESSIONS:
-                        # Task completed while socket was dead — replay the last response
-                        # to the newly connected socket so the UI shows it.
-                        # This covers both: (a) task finished before reconnect, and
-                        # (b) task finished just after reconnect but broadcast was missed.
-                        last_msg = messages[-1]
-                        last_text = last_msg.get("text") or last_msg.get("content", "")
-                        if last_text:
-                            logger.info(f"🔁 Session {session_id}: replaying last assistant message to reconnected socket")
-                            await websocket.send(json.dumps({
-                                "type": "assistant_message",
-                                "text": last_text,
-                                "model": last_msg.get("model", "system")
-                            }))
-                            await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                        # Only replay if the task finished while this socket was dead —
+                        # i.e. the session was actively processing at some point after
+                        # the previous disconnect. We detect this by checking whether the
+                        # last message was produced AFTER the socket connected. Since we
+                        # can't know the exact socket connect time server-side without
+                        # extra tracking, we use a conservative heuristic: only replay
+                        # if the session has a completed task recorded (SESSION_TASKS),
+                        # meaning we produced the response during THIS server run.
+                        # If there's no task record, the response was from a previous
+                        # server run and the UI already has it — don't replay.
+                        has_completed_task = (
+                            session_id in SESSION_TASKS and
+                            SESSION_TASKS[session_id].done()
+                        )
+                        if has_completed_task:
+                            last_msg = messages[-1]
+                            last_text = last_msg.get("text") or last_msg.get("content", "")
+                            if last_text:
+                                logger.info(f"🔁 Session {session_id}: replaying last assistant message to reconnected socket")
+                                await websocket.send(json.dumps({
+                                    "type": "assistant_message",
+                                    "text": last_text,
+                                    "model": last_msg.get("model", "system")
+                                }))
+                                await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                 continue
 
             if data.get("type") == "new_session":
