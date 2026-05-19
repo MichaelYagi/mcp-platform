@@ -736,13 +736,18 @@ def build_intent_catalog() -> list[dict]:
         # Build a word-boundary pattern from the trigger list.
         # Short single words → \bword\b
         # Multi-word phrases → literal match (no word boundary needed)
+        # Triggers prefixed with "r:" → raw regex (not escaped)
         parts = []
         for t in triggers:
-            escaped = re.escape(t)
-            if " " in t:
-                parts.append(escaped)
+            if t.startswith("r:"):
+                # Raw regex trigger — use as-is after stripping the prefix
+                parts.append(t[2:])
             else:
-                parts.append(rf"\b{escaped}\b")
+                escaped = re.escape(t)
+                if " " in t:
+                    parts.append(escaped)
+                else:
+                    parts.append(rf"\b{escaped}\b")
         pattern = "|".join(parts)
 
         entry = {

@@ -24,14 +24,12 @@ from tools.tool_control import check_tool_enabled
 try:
     from client.tool_meta import tool_meta
 except Exception:
-    # Fallback stub — metadata is attached but not used in server subprocess
     def tool_meta(**kwargs):
         def decorator(fn): return fn
         return decorator
 
 from mcp.server.fastmcp import FastMCP
 
-# ── Failure taxonomy ──────────────────────────────────────────────────────────
 try:
     from metrics import FailureKind, MCPToolError, JsonFormatter
 except ImportError:
@@ -87,10 +85,6 @@ _SHASHIN_HEADERS = {
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Internal helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _resolve_file_path(file_path: str) -> Path:
     win_match = re.match(r'^([A-Za-z]):[/\\](.*)', file_path)
     if win_match:
@@ -111,7 +105,6 @@ def _fetch_image_as_base64(image_url: str) -> dict:
         resp = requests.get(image_url, headers=headers, timeout=30)
         resp.raise_for_status()
 
-        # Reject non-image responses (e.g. HTML viewer pages, JSON error pages)
         content_type = resp.headers.get("content-type", "").lower()
         if content_type and not any(t in content_type for t in
                                     ("image/", "application/octet-stream")):
@@ -176,13 +169,9 @@ def _shashin_get(path: str) -> dict:
         return {"ok": False, "error": str(exc)}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# analyze_image_tool
-# ─────────────────────────────────────────────────────────────────────────────
-
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","vision","ai"],triggers=["analyze image","describe image","what is in this image","look at image","what's in this image","image analysis","vision analysis","what does this image show"],idempotent=True,template='use analyze_image_tool: [image_url=""] [image_file_path=""] [image_base64=""] [query=""]')
+@tool_meta(tags=["read","vision","ai"],triggers=["analyze image","describe image","image analysis","vision analysis","r:what(?: is|.?s) in (this|the) image","r:(look at|analyze|describe) (this |the )?image","r:what does this image (show|contain|depict)"],idempotent=True,template='use analyze_image_tool: [image_url=""] [image_file_path=""] [image_base64=""] [query=""]')
 def analyze_image_tool(
     image_url: Optional[str] = None,
     image_file_path: Optional[str] = None,
@@ -232,13 +221,9 @@ def analyze_image_tool(
     return json.dumps(result, indent=2)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# shashin_search_tool
-# ─────────────────────────────────────────────────────────────────────────────
-
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","search","media"],triggers=["find photos","search photos","my photos","show photos","photos of","search gallery","find images","photos from","search shashin"],idempotent=True,template='use shashin_search_tool: term="" [page=""]',text_fields=["tags"],intent_category="shashin_search")
+@tool_meta(tags=["read","search","media"],triggers=["find photos","search photos","my photos","show photos","search gallery","search shashin","r:photos? (of|from|with)","r:find (images?|pictures?) (of|from)"],idempotent=True,template='use shashin_search_tool: term="" [page=""]',text_fields=["tags"],intent_category="shashin_search")
 def shashin_search_tool(
     term: str,
     page: Optional[int] = 0,
@@ -319,13 +304,9 @@ def shashin_search_tool(
     return "\n".join(lines)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# shashin_random_tool
-# ─────────────────────────────────────────────────────────────────────────────
-
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","media"],triggers=["random photo","surprise me","show me a random"],idempotent=False,template="use shashin_random_tool",intent_category="shashin_random")
+@tool_meta(tags=["read","media"],triggers=["random photo","surprise me","r:show me a random (photo|image|picture)"],idempotent=False,template="use shashin_random_tool",intent_category="shashin_random")
 def shashin_random_tool() -> str:
     """
     Fetch metadata for a random image from the Shashin gallery.
@@ -370,13 +351,9 @@ def shashin_random_tool() -> str:
     }, indent=2)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# shashin_analyze_tool
-# ─────────────────────────────────────────────────────────────────────────────
-
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","vision","media","ai"],triggers=["analyze photo","describe photo","what is in this photo","what's in this photo","photo details","analyze shashin photo"],idempotent=True,template='use shashin_analyze_tool: image_id="" [query=""] [use_thumbnail=""]',intent_category="shashin_analyze")
+@tool_meta(tags=["read","vision","media","ai"],triggers=["analyze photo","describe photo","photo details","analyze shashin photo","r:what(?: is|.?s) in (this|the) photo","r:what does this photo (show|contain|depict)"],idempotent=True,template='use shashin_analyze_tool: image_id="" [query=""] [use_thumbnail=""]',intent_category="shashin_analyze")
 def shashin_analyze_tool(
     image_id: str,
     use_thumbnail: bool = True,
@@ -409,7 +386,6 @@ def shashin_analyze_tool(
         body = meta_result["data"]
         meta = body.get("metadata", {})
     else:
-        # Non-fatal — return what we have without metadata
         logger.warning(f"[shashin_analyze_tool] Metadata fetch failed: {meta_result['error']}")
         meta = {}
 
@@ -432,13 +408,9 @@ def shashin_analyze_tool(
     return json.dumps(result, indent=2)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# web_image_search_tool
-# ─────────────────────────────────────────────────────────────────────────────
-
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","what does it look like","find image of","image search","find a photo of","show picture of","search for image","find photo"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search")
+@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","find image of","image search","find a photo of","show picture of","search for image","find photo","show me what","r:what (does|do) (he|she|it|they|[\\w\\s]+?) look like( today)?"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search")
 def web_image_search_tool(query: str) -> str:
     """
     Search the web for images using Google Images (via Serper).
@@ -522,13 +494,9 @@ def web_image_search_tool(query: str) -> str:
     return "\n".join(lines)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# generate_image_tool
-# ─────────────────────────────────────────────────────────────────────────────
-
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","draw","image of","generate a picture","ai image","create artwork","make art","illustrate","make a picture"],idempotent=False,template='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]')
+@tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","ai image","create artwork","make art","r:(generate|create|make|draw|illustrate) (a |an )?(picture|image|artwork|illustration|photo) of","r:draw (me |a |an )?"],idempotent=False,template='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]')
 def generate_image_tool(
     prompt: str,
     width: Optional[int] = 1024,
@@ -622,10 +590,6 @@ def generate_image_tool(
                            {"tool": "generate_image_tool"})
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Skills plumbing
-# ─────────────────────────────────────────────────────────────────────────────
-
 skill_registry = None
 
 @mcp.tool()
@@ -634,20 +598,12 @@ def list_capabilities(filter_tags: str | None = None) -> str:
     """
     Return the full capability schema for every tool on this server.
 
-    Agents call this to discover what this server can do, what parameters
-    each tool accepts, and what constraints apply — without needing the
-    client-side CapabilityRegistry.
-
     Args:
         filter_tags (str, optional): Comma-separated tags to filter by
                                      e.g. "read,search" or "write"
 
     Returns:
-        JSON string with:
-        - server: Server name
-        - tools: Array of tool capability objects, each with:
-            - name, description, input_schema, tags, rate_limit,
-              idempotent, example
+        JSON string with server name, tools array, and total count.
     """
     logger.info(f"🛠  list_capabilities called (filter_tags={filter_tags})")
 
@@ -670,8 +626,6 @@ def list_capabilities(filter_tags: str | None = None) -> str:
         if not callable(_obj) or _name.startswith("_") or _name in _INTERNAL_TOOLS:
             continue
         if not hasattr(_obj, "__tool_meta__") and not hasattr(_obj, "name"):
-            # Only include decorated MCP tools — they have __wrapped__ or .name
-            # Fall back to checking if the function is in the mcp tool registry
             _tool_fn = getattr(_current, _name, None)
             if not (hasattr(_tool_fn, "__tool_meta__") or hasattr(_tool_fn, "_mcp_tool")):
                 continue
@@ -683,7 +637,6 @@ def list_capabilities(filter_tags: str | None = None) -> str:
         if wanted_tags and not (wanted_tags & set(tags)):
             continue
 
-        # Build minimal ParamSchema list inline (no full tool object available)
         import inspect as _inspect
         sig = _inspect.signature(_obj)
         params = []
@@ -762,3 +715,4 @@ if __name__ == "__main__":
     logger.info(f"🛠  {len(server_tools)} tools: {', '.join(server_tools)}")
     logger.info(f"🛠  {len(skill_registry.skills)} skills loaded")
     mcp.run(transport="stdio")
+HEREDOC
