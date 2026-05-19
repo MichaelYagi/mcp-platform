@@ -274,6 +274,116 @@ If nothing new to extract, return [].
 Return ONLY the JSON array. No preamble, no markdown fences."""
 
 
+# ── Technical decision extraction prompt ──────────────────────────────────────
+
+_DECISION_PROMPT = """You are a technical session summarizer. Extract the key technical decisions, fixes, and outcomes from this conversation.
+
+Focus on things that would be useful to know in a future session working on the same codebase:
+- Bugs that were fixed (what was wrong, what file, what the fix was)
+- Features that were added (what was added, where, how it works)
+- Architectural decisions (why X was chosen over Y)
+- Key file paths and what they do
+- Configuration changes
+- Patterns or approaches established
+
+Each entry should be a self-contained fact that makes sense without the full conversation context.
+
+EXAMPLES of good extractions:
+- "Fixed stale year in search queries: langgraph.py confidence-check prompt now says do not include years"
+- "Added broadcast_proactive_result() to client/websocket.py for scheduled job delivery to UI"
+- "Per-query memory injection added in websocket.py before run_agent_fn call using inject_into_system_prompt()"
+- "Cross-encoder now loads eagerly at startup in tools/rag/rag_search.py to avoid per-query load overhead"
+- "websocket.py unrecognised colon commands now return error immediately instead of falling through to LLM"
+
+DO NOT extract:
+- General conversation or questions
+- Things that were discussed but not actually implemented
+- Opinions or recommendations that weren't acted on
+- Personal facts about the user (those go in memory)
+
+Transcript:
+{transcript}
+
+Return ONLY a JSON array of strings. Each string is one decision/outcome (max 200 chars each).
+If there are no significant technical decisions, return [].
+Return ONLY the JSON array. No preamble, no markdown fences."""
+
+
+async def consolidate_decisions(session_id: str, llm_fn, session_manager=None) -> int:
+    """
+    Extract technical decisions and project context from a session and store
+    them in the RAG chunks table so future sessions can search for them.
+
+    Returns number of decisions written.
+    """
+    _ensure_db()
+
+    # Reuse the same transcript fetch as memory consolidation
+    transcript = _get_transcript(session_id, session_manager)
+    if not transcript or len(transcript) < 200:
+        return 0
+
+    # Only extract if transcript looks technical (has code/file references)
+    technical_signals = [".py", ".js", ".css", ".html", "def ", "class ", "import ",
+                         "fix", "added", "update", "error", "bug", "function"]
+    if not any(sig in transcript.lower() for sig in technical_signals):
+        logger.debug(f"🧠 Session {session_id} has no technical content — skipping decision extraction")
+        return 0
+
+    prompt = _DECISION_PROMPT.format(transcript=transcript[:6000])
+
+    try:
+        raw = await llm_fn(
+            "You are a technical session summarizer. Return only valid JSON.",
+            prompt
+        )
+    except Exception as e:
+        logger.warning(f"🧠 Decision extraction LLM call failed: {e}")
+        return 0
+
+    # Parse decisions
+    try:
+        text = raw.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```[a-z]*\n?", "", text)
+            text = re.sub(r"\n?```$", "", text)
+        decisions = json.loads(text)
+        if not isinstance(decisions, list):
+            return 0
+        decisions = [d.strip() for d in decisions if isinstance(d, str) and len(d.strip()) > 10]
+    except Exception as e:
+        logger.warning(f"🧠 Decision extraction parse failed: {e}")
+        return 0
+
+    if not decisions:
+        return 0
+
+    # Store decisions in sessions.db chunks table as a single RAG document
+    # Source format: session_decisions_{session_id} for easy identification/deletion
+    source = f"session_decisions_{session_id}"
+    from datetime import date as _date
+    date_str = _date.today().isoformat()
+    content = f"[Session {session_id} — {date_str}]\n" + "\n".join(f"- {d}" for d in decisions)
+
+    try:
+        embedding = _embed(content)
+        with sqlite3.connect(SESSIONS_DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            # Delete any previous decision entry for this session
+            conn.execute("DELETE FROM chunks WHERE source = ?", (source,))
+            conn.execute(
+                """INSERT INTO chunks (chunk_text, embedding, source, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                (content, embedding, source, datetime.now(timezone.utc).isoformat())
+            )
+            conn.commit()
+        logger.info(f"🧠 Stored {len(decisions)} technical decision(s) for session {session_id}")
+        return len(decisions)
+    except Exception as e:
+        logger.warning(f"🧠 Failed to store decisions for session {session_id}: {e}")
+        return 0
+
+
 # ── Core consolidation ────────────────────────────────────────────────────────
 
 async def consolidate(session_id: str, llm_fn, session_manager=None) -> int:
@@ -619,6 +729,7 @@ class InactivityWatcher:
         self._consolidating.add(sid)
         try:
             await consolidate(sid, self._llm_fn, self._session_manager)
+            await consolidate_decisions(sid, self._llm_fn, self._session_manager)
         finally:
             self._consolidating.discard(sid)
 
