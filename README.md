@@ -1,4 +1,4 @@
-# MCP Platform
+# MCP Platform [![Tests](https://github.com/MichaelYagi/mcp-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/MichaelYagi/mcp-platform/actions/workflows/ci.yml)
 
 Local MCP runtime with multi-agent orchestration, distributed tool servers, ML-powered media recommendations, persistent cross-session memory, and a proactive agent scheduler.
 
