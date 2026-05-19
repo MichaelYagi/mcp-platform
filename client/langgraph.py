@@ -2033,22 +2033,37 @@ def create_langgraph_agent(llm_with_tools, tools):
             all_tools = list(state.get("tools", {}).values())
             _cap_reg = state.get("capability_registry")
             if state.get("rag_fallback"):
-                # RAG already failed — skip trigger matching and give the LLM all tools
-                logger.info("🌐 rag_fallback=True — skipping trigger matching, binding all tools")
-                llm_to_use = base_llm.bind_tools(all_tools)
-                pattern_name = "rag_fallback"
-                # Inject a topic reminder so the LLM knows what it was discussing
-                _last_ai = next(
-                    (m for m in reversed(messages) if isinstance(m, AIMessage) and m.content),
-                    None
-                )
-                if _last_ai and user_message:
-                    _topic_hint = HumanMessage(content=(
-                        f"[Context: the conversation so far covers the following topic — "
-                        f"{_last_ai.content[:300]}... — "
-                        f"Now answer this follow-up using a tool if needed: {user_message}]"
-                    ))
-                    messages = list(messages) + [_topic_hint]
+                # RAG already failed — run trigger matching normally but default to
+                # external (web search) tools if nothing specific matches.
+                # Binding all 100+ tools causes small models to pick wrong tools.
+                logger.info("🌐 rag_fallback=True — using trigger matching with external fallback")
+                _matched_tags = []
+                _matched_tools = []
+                _matched_pattern = None
+                if _cap_reg:
+                    try:
+                        _match = _cap_reg.classify(user_message)
+                        if _match:
+                            _matched_tags = _match.get("tags", [])
+                            _matched_tools = _match.get("tools", [])
+                            _matched_pattern = _match.get("name")
+                    except Exception:
+                        pass
+                if _matched_tools:
+                    llm_to_use = base_llm.bind_tools(_matched_tools)
+                    pattern_name = _matched_pattern or "rag_fallback_matched"
+                    logger.info(f"🌐 rag_fallback trigger match: {pattern_name}, {len(_matched_tools)} tools")
+                else:
+                    # No trigger match — default to external tools (web search)
+                    _external_tools = [
+                        t for t in all_tools
+                        if hasattr(t, "metadata") and "external" in (t.metadata.get("tags") or [])
+                    ]
+                    if not _external_tools:
+                        _external_tools = all_tools
+                    llm_to_use = base_llm.bind_tools(_external_tools)
+                    pattern_name = "rag_fallback_external"
+                    logger.info(f"🌐 rag_fallback no trigger match — bound {len(_external_tools)} external tools")
             elif state.get("context_sufficient"):
                 # Classifier determined context/memory is sufficient — no tools needed.
                 # Re-inject memory block as HumanMessage so the model attends to it.
