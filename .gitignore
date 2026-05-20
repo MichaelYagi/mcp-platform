@@ -40,3 +40,6 @@ test.py
 /.coverage
 /node_modules/
 /tests/js-results/
+/tests/unit/tests/
+/tests/integration/tests/
+/tests/e2e/tests/
