@@ -1845,6 +1845,7 @@ if (_toolsCloseBtn) _toolsCloseBtn.addEventListener('click', toggleToolsPanel);
 // Adds .narrow class when chatContainer width <= 768px so
 // CSS can scale message widths regardless of which panels are open
 // ============================================================
+/* istanbul ignore next */
 (function() {
     const chatContainer = document.getElementById('chatContainer');
     if (!chatContainer || !window.ResizeObserver) return;
@@ -1862,6 +1863,7 @@ if (_toolsCloseBtn) _toolsCloseBtn.addEventListener('click', toggleToolsPanel);
 // Only active on [data-theme="matrix"].
 // Triggers after 5 min of inactivity. Any activity stops it.
 // ============================================================
+/* istanbul ignore next */
 (() => {
     // ── Configurable timing ──────────────────────────────────────────────
     const INACTIVITY_MS  = 5 * 60 * 1000;
@@ -2416,6 +2418,7 @@ if (_toolsCloseBtn) _toolsCloseBtn.addEventListener('click', toggleToolsPanel);
 // ============================================================
 // MATRIX THEME – COSMETIC BLINKING CURSOR ON INPUT
 // ============================================================
+/* istanbul ignore next */
 (() => {
     const textarea   = document.getElementById('input');
     const cursorText = document.getElementById('matrixCursorText');

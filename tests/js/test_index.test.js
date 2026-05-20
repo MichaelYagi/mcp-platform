@@ -265,3 +265,137 @@ describe('toggleLogFilter (DOM)', () => {
         expect(document.querySelector('.filter-btn[data-level="WARNING"]').classList.contains('active')).toBe(true);
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// applyTheme (DOM)
+// ═══════════════════════════════════════════════════════════════════
+
+describe('applyTheme', () => {
+    test('sets data-theme attribute', () => {
+        ui.applyTheme('tron');
+        expect(document.documentElement.getAttribute('data-theme')).toBe('tron');
+    });
+    test('persists to localStorage', () => {
+        ui.applyTheme('dragonball');
+        expect(localStorage.getItem('mcp_theme')).toBe('dragonball');
+    });
+    test('matrix sets border-radius 0 on chat images', () => {
+        const img = document.createElement('img');
+        document.getElementById('chat').appendChild(img);
+        ui.applyTheme('matrix');
+        expect(img.style.borderRadius).toBe('0');
+    });
+    test('non-matrix sets border-radius 6px on chat images', () => {
+        const img = document.createElement('img');
+        document.getElementById('chat').appendChild(img);
+        ui.applyTheme('tron');
+        expect(img.style.borderRadius).toBe('6px');
+    });
+    test('matrix sets border-radius 0 on copy buttons', () => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        document.getElementById('chat').appendChild(btn);
+        ui.applyTheme('matrix');
+        expect(btn.style.borderRadius).toBe('0');
+    });
+    test('non-matrix sets border-radius 4px on copy buttons', () => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        document.getElementById('chat').appendChild(btn);
+        ui.applyTheme('default');
+        expect(btn.style.borderRadius).toBe('4px');
+    });
+    test('does not throw on unknown theme', () => {
+        expect(() => ui.applyTheme('nonexistent')).not.toThrow();
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// discoverThemes
+// ═══════════════════════════════════════════════════════════════════
+
+describe('discoverThemes', () => {
+    test('returns an array', () => {
+        expect(Array.isArray(ui.discoverThemes())).toBe(true);
+    });
+    test('returns at least one entry', () => {
+        expect(ui.discoverThemes().length).toBeGreaterThan(0);
+    });
+    test('contains default when css var not set', () => {
+        expect(ui.discoverThemes()).toContain('default');
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// updateSystemStats (DOM)
+// ═══════════════════════════════════════════════════════════════════
+
+describe('updateSystemStats', () => {
+    test('updates cpu percent', () => {
+        ui.updateSystemStats({ cpu: { usage_percent: 42, frequency_ghz: 3.6 } });
+        expect(document.getElementById('cpuPercent').textContent).toBe('42');
+    });
+    test('updates cpu frequency', () => {
+        ui.updateSystemStats({ cpu: { usage_percent: 10, frequency_ghz: 3.612 } });
+        expect(document.getElementById('cpuFreq').textContent).toBe('3.61');
+    });
+    test('updates memory percent', () => {
+        ui.updateSystemStats({ memory: { percent: 55, used_gb: 8.1, total_gb: 16.0 } });
+        expect(document.getElementById('memPercent').textContent).toBe('55');
+    });
+    test('updates memory used and total', () => {
+        ui.updateSystemStats({ memory: { percent: 40, used_gb: 6.5, total_gb: 32.0 } });
+        expect(document.getElementById('memUsed').textContent).toBe('6.5');
+        expect(document.getElementById('memTotal').textContent).toBe('32.0');
+    });
+    test('updates gpu percent', () => {
+        ui.updateSystemStats({ gpu: { usage_percent: 80, temperature_c: 65, memory_used_mb: 3000, memory_total_mb: 12000 } });
+        expect(document.getElementById('gpuPercent').textContent).toBe('80');
+    });
+    test('updates gpu temperature', () => {
+        ui.updateSystemStats({ gpu: { usage_percent: 70, temperature_c: 72, memory_used_mb: 4000, memory_total_mb: 12000 } });
+        expect(document.getElementById('gpuTemp').textContent).toBe('72');
+    });
+    test('updates gpu memory', () => {
+        ui.updateSystemStats({ gpu: { usage_percent: 50, temperature_c: 60, memory_used_mb: 3072, memory_total_mb: 12288 } });
+        expect(document.getElementById('gpuMemory').textContent).toBe('3072/12288');
+    });
+    test('handles empty object without throwing', () => {
+        expect(() => ui.updateSystemStats({})).not.toThrow();
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// addMessage — additional branch coverage
+// ═══════════════════════════════════════════════════════════════════
+
+describe('addMessage additional branches', () => {
+    test('imageB64 creates img with data uri', () => {
+        ui.addMessage('', 'assistant', false, false, null, null, 'iVBORw0KGgo=');
+        expect(document.querySelector('img').src).toContain('data:image/jpeg;base64,');
+    });
+    test('assistant with timestamp renders timestamp', () => {
+        ui.addMessage('hi', 'assistant', false, false, null, '2026-01-15T12:00:00Z');
+        expect(document.querySelector('.msg-timestamp').textContent.length).toBeGreaterThan(0);
+    });
+    test('messageId set on assistant wrapper', () => {
+        ui.addMessage('hi', 'assistant', false, false, null, null, null, null, 42);
+        expect(document.querySelector('[data-chat-message-id="42"]')).not.toBeNull();
+    });
+    test('direct-answer model shows as MCP', () => {
+        ui.addMessage('hi', 'assistant', false, false, 'direct-answer');
+        expect(document.querySelector('.msg-model').textContent).toBe('MCP');
+    });
+    test('mcp error model shows as MCP', () => {
+        ui.addMessage('hi', 'assistant', false, false, 'mcp error');
+        expect(document.querySelector('.msg-model').textContent).toBe('MCP');
+    });
+    test('image and text both rendered', () => {
+        ui.addMessage('caption', 'assistant', false, false, null, null, null, 'https://example.com/pic.jpg');
+        expect(document.querySelector('img')).not.toBeNull();
+        expect(document.querySelector('.msg-wrapper').textContent).toContain('caption');
+    });
+});
