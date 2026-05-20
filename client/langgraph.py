@@ -2437,11 +2437,12 @@ def create_langgraph_agent(llm_with_tools, tools):
                             logger.warning(f"[LangGraph] ⚠️ Confidence check failed: {_cc_err}")
 
                 if _is_hedging:
-                    logger.info("[LangGraph] 🔍 Low confidence detected — attempting web search fallback")
-                    _search_client = get_search_client()
-                    if _search_client.is_available():
+                    logger.info("[LangGraph] 🔍 Low confidence detected — attempting web search fallback via web_search_tool")
+                    # Use web_search_tool from the MCP server instead of the Ollama search client
+                    # to avoid rate limits and reuse the same search infrastructure as normal queries.
+                    _ws_tool = state.get("tools", {}).get("web_search_tool")
+                    if _ws_tool:
                         try:
-                            # Generate a proper search query rather than using the raw user message
                             _recent_ctx = "\n".join(
                                 f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.content[:200]}"
                                 for m in messages[-6:]
@@ -2464,12 +2465,13 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 logger.info(f"[LangGraph] 🔍 Generated search query: {_search_query}")
                             except Exception:
                                 _search_query = user_message
-                            _search_result = await _search_client.search(_search_query)
-                            if _search_result.get("success") and _search_result.get("results"):
+                            _tool_result = await _ws_tool.ainvoke({"query": _search_query})
+                            if _tool_result:
                                 logger.info("[LangGraph] ✅ Web search fallback succeeded — retrying with context")
-                                _augmented = WEB_SEARCH_WITH_QUESTION.format(
-                                    search_context=_search_result["results"],
-                                    user_message=user_message,
+                                _augmented = (
+                                    f"Web search results for '{_search_query}':\n\n"
+                                    f"{_tool_result}\n\n"
+                                    f"Using the above search results, answer this question: {user_message}"
                                 )
                                 response = await llm_ainvoke(base_llm,
                                     messages + [HumanMessage(content=_augmented)]
@@ -2480,7 +2482,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                         except Exception as _hedge_err:
                             logger.warning(f"[LangGraph] ⚠️ Web search fallback failed: {_hedge_err}")
                     else:
-                        logger.warning("[LangGraph] ⚠️ Web search unavailable for hedge fallback")
+                        logger.warning("[LangGraph] ⚠️ web_search_tool not available for confidence fallback")
 
             # Repetition detection — truncate if the LLM got stuck in a loop
             if response.content and len(response.content) > 500:
