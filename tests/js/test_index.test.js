@@ -178,15 +178,15 @@ describe('Favorites', () => {
 
 describe('getToolPrompt', () => {
     test('returns example when available', () => {
-        ui.buildToolPrompts([{ name: 'get_weather', example: 'use get_weather: city="London"' }]);
+        ui.buildToolPrompts([{ name: 'get_weather', template: 'use get_weather: city="London"' }]);
         expect(ui.getToolPrompt('get_weather', [])).toBe('use get_weather: city="London"');
     });
-    test('generates from params when no example', () => {
+    test('generates from params when no template', () => {
         ui.buildToolPrompts([]);
         expect(ui.getToolPrompt('my_tool', [{ name: 'query' }, { name: 'limit' }])).toBe('use my_tool: query="" limit=""');
     });
-    test('bare use command when no params',  () => { ui.buildToolPrompts([]); expect(ui.getToolPrompt('simple', [])).toBe('use simple'); });
-    test('ignores tools without example',    () => { ui.buildToolPrompts([{ name: 'no_ex' }]); expect(ui.getToolPrompt('no_ex', [])).toBe('use no_ex'); });
+    test('bare use command when no params',    () => { ui.buildToolPrompts([]); expect(ui.getToolPrompt('simple', [])).toBe('use simple'); });
+    test('ignores tools without template',     () => { ui.buildToolPrompts([{ name: 'no_ex' }]); expect(ui.getToolPrompt('no_ex', [])).toBe('use no_ex'); });
 });
 
 
