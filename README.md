@@ -127,6 +127,7 @@ SHASHIN_BASE_URL=http://localhost:6624/
 SHASHIN_API_KEY=your_key_here
 SERPER_API_KEY=your_key_here
 OLLAMA_TOKEN=your_token_here
+LANGSEARCH_API_KEY=your_key_here   # fallback search when Ollama weekly limit is reached
 
 # === A2A Protocol ===
 A2A_ENDPOINTS=http://localhost:8010
@@ -171,7 +172,8 @@ SERPER_API_KEY=<key>
 | Gmail + Google Calendar | — | One-time Google OAuth setup |
 | RAG ingestion & search | — | Ollama running + `bge-large` pulled |
 | Plex media library | `PLEX_URL`, `PLEX_TOKEN` | Plex Media Server running |
-| Ollama web search | `OLLAMA_TOKEN` | Ollama account + API key |
+| Web search (primary) | `OLLAMA_TOKEN` | Ollama account + API key |
+| Web search (fallback) | `LANGSEARCH_API_KEY` | LangSearch account — [dashboard](https://langsearch.com/dashboard). Used automatically when Ollama's weekly limit is reached or returns empty. |
 | Image search | `SERPER_API_KEY` | Serper account + API key |
 | AI image generation | — | Free via Pollinations.ai — no key required |
 | Trilium notes | `TRILIUM_URL`, `TRILIUM_TOKEN` | Trilium server running |
@@ -780,7 +782,13 @@ Using web_image_search_tool, show me a red panda
 netstat -an | grep LISTEN   # check ports 8765, 8766, 9000
 ```
 
-**Google tools not working:**
+**Web search returning no results / empty responses:**
+- Ollama's free tier has a weekly usage cap — when hit, the API returns HTTP 200 with an empty body
+- The platform automatically falls back to LangSearch when this happens
+- Set `LANGSEARCH_API_KEY` in `.env` to enable the fallback (free account at https://langsearch.com/dashboard)
+- To confirm which provider is being used, check logs for `🔍 Ollama web search` vs `🔍 LangSearch web search`
+
+
 - Confirm `servers/google/token.json` exists — if not, re-run `auth_google.py`
 - Confirm Gmail API and Calendar API are enabled in Google Cloud Console
 - Confirm OAuth app is published to **In Production**
