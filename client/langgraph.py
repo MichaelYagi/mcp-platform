@@ -2452,7 +2452,13 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 from datetime import date as _date
                                 _today = _date.today().strftime("%B %Y")
                                 _query_gen = await llm_ainvoke(base_llm, [
-                                    SystemMessage(content="Reply with only a short web search query (5-10 words). No other text."),
+                                    SystemMessage(content=(
+                                        "Reply with only a web search query. No other text.\n"
+                                        "Rules:\n"
+                                        "- Preserve proper nouns, names, and titles EXACTLY as given\n"
+                                        "- Do NOT paraphrase, abbreviate, or reword titles or names\n"
+                                        "- Keep the query concise but never sacrifice accuracy for brevity"
+                                    )),
                                     HumanMessage(content=(
                                         f"Today is {_today}.\n"
                                         f"Given this conversation:\n{_recent_ctx}\n\n"
