@@ -857,9 +857,12 @@ class TestSchedulingKeywordDetection:
         "check this every hour",
         "run at 7am",
     ])
-    def test_detects_scheduling_requests(self, message):
+    async def test_detects_scheduling_requests(self, message):
         from client.proactive_agent import looks_like_scheduling_request
-        assert looks_like_scheduling_request(message) is True
+        # Mock llm_fn to return "YES" for scheduling requests
+        async def _yes_llm(system, user): return "YES"
+        result = await looks_like_scheduling_request(message, llm_fn=_yes_llm)
+        assert result is True
 
     @pytest.mark.parametrize("message", [
         "what's the weather today?",
@@ -869,9 +872,23 @@ class TestSchedulingKeywordDetection:
         ":jobs",
         ":memory",
     ])
-    def test_does_not_flag_normal_messages(self, message):
+    async def test_does_not_flag_normal_messages(self, message):
         from client.proactive_agent import looks_like_scheduling_request
-        assert looks_like_scheduling_request(message) is False
+        # Mock llm_fn to return "NO" for non-scheduling messages
+        async def _no_llm(system, user): return "NO"
+        result = await looks_like_scheduling_request(message, llm_fn=_no_llm)
+        assert result is False
+
+    async def test_returns_false_without_llm_fn(self):
+        from client.proactive_agent import looks_like_scheduling_request
+        result = await looks_like_scheduling_request("run at 7am", llm_fn=None)
+        assert result is False
+
+    async def test_returns_false_on_llm_error(self):
+        from client.proactive_agent import looks_like_scheduling_request
+        async def _failing_llm(system, user): raise RuntimeError("LLM error")
+        result = await looks_like_scheduling_request("run at 7am", llm_fn=_failing_llm)
+        assert result is False
 
 
 # ═══════════════════════════════════════════════════════════════════
