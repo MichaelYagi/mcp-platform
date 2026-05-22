@@ -1387,3 +1387,259 @@ class TestManualConsolidateClearsFlag:
         _ensure_db()
         result = handle_memory_command(":memory consolidate")
         assert "session" in result.lower() or "id" in result.lower()
+
+# ═══════════════════════════════════════════════════════════════════
+# find_job_by_label — numeric ID lookup
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestFindJobByNumericId:
+
+    def test_find_by_numeric_id_string(self, patched_scheduler_path):
+        from client.proactive_agent import create_job, find_job_by_label
+        job_id = create_job(label="Daily Briefing", tool="get_day_briefing", cron="0 6 * * *")
+        job = find_job_by_label(str(job_id))
+        assert job is not None
+        assert job["id"] == job_id
+
+    def test_find_by_numeric_id_returns_none_for_missing(self, patched_scheduler_path):
+        from client.proactive_agent import find_job_by_label
+        assert find_job_by_label("9999") is None
+
+    def test_cancel_by_numeric_id(self, patched_scheduler_path):
+        from client.proactive_agent import create_job, handle_jobs_command, get_job
+        job_id = create_job(label="Daily Briefing", tool="get_day_briefing", cron="0 6 * * *")
+        result = handle_jobs_command(f":jobs cancel {job_id}")
+        assert "deleted" in result.lower()
+        assert get_job(job_id) is None
+
+    def test_pause_by_numeric_id(self, patched_scheduler_path):
+        from client.proactive_agent import create_job, handle_jobs_command, get_job
+        job_id = create_job(label="Daily Briefing", tool="get_day_briefing", cron="0 6 * * *")
+        result = handle_jobs_command(f":jobs pause {job_id}")
+        assert "paused" in result.lower()
+        assert get_job(job_id)["enabled"] == 0
+
+    def test_info_by_numeric_id(self, patched_scheduler_path):
+        from client.proactive_agent import create_job, handle_jobs_command
+        job_id = create_job(label="Daily Briefing", tool="get_day_briefing", cron="0 6 * * *")
+        result = handle_jobs_command(f":jobs info {job_id}")
+        assert "get_day_briefing" in result
+
+
+# ═══════════════════════════════════════════════════════════════════
+# _fire_job — llm_prompt post-processing
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestFireJobLlmPrompt:
+
+    @pytest.mark.asyncio
+    async def test_llm_prompt_post_processes_result(self, patched_scheduler_path):
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        execute_fn = AsyncMock(return_value='{"id": "abc", "description": "Sunset in Banff"}')
+        broadcast_fn = AsyncMock()
+        llm_fn = AsyncMock(return_value="A stunning sunset photo taken in Banff.")
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn, llm_fn=llm_fn)
+        job_id = create_job(
+            label="Daily Photo",
+            tool="shashin_random_tool",
+            cron="0 6 * * *",
+            llm_prompt="Write a short commentary about this photo.",
+        )
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        llm_fn.assert_called_once()
+        prompt_arg = llm_fn.call_args[0][0]
+        assert "Write a short commentary" in prompt_arg
+        assert "Sunset in Banff" in prompt_arg
+        call_data = broadcast_fn.call_args[0][0]
+        assert call_data["result"] == "A stunning sunset photo taken in Banff."
+
+    @pytest.mark.asyncio
+    async def test_no_llm_prompt_uses_raw_result(self, patched_scheduler_path):
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        execute_fn = AsyncMock(return_value="raw tool output")
+        broadcast_fn = AsyncMock()
+        llm_fn = AsyncMock(return_value="should not be called")
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn, llm_fn=llm_fn)
+        job_id = create_job(label="Plain", tool="some_tool", cron="0 6 * * *")
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        llm_fn.assert_not_called()
+        assert broadcast_fn.call_args[0][0]["result"] == "raw tool output"
+
+    @pytest.mark.asyncio
+    async def test_llm_fn_failure_falls_back_to_raw(self, patched_scheduler_path):
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        execute_fn = AsyncMock(return_value="raw result")
+        broadcast_fn = AsyncMock()
+        llm_fn = AsyncMock(side_effect=RuntimeError("LLM unavailable"))
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn, llm_fn=llm_fn)
+        job_id = create_job(
+            label="Photo", tool="shashin_random_tool", cron="0 6 * * *",
+            llm_prompt="Describe this photo.",
+        )
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        # Falls back to raw result, doesn't raise
+        assert broadcast_fn.call_args[0][0]["result"] == "raw result"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# _fire_job — session-bound delivery
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestFireJobSessionDelivery:
+
+    @pytest.mark.asyncio
+    async def test_deliver_to_session_saves_to_session_manager(self, patched_scheduler_path):
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        execute_fn = AsyncMock(return_value="briefing result")
+        broadcast_fn = AsyncMock()
+        session_manager = MagicMock()
+        session_manager.add_message = MagicMock(return_value=1)
+        scheduler = AgentScheduler(
+            execute_fn=execute_fn,
+            broadcast_fn=broadcast_fn,
+            session_manager=session_manager,
+        )
+        job_id = create_job(
+            label="Daily Briefing",
+            tool="get_day_briefing",
+            cron="0 6 * * *",
+            session_id=42,
+            deliver_to_session=True,
+        )
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        session_manager.add_message.assert_called_once()
+        args = session_manager.add_message.call_args[0]
+        assert args[0] == 42          # session_id
+        assert args[1] == "assistant" # role
+        assert "briefing result" in args[2]
+
+    @pytest.mark.asyncio
+    async def test_broadcast_delivery_does_not_use_session_manager(self, patched_scheduler_path):
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        execute_fn = AsyncMock(return_value="alert result")
+        broadcast_fn = AsyncMock()
+        session_manager = MagicMock()
+        scheduler = AgentScheduler(
+            execute_fn=execute_fn,
+            broadcast_fn=broadcast_fn,
+            session_manager=session_manager,
+        )
+        # deliver_to_session=False (default) — should broadcast, not save to session
+        job_id = create_job(label="Email Alert", tool="gmail_get_unread", cron="*/5 * * * *")
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        session_manager.add_message.assert_not_called()
+        broadcast_fn.assert_called_once()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# _check_condition — rich JSON context
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestCheckConditionRichContext:
+
+    @pytest.mark.asyncio
+    async def test_json_scalar_key_available(self, patched_scheduler_path):
+        """total_unread from JSON dict is available directly in expression."""
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        import json
+        execute_fn = AsyncMock(side_effect=[
+            json.dumps({"total_unread": 5, "emails": []}),
+            "action result",
+        ])
+        broadcast_fn = AsyncMock()
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
+        job_id = create_job(
+            label="Email check",
+            tool="gmail_get_unread",
+            trigger_type="condition",
+            condition_tool="gmail_get_unread",
+            condition_expr="total_unread > 0",
+            condition_cron="*/5 * * * *",
+        )
+        job = get_job(job_id)
+        await scheduler._check_condition(job)
+        assert broadcast_fn.called
+
+    @pytest.mark.asyncio
+    async def test_len_list_key_available(self, patched_scheduler_path):
+        """len_emails from JSON list field is available in expression."""
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        import json
+        execute_fn = AsyncMock(side_effect=[
+            json.dumps({"total_unread": 3, "emails": ["a", "b", "c"]}),
+            "action result",
+        ])
+        broadcast_fn = AsyncMock()
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
+        job_id = create_job(
+            label="Email check",
+            tool="gmail_get_unread",
+            trigger_type="condition",
+            condition_tool="gmail_get_unread",
+            condition_expr="len_emails > 0",
+            condition_cron="*/5 * * * *",
+        )
+        job = get_job(job_id)
+        await scheduler._check_condition(job)
+        assert broadcast_fn.called
+
+    @pytest.mark.asyncio
+    async def test_zero_unread_does_not_fire(self, patched_scheduler_path):
+        """total_unread=0 means condition is false — no broadcast."""
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        import json
+        execute_fn = AsyncMock(return_value=json.dumps({"total_unread": 0, "emails": []}))
+        broadcast_fn = AsyncMock()
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
+        job_id = create_job(
+            label="Email check",
+            tool="gmail_get_unread",
+            trigger_type="condition",
+            condition_tool="gmail_get_unread",
+            condition_expr="total_unread > 0",
+            condition_cron="*/5 * * * *",
+        )
+        job = get_job(job_id)
+        await scheduler._check_condition(job)
+        assert not broadcast_fn.called
+
+    @pytest.mark.asyncio
+    async def test_result_len_available_for_raw_string(self, patched_scheduler_path):
+        """result_len works for non-JSON tool output."""
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        execute_fn = AsyncMock(side_effect=["some non-empty output", "action"])
+        broadcast_fn = AsyncMock()
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
+        job_id = create_job(
+            label="Raw check",
+            tool="some_tool",
+            trigger_type="condition",
+            condition_tool="some_tool",
+            condition_expr="result_len > 5",
+            condition_cron="*/5 * * * *",
+        )
+        job = get_job(job_id)
+        await scheduler._check_condition(job)
+        assert broadcast_fn.called
+
+    @pytest.mark.asyncio
+    async def test_llm_prompt_stored_on_job(self, patched_scheduler_path):
+        """llm_prompt is persisted and retrievable from the DB."""
+        from client.proactive_agent import create_job, get_job
+        job_id = create_job(
+            label="Photo",
+            tool="shashin_random_tool",
+            cron="0 6 * * *",
+            llm_prompt="Write a short commentary about this photo.",
+        )
+        job = get_job(job_id)
+        assert job["llm_prompt"] == "Write a short commentary about this photo."
