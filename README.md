@@ -691,49 +691,64 @@ Each entry shows:
 
 The platform remembers facts, preferences, and outcomes across sessions. After a session ends (or after 15 minutes of inactivity), the LLM extracts memorable information from the transcript and stores it in `data/memory.db`. On every new session, relevant memories are injected into the system prompt automatically — no re-explaining required.
 
-### Proactive Agent Scheduler
+### Agentic Automation (Proactive Agent Scheduler)
 
-Agents can run on a schedule or when a condition becomes true — without any prompt from you.
+The platform can act autonomously or semi-autonomously — running tools on a schedule, polling for conditions, and involving the LLM to interpret results before surfacing them to you. This is the foundation for things like daily briefings, email monitoring, and eventually fully autonomous workflows.
 
-**Scheduling via natural language:**
+**Just describe what you want:**
 ```
-do a day briefing every day at 5:30am
-run a Gmail summary every weekday at 8am
-alert me when Gmail unread count is over 10
-check the weather every morning at 7am
+show me my daily briefing every day at 6am
+check for new emails every 5 minutes and summarize anything urgent
+show me a random photo from my gallery every morning with a short commentary
+alert me when I have unread emails
+run the weather check every morning at 7am and write a friendly summary
 ```
 
-The platform parses the request, shows you exactly what it understood (tool, schedule, cron expression), and waits for confirmation before writing anything. Ambiguous requests are clarified with a question rather than guessed.
+The LLM classifies whether your message is a scheduling request, parses the intent into a job definition, and presents it for confirmation before saving anything. Ambiguous requests are clarified with a question rather than guessed.
 
 **Two trigger types:**
 
-| Type | How it works |
-|------|-------------|
-| `cron` | Fires at a fixed time — "every day at 5:30am" |
-| `condition` | Polls a check tool on an interval; fires the action tool only when the condition is true |
+| Type | How it works | Example |
+|------|-------------|---------|
+| `cron` | Fires at a fixed time | "every day at 6am" |
+| `condition` | Polls a check tool on an interval; fires only when condition is true | "when I have unread emails" |
+
+**LLM involvement:** Every job can have an `llm_prompt` — an instruction passed to the LLM after the tool runs. Instead of broadcasting the raw tool output, the LLM interprets it first:
+
+- `shashin_random_tool` + *"write a short commentary about this photo including the location and mood"*
+- `gmail_get_unread` + *"summarize these emails and flag anything that needs a reply"*
+- `get_weather_tool` + *"write a friendly morning weather summary"*
+
+**Condition expressions** have access to rich context from the tool's JSON output:
+```
+total_unread > 0       — fires when Gmail has unread emails
+len_results > 0        — fires when a results list is non-empty
+result > 10            — fires when a numeric value exceeds 10
+result_len > 100       — fires when the raw output is non-trivial
+```
 
 **Job management commands:**
 ```
 :jobs                    — list all scheduled jobs
-:jobs pause <label>      — pause a job
+:jobs pause <label>      — pause a job without deleting it
 :jobs enable <label>     — resume a paused job
-:jobs cancel <label>     — delete a job
-:jobs info <label>       — full job detail
+:jobs cancel <label>     — delete a job permanently
+:jobs info <label>       — full job detail including cron and last run
 ```
 
-**New files (drop into `client/`):**
+**Files:**
 - `client/memory_consolidator.py` — memory extraction, storage, injection, and `:memory` commands
-- `client/proactive_agent.py` — scheduler, condition triggers, schedule parser, and `:jobs` commands
+- `client/proactive_agent.py` — scheduler, condition triggers, LLM-based intent parser, and `:jobs` commands
 
 **Required dependency:**
 ```bash
 pip install apscheduler
 ```
 
-**New data files (created automatically on first run):**
+**Data files (created automatically on first run):**
 ```
 data/memory.db      — persistent memory store
-data/scheduler.db   — scheduled jobs store
+data/scheduler.db   — scheduled jobs store (label, tool, cron, llm_prompt, etc.)
 ```
 
 ---
@@ -742,7 +757,7 @@ data/scheduler.db   — scheduled jobs store
 
 ### Intent Patterns
 
-Routing is driven by `triggers` in each tool's `@tool_meta` decorator — no manual pattern editing required.
+Routing is driven by the LLM classifier and `triggers` in each tool's `@tool_meta` decorator — no manual pattern editing required. Triggers support plain strings and `r:` prefixed regex patterns.
 
 **Force a specific tool:**
 ```
@@ -750,7 +765,9 @@ Using shashin_search_tool, find photos of Sam
 Using web_image_search_tool, show me a red panda
 ```
 
-**Conversational bypass:** Queries starting with `"I like..."`, `"yes"`, `"thanks"`, `"write me a poem"` bypass routing — the LLM answers from context with no tools bound.
+**Conversational bypass:** Queries the LLM classifies as conversational (greetings, opinions, creative writing) bypass tool routing entirely — answered from context with no tools bound.
+
+**Scheduling detection:** The LLM determines whether a message is a scheduling/automation request — no keyword lists. If detected, it's routed to the `ScheduleParser` rather than the agent.
 
 ---
 

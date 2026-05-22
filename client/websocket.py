@@ -40,6 +40,7 @@ SYSTEM_MONITOR_CLIENTS = set()
 # Proactive agent singletons — initialised in start_websocket_server()
 _agent_scheduler    = None
 _schedule_parser    = None
+_confirmation_tracker = None
 _inactivity_watcher = None
 # Per-session tracking: set of session_ids currently processing a query.
 # Replaces the single IS_PROCESSING bool which blocked ALL connections
@@ -271,6 +272,99 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 logger.warning(f"⚠️ Direct-answer delivery failed (session {session_id}): {send_err}")
 
             return  # Exit early - don't call LLM
+
+        # ═══════════════════════════════════════════════════════════════
+        # SCHEDULING FLOW — intercept scheduling requests and yes/no
+        # confirmations before they reach the LLM
+        # ═══════════════════════════════════════════════════════════════
+        if _schedule_parser is not None:
+            from client.proactive_agent import (
+                looks_like_scheduling_request, ConfirmationTracker, create_job
+            )
+
+            _session_key = str(session_id) if session_id else "default"
+
+            # Lazy-init the confirmation tracker (module-level singleton)
+            global _confirmation_tracker
+            if "_confirmation_tracker" not in globals() or _confirmation_tracker is None:
+                _confirmation_tracker = ConfirmationTracker()
+
+            pending = _confirmation_tracker.get_pending(_session_key)
+
+            # Check if this is a yes/no response to a pending confirmation
+            if pending is not None and ConfirmationTracker.is_confirmation(prompt):
+                try:
+                    job_id = create_job(
+                        label=pending.label,
+                        tool=pending.tool,
+                        trigger_type=pending.trigger_type,
+                        cron=pending.cron,
+                        tool_args=pending.tool_args,
+                        condition_tool=pending.condition_tool,
+                        condition_expr=pending.condition_expr,
+                        condition_cron=pending.condition_cron,
+                        timezone=pending.timezone,
+                        llm_prompt=pending.llm_prompt,
+                        session_id=int(session_id) if (pending.deliver_to_session and session_id) else None,
+                        deliver_to_session=pending.deliver_to_session,
+                    )
+                    if _agent_scheduler:
+                        _agent_scheduler.add_job(job_id)
+                    _confirmation_tracker.clear(_session_key)
+                    response_text = (
+                        f"✅ Scheduled: **{pending.label}**\n"
+                        f"  Schedule: {pending.human_schedule}\n"
+                        f"  Tool: `{pending.tool}`\n"
+                        f"  Job ID: {job_id}\n\n"
+                        f"Use `:jobs` to manage your scheduled jobs."
+                    )
+                except Exception as sched_err:
+                    logger.error(f"⏰ Failed to create job: {sched_err}")
+                    response_text = f"⚠️ Failed to save the scheduled job: {sched_err}"
+                    _confirmation_tracker.clear(_session_key)
+
+                if session_manager and session_id:
+                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                    session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "direct-answer")
+                await broadcast_message("assistant_message", {
+                    "text": response_text, "multi_agent": False, "a2a": False, "model": "proactive"
+                })
+                await broadcast_message("complete", {"stopped": False})
+                return
+
+            # Check if this is a cancellation of a pending confirmation
+            if pending is not None and prompt.strip().lower() in ("no", "cancel", "n", "nope"):
+                _confirmation_tracker.clear(_session_key)
+                response_text = "Cancelled — nothing was scheduled."
+                await broadcast_message("assistant_message", {
+                    "text": response_text, "multi_agent": False, "a2a": False, "model": "proactive"
+                })
+                await broadcast_message("complete", {"stopped": False})
+                return
+
+            # Check if this looks like a new scheduling request
+            if await looks_like_scheduling_request(prompt, llm_fn=_schedule_parser._llm_fn):
+                logger.info(f"⏰ Scheduling request detected: {prompt[:60]}")
+                try:
+                    result_sc = await _schedule_parser.parse(prompt)
+                    from client.proactive_agent import ScheduleConfirmation, ScheduleClarification
+                    if isinstance(result_sc, ScheduleConfirmation):
+                        _confirmation_tracker.set_pending(_session_key, result_sc)
+                        response_text = result_sc.render()
+                    else:
+                        response_text = result_sc.render()
+                except Exception as parse_err:
+                    logger.error(f"⏰ ScheduleParser failed: {parse_err}")
+                    response_text = "I had trouble parsing that scheduling request. Try: 'Run [tool] every day at [time]'."
+
+                if session_manager and session_id:
+                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
+                    session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "direct-answer")
+                await broadcast_message("assistant_message", {
+                    "text": response_text, "multi_agent": False, "a2a": False, "model": "proactive"
+                })
+                await broadcast_message("complete", {"stopped": False})
+                return
 
         # ═══════════════════════════════════════════════════════════════
         # Normal flow - Run agent (langgraph will preserve SystemMessage)
@@ -1049,6 +1143,14 @@ async def start_websocket_server(agent, tools, logger, conversation_state, run_a
     if proactive_agent:
         _agent_scheduler = proactive_agent.get("scheduler")
         _schedule_parser  = proactive_agent.get("parser")
+        # Wire llm_fn into the scheduler if provided — used to post-process tool
+        # results with the LLM when a job has an llm_prompt set.
+        _llm_fn = proactive_agent.get("llm_fn")
+        if _agent_scheduler and _llm_fn:
+            _agent_scheduler._llm_fn = _llm_fn
+        # Wire session_manager so session-bound jobs can save to history
+        if _agent_scheduler and session_manager:
+            _agent_scheduler._session_manager = session_manager
     if inactivity_watcher:
         _inactivity_watcher = inactivity_watcher
 

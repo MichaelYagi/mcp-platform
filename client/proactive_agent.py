@@ -61,7 +61,10 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs (
     created_at      TEXT    NOT NULL,
     last_run        TEXT,
     last_check      TEXT,
-    run_count       INTEGER NOT NULL DEFAULT 0
+    run_count       INTEGER NOT NULL DEFAULT 0,
+    llm_prompt      TEXT,                          -- instruction passed to LLM after tool runs
+    session_id      INTEGER,                       -- session to deliver result to (NULL = broadcast)
+    deliver_to_session INTEGER NOT NULL DEFAULT 0  -- 1 = deliver to session_id, 0 = broadcast
 );
 """
 
@@ -71,6 +74,17 @@ def _ensure_db():
     SCHEDULER_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(SCHEDULER_DB_PATH) as conn:
         conn.executescript(_SCHEMA)
+        # Migrate: add llm_prompt column if it doesn't exist yet
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(scheduled_jobs)").fetchall()]
+        if "llm_prompt" not in cols:
+            conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN llm_prompt TEXT")
+            logger.info("⏰ scheduler.db migrated: added llm_prompt column")
+        if "session_id" not in cols:
+            conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN session_id INTEGER")
+            logger.info("⏰ scheduler.db migrated: added session_id column")
+        if "deliver_to_session" not in cols:
+            conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN deliver_to_session INTEGER NOT NULL DEFAULT 0")
+            logger.info("⏰ scheduler.db migrated: added deliver_to_session column")
 
 
 def _conn() -> sqlite3.Connection:
@@ -91,6 +105,9 @@ def create_job(
     condition_tool: str = None,
     condition_expr: str = None,
     condition_cron: str = "*/15 * * * *",
+    llm_prompt: str = None,
+    session_id: int = None,
+    deliver_to_session: bool = False,
     # Keep timezone as alias for backwards compat
     timezone: str = None,
 ) -> int:
@@ -102,13 +119,15 @@ def create_job(
             """INSERT INTO scheduled_jobs
                (label, trigger_type, tool, tool_args, cron,
                 condition_tool, condition_expr, condition_cron,
-                timezone, enabled, created_at)
-               VALUES (?,?,?,?,?,?,?,?,?,1,?)""",
+                timezone, enabled, created_at, llm_prompt,
+                session_id, deliver_to_session)
+               VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?)""",
             (
                 label, trigger_type, tool,
                 json.dumps(tool_args or {}),
                 cron, condition_tool, condition_expr, condition_cron,
-                tz_val, now
+                tz_val, now, llm_prompt,
+                session_id, 1 if deliver_to_session else 0
             )
         )
         return cur.lastrowid
@@ -132,6 +151,17 @@ def get_job(job_id: int) -> Optional[dict]:
 def find_job_by_label(label: str) -> Optional[dict]:
     _ensure_db()
     with _conn() as conn:
+        # Try numeric ID first
+        try:
+            job_id = int(label.strip())
+            r = conn.execute(
+                "SELECT * FROM scheduled_jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            if r:
+                return dict(r)
+        except (ValueError, TypeError):
+            pass
+        # Fall back to label substring match
         r = conn.execute(
             "SELECT * FROM scheduled_jobs WHERE LOWER(label) LIKE ?",
             (f"%{label.lower()}%",)
@@ -316,6 +346,9 @@ class ScheduleConfirmation:
     timezone: str
     human_schedule: str
     original_request: str
+    llm_prompt: Optional[str] = None  # instruction passed to LLM after tool runs
+    session_id: Optional[int] = None    # session to deliver to (None = broadcast)
+    deliver_to_session: bool = False    # True = deliver to session_id, False = broadcast
 
     def render(self) -> str:
         args_str = json.dumps(self.tool_args) if self.tool_args else "none"
@@ -329,12 +362,16 @@ class ScheduleConfirmation:
                 f"  Condition: {self.condition_tool} → {self.condition_expr}\n"
                 f"  Polls:     {cron_to_human(self.condition_cron)}\n"
             )
+        llm_line = f"  LLM:       {self.llm_prompt}\n" if self.llm_prompt else ""
+        delivery = "this session" if self.deliver_to_session else "all clients (broadcast)"
+        delivery_line = f"  Delivery:  {delivery}\n"
         return (
             f"Here's what I'll schedule — confirm to proceed:\n\n"
             f"  Label:     {self.label}\n"
             f"  Tool:      {self.tool}\n"
             f"  Args:      {args_str}\n"
             + sched +
+            llm_line +
             f"  Timezone:  {self.timezone}\n\n"
             f"Reply **yes** to confirm, **no** to cancel, or describe any changes."
         )
@@ -369,7 +406,9 @@ Shape A — all fields resolved (cron trigger):
   "tool_args": {{}},
   "cron": "<5-field cron>",
   "timezone": "<IANA timezone, default America/Vancouver>",
-  "human_schedule": "<plain English>"
+  "human_schedule": "<plain English>",
+  "llm_prompt": "<optional instruction for the LLM after the tool runs, e.g. 'Write a short commentary about this photo including the location and mood'>",
+  "deliver_to_session": false
 }}
 
 Shape B — all fields resolved (condition trigger):
@@ -380,11 +419,29 @@ Shape B — all fields resolved (condition trigger):
   "tool": "<action tool to run when condition is true>",
   "tool_args": {{}},
   "condition_tool": "<tool to call for the check>",
-  "condition_expr": "<expression e.g. result > 10>",
+  "condition_expr": "<Python expression — see notes below>",
   "condition_cron": "<how often to poll, default */15 * * * *>",
   "timezone": "America/Vancouver",
-  "human_schedule": "<plain English description>"
+  "human_schedule": "<plain English description>",
+  "llm_prompt": "<optional instruction for the LLM after the tool runs>",
+  "deliver_to_session": false
 }}
+
+CONDITION EXPRESSION NOTES:
+The expression is evaluated with these variables available:
+- result       : raw string output, or parsed number if numeric, or len(list) if JSON array
+- data         : parsed JSON dict or list (if tool returns JSON)
+- result_len   : len of raw string result
+- Any top-level integer/float/bool/string keys from a JSON dict response
+  e.g. if tool returns {{"total_unread": 3, "count": 5}} then total_unread and count are available
+- len_<key>    : length of any list field e.g. len_emails, len_results
+
+Examples:
+  "total_unread > 0"       — Gmail: fires when there are unread emails
+  "result > 10"            — numeric tool output exceeds 10
+  "result_len > 100"       — raw output is non-trivial (has content)
+  "len_results > 0"        — tool returned a non-empty results list
+  "count > 5"              — any JSON field named count exceeds 5
 
 Shape C — missing info:
 {{
@@ -397,7 +454,8 @@ STRICT RULES:
 2. NEVER assume which tool if ambiguous. Use Shape C.
 3. NEVER default silently. Missing time or frequency = Shape C.
 4. cron must be valid 5-field cron.
-5. Return ONLY JSON. No preamble, no markdown fences."""
+5. Return ONLY JSON. No preamble, no markdown fences.
+6. Set deliver_to_session=true when the user's request implies they want the result in the current conversation (e.g. 'show me', 'tell me', 'give me'). Set false for monitoring/alerting jobs."""
 
 
 class ScheduleParser:
@@ -456,6 +514,8 @@ class ScheduleParser:
                 timezone=data.get("timezone", self._tz),
                 human_schedule=data["human_schedule"],
                 original_request=original,
+                llm_prompt=data.get("llm_prompt") or None,
+                deliver_to_session=bool(data.get("deliver_to_session", False)),
             )
 
         elif status == "clarify":
@@ -501,24 +561,29 @@ class ConfirmationTracker:
 
 # ── Scheduling keyword detector ───────────────────────────────────────────────
 
-_SCHEDULE_KEYWORDS = [
-    "every day", "every morning", "every night", "every week", "every hour",
-    "every monday", "every tuesday", "every wednesday", "every thursday",
-    "every friday", "every saturday", "every sunday",
-    "weekdays", "weekends", "daily", "weekly", "hourly",
-    "each morning", "each day", "each week",
-    "schedule", "remind me", "run at", "do a briefing",
-    "at 5am", "at 6am", "at 7am", "at 8am", "at 9am", "at 10am",
-    "at 11am", "at 12pm", "at noon", "at 1pm", "at 2pm", "at 3pm",
-    "at 4pm", "at 5pm", "at 6pm", "at 7pm", "at 8pm", "at 9pm",
-    "alert me when", "notify me when", "tell me when", "check if",
-    "watch for", "when unread", "if unread",
-]
-
-
-def looks_like_scheduling_request(message: str) -> bool:
-    lower = message.lower()
-    return any(kw in lower for kw in _SCHEDULE_KEYWORDS)
+async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
+    """
+    Use the LLM to determine if a message is a scheduling/automation request.
+    Falls back to False if llm_fn is not provided or the call fails.
+    """
+    if not llm_fn:
+        return False
+    try:
+        system = (
+            "You are a classifier. Reply with only YES or NO.\n"
+            "Does the following message ask to schedule, automate, repeat, "
+            "poll, or trigger a recurring task or alert? "
+            "Examples that are YES: 'show me weather every morning', "
+            "'alert me when I have unread emails', 'run a briefing daily at 7am', "
+            "'check my calendar every hour', 'remind me every Monday'. "
+            "Examples that are NO: 'what is the weather', 'show my emails', "
+            "'what time is it', 'summarize this'."
+        )
+        response = await llm_fn(system, message)
+        return response.strip().upper().startswith("Y")
+    except Exception as e:
+        logger.warning(f"⏰ Scheduling classifier failed: {e}")
+        return False
 
 
 # ── AgentScheduler ────────────────────────────────────────────────────────────
@@ -529,11 +594,14 @@ class AgentScheduler:
 
     execute_fn:  async (tool_name: str, args: dict) -> str
     broadcast_fn: async (data: dict) -> None
+    llm_fn:      async (prompt: str) -> str   -- optional, used when job has llm_prompt
     """
 
-    def __init__(self, execute_fn, broadcast_fn):
+    def __init__(self, execute_fn, broadcast_fn, llm_fn=None, session_manager=None):
         self._execute_fn = execute_fn
         self._broadcast_fn = broadcast_fn
+        self._llm_fn = llm_fn
+        self._session_manager = session_manager
         self._scheduler = None
 
     async def start(self):
@@ -583,13 +651,51 @@ class AgentScheduler:
         record_run(job["id"])
         try:
             args = json.loads(job["tool_args"] or "{}")
-            result = await self._execute_fn(job["tool"], args)
-            await self._broadcast_fn({
-                "type": "scheduled_result",
-                "job_id": job["id"],
-                "label": job["label"],
-                "result": result,
-            })
+            tool_result = await self._execute_fn(job["tool"], args)
+
+            # If the job has an llm_prompt and we have an LLM function,
+            # pass the tool result through the LLM for a richer response.
+            llm_prompt = job.get("llm_prompt") or ""
+            if llm_prompt.strip() and self._llm_fn:
+                try:
+                    prompt = (
+                        f"{llm_prompt}\n\n"
+                        f"Tool result:\n{tool_result}"
+                    )
+                    result = await self._llm_fn(prompt)
+                    logger.info(f"⏰ LLM post-processed result for job {job['id']}")
+                except Exception as llm_err:
+                    logger.warning(f"⏰ LLM post-processing failed for job {job['id']}: {llm_err} — using raw result")
+                    result = tool_result
+            else:
+                result = tool_result
+
+            # Deliver to specific session or broadcast to all clients
+            if job.get("deliver_to_session") and job.get("session_id") and self._session_manager:
+                try:
+                    import os as _os
+                    _max = int(_os.getenv("MAX_MESSAGE_HISTORY", 30))
+                    self._session_manager.add_message(
+                        job["session_id"], "assistant", result, _max, "proactive"
+                    )
+                    logger.info(f"⏰ Delivered job {job['id']} result to session {job['session_id']}")
+                except Exception as _sm_err:
+                    logger.warning(f"⏰ session_manager delivery failed: {_sm_err} — falling back to broadcast")
+                # Also broadcast so the UI updates regardless of which session is open
+                await self._broadcast_fn({
+                    "type": "scheduled_result",
+                    "job_id": job["id"],
+                    "label": job["label"],
+                    "result": result,
+                    "session_id": job.get("session_id"),
+                })
+            else:
+                await self._broadcast_fn({
+                    "type": "scheduled_result",
+                    "job_id": job["id"],
+                    "label": job["label"],
+                    "result": result,
+                })
         except Exception as e:
             logger.error(f"⏰ Scheduled job {job['id']} failed: {e}")
             await self._broadcast_fn({
@@ -604,16 +710,47 @@ class AgentScheduler:
         record_run(job["id"], is_check=True)
         try:
             result_raw = await self._execute_fn(job["condition_tool"], {})
-            # Evaluate expression: result is accessible as 'result'
-            result = result_raw  # noqa — used in eval below
+
+            # Build evaluation context — try to give the expression as much
+            # to work with as possible regardless of what the tool returned.
+            eval_ctx: dict = {"__builtins__": {}}
+
+            # Always expose the raw string
+            eval_ctx["result"] = result_raw
+
+            # Try numeric parse
             try:
-                # Parse numeric result if possible
-                result_num = float(str(result_raw).strip())
-                result = result_num
+                eval_ctx["result"] = float(str(result_raw).strip())
             except (ValueError, TypeError):
                 pass
 
-            triggered = bool(eval(job["condition_expr"], {"result": result, "__builtins__": {}}))
+            # Try JSON parse — expose parsed dict/list AND common convenience keys
+            try:
+                parsed = json.loads(result_raw)
+                eval_ctx["data"] = parsed
+                if isinstance(parsed, dict):
+                    # Flat convenience keys: total_unread, count, total_results, etc.
+                    for k, v in parsed.items():
+                        if isinstance(v, (int, float, bool, str)):
+                            eval_ctx[k] = v
+                    # len(emails), len(results) etc.
+                    for k, v in parsed.items():
+                        if isinstance(v, list):
+                            eval_ctx[f"len_{k}"] = len(v)
+                elif isinstance(parsed, list):
+                    eval_ctx["result"] = len(parsed)
+                    eval_ctx["data"] = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            # Also expose len(result) for raw string checks
+            eval_ctx["result_len"] = len(str(result_raw))
+
+            triggered = bool(eval(job["condition_expr"], eval_ctx))
+            logger.debug(
+                f"⏰ Condition '{job['condition_expr']}' evaluated "
+                f"{'True' if triggered else 'False'} for job {job['id']}"
+            )
         except Exception as e:
             logger.warning(f"⏰ Condition check failed for job {job['id']}: {e}")
             return

@@ -49,6 +49,11 @@ def get_commands_list():
         ":memory consolidate <id> - Extract memories from a specific session",
         ":memory dedup - Remove duplicate memories",
         ":memory add <fact> - Manually add a memory",
+        ":jobs - List all scheduled jobs",
+        ":jobs pause <label> - Pause a scheduled job",
+        ":jobs enable <label> - Resume a paused job",
+        ":jobs cancel <label> - Delete a scheduled job",
+        ":jobs info <label> - Show full job detail",
     ]
 
 
@@ -528,6 +533,15 @@ async def handle_command(
             sessionmanager.delete_session(session_id)
             return (True, f"✅ Session {session_id} - {session.get('name', 'No session name')} deleted", None, None)
         return (True, "✅ Session not found", None, None)
+
+    # Jobs commands
+    if command.startswith(":jobs"):
+        try:
+            from client.proactive_agent import handle_jobs_command
+            result = handle_jobs_command(command)
+            return (True, result, None, None)
+        except ImportError:
+            return (True, "⚠️ proactive_agent not available", None, None)
 
     # Command not recognized
     return (False, None, None, None)

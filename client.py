@@ -807,9 +807,20 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     return f"Tool {tool_name} error: {e}"
         return f"Tool '{tool_name}' not found."
 
+    async def _scheduler_llm_fn(prompt: str) -> str:
+        """LLM function for post-processing scheduled job results.
+        Takes a plain prompt string (no system/user split) and returns the response.
+        Used by AgentScheduler._fire_job when a job has an llm_prompt set.
+        """
+        from langchain_core.messages import HumanMessage
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        return response.content if hasattr(response, "content") else str(response)
+
     agent_scheduler = AgentScheduler(
         execute_fn=_tool_executor,
         broadcast_fn=broadcast_proactive_result,
+        llm_fn=_scheduler_llm_fn,
+        session_manager=session_manager,
     )
     await agent_scheduler.start()
 
@@ -2342,7 +2353,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         session_manager=session_manager,
         session_state_registry=session_state_registry,
         capability_registry=capability_registry,
-        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser},
+        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser, "llm_fn": _scheduler_llm_fn},
         inactivity_watcher=inactivity_watcher,
         host="0.0.0.0",
         port=8765
