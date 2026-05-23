@@ -53,6 +53,7 @@ def get_commands_list():
         ":jobs pause <label> - Pause a scheduled job",
         ":jobs enable <label> - Resume a paused job",
         ":jobs cancel <label> - Delete a scheduled job",
+        ":jobs cancel all - Delete ALL scheduled jobs",
         ":jobs info <label> - Show full job detail",
     ]
 
