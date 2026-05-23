@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_tests.sh
 # Runs both Python and JS tests with full reporting.
-# Usage: ./run_tests.sh [--no-coverage] [--py-only] [--js-only]
+# Usage: ./run_tests.sh [options]
 
 set -e
 
@@ -9,11 +9,31 @@ NO_COVERAGE=false
 PY_ONLY=false
 JS_ONLY=false
 
+show_help() {
+    echo ""
+    echo "Usage: ./run_tests.sh [options]"
+    echo ""
+    echo "Options:"
+    echo "  --no-coverage   Skip coverage reporting (faster)"
+    echo "  --py-only       Run Python tests only"
+    echo "  --js-only       Run JavaScript tests only"
+    echo "  -h, --help      Show this help message"
+    echo ""
+    echo "Reports:"
+    echo "  Python:  tests/results/test-report.html"
+    echo "           tests/results/coverage-report.html"
+    echo "  JS:      tests/js-results/test-report.html"
+    echo "           tests/js-results/coverage/lcov-report/index.html"
+    echo ""
+}
+
 for arg in "$@"; do
     case $arg in
         --no-coverage) NO_COVERAGE=true ;;
         --py-only)     PY_ONLY=true ;;
         --js-only)     JS_ONLY=true ;;
+        -h|--help)     show_help; exit 0 ;;
+        *) echo "❌ Unknown option: $arg"; show_help; exit 1 ;;
     esac
 done
 
