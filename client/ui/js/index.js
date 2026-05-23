@@ -993,7 +993,8 @@ function hideThinking() {
 const hostname = window.location.hostname || 'localhost';
 const FAVORITES_SETTING_KEY = 'tool_favorites'; // declared here — used in onopen before favorites section
 let ws;
-let _wsHasConnected = false;
+let _wsHasConnected  = false;
+let _wsToolsLoaded   = false;  // tool list cached — skip on reconnect
 let _wsReconnectTimer = null;
 let _wsReconnectDelay = 1000;
 let _wsPingTimer = null;
@@ -1034,7 +1035,9 @@ function connectMainWS() {
         startWsPing();
         updateStatusWithMode();
         ws.send(JSON.stringify({ type:"list_models" }));
-        ws.send(JSON.stringify({ type:"list_tools" }));
+        if (!_wsToolsLoaded) {
+            ws.send(JSON.stringify({ type:"list_tools" }));
+        }
         ws.send(JSON.stringify({ type:"subscribe_system_stats" }));
         connectLogWebSocket();
         ws.send(JSON.stringify({ type:"get_setting", key:FAVORITES_SETTING_KEY }));
@@ -1359,6 +1362,7 @@ ws.onmessage = (event) => {
     }
 
     if (data.type==="tools_list") {
+        _wsToolsLoaded = true;
         buildToolPrompts(data.tools);
         renderToolsPanel(data.tools);
         return;
