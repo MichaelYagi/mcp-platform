@@ -208,7 +208,7 @@ class TestBroadcastProactiveResult:
         mock_bcast.assert_called_once()
         call_args = mock_bcast.call_args
         assert call_args[0][0] == "assistant_message"
-        assert "Morning Briefing" in call_args[0][1]["text"]
+        # Label is no longer prefixed — result is broadcast directly
         assert "Here is your briefing." in call_args[0][1]["text"]
 
     @pytest.mark.asyncio

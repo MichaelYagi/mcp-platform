@@ -1436,10 +1436,13 @@ class TestFireJobLlmPrompt:
 
     @pytest.mark.asyncio
     async def test_llm_prompt_post_processes_result(self, patched_scheduler_path):
+        # Tool jobs always use raw result — llm_prompt is ignored for tool jobs.
+        # llm_fn is only used for pure LLM jobs (tool=None/empty).
         from client.proactive_agent import AgentScheduler, create_job, get_job
-        execute_fn = AsyncMock(return_value='{"id": "abc", "description": "Sunset in Banff"}')
+        raw = '{"id": "abc", "description": "Sunset in Banff"}'
+        execute_fn = AsyncMock(return_value=raw)
         broadcast_fn = AsyncMock()
-        llm_fn = AsyncMock(return_value="A stunning sunset photo taken in Banff.")
+        llm_fn = AsyncMock(return_value="should not be called")
         scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn, llm_fn=llm_fn)
         job_id = create_job(
             label="Daily Photo",
@@ -1449,12 +1452,11 @@ class TestFireJobLlmPrompt:
         )
         job = get_job(job_id)
         await scheduler._fire_job(job)
-        llm_fn.assert_called_once()
-        prompt_arg = llm_fn.call_args[0][0]
-        assert "Write a short commentary" in prompt_arg
-        assert "Sunset in Banff" in prompt_arg
+        # LLM must NOT be called for tool jobs
+        llm_fn.assert_not_called()
+        # Raw tool result broadcast as-is
         call_data = broadcast_fn.call_args[0][0]
-        assert call_data["result"] == "A stunning sunset photo taken in Banff."
+        assert call_data["result"] == raw
 
     @pytest.mark.asyncio
     async def test_no_llm_prompt_uses_raw_result(self, patched_scheduler_path):
