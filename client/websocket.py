@@ -293,68 +293,37 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
 
             # Check if this is a yes/no response to a pending confirmation
             if pending is not None and ConfirmationTracker.is_confirmation(prompt):
-                _is_yes = prompt.strip().lower() in ("yes", "y", "confirm", "ok", "sure", "yep")
-                if not _is_yes:
+                try:
+                    job_id = create_job(
+                        label=pending.label,
+                        tool=pending.tool,
+                        trigger_type=pending.trigger_type,
+                        cron=pending.cron,
+                        tool_args=pending.tool_args,
+                        condition_tool=pending.condition_tool,
+                        condition_expr=pending.condition_expr,
+                        condition_cron=pending.condition_cron,
+                        timezone=pending.timezone,
+                        llm_prompt=pending.llm_prompt,
+                        run_date=getattr(pending, "run_date", None),
+                        end_date=getattr(pending, "end_date", None),
+                        session_id=int(session_id) if (pending.deliver_to_session and session_id) else None,
+                        deliver_to_session=pending.deliver_to_session,
+                    )
+                    if _agent_scheduler:
+                        _agent_scheduler.add_job(job_id)
                     _confirmation_tracker.clear(_session_key)
-                    response_text = "Cancelled — nothing was scheduled."
-                else:
-                    # For once jobs, check if run_date is already in the past
-                    _run_date = getattr(pending, "run_date", None)
-                    if getattr(pending, "trigger_type", None) == "once" and _run_date:
-                        try:
-                            from datetime import datetime, timezone as _tz
-                            _rd = datetime.fromisoformat(_run_date)
-                            if _rd.tzinfo is None:
-                                import zoneinfo
-                                _rd = _rd.replace(tzinfo=zoneinfo.ZoneInfo(pending.timezone or "America/Vancouver"))
-                            _now = datetime.now(_tz.utc)
-                            if _rd < _now:
-                                _confirmation_tracker.clear(_session_key)
-                                response_text = (
-                                    f"⚠️ That time has already passed ({_run_date}). "
-                                    f"Please try again with a future time."
-                                )
-                                if session_manager and session_id:
-                                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
-                                    session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "direct-answer")
-                                await broadcast_message("assistant_message", {
-                                    "text": response_text, "multi_agent": False, "a2a": False, "model": "proactive"
-                                })
-                                await broadcast_message("complete", {"stopped": False})
-                                return
-                        except Exception:
-                            pass
-                    try:
-                        job_id = create_job(
-                            label=pending.label,
-                            tool=pending.tool,
-                            trigger_type=pending.trigger_type,
-                            cron=pending.cron,
-                            tool_args=pending.tool_args,
-                            condition_tool=pending.condition_tool,
-                            condition_expr=pending.condition_expr,
-                            condition_cron=pending.condition_cron,
-                            timezone=pending.timezone,
-                            llm_prompt=pending.llm_prompt,
-                            run_date=_run_date,
-                            end_date=getattr(pending, "end_date", None),
-                            session_id=int(session_id) if (pending.deliver_to_session and session_id) else None,
-                            deliver_to_session=pending.deliver_to_session,
-                        )
-                        if _agent_scheduler:
-                            _agent_scheduler.add_job(job_id)
-                        _confirmation_tracker.clear(_session_key)
-                        response_text = (
-                            f"✅ Scheduled: **{pending.label}**\n"
-                            f"  Schedule: {pending.human_schedule}\n"
-                            f"  Tool: `{pending.tool}`\n"
-                            f"  Job ID: {job_id}\n\n"
-                            f"Use `:jobs` to manage your scheduled jobs."
-                        )
-                    except Exception as sched_err:
-                        logger.error(f"⏰ Failed to create job: {sched_err}")
-                        response_text = f"⚠️ Failed to save the scheduled job: {sched_err}"
-                        _confirmation_tracker.clear(_session_key)
+                    response_text = (
+                        f"✅ Scheduled: **{pending.label}**\n"
+                        f"  Schedule: {pending.human_schedule}\n"
+                        f"  Tool: `{pending.tool}`\n"
+                        f"  Job ID: {job_id}\n\n"
+                        f"Use `:jobs` to manage your scheduled jobs."
+                    )
+                except Exception as sched_err:
+                    logger.error(f"⏰ Failed to create job: {sched_err}")
+                    response_text = f"⚠️ Failed to save the scheduled job: {sched_err}"
+                    _confirmation_tracker.clear(_session_key)
 
                 if session_manager and session_id:
                     MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
@@ -1038,6 +1007,9 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 from client.input_sanitizer import sanitize_user_input, sanitize_command
 
+                # Normalize: treat leading-space colon as command
+                if prompt.lstrip().startswith(":"):
+                    prompt = prompt.lstrip()
                 if prompt.startswith(":"):
                     prompt = sanitize_command(prompt)
                 else:
@@ -1076,6 +1048,14 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             agent_ref[0] = new_agent
                         if new_model:
                             model_name = new_model
+                        await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                        continue
+                    else:
+                        # Unrecognized command — show error and valid commands
+                        from client.commands import get_commands_list
+                        _cmds = "\n".join(get_commands_list())
+                        _err = f"❓ Unknown command: `{prompt}`\n\nAvailable commands:\n{_cmds}"
+                        await broadcast_message("assistant_message", {"text": _err})
                         await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                         continue
 
