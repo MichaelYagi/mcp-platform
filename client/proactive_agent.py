@@ -106,6 +106,8 @@ def create_job(
     condition_expr: str = None,
     condition_cron: str = "*/15 * * * *",
     llm_prompt: str = None,
+    run_date: str = None,
+    end_date: str = None,
     session_id: int = None,
     deliver_to_session: bool = False,
     # Keep timezone as alias for backwards compat
@@ -241,6 +243,8 @@ def handle_jobs_command(raw: str) -> str:
     elif verb == "enable":
         return _toggle_job(label, True)
     elif verb in ("cancel", "delete", "remove"):
+        if label.strip().lower() == "all":
+            return _cancel_all_jobs()
         return _cancel_job(label)
     elif verb == "info":
         return _job_info(label)
@@ -251,6 +255,7 @@ def handle_jobs_command(raw: str) -> str:
             "  :jobs pause <label>    — pause a job\n"
             "  :jobs enable <label>   — resume a job\n"
             "  :jobs cancel <label>   — delete a job\n"
+            "  :jobs cancel all       — delete ALL jobs\n"
             "  :jobs info <label>     — full detail\n"
         )
 
@@ -291,6 +296,15 @@ def _toggle_job(label: str, enabled: bool) -> str:
         return f"No job found matching '{label}'."
     set_job_enabled(job["id"], enabled)
     return f"Job '{job['label']}' {'resumed' if enabled else 'paused'}."
+
+
+def _cancel_all_jobs() -> str:
+    jobs = list_jobs()
+    if not jobs:
+        return "No scheduled jobs to cancel."
+    for job in jobs:
+        delete_job(job["id"])
+    return f"✅ Deleted {len(jobs)} job(s)."
 
 
 def _cancel_job(label: str) -> str:
@@ -347,15 +361,24 @@ class ScheduleConfirmation:
     human_schedule: str
     original_request: str
     llm_prompt: Optional[str] = None  # instruction passed to LLM after tool runs
+    run_date: Optional[str] = None    # ISO datetime for 'once' trigger
+    end_date: Optional[str] = None    # ISO datetime to stop cron
     session_id: Optional[int] = None    # session to deliver to (None = broadcast)
     deliver_to_session: bool = False    # True = deliver to session_id, False = broadcast
 
     def render(self) -> str:
         args_str = json.dumps(self.tool_args) if self.tool_args else "none"
-        if self.trigger_type == "cron":
+        if self.trigger_type == "once":
+            sched = (
+                f"  Run once:  {self.human_schedule}\n"
+                f"  Date:      {self.run_date}\n"
+            )
+        elif self.trigger_type == "cron":
+            end_line = f"  Ends:      {self.end_date}\n" if self.end_date else ""
             sched = (
                 f"  Schedule:  {self.human_schedule}\n"
                 f"  Cron:      {self.cron}\n"
+                + end_line
             )
         else:
             sched = (
@@ -476,9 +499,9 @@ class ScheduleParser:
                 question="I had trouble parsing that scheduling request. "
                          "Could you rephrase it? e.g. 'Run the day briefing every day at 7am'."
             )
-        return self._parse_response(raw, user_message)
+        return await self._parse_response(raw, user_message)
 
-    def _parse_response(self, raw: str, original: str) -> ScheduleConfirmation | ScheduleClarification:
+    async def _parse_response(self, raw: str, original: str) -> ScheduleConfirmation | ScheduleClarification:
         clean = re.sub(r"```(?:json)?|```", "", raw).strip()
         try:
             data = json.loads(clean)
@@ -492,9 +515,56 @@ class ScheduleParser:
 
         if status == "ready":
             ttype = data.get("trigger_type", "cron")
+
+            # If model returned cron but run_date is set, honour run_date as once
+            if ttype == "cron" and data.get("run_date"):
+                ttype = "once"
+                data["trigger_type"] = "once"
+
+            # If model returned cron with a valid cron expression, check whether
+            # the human_schedule or original request implies one-time execution.
+            # We do this by asking the LLM classifier a single yes/no question
+            # rather than using keywords.
+            if ttype == "cron" and data.get("cron"):
+                try:
+                    _human = data.get("human_schedule", "")
+                    _is_once_check = await self._llm_fn(
+                        "Reply with only YES or NO.",
+                        f"Does this scheduling request ask for a ONE-TIME run (not recurring)? "
+                        f"Request: '{original}'. Parsed schedule: '{_human}'. "
+                        f"YES = run once. NO = recurring."
+                    )
+                    if _is_once_check.strip().upper().startswith("Y"):
+                        ttype = "once"
+                        data["trigger_type"] = "once"
+                        # Try to derive run_date from cron expression + today
+                        _run_date = None
+                        _cron_str = (data.get("cron") or "").strip()
+                        if _cron_str:
+                            _parts = _cron_str.split()
+                            if len(_parts) >= 2 and _parts[0].isdigit() and _parts[1].isdigit():
+                                from datetime import date as _date
+                                _run_date = f"{_date.today().isoformat()}T{int(_parts[1]):02d}:{int(_parts[0]):02d}:00"
+                        # If cron derivation failed, ask LLM to extract time from original
+                        if not _run_date:
+                            try:
+                                _time_extract = await self._llm_fn(
+                                    "Extract the time from the request and return ONLY an ISO datetime string for today in format YYYY-MM-DDTHH:MM:00. No other text.",
+                                    f"Today's date is {__import__('datetime').date.today().isoformat()}. Request: '{original}'"
+                                )
+                                _run_date = _time_extract.strip().strip('"').strip("'")
+                            except Exception:
+                                pass
+                        if _run_date:
+                            data["run_date"] = _run_date
+                except Exception:
+                    pass  # leave as cron if LLM check fails
+
             required = ["label", "tool", "human_schedule"]
             if ttype == "cron":
                 required.append("cron")
+            elif ttype == "once":
+                required.append("run_date")
             else:
                 required += ["condition_tool", "condition_expr"]
             missing = [k for k in required if not data.get(k)]
@@ -514,7 +584,8 @@ class ScheduleParser:
                 timezone=data.get("timezone", self._tz),
                 human_schedule=data["human_schedule"],
                 original_request=original,
-                llm_prompt=data.get("llm_prompt") or None,
+                run_date=data.get("run_date") or None,
+                end_date=data.get("end_date") or None,
                 deliver_to_session=bool(data.get("deliver_to_session", False)),
             )
 
@@ -628,15 +699,28 @@ class AgentScheduler:
             return
         try:
             from apscheduler.triggers.cron import CronTrigger
+            from apscheduler.triggers.date import DateTrigger
         except ImportError:
             return
 
-        cron_str = job["cron"] if job["trigger_type"] == "cron" else job["condition_cron"]
-        if not cron_str:
-            return
+        ttype = job["trigger_type"]
+        fire_fn = self._fire_job if ttype in ("cron", "once") else self._check_condition
 
-        trigger = CronTrigger.from_crontab(cron_str, timezone=job["timezone"])
-        fire_fn = self._fire_job if job["trigger_type"] == "cron" else self._check_condition
+        if ttype == "once":
+            run_date = job.get("run_date")
+            if not run_date:
+                logger.warning(f"⏰ Job {job['id']} is 'once' but has no run_date — skipping")
+                return
+            trigger = DateTrigger(run_date=run_date, timezone=job["timezone"])
+        else:
+            cron_str = job["cron"] if ttype == "cron" else job["condition_cron"]
+            if not cron_str:
+                return
+            _cron = CronTrigger.from_crontab(cron_str, timezone=job["timezone"])
+            _end = job.get("end_date") or None
+            if _end:
+                _cron.end_date = _end
+            trigger = _cron
 
         self._scheduler.add_job(
             fire_fn,
@@ -649,26 +733,29 @@ class AgentScheduler:
     async def _fire_job(self, job: dict):
         logger.info(f"⏰ Firing scheduled job: {job['label']} (id={job['id']})")
         record_run(job["id"])
+        # Auto-delete one-shot jobs after firing
+        if job.get("trigger_type") == "once":
+            try:
+                delete_job(job["id"])
+                logger.info(f"⏰ One-shot job {job['id']} deleted after firing")
+            except Exception as _del_err:
+                logger.warning(f"⏰ Failed to delete one-shot job {job['id']}: {_del_err}")
         try:
-            args = json.loads(job["tool_args"] or "{}")
-            tool_result = await self._execute_fn(job["tool"], args)
+            tool = (job.get("tool") or "").strip()
+            llm_prompt = (job.get("llm_prompt") or "").strip()
 
-            # If the job has an llm_prompt and we have an LLM function,
-            # pass the tool result through the LLM for a richer response.
-            llm_prompt = job.get("llm_prompt") or ""
-            if llm_prompt.strip() and self._llm_fn:
-                try:
-                    prompt = (
-                        f"{llm_prompt}\n\n"
-                        f"Tool result:\n{tool_result}"
-                    )
-                    result = await self._llm_fn(prompt)
-                    logger.info(f"⏰ LLM post-processed result for job {job['id']}")
-                except Exception as llm_err:
-                    logger.warning(f"⏰ LLM post-processing failed for job {job['id']}: {llm_err} — using raw result")
-                    result = tool_result
+            if not tool:
+                # Pure LLM job — no tool, send llm_prompt directly to the LLM
+                if llm_prompt and self._llm_fn:
+                    result = await self._llm_fn(llm_prompt)
+                    logger.info(f"⏰ Pure LLM job {job['id']} completed")
+                else:
+                    logger.warning(f"⏰ Job {job['id']} has no tool and no llm_prompt — skipping")
+                    return
             else:
-                result = tool_result
+                # Tool job — execute and use raw result, no LLM involvement
+                args = json.loads(job["tool_args"] or "{}")
+                result = await self._execute_fn(tool, args)
 
             # Deliver to specific session or broadcast to all clients
             if job.get("deliver_to_session") and job.get("session_id") and self._session_manager:

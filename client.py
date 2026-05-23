@@ -796,14 +796,140 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     from client.proactive_agent import AgentScheduler, ScheduleParser
     from client.websocket import broadcast_proactive_result
 
+    async def _process_image_result(tool_json: dict, tool_name: str) -> str:
+        """Shared image post-processor for scheduled jobs. Fetches image, runs vision model."""
+        import httpx as _httpx_img, base64 as _b64_img
+
+        _img_src  = tool_json.get("image_source")
+        _img_orig = tool_json.get("image_source_original") or _img_src
+        _b64img   = None
+        summary_text = None
+
+        if tool_json.get("image_base64"):
+            _b64img = tool_json["image_base64"]
+        elif _img_orig:
+            try:
+                async with _httpx_img.AsyncClient(timeout=60.0) as _ic:
+                    _ir = await _ic.get(_img_orig)
+                _b64img = _b64_img.b64encode(_ir.content).decode()
+            except Exception as _fe:
+                logger.warning(f"[image result] Failed to fetch image: {_fe}")
+
+        if _b64img:
+            try:
+                _meta_parts = []
+                for _k in ("takenAt", "placeName", "camera", "description", "fileName"):
+                    _v = tool_json.get(_k)
+                    if _v:
+                        _meta_parts.append(f"{_k}: {_v}")
+                _meta_str = "\n".join(_meta_parts)
+                _vision_prompt = (
+                    f"Describe this photo in 3-5 sentences. Include the setting, mood, "
+                    f"and any notable subjects or details.\n\nPhoto metadata:\n{_meta_str}"
+                )
+                _ollama_url   = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+                _vision_model = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b-instruct")
+                async with _httpx_img.AsyncClient(timeout=300.0) as _vc:
+                    _vresp = await _vc.post(
+                        f"{_ollama_url}/api/chat",
+                        json={
+                            "model": _vision_model,
+                            "stream": False,
+                            "options": {"num_predict": 300, "repeat_penalty": 1.3, "temperature": 0.3},
+                            "messages": [{"role": "user", "content": _vision_prompt, "images": [_b64img]}]
+                        }
+                    )
+                summary_text = _vresp.json().get("message", {}).get("content", "").strip()
+                if summary_text:
+                    _sents = summary_text.split(". ")
+                    _seen: dict = {}
+                    _cut = len(_sents)
+                    for _si, _s in enumerate(_sents):
+                        _key = _s.strip().lower()[:60]
+                        if not _key:
+                            continue
+                        _seen[_key] = _seen.get(_key, 0) + 1
+                        if _seen[_key] >= 3:
+                            _cut = _si
+                            break
+                    if _cut < len(_sents):
+                        summary_text = ". ".join(_sents[:_cut]).rstrip(".") + "."
+            except Exception as _ve:
+                logger.warning(f"[image result] Vision failed: {_ve}")
+                summary_text = None
+
+        _image_id     = tool_json.get("image_id")
+        _shashin_base = os.getenv("SHASHIN_BASE_URL", "").rstrip("/")
+        _shashin_link = (
+            f"\n\n[🔗 View in Shashin]({_shashin_base}/search?term={_image_id})"
+            if _image_id and _shashin_base else ""
+        )
+
+        # Always prepend thumbnail image
+        _img_line = f"![]({_img_src})" if _img_src else ""
+
+        if summary_text:
+            result_parts = [p for p in [_img_line, summary_text + _shashin_link] if p]
+            return "\n\n".join(result_parts)
+
+        # Fallback: show image inline + metadata
+        _parts = [_img_line] if _img_line else []
+        for _k, _label in [("placeName", "📍"), ("takenAt", "📅"), ("camera", "📷")]:
+            _v = tool_json.get(_k)
+            if _v:
+                _parts.append(f"{_label} {_v}")
+        if _shashin_link:
+            _parts.append(_shashin_link)
+        return "\n".join(p for p in _parts if p)
+
     async def _tool_executor(tool_name: str, args: dict) -> str:
-        """Execute a named tool by finding it in the loaded tools list."""
+        """Execute a named tool. Extracts text from MCP content objects,
+        and post-processes image results through vision model."""
+        import json as _json_te, re as _re_te
         for tool in tools:
             if tool.name == tool_name:
                 try:
                     result = await tool.ainvoke(args)
-                    return str(result)
+                    logger.debug(f"[_tool_executor] {tool_name} result type={type(result).__name__}")
+
+                    # Extract plain text from MCP TextContent objects (list or single)
+                    if isinstance(result, list):
+                        parts = []
+                        for item in result:
+                            if hasattr(item, "text") and item.text is not None:
+                                parts.append(item.text)
+                            else:
+                                parts.append(str(item))
+                        result_str = "\n".join(parts)
+                    elif hasattr(result, "text") and result.text is not None:
+                        result_str = result.text
+                    else:
+                        result_str = str(result)
+
+                    # If still looks like a TextContent repr, extract text field
+                    if result_str.startswith("[TextContent(") or result_str.startswith("TextContent("):
+                        _m = _re_te.search(r"text=\'(.*?)\',\s*annotations=", result_str, _re_te.DOTALL)
+                        if _m:
+                            result_str = _m.group(1)
+                            try:
+                                if "\\n" in result_str:
+                                    result_str = result_str.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"')
+                            except Exception:
+                                pass
+
+                    # Check if result contains image data — post-process with vision
+                    try:
+                        _rjson = _json_te.loads(result_str)
+                        if isinstance(_rjson, dict) and (
+                            _rjson.get("image_source") or _rjson.get("image_base64")
+                        ):
+                            logger.info(f"[_tool_executor] image result for {tool_name} — running vision")
+                            return await _process_image_result(_rjson, tool_name)
+                    except Exception:
+                        pass
+                    return result_str
                 except Exception as e:
+                    logger.error(f"[_tool_executor] {tool_name} error: {e}")
                     return f"Tool {tool_name} error: {e}"
         return f"Tool '{tool_name}' not found."
 
