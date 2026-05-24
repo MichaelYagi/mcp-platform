@@ -49,12 +49,10 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scheduled_jobs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     label           TEXT    NOT NULL,
-    trigger_type    TEXT    NOT NULL DEFAULT 'cron',  -- 'cron' | 'condition' | 'once'
+    trigger_type    TEXT    NOT NULL DEFAULT 'cron',  -- 'cron' | 'condition'
     tool            TEXT    NOT NULL,
     tool_args       TEXT    NOT NULL DEFAULT '{}',
-    cron            TEXT,                              -- 5-field cron (cron/once jobs)
-    run_date        TEXT,                              -- ISO datetime for 'once' trigger
-    end_date        TEXT,                              -- ISO datetime to stop cron
+    cron            TEXT,                              -- 5-field cron (cron jobs)
     condition_tool  TEXT,                              -- tool to call for check (condition jobs)
     condition_expr  TEXT,                              -- e.g. "result > 10"
     condition_cron  TEXT    NOT NULL DEFAULT '*/15 * * * *',  -- how often to poll
@@ -537,44 +535,40 @@ class ScheduleParser:
                 ttype = "once"
                 data["trigger_type"] = "once"
 
-            # If model returned cron with a valid cron expression, check whether
-            # the human_schedule or original request implies one-time execution.
-            # We do this by asking the LLM classifier a single yes/no question
-            # rather than using keywords.
+            # Deterministic one-time detection — no LLM call needed
             if ttype == "cron" and data.get("cron"):
-                try:
-                    _human = data.get("human_schedule", "")
-                    _is_once_check = await self._llm_fn(
-                        "Reply with only YES or NO.",
-                        f"Does this scheduling request ask for a ONE-TIME run (not recurring)? "
-                        f"Request: '{original}'. Parsed schedule: '{_human}'. "
-                        f"YES = run once. NO = recurring."
+                import re as _re_once
+                _one_time_signals = _re_once.search(
+                    r'\b(today|tonight|this\s+(morning|afternoon|evening|night)|right\s+now|just\s+once|one\s+time|one-time)\b',
+                    original, _re_once.IGNORECASE
+                )
+                _cron_parts = (data.get("cron") or "").strip().split()
+                _is_specific_date = (
+                    len(_cron_parts) == 5 and
+                    _cron_parts[2] != "*" and _cron_parts[3] != "*"
+                )
+                if _one_time_signals or _is_specific_date:
+                    ttype = "once"
+                    data["trigger_type"] = "once"
+                    _run_date = None
+                    if len(_cron_parts) >= 2 and _cron_parts[0].isdigit() and _cron_parts[1].isdigit():
+                        from datetime import date as _date
+                        _run_date = f"{_date.today().isoformat()}T{int(_cron_parts[1]):02d}:{int(_cron_parts[0]):02d}:00"
+                        _h, _m = int(_cron_parts[1]), int(_cron_parts[0])
+                        _suffix = "am" if _h < 12 else "pm"
+                        _h12 = _h if 1 <= _h <= 12 else (12 if _h == 0 else _h - 12)
+                        data["human_schedule"] = f"Once at {_h12}:{_m:02d}{_suffix} today"
+                    if _run_date:
+                        data["run_date"] = _run_date
+
+            # Validate cron — must be exactly 5 fields
+            if ttype == "cron" and data.get("cron"):
+                if len(data["cron"].strip().split()) != 5:
+                    logger.warning(f"ScheduleParser: malformed cron '{data['cron']}'")
+                    return ScheduleClarification(
+                        question="I couldn't parse a valid schedule from that. "
+                                 "Could you rephrase? e.g. 'Run get_day_briefing at 7:54am today'"
                     )
-                    if _is_once_check.strip().upper().startswith("Y"):
-                        ttype = "once"
-                        data["trigger_type"] = "once"
-                        # Try to derive run_date from cron expression + today
-                        _run_date = None
-                        _cron_str = (data.get("cron") or "").strip()
-                        if _cron_str:
-                            _parts = _cron_str.split()
-                            if len(_parts) >= 2 and _parts[0].isdigit() and _parts[1].isdigit():
-                                from datetime import date as _date
-                                _run_date = f"{_date.today().isoformat()}T{int(_parts[1]):02d}:{int(_parts[0]):02d}:00"
-                        # If cron derivation failed, ask LLM to extract time from original
-                        if not _run_date:
-                            try:
-                                _time_extract = await self._llm_fn(
-                                    "Extract the time from the request and return ONLY an ISO datetime string for today in format YYYY-MM-DDTHH:MM:00. No other text.",
-                                    f"Today's date is {__import__('datetime').date.today().isoformat()}. Request: '{original}'"
-                                )
-                                _run_date = _time_extract.strip().strip('"').strip("'")
-                            except Exception:
-                                pass
-                        if _run_date:
-                            data["run_date"] = _run_date
-                except Exception:
-                    pass  # leave as cron if LLM check fails
 
             required = ["label", "tool", "human_schedule"]
             if ttype == "cron":
