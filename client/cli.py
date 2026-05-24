@@ -142,6 +142,13 @@ async def cli_input_loop(agent, logger, tools, model_name, conversation_state, r
                         if new_model:
                             model_name = new_model
                         continue
+                    else:
+                        # Unrecognized command — don't send to LLM
+                        _cmds = "\n".join(get_commands_list())
+                        _err = f"❓ Unknown command: `{query}`\n\nAvailable commands:\n{_cmds}"
+                        print(_err)
+                        await broadcast_message("assistant_message", {"text": _err, "model": "system"})
+                        continue
 
                 logger.info(f"💬 Received query: '{query}'")
 

@@ -882,52 +882,129 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             _parts.append(_shashin_link)
         return "\n".join(p for p in _parts if p)
 
+    async def _process_tool_result(tool_name: str, tool_result: str, arg_str: str, active_llm) -> str:
+        """Shared post-processor for tool results.
+        Handles images, plain text, structured JSON, lists, and LLM summarization.
+        Used by both _tool_executor (scheduler) and run_agent_wrapper (direct dispatch)."""
+        import re as _re4, uuid as _tmsg_uuid
+
+        # Plain text passthrough
+        _is_plain_text = not tool_result.strip().startswith(("{", "["))
+        if _is_plain_text:
+            return tool_result
+
+        try:
+            _tool_json = json.loads(tool_result)
+        except Exception:
+            return tool_result
+
+        # Image result — vision model
+        if isinstance(_tool_json, dict) and (_tool_json.get("image_source") or _tool_json.get("image_base64")):
+            return await _process_image_result(_tool_json, tool_name)
+
+        # Pre-built summary passthrough
+        if isinstance(_tool_json, dict) and "summary" in _tool_json and not any(
+            isinstance(_tool_json.get(k), list) for k in
+            ("documents", "sources", "results", "items", "records", "entries", "chunks")
+        ):
+            _presummary = _tool_json["summary"]
+            _title = _tool_json.get("title", "")
+            _url = _tool_json.get("url", "")
+            header_parts = []
+            if _title:
+                header_parts.append(f"**{_title}**")
+            if _url:
+                header_parts.append(f"[{_url}]({_url})")
+            header = " — ".join(header_parts)
+            return f"{header}\n\n{_presummary}" if header else _presummary
+
+        # List builder for array results
+        list_lines = None
+        try:
+            parsed = _tool_json
+            items = None
+            array_key = None
+
+            if isinstance(parsed, dict) and parsed.get("text") and isinstance(parsed["text"], str):
+                return parsed["text"]
+
+            if isinstance(parsed, list):
+                items = parsed
+                array_key = "results"
+            elif isinstance(parsed, dict):
+                for k, v in parsed.items():
+                    if isinstance(v, list) and v and isinstance(v[0], dict):
+                        items = v
+                        array_key = k
+                        break
+                    elif isinstance(v, dict):
+                        for k2, v2 in v.items():
+                            if isinstance(v2, list) and v2 and isinstance(v2[0], dict):
+                                items = v2
+                                array_key = k2
+                                break
+                        if items:
+                            break
+
+            if items and isinstance(parsed, dict):
+                _sibling_dicts = sum(1 for v in parsed.values() if isinstance(v, dict)) >= 2
+                _is_weather = isinstance(parsed.get("current"), dict) and isinstance(parsed.get("forecast"), list)
+                if _sibling_dicts or _is_weather:
+                    items = None
+
+            if items:
+                total = len(items)
+                label_word = array_key.rstrip("s") if array_key else "result"
+                arg_label = f' for "{arg_str}"' if arg_str else ""
+                _loc_parts = [p for p in [parsed.get("city",""), parsed.get("state",""), parsed.get("country","")] if p]
+                _loc_prefix = f"📍 {', '.join(_loc_parts)}\n\n" if _loc_parts else ""
+                list_lines = [f"{_loc_prefix}Found {total} {label_word}(s){arg_label}:\n"]
+
+                for i, item in enumerate(items, 1):
+                    if not isinstance(item, dict):
+                        list_lines.append(f"{i}. {item}")
+                        continue
+                    title = (item.get("title") or item.get("name") or item.get("source")
+                             or item.get("date") or item.get("id") or f"Item {i}")
+                    score = item.get("score")
+                    score_label = f" (score: {score:.2f})" if score is not None else ""
+                    _text_val = (item.get("text") or item.get("snippet") or item.get("preview")
+                                 or item.get("content") or item.get("contentPreview") or "")
+                    summary = _text_val[:300] if _text_val else ""
+                    list_lines.append(f"{i}. {title}{score_label}")
+                    if summary:
+                        list_lines.append(f"   {summary}")
+                    list_lines.append("")
+
+        except Exception:
+            pass
+
+        if list_lines:
+            return "\n".join(list_lines)
+
+        # LLM summarization fallback
+        try:
+            from langchain_core.messages import SystemMessage, HumanMessage as _HM
+            resp = await active_llm.ainvoke([
+                SystemMessage(content=TOOL_RESULT_PRESENT.format(tool_name=tool_name)),
+                _HM(content=tool_result),
+            ])
+            return resp.content if hasattr(resp, "content") else str(resp)
+        except Exception as _e:
+            logger.error(f"[_process_tool_result] LLM summarization failed: {_e}")
+
+        return tool_result
+
     async def _tool_executor(tool_name: str, args: dict) -> str:
-        """Execute a named tool. Extracts text from MCP content objects,
-        and post-processes image results through vision model."""
-        import json as _json_te, re as _re_te
+        """Execute a named tool via the same path as direct dispatch.
+        Routes through _invoke_tool_directly for TextContent handling,
+        then _process_tool_result for formatting — identical to 'use <tool>'."""
         for tool in tools:
             if tool.name == tool_name:
+                arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
                 try:
-                    result = await tool.ainvoke(args)
-                    logger.debug(f"[_tool_executor] {tool_name} result type={type(result).__name__}")
-
-                    # Extract plain text from MCP TextContent objects (list or single)
-                    if isinstance(result, list):
-                        parts = []
-                        for item in result:
-                            if hasattr(item, "text") and item.text is not None:
-                                parts.append(item.text)
-                            else:
-                                parts.append(str(item))
-                        result_str = "\n".join(parts)
-                    elif hasattr(result, "text") and result.text is not None:
-                        result_str = result.text
-                    else:
-                        result_str = str(result)
-
-                    # If still looks like a TextContent repr, extract text field
-                    if result_str.startswith("[TextContent(") or result_str.startswith("TextContent("):
-                        _m = _re_te.search(r"text=\'(.*?)\',\s*annotations=", result_str, _re_te.DOTALL)
-                        if _m:
-                            result_str = _m.group(1)
-                            try:
-                                if "\\n" in result_str:
-                                    result_str = result_str.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"')
-                            except Exception:
-                                pass
-
-                    # Check if result contains image data — post-process with vision
-                    try:
-                        _rjson = _json_te.loads(result_str)
-                        if isinstance(_rjson, dict) and (
-                            _rjson.get("image_source") or _rjson.get("image_base64")
-                        ):
-                            logger.info(f"[_tool_executor] image result for {tool_name} — running vision")
-                            return await _process_image_result(_rjson, tool_name)
-                    except Exception:
-                        pass
-                    return result_str
+                    result_str = await _invoke_tool_directly(tool, arg_str, logger)
+                    return await _process_tool_result(tool_name, result_str, arg_str, llm)
                 except Exception as e:
                     logger.error(f"[_tool_executor] {tool_name} error: {e}")
                     return f"Tool {tool_name} error: {e}"
@@ -1756,387 +1833,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         "current_model": getattr(active_llm, "model", "unknown")
                     }
 
-            # Build output with per-note LLM summaries assembled entirely in Python.
-            # One small focused LLM call per note avoids small-model context overload.
-            trilium_base = os.getenv("TRILIUM_URL", "").rstrip("/")
-            note_lines = None
-
-            if trilium_base:
-                try:
-                    parsed = json.loads(tool_result)
-                    items = parsed if isinstance(parsed, list) else parsed.get("results", [])
-                    if items and items[0].get("noteId"):
-                        _tool_map = {t.name: t for t in tools if hasattr(t, "name")}
-                        get_note_tool = _tool_map.get("get_note_by_id")
-
-                        note_lines = [f'Found {len(items)} note(s) matching "{explicit_arg}":\n']
-
-                        for i, item in enumerate(items, 1):
-                            note_id = item.get("noteId")
-                            title = item.get("title", note_id)
-                            url = f"{trilium_base}/#root/{note_id}"
-
-                            # Fetch full content if tool available, else use preview
-                            full_content = None
-                            if get_note_tool and note_id:
-                                try:
-                                    raw = await get_note_tool.ainvoke({"note_id": note_id})
-                                    if isinstance(raw, list) and raw:
-                                        raw = raw[0].text if hasattr(raw[0], "text") else str(raw[0])
-                                    full_content = str(raw)
-                                    full_content = _re4.sub(r'<[^>]+>', ' ', full_content).strip()
-                                    full_content = _re4.sub(r' +', ' ', full_content)
-                                    full_content = full_content[:2000] + "..." if len(full_content) > 2000 else full_content
-                                except Exception as _e:
-                                    logger.warning(f"⚠️ Could not fetch full content for {note_id}: {_e}")
-
-                            if not full_content:
-                                full_content = item.get("contentPreview", "")
-                                full_content = _re4.sub(r'<[^>]+>', '', full_content).strip()
-
-                            # One focused LLM call per note: just summarise this content
-                            summary = ""
-                            if full_content:
-                                try:
-                                    _note_llm_start = _time.time()
-                                    resp = await active_llm.ainvoke([
-                                        SystemMessage(content=NOTE_SUMMARISE),
-                                        HumanMessage(content=full_content),
-                                    ])
-                                    summary = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
-                                    if _client_metrics is not None:
-                                        _client_metrics["llm_calls"] += 1
-                                        _client_metrics["llm_times"].append((_time.time(), _time.time() - _note_llm_start))
-                                except Exception as _e:
-                                    logger.warning(f"⚠️ Summary failed for {note_id}: {_e}")
-                                    summary = full_content[:200] + "..."
-
-                            note_lines.append(f"{i}. [{title}]({url}) `{note_id}`")
-                            if summary:
-                                note_lines.append(f"   {summary}")
-                            note_lines.append("")
-
-                        logger.info(f"📋 Built {len(items)} per-note summaries")
-                except (json.JSONDecodeError, AttributeError):
-                    pass
-
-            if note_lines:
-                summary_text = "\n".join(note_lines)
-            elif _tool_json and isinstance(_tool_json, dict) and "summary" in _tool_json and not any(
-                isinstance(_tool_json.get(k), list) for k in
-                ("documents", "sources", "results", "items", "records", "entries", "chunks")
-            ):
-                # Tool already did the summarisation internally (e.g. summarize_url_tool,
-                # summarize_text_tool). Pass the summary through directly — no second LLM
-                # call needed.
-                # Guard: only use this path when there is NO primary list in the response.
-                # Tools like rag_browse_tool and rag_list_sources_tool add a convenience
-                # "summary" key alongside their document/source lists — we want the
-                # list-builder to handle those so all the rich data is shown.
-                _presummary = _tool_json["summary"]
-                _title      = _tool_json.get("title", "")
-                _url        = _tool_json.get("url", "")
-                _src        = _tool_json.get("source", "")
-                _orig_len   = _tool_json.get("original_length", 0)
-                _truncated  = _tool_json.get("truncated", False)
-
-                header_parts = []
-                if _title:
-                    header_parts.append(f"**{_title}**")
-                if _url:
-                    header_parts.append(f"[{_url}]({_url})")
-                elif _src and _src != "text":
-                    header_parts.append(f"`{_src}`")
-                if _orig_len:
-                    trunc_note = " *(truncated)*" if _truncated else ""
-                    header_parts.append(f"({_orig_len:,} chars{trunc_note})")
-
-                header = " — ".join(header_parts)
-                summary_text = (f"{header}\n\n{_presummary}" if header else _presummary)
-                logger.info(f"📋 Passing through pre-built summary ({len(_presummary)} chars)")
-            else:
-                # Try to build a Python-formatted list for any JSON result that
-                # contains a top-level list under a common key, matching the same
-                # style as the Trilium / shashin search outputs.
-                # Falls back to a single LLM call only for non-list results.
-                list_lines = None
-                try:
-                    parsed = json.loads(tool_result)
-
-                    items = None
-                    array_key = None
-                    # If the result has a top-level "text" field, use it directly — no LLM
-                    if isinstance(parsed, dict) and parsed.get("text") and isinstance(parsed["text"], str):
-                        logger.info(f"📋 Using top-level text field directly")
-                        list_lines = [parsed["text"]]
-                    else:
-                        # Find the first array value in the response regardless of key name
-                        if isinstance(parsed, list):
-                            items = parsed
-                            array_key = "results"
-                        else:
-                            for k, v in parsed.items():
-                                # Only treat as a list if items are dicts (not primitives like strings)
-                                if isinstance(v, list) and v and isinstance(v[0], dict):
-                                    items = v
-                                    array_key = k
-                                    break
-                                # Handle one level of nesting: {scenes: {scenes: [...]}}
-                                elif isinstance(v, dict):
-                                    for k2, v2 in v.items():
-                                        if isinstance(v2, list) and v2 and isinstance(v2[0], dict):
-                                            items = v2
-                                            array_key = k2
-                                            break
-                                    if items:
-                                        break
-
-                    if items and isinstance(parsed, dict):
-                        _sibling_dicts = (
-                            isinstance(parsed, dict) and
-                            sum(1 for v in parsed.values() if isinstance(v, dict)) >= 2
-                        )
-                        # Also skip list path when the response has multiple substantial
-                        # top-level scalar/string fields alongside the list — these are
-                        # structured reports (e.g. weather: temperature/condition/humidity
-                        # + forecast list) where the LLM single call renders everything.
-                        _sibling_scalars = (
-                            isinstance(parsed, dict) and
-                            sum(1 for k, v in parsed.items()
-                                if not isinstance(v, (list, dict)) and v not in (None, "", 0)
-                                and k not in ("total", "count", "total_count", "summary",
-                                              "message", "status", "error",
-                                              # location/weather metadata — not content
-                                              "city", "state", "country", "latitude",
-                                              "longitude", "timezone")) >= 3
-                        )
-                        # Weather responses have a "current" dict + "forecast" list —
-                        # the list builder only sees the forecast array and renders bare
-                        # date strings. Route the whole response to the LLM instead so
-                        # it can render current conditions and forecast together.
-                        _is_weather_response = (
-                            isinstance(parsed, dict) and
-                            isinstance(parsed.get("current"), dict) and
-                            isinstance(parsed.get("forecast"), list)
-                        )
-                        if _sibling_dicts or _sibling_scalars or _is_weather_response:
-                            items = None  # skip list path → falls through to LLM call
-
-                    if items:
-                        # Use actual list length as the count — most accurate
-                        total = len(items)
-                        # Use the array key name as the label (sources, documents, results…)
-                        label_word = array_key.rstrip("s") if array_key else "result"
-                        arg_label = f' for "{explicit_arg}"' if explicit_arg else ""
-                        # Prepend location line for weather/location tools
-                        _loc_city    = parsed.get("city", "")
-                        _loc_state   = parsed.get("state", "")
-                        _loc_country = parsed.get("country", "")
-                        _loc_parts   = [p for p in [_loc_city, _loc_state, _loc_country] if p]
-                        _loc_prefix  = f"📍 {', '.join(_loc_parts)}\n\n" if _loc_parts else ""
-                        header = f"{_loc_prefix}Found {total} {label_word}(s){arg_label}:\n"
-                        list_lines = [header]
-
-                        # For RAG search results: fetch chunk text from sessions.db
-                        # Items have chunk_id but no text field
-                        _sessions_db_path = os.getenv("SESSIONS_DB", str(
-                            PROJECT_ROOT / "data" / "sessions.db"
-                        ))
-                        _chunk_cache = {}
-                        _has_chunk_ids = any(
-                            isinstance(it, dict) and it.get("chunk_id") and not (
-                                it.get("preview") or it.get("sample") or
-                                it.get("content") or it.get("contentPreview")
-                            )
-                            for it in items
-                        )
-                        if _has_chunk_ids:
-                            try:
-                                import sqlite3 as _sq
-                                _sc = _sq.connect(_sessions_db_path)
-                                for it in items:
-                                    cid = it.get("chunk_id")
-                                    if cid and cid not in _chunk_cache:
-                                        row = _sc.execute(
-                                            "SELECT text FROM chunks WHERE id = ?", (cid,)
-                                        ).fetchone()
-                                        _chunk_cache[cid] = row[0] if row else ""
-                                _sc.close()
-                            except Exception as _ce:
-                                logger.warning(f"⚠️ Could not fetch chunk text: {_ce}")
-
-                        for i, item in enumerate(items, 1):
-                            if not isinstance(item, dict):
-                                list_lines.append(f"{i}. {item}")
-                                continue
-
-                            # Build a title from common fields
-                            title = (
-                                item.get("title")
-                                or item.get("name")
-                                or item.get("source")
-                                or item.get("date")
-                                or item.get("day")
-                                or item.get("id")
-                                or f"Item {i}"
-                            )
-                            # For process items, append PID to disambiguate multiple python processes
-                            if item.get("pid") and item.get("name"):
-                                title = f"{item['name']} (pid {item['pid']})"
-                            # Score label for search results
-                            score = item.get("score")
-                            score_label = f" (score: {score:.2f})" if score is not None else ""
-
-                            # Get content: prefer cached chunk text, then common fields
-                            chunk_id = item.get("chunk_id")
-                            # If no standard content field, serialise all kv pairs
-                            _kv_content = "; ".join(
-                                f"{k}: {v}" for k, v in item.items()
-                                if v not in (None, "", []) and k not in ("chunk_id", "score", "id")
-                            )
-                            content_text = (
-                                _chunk_cache.get(chunk_id, "")
-                                or item.get("preview")
-                                or item.get("sample")
-                                or item.get("content")
-                                or item.get("contentPreview")
-                                or item.get("text")
-                                or item.get("dialogue")
-                                or item.get("snippet")      # web search results
-                                or _kv_content
-                                or ""
-                            )
-                            # For scene results: prepend timestamp if available
-                            timestamp = item.get("timestamp") or item.get("time") or item.get("start_time")
-                            if timestamp and content_text:
-                                content_text = f"[{timestamp}] {content_text}"
-                            content_text = _re4.sub(r'<[^>]+>', ' ', str(content_text)).strip()
-                            # Truncate hard — small models hallucinate on long text
-                            content_text = content_text[:300]
-
-                            # Detect metadata-only items (sources, stats) — render directly,
-                            # no LLM call needed. Only summarise when real text content exists.
-                            meta_fields = {
-                                k: v for k, v in item.items()
-                                if k in ("documents", "chars", "words", "total_words",
-                                         "total_chars", "score", "created", "dateModified",
-                                         # process / system fields
-                                         "pid", "memory_percent", "cpu_percent", "status",
-                                         "memory_mb", "cpu_time", "threads", "ppid",
-                                         # generic numeric stats
-                                         "count", "total", "size", "duration", "bytes",
-                                         "percent", "usage", "rate", "value")
-                                and v is not None
-                            }
-                            # Items with a preview field have real text — summarise with LLM
-                            has_preview = bool(item.get("preview") or item.get("sample"))
-                            # Also treat items with ONLY numeric/id fields as metadata
-                            _text_fields = {"preview", "sample", "content", "contentPreview",
-                                            "text", "dialogue", "description", "body", "summary",
-                                            "snippet"}   # web search results
-                            _has_text_field = any(item.get(f) for f in _text_fields)
-                            # Web search items: snippet is the final answer, never send to LLM
-                            _is_web_search_item = bool(item.get("snippet") and item.get("url"))
-                            is_metadata_item = (
-                                (bool(meta_fields) or not _has_text_field or _is_web_search_item)
-                                and not chunk_id
-                                and not _chunk_cache
-                                and not has_preview
-                            )
-
-                            summary = ""
-                            if is_metadata_item:
-                                # Build a concise metadata line directly in Python
-                                parts = []
-                                # Process / system items
-                                if "pid" in item:
-                                    if "memory_percent" in item:
-                                        parts.append(f"mem: {item['memory_percent']:.1f}%")
-                                    if "cpu_percent" in item:
-                                        parts.append(f"cpu: {item['cpu_percent']:.1f}%")
-                                    if "status" in item:
-                                        parts.append(f"status: {item['status']}")
-                                    if "memory_mb" in item:
-                                        parts.append(f"{item['memory_mb']:.0f} MB")
-                                # Web search results — title already in heading, show url + snippet
-                                elif item.get("snippet") or item.get("url"):
-                                    if item.get("url"):
-                                        parts.append(item["url"])
-                                    if item.get("snippet"):
-                                        # snippet is the useful text — show it directly, no LLM
-                                        summary = item["snippet"]
-                                        if item.get("url"):
-                                            summary = f"{item['url']}\n   {summary}"
-                                # Shashin / photo items
-                                elif item.get("filename") or item.get("tags") or item.get("date"):
-                                    if item.get("date"):
-                                        parts.append(str(item["date"]))
-                                    if item.get("tags"):
-                                        tags = item["tags"]
-                                        if isinstance(tags, list):
-                                            parts.append(", ".join(str(t) for t in tags[:6]))
-                                        else:
-                                            parts.append(str(tags))
-                                    if item.get("filename") and not title.startswith(item.get("filename", "")):
-                                        parts.append(item["filename"])
-                                # Source / RAG items
-                                elif "documents" in meta_fields:
-                                    parts.append(f"{meta_fields['documents']} chunk(s)")
-                                # Generic char/word counts
-                                if "chars" in meta_fields or "total_chars" in meta_fields:
-                                    c = meta_fields.get("chars") or meta_fields.get("total_chars")
-                                    parts.append(f"{c:,} chars")
-                                if "score" in meta_fields:
-                                    parts.append(f"score: {meta_fields['score']:.2f}")
-                                if "created" in meta_fields:
-                                    parts.append(f"created: {meta_fields['created']}")
-                                if not summary:
-                                    if content_text and not parts:
-                                        # sample field — show it as-is, no LLM
-                                        summary = content_text[:150] + ("..." if len(content_text) > 150 else "")
-                                    elif parts:
-                                        summary = ", ".join(parts)
-                            elif content_text:
-                                # If item has a "text" field, use it directly — no LLM
-                                if item.get("text"):
-                                    summary = item["text"]
-                                else:
-                                    try:
-                                        _item_llm_start = _time.time()
-                                        resp = await active_llm.ainvoke([
-                                            SystemMessage(content=ITEM_SUMMARISE),
-                                            HumanMessage(content=content_text),
-                                        ])
-                                        summary = resp.content.strip() if hasattr(resp, "content") else ""
-                                        if _client_metrics is not None:
-                                            _client_metrics["llm_calls"] += 1
-                                            _client_metrics["llm_times"].append((_time.time(), _time.time() - _item_llm_start))
-                                    except Exception:
-                                        summary = content_text[:120] + "..."
-
-                            list_lines.append(f"{i}. {title}{score_label}")
-                            if summary:
-                                list_lines.append(f"   {summary}")
-                            list_lines.append("")
-
-                except (json.JSONDecodeError, AttributeError, StopIteration) as _list_err:
-                    logger.warning(f"⚠️ List builder failed: {_list_err}")
-
-                if list_lines:
-                    logger.info(f"📋 Built list output ({len(list_lines)} lines)")
-                    summary_text = "\n".join(list_lines)
-                else:
-                    # Scalar / confirmation result — single LLM call
-                    logger.info(f"🧠 Summarising tool result with LLM ({len(tool_result)} chars)")
-                    _llm_start = _time.time()
-                    resp = await active_llm.ainvoke([
-                        SystemMessage(content=TOOL_RESULT_PRESENT.format(tool_name=explicit_tool.name)),
-                        HumanMessage(content=tool_result),
-                    ])
-                    summary_text = resp.content if hasattr(resp, "content") else str(resp)
-                    if _client_metrics is not None:
-                        _client_metrics["llm_calls"] += 1
-                        _client_metrics["llm_times"].append((_time.time(), _time.time() - _llm_start))
+            # Route through shared post-processor (same as scheduler path)
+            summary_text = await _process_tool_result(explicit_tool.name, tool_result, explicit_arg, active_llm)
 
             # Persist the exchange in conversation history.
             # Include a ToolMessage so websocket image/place scanner finds image_source.

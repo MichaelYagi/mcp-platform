@@ -49,10 +49,12 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS scheduled_jobs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     label           TEXT    NOT NULL,
-    trigger_type    TEXT    NOT NULL DEFAULT 'cron',  -- 'cron' | 'condition'
+    trigger_type    TEXT    NOT NULL DEFAULT 'cron',  -- 'cron' | 'condition' | 'once'
     tool            TEXT    NOT NULL,
     tool_args       TEXT    NOT NULL DEFAULT '{}',
-    cron            TEXT,                              -- 5-field cron (cron jobs)
+    cron            TEXT,                              -- 5-field cron (cron/once jobs)
+    run_date        TEXT,                              -- ISO datetime for 'once' trigger
+    end_date        TEXT,                              -- ISO datetime to stop cron
     condition_tool  TEXT,                              -- tool to call for check (condition jobs)
     condition_expr  TEXT,                              -- e.g. "result > 10"
     condition_cron  TEXT    NOT NULL DEFAULT '*/15 * * * *',  -- how often to poll
@@ -85,6 +87,12 @@ def _ensure_db():
         if "deliver_to_session" not in cols:
             conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN deliver_to_session INTEGER NOT NULL DEFAULT 0")
             logger.info("⏰ scheduler.db migrated: added deliver_to_session column")
+        if "run_date" not in cols:
+            conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN run_date TEXT")
+            logger.info("⏰ scheduler.db migrated: added run_date column")
+        if "end_date" not in cols:
+            conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN end_date TEXT")
+            logger.info("⏰ scheduler.db migrated: added end_date column")
 
 
 def _conn() -> sqlite3.Connection:
@@ -122,14 +130,15 @@ def create_job(
                (label, trigger_type, tool, tool_args, cron,
                 condition_tool, condition_expr, condition_cron,
                 timezone, enabled, created_at, llm_prompt,
-                session_id, deliver_to_session)
-               VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?)""",
+                session_id, deliver_to_session, run_date, end_date)
+               VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)""",
             (
                 label, trigger_type, tool,
                 json.dumps(tool_args or {}),
                 cron, condition_tool, condition_expr, condition_cron,
                 tz_val, now, llm_prompt,
-                session_id, 1 if deliver_to_session else 0
+                session_id, 1 if deliver_to_session else 0,
+                run_date, end_date
             )
         )
         return cur.lastrowid
@@ -255,7 +264,6 @@ def handle_jobs_command(raw: str) -> str:
             "  :jobs pause <label>    — pause a job\n"
             "  :jobs enable <label>   — resume a job\n"
             "  :jobs cancel <label>   — delete a job\n"
-            "  :jobs cancel all       — delete ALL jobs\n"
             "  :jobs info <label>     — full detail\n"
         )
 
@@ -272,7 +280,11 @@ def _format_job_list() -> str:
     for j in jobs:
         status = "● active" if j["enabled"] else "⏸ paused"
         ttype = j["trigger_type"]
-        if ttype == "cron":
+        if ttype == "once":
+            _rd = (j.get("run_date") or "")[:16].replace("T", " ")
+            schedule = f"Once at {_rd}"
+            schedule_detail = f"run_date: {j.get('run_date', '?')}"
+        elif ttype == "cron":
             schedule = cron_to_human(j["cron"])
             schedule_detail = f"cron: {j['cron']}"
         else:
@@ -320,11 +332,15 @@ def _job_info(label: str) -> str:
     if not job:
         return f"No job found matching '{label}'."
     args = json.loads(job["tool_args"] or "{}")
-    if job["trigger_type"] == "cron":
+    if job["trigger_type"] == "once":
+        sched_lines = f"Run date:  {job.get('run_date', '?')}\n"
+    elif job["trigger_type"] == "cron":
         sched_lines = (
             f"Cron:      {job['cron']}\n"
             f"Schedule:  {cron_to_human(job['cron'])}\n"
         )
+        if job.get("end_date"):
+            sched_lines += f"Ends:      {job['end_date']}\n"
     else:
         sched_lines = (
             f"Condition: {job['condition_tool']} → {job['condition_expr']}\n"
@@ -637,6 +653,14 @@ async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
     Use the LLM to determine if a message is a scheduling/automation request.
     Falls back to False if llm_fn is not provided or the call fails.
     """
+    import re as _re_sched
+    _time_pattern = _re_sched.search(
+        r'\b(at\s+\d{1,2}(:\d{2})?\s*(am|pm)|every\s+(day|morning|night|hour|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|daily|weekly|each\s+(day|morning|night)|\d{1,2}(:\d{2})?\s*(am|pm)\s+today|tomorrow\s+at)',
+        message, _re_sched.IGNORECASE
+    )
+    if _time_pattern:
+        return True
+
     if not llm_fn:
         return False
     try:
