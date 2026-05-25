@@ -286,6 +286,7 @@ function startNewSession() {
     chat.innerHTML = "";
     messageIndex = [];
     renderNavigator();
+    if (allSessions && allSessions.length > 0) renderSessions(allSessions);
     ws.send(JSON.stringify({ type: "new_session" }));
 }
 
