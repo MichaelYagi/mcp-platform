@@ -1367,10 +1367,10 @@ ws.onmessage = (event) => {
     }
 
     if (data.type==="complete") {
-        hideThinking(); isProcessing=false; sendBtn.disabled=false; sendBtn.style.opacity='1'; sendBtn.style.cursor="pointer";
+        hideThinking(); resetControlButtons();
         if (messageIndex.length > 0)
             messageIndex[messageIndex.length - 1].domRef.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        if (data.stopped) status.textContent="Stopped"; else updateStatusWithMode(); return;
+        if (data.stopped) status.textContent="Stopped"; return;
     }
 
     if (data.type==="model_switched") { updateStatusWithMode(); sendBtn.disabled=false; isProcessing=false; hideThinking(); return; }
