@@ -554,6 +554,26 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         except Exception as send_err:
             logger.warning(f"⚠️ Delivery failed (session {session_id}): {send_err}")
 
+    except asyncio.CancelledError:
+        logger.warning("🛑 process_query cancelled cleanly")
+        # Save stop marker so session doesn't end on a bare user message,
+        # which would trigger the orphan warning on reconnect.
+        if session_manager and session_id:
+            try:
+                MAX_MESSAGE_HISTORY = int(os.getenv("MAX_MESSAGE_HISTORY", 30))
+                session_manager.add_message(
+                    session_id, "assistant", "__stopped__",
+                    MAX_MESSAGE_HISTORY, "system"
+                )
+            except Exception:
+                pass
+        try:
+            await broadcast_message("stop_banner", {})
+            await broadcast_message("complete", {"stopped": True})
+        except Exception:
+            pass
+        raise  # must re-raise so the task actually cancels
+
     except Exception as e:
         logger.error(f"❌ Error processing query: {e}")
         import traceback
@@ -675,15 +695,21 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         # broadcast will deliver result automatically.
                         logger.info(f"⏳ Session {session_id}: in-flight, reconnected socket will receive broadcast")
                     else:
-                        # Task finished but socket was dead — response lost
-                        logger.warning(f"⚠️ Session {session_id} ends on user message with no active processing")
-                        await websocket.send(json.dumps({
-                            "type": "assistant_message",
-                            "text": "⚠️ It looks like your previous message may not have received a response. "
-                                     "Please resend it.",
-                            "model": "system"
-                        }))
-                        await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                        # Check if the previous assistant message is a stop marker —
+                        # user deliberately stopped, not a dropped response.
+                        prev_msgs = messages[:-1]
+                        last_asst = next((m for m in reversed(prev_msgs) if m["role"] == "assistant"), None)
+                        was_stopped = last_asst and last_asst.get("text") == "__stopped__"
+                        if not was_stopped:
+                            # Task finished but socket was dead — response lost
+                            logger.warning(f"⚠️ Session {session_id} ends on user message with no active processing")
+                            await websocket.send(json.dumps({
+                                "type": "assistant_message",
+                                "text": "⚠️ It looks like your previous message may not have received a response. "
+                                         "Please resend it.",
+                                "model": "system"
+                            }))
+                            await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                 elif messages and messages[-1]["role"] == "assistant":
                     if session_id not in PROCESSING_SESSIONS:
                         # Only replay if the task finished while this socket was dead —
@@ -812,10 +838,9 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 print("   Watch for '🛑 Stopped' messages below.\n")
                 sys.stdout.flush()
 
-                await websocket.send(json.dumps({
-                    "type": "assistant_message",
-                    "text": "🛑 Stop requested - operation will halt at next checkpoint.\n\nThis may take a few seconds for the current step to complete."
-                }))
+                # stop_banner and __stopped__ DB save are handled by the
+                # CancelledError handler in process_query — don't duplicate here.
+                # Just send complete so the UI resets the button immediately.
                 await websocket.send(json.dumps({"type": "complete", "stopped": True}))
                 continue
 
@@ -1129,6 +1154,14 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                 if existing and not existing.done():
                     logger.warning("⚠️ Cancelling previous task for session")
                     existing.cancel()
+
+                # Clear stop signal only if no user-requested stop is pending.
+                # If the user hit :stop, the flag must stay set until run_agent
+                # starts so it can detect and abort before the classifier LLM call.
+                # Always clear stop on new query — user wants to proceed.
+                # run_agent checks the flag on entry to handle any race.
+                from client.stop_signal import clear_stop as _clear_stop
+                _clear_stop()
 
                 current_task = asyncio.create_task(
                     process_query(websocket, prompt, original_prompt, agent_ref, conversation_state,

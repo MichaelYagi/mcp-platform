@@ -68,11 +68,11 @@ async def cli_input_loop(agent, logger, tools, model_name, conversation_state, r
                 # ═══════════════════════════════════════════════════════════
                 if query == ":stop":
                     request_stop()
-                    print("\n🛑 Stop requested - operation will halt at next checkpoint")
-                    print("   This may take a few seconds for the current step to complete.")
-                    print("   Watch for '🛑 Stopped' messages below.\n")
+                    if current_agent_task and not current_agent_task.done():
+                        current_agent_task.cancel()
                     sys.stdout.flush()
-                    await broadcast_message("assistant_message", {"text": "🛑 Stop requested"})
+                    await broadcast_message("stop_banner", {})
+                    await broadcast_message("complete", {"stopped": True})
 
                     # If there's a running task, don't wait for it - just continue
                     # The stop signal will be picked up by the agent
@@ -162,6 +162,8 @@ async def cli_input_loop(agent, logger, tools, model_name, conversation_state, r
                 # ═══════════════════════════════════════════════════════════
                 async def run_and_display():
                     try:
+                        from client.stop_signal import clear_stop as _clear_stop
+                        _clear_stop()
                         enriched_system_prompt = inject_into_system_prompt(system_prompt, query=query)
                         result = await run_agent_fn(agent, conversation_state, query, logger, tools, enriched_system_prompt)
 
@@ -176,6 +178,10 @@ async def cli_input_loop(agent, logger, tools, model_name, conversation_state, r
                             "multi_agent": result.get("multi_agent", False),
                             "a2a": result.get("a2a", False)
                         })
+                    except asyncio.CancelledError:
+                        logger.warning("🛑 run_and_display cancelled cleanly")
+                        await broadcast_message("stop_banner", {})
+                        await broadcast_message("complete", {"stopped": True})
                     except Exception as e:
                         logger.error(f"❌ Error in agent execution: {e}")
                         import traceback

@@ -644,8 +644,11 @@ class TestRunAgentErrorPaths:
         assert result["current_model"] == "test-model"
 
     async def test_stop_signal_cleared_before_run(self):
+        # Behavior changed: run_agent now aborts immediately when stop is set,
+        # raising CancelledError. clear_stop() is the caller's responsibility
+        # (websocket layer), not run_agent's.
         from client.langgraph import run_agent
-        from client.stop_signal import request_stop, is_stop_requested
+        from client.stop_signal import request_stop, is_stop_requested, clear_stop
         request_stop()
         assert is_stop_requested()
 
@@ -656,15 +659,18 @@ class TestRunAgentErrorPaths:
             "current_model": "test",
         })
 
-        await run_agent(
-            agent=mock_agent,
-            conversation_state=conv_state,
-            user_message="hello",
-            logger=MagicMock(),
-            tools=[],
-            system_prompt="Test",
-            llm=MagicMock(),
-        )
+        import asyncio
+        with pytest.raises(asyncio.CancelledError):
+            await run_agent(
+                agent=mock_agent,
+                conversation_state=conv_state,
+                user_message="hello",
+                logger=MagicMock(),
+                tools=[],
+                system_prompt="Test",
+                llm=MagicMock(),
+            )
 
-        # Stop flag should be cleared at start of run_agent
-        assert not is_stop_requested()
+        # Stop flag is NOT cleared by run_agent — caller clears it
+        assert is_stop_requested()
+        clear_stop()  # cleanup

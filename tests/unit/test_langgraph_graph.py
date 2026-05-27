@@ -178,25 +178,29 @@ class TestGraphBasicExecution:
 @pytest.mark.asyncio
 class TestCallModelStopSignal:
     async def test_stop_before_invoke_cancels(self):
-        """Stop signal set before run causes early cancelled response."""
+        """Stop signal set before run raises CancelledError immediately."""
+        import asyncio
         request_stop()
         agent, llm = make_agent(AIMessage(content="should not see this"))
-        result = await invoke(agent, "hello")
-        # LLM should not have been called — graph should exit early
-        assert "messages" in result
+        with pytest.raises(asyncio.CancelledError):
+            await invoke(agent, "hello")
+        # LLM should not have been called
+        llm.ainvoke.assert_not_called()
         clear_stop()
 
     async def test_stop_cleared_at_start_of_run(self):
-        """run_agent clears any previous stop signal before executing."""
+        """run_agent aborts with CancelledError when stop is set on entry.
+        clear_stop() is the caller's (websocket) responsibility, not run_agent's."""
+        import asyncio
+        from client.stop_signal import is_stop_requested
         request_stop()
         agent, llm = make_agent(AIMessage(content="proceeded"))
-        # run_agent calls clear_stop() at the top
-        result = await invoke(agent, "hello")
-        assert "messages" in result
-        # After run, stop is cleared
-        from client.stop_signal import is_stop_requested
-        assert not is_stop_requested()
+        with pytest.raises(asyncio.CancelledError):
+            await invoke(agent, "hello")
+        # Stop flag remains set — caller must clear it
+        assert is_stop_requested()
         clear_stop()
+        assert not is_stop_requested()
 
 
 # ═══════════════════════════════════════════════════════════════════

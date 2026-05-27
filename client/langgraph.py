@@ -1567,6 +1567,10 @@ def create_langgraph_agent(llm_with_tools, tools):
                         ],
                         "stream": False
                     }
+                    # Check stop before committing to a potentially long vision inference
+                    if is_stop_requested():
+                        logger.warning("🛑 Vision call skipped: stop requested")
+                        raise asyncio.CancelledError("Vision call cancelled: stop requested")
                     start_time = time.time()
                     async with httpx.AsyncClient(timeout=300.0) as hc:
                         vision_resp = await hc.post(
@@ -2202,7 +2206,7 @@ def create_langgraph_agent(llm_with_tools, tools):
         start_time = time.time()
         try:
             response = await asyncio.wait_for(
-                llm_to_use.ainvoke(sanitized_messages),
+                llm_ainvoke(llm_to_use, sanitized_messages),
                 timeout=300.0
             )
             duration = time.time() - start_time
@@ -3015,9 +3019,16 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
     - If no SystemMessage exists, we create one from system_prompt parameter
     """
     start_time = time.time()
+    # If a stop was requested, honour it immediately — don't run at all.
+    # This catches the race where websocket task.cancel() fires but run_agent
+    # starts before the CancelledError propagates through the event loop.
+    if is_stop_requested():
+        logger.warning("🛑 run_agent: stop signal set on entry — aborting immediately")
+        raise asyncio.CancelledError("run_agent aborted: stop was requested")
+    # Safe to clear now — no pending stop.
     clear_stop()
     trace_id = new_trace()
-    logger.info(f"[LangGraph] ✅ Stop signal cleared for new request")
+    logger.info(f"[LangGraph] 🚀 Agent run starting")
 
     try:
         if METRICS_AVAILABLE:
@@ -3377,6 +3388,10 @@ This model cannot handle your current workload.""")
             return {"messages": conversation_state["messages"]}
 
         raise
+
+    except asyncio.CancelledError:
+        logger.warning("🛑 run_agent cancelled cleanly")
+        raise  # propagate so process_query CancelledError handler fires
 
     except Exception as e:
 

@@ -438,6 +438,8 @@
 
     --user-bubble:      linear-gradient(135deg, #D92121, #a01515);
     --send-btn:         #D92121;
+    --stop-btn:          #e67e22;
+    --stop-btn-hover:    #ca6f1e;
     --send-btn-hover:   #a01515;
     --send-btn-focus:   rgba(217,33,33,0.3);
 
@@ -692,6 +694,8 @@
     /* User bubbles & buttons — unchanged */
     --user-bubble:      linear-gradient(135deg, #b02025, #7a1518);
     --send-btn:         #b02025;
+    --stop-btn:          #FEEB00;
+    --stop-btn-hover:    #e0d000;
     --send-btn-hover:   #8f1a1f;
     --send-btn-focus:   rgba(176,32,37,0.35);
 
@@ -950,6 +954,8 @@
 
     --user-bubble:      linear-gradient(135deg, #e63946, #c1121f);
     --send-btn:         #e63946;
+    --stop-btn:          #e67e22;
+    --stop-btn-hover:    #ca6f1e;
     --send-btn-hover:   #c1121f;
     --send-btn-focus:   rgba(230,57,70,0.3);
 
@@ -1781,6 +1787,8 @@
     /* User bubbles & buttons */
     --user-bubble:      linear-gradient(135deg, #003300, #005500);
     --send-btn:         #00aa2a;
+    --stop-btn:          #00cc33;
+    --stop-btn-hover:    #00ff41;
     --send-btn-hover:   #00cc33;
     --send-btn-focus:   rgba(0,255,65,0.2);
 

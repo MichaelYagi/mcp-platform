@@ -510,6 +510,21 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 #stopBtn           { background: #e74c3c; display: none; }
 #stopBtn:hover     { background: #c0392b; }
 
+/* ── Send→Stop transition states ── */
+#sendBtn.is-stop {
+    background: var(--stop-btn, color-mix(in srgb, var(--send-btn) 60%, #e74c3c 40%));
+    cursor: pointer;
+    opacity: 1;
+}
+#sendBtn.is-stop:hover {
+    background: var(--stop-btn-hover, color-mix(in srgb, var(--send-btn) 40%, #c0392b 60%));
+}
+#sendBtn.is-stopping {
+    background: var(--send-btn);
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 /* ── Status row ── */
 #statusRow {
     grid-column: 1;
@@ -1274,4 +1289,30 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     font-family: 'Inter', 'Helvetica Neue', sans-serif;
     color: var(--label-color, #ccc);
     letter-spacing: 0.05em;
+}
+/* ── Stop banner ─────────────────────────────────────────────────────── */
+.stop-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 10px 0 10px 12px;
+    padding: 5px 18px;
+    max-width: 160px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: color-mix(in srgb, #c0392b 12%, transparent);
+    color: #c0392b;
+    border: 1px solid color-mix(in srgb, #c0392b 28%, transparent);
+}
+.stop-banner::before {
+    content: "■";
+    font-size: 9px;
+}
+[data-theme="matrix"] .stop-banner {
+    background: color-mix(in srgb, #00ff41 10%, transparent);
+    color: #00ff41;
+    border-color: color-mix(in srgb, #00ff41 25%, transparent);
 }

@@ -73,12 +73,13 @@ TOOL_PATCH = {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}
 @pytest.mark.asyncio
 class TestIngestNode:
     async def test_ingest_stop_signal_exits_early(self):
-        """Stop signal before ingest returns cancelled message."""
+        """Stop signal before run_agent raises CancelledError immediately."""
+        import asyncio
         request_stop()
         llm, bound = make_mock_llm(AIMessage(content="ok"))
         agent = create_langgraph_agent(bound, [])
-        result = await invoke(agent, "ingest now then stop")
-        assert "messages" in result
+        with pytest.raises(asyncio.CancelledError):
+            await invoke(agent, "ingest now then stop")
         clear_stop()
 
     async def test_ingest_no_tool_returns_unavailable(self):

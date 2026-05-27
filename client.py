@@ -773,8 +773,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     async def _llm_fn_for_memory(system: str, user: str) -> str:
         """Thin wrapper — calls the same Ollama LLM used by the agent."""
         from langchain_core.messages import SystemMessage, HumanMessage
+        from client.langgraph import llm_ainvoke as _llm_ainvoke
         msgs = [SystemMessage(content=system), HumanMessage(content=user)]
-        response = await llm.ainvoke(msgs)
+        response = await _llm_ainvoke(llm, msgs)
         return response.content if hasattr(response, "content") else str(response)
 
     inactivity_watcher = InactivityWatcher(_llm_fn_for_memory, session_manager)
@@ -985,11 +986,15 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # LLM summarization fallback
         try:
             from langchain_core.messages import SystemMessage, HumanMessage as _HM
-            resp = await active_llm.ainvoke([
+            from client.langgraph import llm_ainvoke as _llm_ainvoke
+            resp = await _llm_ainvoke(active_llm, [
                 SystemMessage(content=TOOL_RESULT_PRESENT.format(tool_name=tool_name)),
                 _HM(content=tool_result),
             ])
             return resp.content if hasattr(resp, "content") else str(resp)
+        except asyncio.CancelledError:
+            logger.warning("🛑 _process_tool_result: LLM summarization cancelled")
+            raise
         except Exception as _e:
             logger.error(f"[_process_tool_result] LLM summarization failed: {_e}")
 
@@ -1016,7 +1021,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         Used by AgentScheduler._fire_job when a job has an llm_prompt set.
         """
         from langchain_core.messages import HumanMessage
-        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        from client.langgraph import llm_ainvoke as _llm_ainvoke
+        response = await _llm_ainvoke(llm, [HumanMessage(content=prompt)])
         return response.content if hasattr(response, "content") else str(response)
 
     agent_scheduler = AgentScheduler(
@@ -1487,6 +1493,13 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     # Create enhanced agent runner with multi-agent support
     async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None):
         """Enhanced agent runner with multi-agent, A2A, and skills support"""
+
+        # Bail immediately if a stop was requested — before any pre-checks
+        # (memory search, skill injection, multi-agent routing) run.
+        from client.stop_signal import is_stop_requested as _is_stop_requested
+        if _is_stop_requested():
+            logger.warning("🛑 run_agent_wrapper: stop signal set on entry — aborting")
+            raise asyncio.CancelledError("run_agent_wrapper aborted: stop was requested")
 
         # Use provided system_prompt or fallback to global SYSTEM_PROMPT
         if system_prompt is None:

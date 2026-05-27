@@ -855,8 +855,30 @@ function updateStatusWithMode() {
 
 function stopProcessing() {}
 
+function setSendBtnStop() {
+    // Processing started — turn Send into a clickable Stop button
+    sendBtn.textContent = 'Stop';
+    sendBtn.classList.add('is-stop');
+    sendBtn.classList.remove('is-stopping');
+    sendBtn.disabled = false;
+    sendBtn.style.opacity = '1';
+    sendBtn.style.cursor = 'pointer';
+}
+
+function setSendBtnStopping() {
+    // Stop was clicked — grey out and disable until confirmed
+    sendBtn.textContent = 'Stop';
+    sendBtn.classList.remove('is-stop');
+    sendBtn.classList.add('is-stopping');
+    sendBtn.disabled = true;
+    sendBtn.style.opacity = '0.45';
+    sendBtn.style.cursor = 'not-allowed';
+}
+
 function resetControlButtons() {
     isProcessing = false;
+    sendBtn.textContent = 'Send';
+    sendBtn.classList.remove('is-stop', 'is-stopping');
     sendBtn.style.display  = 'flex';
     sendBtn.disabled       = false;
     sendBtn.style.opacity  = '1';
@@ -1272,7 +1294,7 @@ ws.onmessage = (event) => {
         const msgs = data.messages;
         if (msgs.length > 0 && msgs[msgs.length - 1].role === 'user') {
             showThinking(); isProcessing = true;
-            sendBtn.disabled = true; status.textContent = 'Processing…';
+            setSendBtnStop(); status.textContent = 'Processing…';
         }
         // Reset nav highlight to the last prompt, matching chat scroll-to-bottom
         if (window.resetNavHighlight) window.resetNavHighlight(messageIndex.length - 1);
@@ -1320,15 +1342,20 @@ ws.onmessage = (event) => {
     if (data.type==="user_message") {
         if (data.text===lastSentMessage) {
             lastSentMessage = null;
-            if (!data.text.startsWith(":")) { showThinking(); isProcessing=true; sendBtn.disabled=true; status.textContent="Processing…"; }
+            if (!data.text.startsWith(":")) { showThinking(); isProcessing=true; setSendBtnStop(); status.textContent="Processing…"; }
             return;
         }
-        addMessage(data.text,"user",false); showThinking(); isProcessing=true; sendBtn.disabled=true; status.textContent="Processing…"; return;
+        addMessage(data.text,"user",false); showThinking(); isProcessing=true; setSendBtnStop(); status.textContent="Processing…"; return;
+    }
+
+    if (data.type==="stop_banner") {
+        hideThinking(); addStopBanner(); isProcessing=false; resetControlButtons(); return;
     }
 
     if (data.type==="assistant_message") {
+        if (data.text==="__stopped__") return; // stop marker — rendered as banner already
         if (data.text.includes("🛑")||data.text.toLowerCase().includes("interrupted")||data.text.toLowerCase().includes("stopped")) {
-            hideThinking(); addMessage(data.text,"assistant",false,false,data.model); isProcessing=false; resetControlButtons(); return;
+            hideThinking(); addStopBanner(); isProcessing=false; resetControlButtons(); return;
         }
         hideThinking(); lastResponseWasMultiAgent = data.multi_agent===true;
         addMessage(data.text,"assistant",false,lastResponseWasMultiAgent,data.model,new Date().toISOString(),data.image||null,data.image_url||null);
@@ -1375,7 +1402,7 @@ ws.onmessage = (event) => {
 };
 
 modelSelect.addEventListener("change", (e) => {
-    status.textContent = "Switching model…"; sendBtn.disabled=true; isProcessing=true; showThinking();
+    status.textContent = "Switching model…"; isProcessing=true; setSendBtnStop(); showThinking();
     ws.send(JSON.stringify({ type:"switch_model", model:e.target.value }));
 });
 
@@ -1446,8 +1473,18 @@ function fallbackCopy(text, onSuccess) {
 // ============================================================
 // ADD MESSAGE
 // ============================================================
+function addStopBanner() {
+    const banner = document.createElement("div");
+    banner.className = "stop-banner";
+    banner.textContent = "Stopped";
+    const chat = document.getElementById("chat");
+    chat.appendChild(banner);
+    chat.scrollTop = chat.scrollHeight;
+}
+
 function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=null, timestamp=null, imageB64=null, imageUrl=null, messageId=null) {
     text = text || "";
+    if (text === "__stopped__") { if (role === "assistant") addStopBanner(); return; }
     if (text.startsWith("[TextContent(")) return;
     if (text.trim()===""&&!imageB64&&!imageUrl) return;
     const div = document.createElement("div");
@@ -1511,24 +1548,33 @@ function addMessage(text, role, saveToDb=false, isMultiAgent=false, modelName=nu
 // SEND MESSAGE
 // ============================================================
 function send() {
-    sendBtn.style.opacity='0.5'; sendBtn.disabled=true; sendBtn.style.cursor="not-allowed";
+    // If button is in stop-ready state, intercept and send :stop
+    if (isProcessing && sendBtn.classList.contains('is-stop')) {
+        ws.send(JSON.stringify({type:"user",text:":stop"}));
+        status.textContent="Stopping…";
+        setSendBtnStopping();
+        return;
+    }
     const text = input.value.trim();
-    if (isProcessing&&text!==":stop") { sendBtn.style.opacity='1'; sendBtn.disabled=false; sendBtn.style.cursor="pointer"; return; }
-    if (!text) { sendBtn.style.opacity='1'; sendBtn.disabled=false; sendBtn.style.cursor="pointer"; return; }
-    if (ws.readyState!==WebSocket.OPEN) { status.textContent="Cannot send: WebSocket not connected"; sendBtn.style.opacity='1'; sendBtn.disabled=false; sendBtn.style.cursor="pointer"; return; }
+    if (isProcessing) return; // already stopping, ignore
+    if (!text) return;
+    if (ws.readyState!==WebSocket.OPEN) { status.textContent="Cannot send: WebSocket not connected"; return; }
 
     addMessage(text,"user",false);
     addLocalLogEntry('USER', text);
     input.value=""; lastSentMessage=text;
 
     if (text===":stop") {
-        ws.send(JSON.stringify({type:"user",text:":stop"})); isProcessing=false; status.textContent="Stop signal sent...";
-        sendBtn.style.opacity='1'; sendBtn.disabled=false; sendBtn.style.cursor="pointer"; return;
+        ws.send(JSON.stringify({type:"user",text:":stop"}));
+        status.textContent="Stopping…";
+        setSendBtnStopping();
+        input.value = "";
+        return;
     }
 
     const quickCommands=[':commands',':tools',':model',':models',':stats',':multi',':a2a',':health',':metrics'];
     const isQuickCommand=quickCommands.some(cmd=>text.startsWith(cmd));
-    isProcessing=true; sendBtn.disabled=true; status.textContent="Processing…"; lastResponseWasMultiAgent=false;
+    isProcessing=true; setSendBtnStop(); status.textContent="Processing…"; lastResponseWasMultiAgent=false;
     if (!isQuickCommand) showThinking();
     ws.send(JSON.stringify({type:"user",text,session_id:currentSessionId}));
 }
