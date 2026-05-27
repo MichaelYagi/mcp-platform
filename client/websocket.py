@@ -484,8 +484,9 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                     image_b64 = tool_data["image_base64"]
                     logger.info(f"🖼️ Found image_base64 ({len(image_b64)} chars) in ToolMessage")
 
-                # Pick up image_source — convert local paths to /image?path= endpoint
-                _candidate = tool_data.get("image_source", "")
+                # Pick up image_source — prefer original over thumbnail.
+                # image_source_original is the full-res URL; image_source is the 225px thumbnail.
+                _candidate = tool_data.get("image_source_original") or tool_data.get("image_source", "")
                 if image_source is None and _candidate:
                     if _candidate.startswith(("http://", "https://")):
                         image_source = _candidate
