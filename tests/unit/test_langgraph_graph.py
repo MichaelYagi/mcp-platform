@@ -391,6 +391,121 @@ class TestCallModelToolPath:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Tool mid-execution stop (asyncio.wait race pattern)
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestToolMidExecutionStop:
+
+    async def test_stop_during_slow_tool_cancels(self):
+        """Stop fires while a tool is running — asyncio.wait race cancels it."""
+        clear_stop()
+
+        tool_started = asyncio.Event()
+
+        async def slow_tool_fn(args):
+            tool_started.set()
+            await asyncio.sleep(10)
+            return "should not return"
+
+        tool_a = make_tool("slow_tool")
+        tool_a.ainvoke = slow_tool_fn
+
+        tool_call_response = AIMessage(
+            content="",
+            tool_calls=[{"name": "slow_tool", "args": {}, "id": "t1"}]
+        )
+        final = AIMessage(content="done")
+
+        # Don't pass llm= so classifier is skipped; LLM goes straight to tool call
+        llm, bound = make_mock_llm(side_effect=[tool_call_response, final])
+        agent = create_langgraph_agent(bound, [tool_a])
+
+        async def trigger_stop():
+            await tool_started.wait()
+            await asyncio.sleep(0.05)
+            request_stop()
+
+        asyncio.create_task(trigger_stop())
+
+        with patch.dict("sys.modules", {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}):
+            with pytest.raises(asyncio.CancelledError):
+                await run_agent(
+                    agent=agent,
+                    conversation_state=base_state(),
+                    user_message="use slow tool",
+                    logger=MagicMock(),
+                    tools=[tool_a],
+                    system_prompt="System",
+                    llm=None,  # skip classifier
+                )
+
+        assert tool_started.is_set(), "Tool should have started before stop fired"
+        clear_stop()
+
+    async def test_fast_tool_completes_before_stop(self):
+        """Fast tool finishes before stop watcher fires — result used normally."""
+        clear_stop()
+
+        tool_a = make_tool("fast_tool", "fast result")
+
+        tool_call_response = AIMessage(
+            content="",
+            tool_calls=[{"name": "fast_tool", "args": {}, "id": "t1"}]
+        )
+        final = AIMessage(content="done")
+
+        llm, bound = make_mock_llm(side_effect=[tool_call_response, final])
+        agent = create_langgraph_agent(bound, [tool_a])
+
+        with patch.dict("sys.modules", {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}):
+            result = await run_agent(
+                agent=agent,
+                conversation_state=base_state(),
+                user_message="use fast tool",
+                logger=MagicMock(),
+                tools=[tool_a],
+                system_prompt="System",
+                llm=None,  # skip classifier
+            )
+
+        assert "messages" in result
+        assert tool_a.ainvoke.call_count >= 1
+
+    async def test_stop_before_tool_starts_skips_execution(self):
+        """Stop set when LLM returns tool call — call_tools entry check fires, tool skipped."""
+        clear_stop()
+
+        tool_a = make_tool("skip_tool")
+
+        async def llm_side_effect(messages):
+            request_stop()
+            return AIMessage(
+                content="",
+                tool_calls=[{"name": "skip_tool", "args": {}, "id": "t1"}]
+            )
+
+        llm, bound = make_mock_llm(side_effect=llm_side_effect)
+        agent = create_langgraph_agent(bound, [tool_a])
+
+        with patch.dict("sys.modules", {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}):
+            result = await run_agent(
+                agent=agent,
+                conversation_state=base_state(),
+                user_message="use skip tool",
+                logger=MagicMock(),
+                tools=[tool_a],
+                system_prompt="System",
+                llm=None,  # skip classifier
+            )
+
+        tool_a.ainvoke.assert_not_called()
+        assert "messages" in result
+        clear_stop()
+
+
+# ═══════════════════════════════════════════════════════════════════
 # call_model — Ollama search override path
 # ═══════════════════════════════════════════════════════════════════
 

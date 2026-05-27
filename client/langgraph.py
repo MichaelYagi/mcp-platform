@@ -819,6 +819,8 @@ async def rag_node(state):
 
         return {"messages": [response], "llm": state.get("llm")}
 
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         logger.error(f"❌ Error in RAG node: {e}")
         msg = AIMessage(content=f"Error searching knowledge base: {str(e)}")
@@ -1895,6 +1897,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                         else:
                             logger.warning("⚠️ Web search returned no results")
 
+                    except asyncio.CancelledError:
+                        raise
                     except Exception as e:
                         logger.error(f"❌ Web search failed: {e}")
 
@@ -2437,6 +2441,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                             ])
                             _is_hedging = _confidence_check.content.strip().upper().startswith("N")
                             logger.info(f"[LangGraph] 🔎 Confidence check: {'LOW — will search' if _is_hedging else 'OK'}")
+                        except asyncio.CancelledError:
+                            raise
                         except Exception as _cc_err:
                             logger.warning(f"[LangGraph] ⚠️ Confidence check failed: {_cc_err}")
 
@@ -2473,6 +2479,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 ])
                                 _search_query = _query_gen.content.strip().strip('"').strip("'")
                                 logger.info(f"[LangGraph] 🔍 Generated search query: {_search_query}")
+                            except asyncio.CancelledError:
+                                raise
                             except Exception:
                                 _search_query = user_message
                             _tool_result = await _ws_tool.ainvoke({"query": _search_query})
@@ -2489,6 +2497,8 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 current_model = get_model_name(base_llm)
                             else:
                                 logger.warning("[LangGraph] ⚠️ Web search fallback returned no results")
+                        except asyncio.CancelledError:
+                            raise
                         except Exception as _hedge_err:
                             logger.warning(f"[LangGraph] ⚠️ Web search fallback failed: {_hedge_err}")
                     else:
@@ -2791,7 +2801,32 @@ def create_langgraph_agent(llm_with_tools, tools):
                 # Enrich args with session context (e.g. last_file_path) when missing
                 if session_state:
                     tool_args = session_state.inject_into_args(tool_name, tool_args)
-                result = await tool.ainvoke(tool_args)
+                # Race tool execution against a stop-signal watcher.
+                # If stop fires first, cancel the tool task and raise CancelledError.
+                # If the tool finishes first, cancel the watcher and use the result.
+                async def _stop_waiter():
+                    while not is_stop_requested():
+                        await asyncio.sleep(0.1)
+
+                _tool_task = asyncio.create_task(tool.ainvoke(tool_args))
+                _stop_task = asyncio.create_task(_stop_waiter())
+
+                done, pending = await asyncio.wait(
+                    [_tool_task, _stop_task],
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+
+                for t in pending:
+                    t.cancel()
+                    try:
+                        await t
+                    except (asyncio.CancelledError, Exception):
+                        pass
+
+                if _tool_task not in done:
+                    raise asyncio.CancelledError(f"Tool '{tool_name}' cancelled: stop requested")
+
+                result = await _tool_task
                 tool_duration = time.time() - tool_start
 
                 if METRICS_AVAILABLE:

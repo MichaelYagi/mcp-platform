@@ -31,10 +31,17 @@ def make_mock_llm(response=None, side_effect=None):
     bound.model = "mock-model"
     bound.bound = llm
     if side_effect:
-        bound.ainvoke = AsyncMock(side_effect=side_effect)
+        # Share the same AsyncMock on both llm and bound so llm_ainvoke
+        # works regardless of whether run_agent resolves llm or llm.bound
+        shared = AsyncMock(side_effect=side_effect)
+        bound.ainvoke = shared
+        llm.ainvoke = shared
     else:
-        bound.ainvoke = AsyncMock(return_value=response or AIMessage(content="ok"))
+        shared = AsyncMock(return_value=response or AIMessage(content="ok"))
+        bound.ainvoke = shared
+        llm.ainvoke = shared
     llm.bind_tools = MagicMock(return_value=bound)
+    bound.bind_tools = MagicMock(return_value=bound)
     return llm, bound
 
 
