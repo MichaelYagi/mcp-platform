@@ -340,6 +340,7 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                             cron=pending.cron,
                             tool_args=pending.tool_args,
                             condition_tool=pending.condition_tool,
+                            condition_tool_args=getattr(pending, "condition_tool_args", {}),
                             condition_expr=pending.condition_expr,
                             condition_cron=pending.condition_cron,
                             timezone=pending.timezone,

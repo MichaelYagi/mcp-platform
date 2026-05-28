@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs (
     tool_args       TEXT    NOT NULL DEFAULT '{}',
     cron            TEXT,                              -- 5-field cron (cron jobs)
     condition_tool  TEXT,                              -- tool to call for check (condition jobs)
+    condition_tool_args TEXT NOT NULL DEFAULT '{}',    -- args for the condition tool (condition jobs)
     condition_expr  TEXT,                              -- e.g. "result > 10"
     condition_cron  TEXT    NOT NULL DEFAULT '*/15 * * * *',  -- how often to poll
     timezone        TEXT    NOT NULL DEFAULT 'America/Vancouver',
@@ -91,6 +92,9 @@ def _ensure_db():
         if "end_date" not in cols:
             conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN end_date TEXT")
             logger.info("⏰ scheduler.db migrated: added end_date column")
+        if "condition_tool_args" not in cols:
+            conn.execute("ALTER TABLE scheduled_jobs ADD COLUMN condition_tool_args TEXT NOT NULL DEFAULT '{}'")
+            logger.info("⏰ scheduler.db migrated: added condition_tool_args column")
 
 
 def _conn() -> sqlite3.Connection:
@@ -109,6 +113,7 @@ def create_job(
     tool_args: dict = None,
     tz: str = "America/Vancouver",
     condition_tool: str = None,
+    condition_tool_args: dict = None,
     condition_expr: str = None,
     condition_cron: str = "*/15 * * * *",
     llm_prompt: str = None,
@@ -126,14 +131,16 @@ def create_job(
         cur = conn.execute(
             """INSERT INTO scheduled_jobs
                (label, trigger_type, tool, tool_args, cron,
-                condition_tool, condition_expr, condition_cron,
+                condition_tool, condition_tool_args, condition_expr, condition_cron,
                 timezone, enabled, created_at, llm_prompt,
                 session_id, deliver_to_session, run_date, end_date)
-               VALUES (?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)""",
+               VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)""",
             (
                 label, trigger_type, tool,
                 json.dumps(tool_args or {}),
-                cron, condition_tool, condition_expr, condition_cron,
+                cron, condition_tool,
+                json.dumps(condition_tool_args or {}),
+                condition_expr, condition_cron,
                 tz_val, now, llm_prompt,
                 session_id, 1 if deliver_to_session else 0,
                 run_date, end_date
@@ -374,6 +381,7 @@ class ScheduleConfirmation:
     timezone: str
     human_schedule: str
     original_request: str
+    condition_tool_args: dict = field(default_factory=dict)
     llm_prompt: Optional[str] = None  # instruction passed to LLM after tool runs
     run_date: Optional[str] = None    # ISO datetime for 'once' trigger
     end_date: Optional[str] = None    # ISO datetime to stop cron
@@ -395,8 +403,9 @@ class ScheduleConfirmation:
                 + end_line
             )
         else:
+            cta_str = json.dumps(self.condition_tool_args) if self.condition_tool_args else "none"
             sched = (
-                f"  Condition: {self.condition_tool} → {self.condition_expr}\n"
+                f"  Condition: {self.condition_tool}({cta_str}) → {self.condition_expr}\n"
                 f"  Polls:     {cron_to_human(self.condition_cron)}\n"
             )
         llm_line = f"  LLM:       {self.llm_prompt}\n" if self.llm_prompt else ""
@@ -456,11 +465,12 @@ Shape B — all fields resolved (condition trigger):
   "tool": "<action tool to run when condition is true>",
   "tool_args": {{}},
   "condition_tool": "<tool to call for the check>",
+  "condition_tool_args": {{}},
   "condition_expr": "<Python expression — see notes below>",
   "condition_cron": "<how often to poll, default */15 * * * *>",
   "timezone": "America/Vancouver",
   "human_schedule": "<plain English description>",
-  "llm_prompt": "<optional instruction for the LLM after the tool runs>",
+  "llm_prompt": "<optional instruction for the LLM to execute with full tool access after condition fires — use this for compound actions like 'reply to the email AND send a chat message'>",
   "deliver_to_session": false
 }}
 
@@ -589,6 +599,7 @@ class ScheduleParser:
                 trigger_type=ttype,
                 cron=data.get("cron"),
                 condition_tool=data.get("condition_tool"),
+                condition_tool_args=data.get("condition_tool_args", {}),
                 condition_expr=data.get("condition_expr"),
                 condition_cron=data.get("condition_cron", "*/15 * * * *"),
                 timezone=data.get("timezone", self._tz),
@@ -686,11 +697,12 @@ class AgentScheduler:
     llm_fn:      async (prompt: str) -> str   -- optional, used when job has llm_prompt
     """
 
-    def __init__(self, execute_fn, broadcast_fn, llm_fn=None, session_manager=None):
+    def __init__(self, execute_fn, broadcast_fn, llm_fn=None, session_manager=None, agent_fn=None):
         self._execute_fn = execute_fn
         self._broadcast_fn = broadcast_fn
         self._llm_fn = llm_fn
         self._session_manager = session_manager
+        self._agent_fn = agent_fn  # full agent run with tool access (run_agent_wrapper)
         self._scheduler = None
 
     async def start(self):
@@ -761,19 +773,37 @@ class AgentScheduler:
         try:
             tool = (job.get("tool") or "").strip()
             llm_prompt = (job.get("llm_prompt") or "").strip()
+            condition_result = job.get("_condition_result", "")  # injected by _check_condition
 
-            if not tool:
-                # Pure LLM job — no tool, send llm_prompt directly to the LLM
-                if llm_prompt and self._llm_fn:
-                    result = await self._llm_fn(llm_prompt)
-                    logger.info(f"⏰ Pure LLM job {job['id']} completed")
-                else:
-                    logger.warning(f"⏰ Job {job['id']} has no tool and no llm_prompt — skipping")
-                    return
-            else:
-                # Tool job — execute and use raw result, no LLM involvement
+            if not tool and not llm_prompt:
+                logger.warning(f"⏰ Job {job['id']} has no tool and no llm_prompt — skipping")
+                return
+
+            tool_result = None
+            if tool:
                 args = json.loads(job["tool_args"] or "{}")
-                result = await self._execute_fn(tool, args)
+                tool_result = await self._execute_fn(tool, args)
+
+            if llm_prompt:
+                # Build full prompt with condition result and tool result as context
+                context_parts = []
+                if condition_result:
+                    context_parts.append(f"Condition check result:\n{condition_result}")
+                if tool_result:
+                    context_parts.append(f"Action tool result:\n{tool_result}")
+                context = "\n\n".join(context_parts)
+                full_prompt = f"{llm_prompt}\n\n{context}".strip() if context else llm_prompt
+
+                if self._agent_fn:
+                    # Full agent run — LLM has tool access for compound actions
+                    result = await self._agent_fn(full_prompt)
+                elif self._llm_fn:
+                    # Fallback: bare LLM (no tool access)
+                    result = await self._llm_fn(full_prompt)
+                else:
+                    result = tool_result or "No result."
+            else:
+                result = tool_result
 
             # Deliver to specific session or broadcast to all clients
             if job.get("deliver_to_session") and job.get("session_id") and self._session_manager:
@@ -814,7 +844,8 @@ class AgentScheduler:
         """Poll the condition tool; fire the action tool only if condition is true."""
         record_run(job["id"], is_check=True)
         try:
-            result_raw = await self._execute_fn(job["condition_tool"], {})
+            condition_args = json.loads(job.get("condition_tool_args") or "{}")
+            result_raw = await self._execute_fn(job["condition_tool"], condition_args)
 
             # Build evaluation context — try to give the expression as much
             # to work with as possible regardless of what the tool returned.
@@ -862,7 +893,10 @@ class AgentScheduler:
 
         if triggered:
             logger.info(f"⏰ Condition met for job '{job['label']}' — firing action")
-            await self._fire_job(job)
+            # Inject condition result as context for llm_prompt
+            job_with_context = dict(job)
+            job_with_context["_condition_result"] = result_raw
+            await self._fire_job(job_with_context)
 
     def add_job(self, job_id: int):
         """Hot-register a newly created job without restart."""

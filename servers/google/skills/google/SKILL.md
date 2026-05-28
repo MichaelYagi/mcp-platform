@@ -1,10 +1,9 @@
 ---
 name: google
 description: >
-  Read and send Gmail emails, manage Google Calendar events, and interact
-  with Google Chat spaces. Check unread mail, browse the inbox, send emails,
-  view today's schedule, see the week ahead, create calendar events, list
-  Chat spaces, read and send Chat messages, and search across spaces.
+  Read and send Gmail emails, and manage Google Calendar events.
+  Check unread mail, browse the inbox, send emails, view today's
+  schedule, see the week ahead, and create new calendar events.
 tags:
   - gmail
   - calendar
@@ -12,8 +11,6 @@ tags:
   - email
   - schedule
   - appointments
-  - chat
-  - messaging
 tools:
   - gmail_get_unread
   - gmail_get_recent
@@ -26,11 +23,6 @@ tools:
   - calendar_get_this_week
   - calendar_create_event
   - get_day_briefing
-  - chat_list_spaces
-  - chat_get_messages
-  - chat_send_message
-  - chat_reply_to_thread
-  - chat_search_messages
 ---
 
 # Google (Gmail + Calendar) Skill
@@ -55,13 +47,6 @@ Interact with Gmail and Google Calendar through a single server.
 
 **Briefing:**
 1. **Day briefing** — weather, unread emails, and calendar in one call; supports `date_offset` for today (0) or tomorrow (1)
-
-**Google Chat capabilities:**
-1. **List spaces** — discover all Chat spaces and DMs you're a member of (required bootstrap step)
-2. **Get messages** — fetch recent messages from a space, with optional `since_hours` window for polling
-3. **Send message** — post a new top-level message to a space or DM
-4. **Reply to thread** — reply within an existing thread by thread resource name
-5. **Search messages** — find messages matching a text query across all spaces or within one space
 
 **Authentication:** OAuth2 via `credentials.json` (downloaded from Google Cloud Console). A `token.json` is written on first authorization and silently refreshed afterwards. See ⚙️ Configuration below.
 
@@ -303,92 +288,6 @@ Each section fails independently — a Gmail auth issue won't break the weather 
 
 > **`date_offset`**: Integer day offset from today. `0` = today (default), `1` = tomorrow. The calendar window starts at midnight of the offset day and spans `calendar_days` days forward. Email is always current unread regardless of offset.
 
----
-
-## 📋 Google Chat Workflows
-
-### List spaces (always do this first)
-
-```python
-chat_list_spaces()
-```
-
-**Returns:**
-```json
-{
-  "count": 3,
-  "spaces": [
-    { "id": "spaces/XXXXXX", "display_name": "general", "type": "ROOM", "member_count": 12 },
-    { "id": "spaces/YYYYYY", "display_name": "Alice Smith", "type": "DIRECT_MESSAGE" }
-  ]
-}
-```
-
-You need a `spaces/XXXXXX` ID for every other chat tool. Run this once to discover them.
-
-### Fetch messages from a space
-
-```python
-chat_get_messages(space_id="spaces/XXXXXX")                    # last 25 messages
-chat_get_messages(space_id="spaces/XXXXXX", max_results=50)
-chat_get_messages(space_id="spaces/XXXXXX", since_hours=0.25)  # last 15 minutes (scheduler polling)
-chat_get_messages(space_id="spaces/XXXXXX", since_hours=1)     # last hour
-```
-
-Each message includes `name` (message resource ID), `sender`, `text`, `create_time`, and `thread_name`. Returns `len_messages` for scheduler condition expressions.
-
-### Send a message
-
-```python
-chat_send_message(space_id="spaces/XXXXXX", text="Deploy is done ✅")
-chat_send_message(space_id="spaces/YYYYYY", text="Hey Alice, the report is ready.")
-
-# Chat markdown supported
-chat_send_message(space_id="spaces/XXXXXX", text="*Alert:* invoice email received from `john@company.com`")
-```
-
-### Reply in a thread
-
-```python
-chat_reply_to_thread(
-    space_id="spaces/XXXXXX",
-    thread_name="spaces/XXXXXX/threads/ZZZZZZ",   # from chat_get_messages result
-    text="Got it, I'll take a look."
-)
-```
-
-`thread_name` comes from the `thread_name` field in `chat_get_messages` output. If the thread no longer exists, the API falls back to creating a new top-level message.
-
-### Search messages
-
-```python
-chat_search_messages(query="deployment")                                  # across all spaces
-chat_search_messages(query="invoice", space_id="spaces/XXXXXX")          # within one space
-chat_search_messages(query="outage", max_results=10)
-```
-
-**Returns:**
-```json
-{
-  "query": "invoice",
-  "count": 2,
-  "len_messages": 2,
-  "messages": [
-    {
-      "name": "spaces/XXXXXX/messages/MMMMMM",
-      "sender": "John Smith",
-      "text": "New invoice arrived from supplier",
-      "create_time": "2025-06-25T10:30:00Z",
-      "space_name": "spaces/XXXXXX",
-      "thread_name": "spaces/XXXXXX/threads/ZZZZZZ"
-    }
-  ]
-}
-```
-
-Cross-space search fetches recent messages from each space and filters client-side. For high-volume spaces, scope to a `space_id` for better accuracy.
-
----
 
 ## 🚀 Complete Examples
 
@@ -492,41 +391,6 @@ interval: 30 min
 
 Typical automation pattern: `gmail_search` → get `thread_id` from result → `gmail_check_replied` → act if unreplied.
 
-### Example 5: Chat space monitor (OpenClaw-style)
-
-```
-Scheduler job: notify #ops when an invoice email arrives
-
-condition_tool: gmail_search
-condition_args: {query: "subject:invoice is:unread"}
-condition_expr: len_messages > 0
-action_tool: chat_send_message
-action_args: {space_id: "spaces/XXXXXX", text: "New invoice email from {messages[0].from}"}
-interval: 15 min
-```
-
-```
-Scheduler job: watch #general for mentions of 'outage'
-
-condition_tool: chat_search_messages
-condition_args: {query: "outage", space_id: "spaces/XXXXXX"}
-condition_expr: len_messages > 0
-action_tool: chat_send_message
-action_args: {space_id: "spaces/YYYYYY", text: "Outage mentioned in #general: {messages[0].text}"}
-interval: 5 min
-```
-
-```
-Scheduler job: poll a DM space and auto-reply to new messages
-
-condition_tool: chat_get_messages
-condition_args: {space_id: "spaces/YYYYYY", since_hours: 0.25}
-condition_expr: len_messages > 0
-action_tool: chat_reply_to_thread
-action_args: {space_id: "spaces/YYYYYY", thread_name: "{messages[0].thread_name}", text: "...LLM-generated..."}
-interval: 15 min
-```
-
 ---
 
 ## 🔧 Tool Reference
@@ -544,11 +408,6 @@ interval: 15 min
 | `calendar_get_this_week` | This week's events | — |
 | `calendar_create_event` | Create a calendar event | `summary`, `start`, `end`, `attendees`, `all_day` |
 | `get_day_briefing` | Weather + unread email + calendar in one call | `max_emails`, `forecast_days`, `calendar_days`, `date_offset` |
-| `chat_list_spaces` | List all Chat spaces and DMs | — |
-| `chat_get_messages` | Fetch messages from a space | `space_id`, `max_results`, `since_hours` |
-| `chat_send_message` | Send a message to a space or DM | `space_id`, `text` |
-| `chat_reply_to_thread` | Reply within an existing thread | `space_id`, `thread_name`, `text` |
-| `chat_search_messages` | Search messages by text query | `query`, `space_id`, `max_results` |
 
 ---
 
@@ -558,7 +417,7 @@ interval: 15 min
 
 1. Go to https://console.cloud.google.com/
 2. Create a new project (or use an existing one)
-3. Enable the **Gmail API**, **Google Calendar API**, and **Google Chat API** under *APIs & Services → Library*
+3. Enable the **Gmail API** and **Google Calendar API** under *APIs & Services → Library*
 
 ### Step 2 — Create OAuth2 credentials
 
@@ -586,9 +445,6 @@ After you approve, `token.json` is written and all subsequent runs are silent.
 | `gmail.send` | Send emails |
 | `calendar.readonly` | Read events |
 | `calendar.events` | Create / modify events |
-| `chat.messages` | Read Chat messages |
-| `chat.messages.create` | Send Chat messages |
-| `chat.spaces.readonly` | List Chat spaces |
 
 ---
 
@@ -597,11 +453,8 @@ After you approve, `token.json` is written and all subsequent runs are silent.
 **Timezone:** `calendar_create_event` defaults to `America/Vancouver`. Change the
 `timeZone` value in `server.py` to match your local timezone.
 
-**Google Chat API access:** The Chat API requires your Google Workspace account to have Chat enabled. Personal Gmail accounts may have limited or no Chat API access. The `chat_search_messages` cross-space search falls back to per-space scanning if the `searchSpaces` endpoint is unavailable for your account type.
 
-**Space IDs:** Always call `chat_list_spaces` first to discover `spaces/XXXXXX` IDs. These are stable and can be stored in your scheduler job configs once discovered.
 
-**Thread replies:** `chat_reply_to_thread` uses `REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD` — if the thread is deleted or inaccessible it creates a new top-level message rather than failing.
 
 **All-day events:** Pass `all_day=True` and use `"YYYY-MM-DD"` format for `start`/`end`.
 

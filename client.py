@@ -1025,11 +1025,25 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         response = await _llm_ainvoke(llm, [HumanMessage(content=prompt)])
         return response.content if hasattr(response, "content") else str(response)
 
+    async def _scheduler_agent_fn(prompt: str) -> str:
+        """Full agent run for scheduled jobs with llm_prompt — gives the LLM tool access
+        so it can execute compound actions (e.g. reply to email AND send chat message).
+        """
+        _state = {"messages": [], "loop_count": 0}
+        result = await run_agent_wrapper(prompt, _state)
+        if isinstance(result, dict):
+            msgs = result.get("messages", [])
+            if msgs:
+                last = msgs[-1]
+                return last.content if hasattr(last, "content") else str(last)
+        return str(result)
+
     agent_scheduler = AgentScheduler(
         execute_fn=_tool_executor,
         broadcast_fn=broadcast_proactive_result,
         llm_fn=_scheduler_llm_fn,
         session_manager=session_manager,
+        agent_fn=_scheduler_agent_fn,
     )
     await agent_scheduler.start()
 
