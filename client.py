@@ -2205,6 +2205,40 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     # Start log file tailing
     asyncio.create_task(logging_handler.tail_log_file(SERVER_LOG_FILE))
 
+    # ── Google re-auth notifier ───────────────────────────────────────────────
+    # If a Google server wrote auth_pending.json at startup (invalid token),
+    # wait for the first browser client to connect then push the auth URL into chat.
+    # Uses a dedicated 'google_auth_required' message type so the frontend can
+    # re-inject it after session_loaded wipes the chat.
+    _AUTH_PENDING_FILE = PROJECT_ROOT / "auth_pending.json"
+
+    async def _google_auth_notifier():
+        if not _AUTH_PENDING_FILE.exists():
+            return
+        # Wait up to 30s for at least one browser client to connect
+        for _ in range(60):
+            if websocket.CONNECTED_WEBSOCKETS:
+                break
+            await asyncio.sleep(0.5)
+        else:
+            return  # No client connected in time — URL is still in the log
+
+        # Extra delay to let the session fully load before broadcasting
+        await asyncio.sleep(3.0)
+
+        try:
+            pending = json.loads(_AUTH_PENDING_FILE.read_text())
+            auth_url = pending.get("auth_url", "")
+            if not auth_url:
+                return
+            from client.websocket import broadcast_message as _ws_broadcast
+            await _ws_broadcast("google_auth_required", {"auth_url": auth_url})
+            logger.info("🔑 Google auth URL broadcast to UI")
+        except Exception as _e:
+            logger.warning(f"🔑 Could not broadcast auth URL: {_e}")
+
+    asyncio.create_task(_google_auth_notifier())
+
     # Start system monitor
     if SYSTEM_MONITOR_AVAILABLE:
         asyncio.create_task(system_monitor_loop(websocket.get_system_monitor_clients(), update_interval=1.0))

@@ -98,6 +98,10 @@ logger.info("🚀 Google server logging initialized")
 
 mcp = FastMCP("google-server")
 
+# Cached credentials — avoids hitting the network on every tool call.
+# Invalidated when expired; google_reauth_complete also clears it.
+_cached_creds = None
+
 # ── OAuth2 Configuration ───────────────────────────────────────────────────────
 
 # Scopes required for Gmail (read + send) and Calendar (read + write)
@@ -106,6 +110,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/calendar.readonly",
     "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/chat.messages",
+    "https://www.googleapis.com/auth/chat.messages.create",
+    "https://www.googleapis.com/auth/chat.spaces.readonly",
 ]
 
 # Paths — set GOOGLE_CREDENTIALS_FILE and GOOGLE_TOKEN_FILE in .env,
@@ -122,11 +129,18 @@ TOKEN_FILE = os.getenv(
 
 def _get_google_creds() -> Optional["Credentials"]:
     """
-    Load or refresh OAuth2 credentials.
-    On first run with no token.json, an interactive browser flow is triggered.
+    Load or refresh OAuth2 credentials, with in-memory caching.
+    Returns cached creds immediately if still valid; only hits the network
+    when the token is expired or missing.
     """
+    global _cached_creds
+
     if not GOOGLE_AVAILABLE:
         return None
+
+    # Return cached creds if still valid
+    if _cached_creds and _cached_creds.valid:
+        return _cached_creds
 
     creds = None
 
@@ -145,12 +159,14 @@ def _get_google_creds() -> Optional["Credentials"]:
             if not Path(CREDENTIALS_FILE).exists():
                 logger.error(f"credentials.json not found at {CREDENTIALS_FILE}")
                 return None
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-            creds = flow.run_console()
+            # No interactive flow here — use google_reauth_start / google_reauth_complete
+            logger.error("No valid token — call google_reauth_start to re-authorise")
+            return None
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
 
+    _cached_creds = creds
     return creds
 
 
@@ -1165,6 +1181,786 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
         raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail reply error: {e}",
                            {"tool": "gmail_reply_tool", "message_id": message_id})
 
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["read","search","email","external"],
+    triggers=["search email","find email","look for email","email from","emails about","find messages"],
+    idempotent=True,
+    template='use gmail_search: query="" [max_results=""]',
+    intent_category="google",
+    text_fields=["text"]
+)
+def gmail_search(query: str, max_results: int = 20) -> str:
+    """
+    Search Gmail messages using a Gmail query string.
+
+    Supports all Gmail search operators:
+      from:john@example.com   — sender filter
+      to:me                   — recipient filter
+      subject:invoice         — subject keyword
+      is:unread               — unread only
+      is:starred              — starred messages
+      after:2024/01/01        — date range
+      has:attachment          — has attachments
+      label:work              — label filter
+      in:inbox                — location filter
+      thread:THREAD_ID        — all messages in a thread
+
+    Multiple operators can be combined: "from:john is:unread subject:invoice"
+
+    Args:
+        query (str, required): Gmail search query string
+        max_results (int, optional): Maximum messages to return. Default: 20.
+
+    Returns:
+        JSON with:
+        - query: The search query used
+        - count: Number of messages returned
+        - messages: List of matching messages (id, thread_id, from, subject, date, snippet, link)
+        - text: Human-readable formatted list
+
+    Use cases:
+        - Scheduler condition: check for new emails matching a pattern
+        - "Find all unread emails from john@company.com"
+        - "Search for emails with subject containing 'invoice'"
+        - "Are there any unread emails from my boss?"
+    """
+    logger.info(f"🛠  gmail_search called: query={query!r} max={max_results}")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("gmail_search")
+
+    if not query or not query.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "query must not be empty",
+                           {"tool": "gmail_search"})
+
+    try:
+        service = _gmail_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "gmail_search"})
+
+        result = service.users().messages().list(
+            userId="me",
+            q=query,
+            maxResults=max_results
+        ).execute()
+
+        message_refs = result.get("messages", [])
+        messages = []
+
+        for ref in message_refs:
+            msg = service.users().messages().get(
+                userId="me",
+                id=ref["id"],
+                format="metadata",
+                metadataHeaders=["From", "To", "Subject", "Date"]
+            ).execute()
+
+            headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
+            import html as _html
+            _msg_id = msg["id"]
+            messages.append({
+                "id":        _msg_id,
+                "thread_id": msg.get("threadId", ""),
+                "from":      _html.unescape(headers.get("from", "")),
+                "subject":   _html.unescape(headers.get("subject", "(no subject)")),
+                "date":      headers.get("date", ""),
+                "snippet":   _html.unescape(msg.get("snippet", "")),
+                "unread":    "UNREAD" in msg.get("labelIds", []),
+                "link":      f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
+            })
+
+        lines = []
+        for i, m in enumerate(messages, 1):
+            lines.append(f"{i}. {m['subject']}")
+            lines.append(f"   From:    {m['from']}")
+            lines.append(f"   Date:    {m['date']}")
+            lines.append(f"   Snippet: {m['snippet'][:120]}{'…' if len(m['snippet']) > 120 else ''}")
+            lines.append(f"   ID:      {m['id']}")
+            lines.append(f"   Thread:  {m['thread_id']}")
+            lines.append(f"   Link:    {m['link']}")
+            lines.append("")
+
+        logger.info(f"✅ gmail_search returned {len(messages)} messages for query={query!r}")
+        return json.dumps({
+            "query":         query,
+            "count":         len(messages),
+            "len_messages":  len(messages),  # Explicit alias for scheduler condition expressions
+            "messages":      messages,
+            "text":          "\n".join(lines) if lines else f"No messages found for query: {query}",
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ Gmail search error: {e}")
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail API error: {e}",
+                           {"tool": "gmail_search", "query": query,
+                            "status": getattr(e, "status_code", None)})
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["read","email","external"],
+    triggers=["have i replied","did i reply","check if replied","replied to thread","reply status"],
+    idempotent=True,
+    template='use gmail_check_replied: thread_id="" [since_hours=""]',
+    intent_category="google",
+    text_fields=["text"]
+)
+def gmail_check_replied(thread_id: str, since_hours: Optional[float] = None) -> str:
+    """
+    Check whether you have sent a reply in a given Gmail thread.
+
+    Fetches all messages in the thread and checks whether any are from the
+    authenticated user (i.e. in the SENT label). Optionally restricts the
+    check to replies sent within the last N hours.
+
+    Args:
+        thread_id (str, required): Gmail thread ID (from gmail_search or gmail_get_recent)
+        since_hours (float, optional): If provided, only count replies sent within
+                                       this many hours. E.g. 2.0 = last 2 hours.
+                                       Default: check entire thread history.
+
+    Returns:
+        JSON with:
+        - thread_id: The thread checked
+        - replied: True if you have sent a reply (within the time window if specified)
+        - reply_count: Number of your sent messages in the thread (within window)
+        - last_reply_at: ISO timestamp of your most recent reply, or null
+        - since_hours: The time window used, or null
+        - text: Human-readable summary
+
+    Use cases:
+        - Scheduler condition: "replied == False" triggers a follow-up action
+        - "Have I replied to this thread?"
+        - "Check if I've responded to John's email in the last 2 hours"
+    """
+    logger.info(f"🛠  gmail_check_replied called: thread_id={thread_id} since_hours={since_hours}")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("gmail_check_replied")
+
+    if not thread_id or not thread_id.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "thread_id must not be empty",
+                           {"tool": "gmail_check_replied"})
+
+    try:
+        service = _gmail_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "gmail_check_replied"})
+
+        thread = service.users().threads().get(
+            userId="me",
+            id=thread_id,
+            format="metadata",
+            metadataFields="messages/id,messages/labelIds,messages/internalDate,messages/payload/headers"
+        ).execute()
+
+        cutoff_ms = None
+        if since_hours is not None:
+            cutoff_dt = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+            cutoff_ms = int(cutoff_dt.timestamp() * 1000)
+
+        sent_messages = []
+        for msg in thread.get("messages", []):
+            label_ids = msg.get("labelIds", [])
+            if "SENT" not in label_ids:
+                continue
+            internal_date_ms = int(msg.get("internalDate", 0))
+            if cutoff_ms is not None and internal_date_ms < cutoff_ms:
+                continue
+            headers = {h["name"].lower(): h["value"]
+                       for h in (msg.get("payload") or {}).get("headers", [])}
+            sent_messages.append({
+                "id":   msg["id"],
+                "date": headers.get("date", ""),
+                "sent_at_ms": internal_date_ms,
+            })
+
+        sent_messages.sort(key=lambda m: m["sent_at_ms"])
+        replied = len(sent_messages) > 0
+        last_reply_at = None
+        if sent_messages:
+            from datetime import datetime as _dt
+            last_ms = sent_messages[-1]["sent_at_ms"]
+            last_reply_at = _dt.fromtimestamp(last_ms / 1000, tz=timezone.utc).isoformat()
+
+        if replied:
+            window_str = f" in the last {since_hours}h" if since_hours is not None else ""
+            text = f"You have sent {len(sent_messages)} reply/replies in this thread{window_str}. Last reply: {last_reply_at}."
+        else:
+            window_str = f" in the last {since_hours}h" if since_hours is not None else ""
+            text = f"No reply found from you in this thread{window_str}."
+
+        logger.info(f"✅ gmail_check_replied: thread={thread_id} replied={replied} count={len(sent_messages)}")
+        return json.dumps({
+            "thread_id":    thread_id,
+            "replied":      replied,
+            "reply_count":  len(sent_messages),
+            "last_reply_at": last_reply_at,
+            "since_hours":  since_hours,
+            "text":         text,
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ gmail_check_replied error: {e}")
+        status = getattr(e, "status_code", None)
+        kind = FailureKind.USER_ERROR if status == 404 else FailureKind.UPSTREAM_ERROR
+        raise MCPToolError(kind, f"Gmail API error: {e}",
+                           {"tool": "gmail_check_replied", "thread_id": thread_id, "status": status})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GOOGLE CHAT TOOLS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _chat_service():
+    creds = _get_google_creds()
+    if not creds:
+        return None
+    return build("chat", "v1", credentials=creds)
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["read","chat","external"],
+    triggers=["list chat spaces","chat rooms","my spaces","google chat spaces","chat channels","list spaces"],
+    idempotent=True,
+    template="use chat_list_spaces",
+    intent_category="google",
+    text_fields=["text"]
+)
+def chat_list_spaces() -> str:
+    """
+    List all Google Chat spaces and DMs you are a member of.
+
+    Returns space IDs, display names, and space types. Use this to discover
+    space IDs required by all other chat tools.
+
+    Returns:
+        JSON with:
+        - count: Number of spaces returned
+        - spaces: List of spaces with id, name, display_name, type, and member_count
+        - text: Human-readable formatted list
+
+    Space types:
+        - ROOM: Named group spaces
+        - DIRECT_MESSAGE: 1:1 or group DMs
+        - GROUP_CHAT: Unnamed group chats
+
+    Use cases:
+        - "List my Google Chat spaces"
+        - "What chat rooms am I in?"
+        - Bootstrap step to discover space IDs before calling other chat tools
+    """
+    logger.info("🛠  chat_list_spaces called")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("chat_list_spaces")
+
+    try:
+        service = _chat_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "chat_list_spaces"})
+
+        spaces = []
+        page_token = None
+        while True:
+            kwargs = {"pageSize": 100}
+            if page_token:
+                kwargs["pageToken"] = page_token
+            result = service.spaces().list(**kwargs).execute()
+            for s in result.get("spaces", []):
+                space_type = s.get("spaceType") or s.get("type", "UNKNOWN")
+                display = s.get("displayName") or s.get("name", "")
+                spaces.append({
+                    "id":           s["name"],          # e.g. "spaces/XXXXXX"
+                    "display_name": display,
+                    "type":         space_type,
+                    "member_count": s.get("memberCount", None),
+                    "single_user_bot_dm": s.get("singleUserBotDm", False),
+                })
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+
+        lines = []
+        for i, sp in enumerate(spaces, 1):
+            lines.append(f"{i}. {sp['display_name'] or '(unnamed)'} [{sp['type']}]")
+            lines.append(f"   ID: {sp['id']}")
+            if sp["member_count"]:
+                lines.append(f"   Members: {sp['member_count']}")
+            lines.append("")
+
+        logger.info(f"✅ chat_list_spaces: {len(spaces)} spaces")
+        return json.dumps({
+            "count":  len(spaces),
+            "spaces": spaces,
+            "text":   "\n".join(lines) if lines else "No spaces found.",
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ Chat API error: {e}")
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Chat API error: {e}",
+                           {"tool": "chat_list_spaces", "status": getattr(e, "status_code", None)})
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["read","chat","external"],
+    triggers=["chat messages","get messages","recent messages in space","read chat","show chat","messages from space"],
+    idempotent=True,
+    template='use chat_get_messages: space_id="" [max_results=""] [since_hours=""]',
+    intent_category="google",
+    text_fields=["text"]
+)
+def chat_get_messages(space_id: str, max_results: int = 25, since_hours: Optional[float] = None) -> str:
+    """
+    Fetch recent messages from a Google Chat space or DM.
+
+    Supports optional time-window filtering via since_hours, making this suitable
+    as a scheduler condition tool for watching spaces for new activity.
+
+    Args:
+        space_id (str, required): Space resource name, e.g. "spaces/XXXXXX"
+                                  (get from chat_list_spaces)
+        max_results (int, optional): Maximum messages to return. Default: 25.
+        since_hours (float, optional): Only return messages sent within this many
+                                       hours. E.g. 0.25 = last 15 minutes.
+                                       Default: no time filter.
+
+    Returns:
+        JSON with:
+        - space_id: The space queried
+        - count: Number of messages returned
+        - len_messages: Alias for count (for scheduler condition expressions)
+        - messages: List of messages (name, sender, text, create_time, thread_name)
+        - text: Human-readable formatted list
+
+    Use cases:
+        - "Show recent messages in #general"
+        - Scheduler condition: poll a space every N minutes for new messages
+        - "What has been said in this DM recently?"
+    """
+    logger.info(f"🛠  chat_get_messages called: space_id={space_id} max={max_results} since_hours={since_hours}")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("chat_get_messages")
+
+    if not space_id or not space_id.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "space_id must not be empty",
+                           {"tool": "chat_get_messages"})
+
+    # Normalise — accept bare ID or full resource name
+    if not space_id.startswith("spaces/"):
+        space_id = f"spaces/{space_id}"
+
+    try:
+        service = _chat_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "chat_get_messages"})
+
+        kwargs = {
+            "parent":   space_id,
+            "pageSize": max_results,
+            "orderBy":  "createTime desc",
+        }
+        if since_hours is not None:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+            kwargs["filter"] = f'createTime > "{cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")}"'
+
+        result = service.spaces().messages().list(**kwargs).execute()
+        raw_messages = result.get("messages", [])
+
+        # API returns newest-first; reverse so oldest is first in output
+        raw_messages = list(reversed(raw_messages))
+
+        messages = []
+        for m in raw_messages:
+            sender = m.get("sender", {})
+            sender_name = sender.get("displayName") or sender.get("name", "unknown")
+            messages.append({
+                "name":        m["name"],                          # e.g. "spaces/X/messages/Y"
+                "sender":      sender_name,
+                "text":        m.get("text") or m.get("formattedText", ""),
+                "create_time": m.get("createTime", ""),
+                "thread_name": (m.get("thread") or {}).get("name", ""),
+            })
+
+        lines = []
+        for msg in messages:
+            lines.append(f"[{msg['create_time']}] {msg['sender']}")
+            lines.append(f"  {msg['text']}")
+            lines.append(f"  ID: {msg['name']}")
+            if msg["thread_name"]:
+                lines.append(f"  Thread: {msg['thread_name']}")
+            lines.append("")
+
+        logger.info(f"✅ chat_get_messages: {len(messages)} messages from {space_id}")
+        return json.dumps({
+            "space_id":     space_id,
+            "count":        len(messages),
+            "len_messages": len(messages),
+            "messages":     messages,
+            "text":         "\n".join(lines) if lines else f"No messages found in {space_id}.",
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ Chat API error: {e}")
+        status = getattr(e, "status_code", None)
+        kind = FailureKind.USER_ERROR if status == 404 else FailureKind.UPSTREAM_ERROR
+        raise MCPToolError(kind, f"Chat API error: {e}",
+                           {"tool": "chat_get_messages", "space_id": space_id, "status": status})
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["write","chat","external"],
+    triggers=["send chat message","message a space","post to chat","send message to space","chat someone","dm someone on chat"],
+    idempotent=False,
+    template='use chat_send_message: space_id="" text=""',
+    intent_category="google"
+)
+def chat_send_message(space_id: str, text: str) -> str:
+    """
+    Send a message to a Google Chat space or DM.
+
+    Args:
+        space_id (str, required): Space resource name, e.g. "spaces/XXXXXX"
+                                  (get from chat_list_spaces)
+        text (str, required): Message text to send. Supports basic Chat markdown:
+                              *bold*, _italic_, `code`, ```code block```
+
+    Returns:
+        JSON with:
+        - status: "sent"
+        - message_name: Full resource name of the sent message
+        - space_id: Space it was sent to
+        - text: The message text sent
+        - create_time: Server timestamp
+
+    Use cases:
+        - "Send a message to #general saying the deploy is done"
+        - Scheduler action: notify a space when a condition fires
+        - "DM Alice on Chat saying I'll be 5 minutes late"
+    """
+    logger.info(f"🛠  chat_send_message called: space_id={space_id}")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("chat_send_message")
+
+    if not space_id or not space_id.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "space_id must not be empty",
+                           {"tool": "chat_send_message"})
+    if not text or not text.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "text must not be empty",
+                           {"tool": "chat_send_message"})
+
+    if not space_id.startswith("spaces/"):
+        space_id = f"spaces/{space_id}"
+
+    try:
+        service = _chat_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "chat_send_message"})
+
+        result = service.spaces().messages().create(
+            parent=space_id,
+            body={"text": text}
+        ).execute()
+
+        logger.info(f"✅ chat_send_message: sent to {space_id}, name={result.get('name')}")
+        return json.dumps({
+            "status":       "sent",
+            "message_name": result.get("name", ""),
+            "space_id":     space_id,
+            "text":         text,
+            "create_time":  result.get("createTime", ""),
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ Chat send error: {e}")
+        status = getattr(e, "status_code", None)
+        kind = FailureKind.USER_ERROR if status in (403, 404) else FailureKind.UPSTREAM_ERROR
+        raise MCPToolError(kind, f"Chat API error: {e}",
+                           {"tool": "chat_send_message", "space_id": space_id, "status": status})
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["write","chat","external"],
+    triggers=["reply in chat","reply to thread","respond in thread","chat thread reply","reply to chat message"],
+    idempotent=False,
+    template='use chat_reply_to_thread: space_id="" thread_name="" text=""',
+    intent_category="google"
+)
+def chat_reply_to_thread(space_id: str, thread_name: str, text: str) -> str:
+    """
+    Reply to an existing thread in a Google Chat space.
+
+    Sends a message scoped to a specific thread so it appears as a reply
+    rather than a new top-level message.
+
+    Args:
+        space_id (str, required): Space resource name, e.g. "spaces/XXXXXX"
+        thread_name (str, required): Thread resource name, e.g. "spaces/XXXXXX/threads/YYYYYY"
+                                     (returned as thread_name in chat_get_messages results)
+        text (str, required): Reply text. Supports Chat markdown.
+
+    Returns:
+        JSON with:
+        - status: "sent"
+        - message_name: Full resource name of the sent reply
+        - thread_name: Thread the reply was posted to
+        - space_id: Space it was sent to
+        - text: The reply text
+        - create_time: Server timestamp
+
+    Use cases:
+        - "Reply to that thread in #dev"
+        - Scheduler action: reply to a thread when a condition fires
+        - "Respond in the same thread as the original message"
+    """
+    logger.info(f"🛠  chat_reply_to_thread called: space_id={space_id} thread={thread_name}")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("chat_reply_to_thread")
+
+    if not space_id or not space_id.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "space_id must not be empty",
+                           {"tool": "chat_reply_to_thread"})
+    if not thread_name or not thread_name.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "thread_name must not be empty",
+                           {"tool": "chat_reply_to_thread"})
+    if not text or not text.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "text must not be empty",
+                           {"tool": "chat_reply_to_thread"})
+
+    if not space_id.startswith("spaces/"):
+        space_id = f"spaces/{space_id}"
+
+    try:
+        service = _chat_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "chat_reply_to_thread"})
+
+        result = service.spaces().messages().create(
+            parent=space_id,
+            messageReplyOption="REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+            body={
+                "text":   text,
+                "thread": {"name": thread_name},
+            }
+        ).execute()
+
+        logger.info(f"✅ chat_reply_to_thread: replied in {thread_name}, name={result.get('name')}")
+        return json.dumps({
+            "status":       "sent",
+            "message_name": result.get("name", ""),
+            "thread_name":  thread_name,
+            "space_id":     space_id,
+            "text":         text,
+            "create_time":  result.get("createTime", ""),
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ Chat reply error: {e}")
+        status = getattr(e, "status_code", None)
+        kind = FailureKind.USER_ERROR if status in (403, 404) else FailureKind.UPSTREAM_ERROR
+        raise MCPToolError(kind, f"Chat API error: {e}",
+                           {"tool": "chat_reply_to_thread", "space_id": space_id,
+                            "thread_name": thread_name, "status": status})
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["read","search","chat","external"],
+    triggers=["search chat","find chat message","look for chat message","chat message search","search google chat"],
+    idempotent=True,
+    template='use chat_search_messages: query="" [space_id=""] [max_results=""]',
+    intent_category="google",
+    text_fields=["text"]
+)
+def chat_search_messages(query: str, space_id: Optional[str] = None, max_results: int = 25) -> str:
+    """
+    Search Google Chat messages by text query, optionally scoped to a space.
+
+    Uses the Chat API's search endpoint when available; falls back to
+    client-side text filtering of recent messages when a space_id is provided.
+
+    Args:
+        query (str, required): Text to search for in message bodies
+        space_id (str, optional): Limit search to a specific space ("spaces/XXXXXX").
+                                  If omitted, searches across all spaces.
+        max_results (int, optional): Maximum messages to return. Default: 25.
+
+    Returns:
+        JSON with:
+        - query: Search query used
+        - space_id: Space filtered to, or null for all spaces
+        - count: Number of matching messages
+        - len_messages: Alias for count (for scheduler condition expressions)
+        - messages: List of matching messages (name, sender, text, create_time, space_name, thread_name)
+        - text: Human-readable formatted list
+
+    Use cases:
+        - "Find all chat messages mentioning 'deployment'"
+        - Scheduler condition: watch for keyword mentions across spaces
+        - "Search #general for messages about the outage"
+    """
+    logger.info(f"🛠  chat_search_messages called: query={query!r} space_id={space_id} max={max_results}")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("chat_search_messages")
+
+    if not query or not query.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "query must not be empty",
+                           {"tool": "chat_search_messages"})
+
+    if space_id and not space_id.startswith("spaces/"):
+        space_id = f"spaces/{space_id}"
+
+    try:
+        service = _chat_service()
+        if not service:
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
+                               {"tool": "chat_search_messages"})
+
+        matched = []
+
+        if space_id:
+            # Scoped search: fetch recent messages from the space and filter client-side.
+            # The Chat API list endpoint supports a `filter` param for createTime but not
+            # full-text; we pull up to 200 messages and match locally.
+            fetch_limit = min(max(max_results * 4, 100), 200)
+            result = service.spaces().messages().list(
+                parent=space_id,
+                pageSize=fetch_limit,
+                orderBy="createTime desc",
+            ).execute()
+            q_lower = query.lower()
+            for m in result.get("messages", []):
+                body = m.get("text") or m.get("formattedText", "")
+                if q_lower in body.lower():
+                    sender = m.get("sender", {})
+                    matched.append({
+                        "name":        m["name"],
+                        "sender":      sender.get("displayName") or sender.get("name", "unknown"),
+                        "text":        body,
+                        "create_time": m.get("createTime", ""),
+                        "space_name":  space_id,
+                        "thread_name": (m.get("thread") or {}).get("name", ""),
+                    })
+                    if len(matched) >= max_results:
+                        break
+        else:
+            # Cross-space search using the top-level search endpoint.
+            try:
+                result = service.spaces().searchSpaces(
+                    query=query,
+                    pageSize=max_results,
+                    useAdminAccess=False,
+                ).execute()
+                # searchSpaces returns spaces not messages; fall back to per-space scan below
+                spaces_to_search = [s["name"] for s in result.get("spaces", [])]
+            except HttpError:
+                # searchSpaces may not be available for all account types
+                spaces_to_search = []
+
+            if not spaces_to_search:
+                # Fallback: list all spaces and scan each for the query
+                spaces_result = service.spaces().list(pageSize=50).execute()
+                spaces_to_search = [s["name"] for s in spaces_result.get("spaces", [])]
+
+            q_lower = query.lower()
+            for sp in spaces_to_search:
+                if len(matched) >= max_results:
+                    break
+                try:
+                    msgs = service.spaces().messages().list(
+                        parent=sp,
+                        pageSize=50,
+                        orderBy="createTime desc",
+                    ).execute()
+                    for m in msgs.get("messages", []):
+                        body = m.get("text") or m.get("formattedText", "")
+                        if q_lower in body.lower():
+                            sender = m.get("sender", {})
+                            matched.append({
+                                "name":        m["name"],
+                                "sender":      sender.get("displayName") or sender.get("name", "unknown"),
+                                "text":        body,
+                                "create_time": m.get("createTime", ""),
+                                "space_name":  sp,
+                                "thread_name": (m.get("thread") or {}).get("name", ""),
+                            })
+                            if len(matched) >= max_results:
+                                break
+                except HttpError:
+                    pass  # Skip spaces we can't read
+
+        matched.sort(key=lambda m: m["create_time"])
+
+        lines = []
+        for msg in matched:
+            lines.append(f"[{msg['create_time']}] {msg['sender']} in {msg['space_name']}")
+            lines.append(f"  {msg['text']}")
+            lines.append(f"  ID: {msg['name']}")
+            if msg["thread_name"]:
+                lines.append(f"  Thread: {msg['thread_name']}")
+            lines.append("")
+
+        logger.info(f"✅ chat_search_messages: {len(matched)} matches for {query!r}")
+        return json.dumps({
+            "query":        query,
+            "space_id":     space_id,
+            "count":        len(matched),
+            "len_messages": len(matched),
+            "messages":     matched,
+            "text":         "\n".join(lines) if lines else f"No messages found matching '{query}'.",
+        }, indent=2)
+
+    except MCPToolError:
+        raise
+    except HttpError as e:
+        logger.error(f"❌ Chat search error: {e}")
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Chat API error: {e}",
+                           {"tool": "chat_search_messages", "query": query,
+                            "status": getattr(e, "status_code", None)})
+
+
 @mcp.tool()
 @check_tool_enabled(category="google")
 @tool_meta(
@@ -1381,6 +2177,177 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
 
 skill_registry = None
 
+# Module-level store for the in-progress OAuth flow (step 1 → step 2)
+_reauth_flow = None
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["auth","google"],
+    triggers=["reauth google","google auth","re-authorise google","google token","fix google auth","google login"],
+    idempotent=False,
+    template="use google_reauth_start | use google_reauth_complete: code=\"\"",
+    intent_category="google",
+)
+def google_reauth_start() -> str:
+    """
+    Step 1 of 2: Begin Google OAuth re-authorisation.
+
+    Generates an authorisation URL and returns it. Open the URL in your browser,
+    approve access, then copy the authorisation code shown by Google and pass it
+    to google_reauth_complete.
+
+    Call this when Google tools return auth errors or token.json is missing/invalid.
+
+    Returns:
+        JSON with:
+        - status: "awaiting_code"
+        - auth_url: URL to open in your browser
+        - instructions: What to do next
+    """
+    global _reauth_flow
+    logger.info("🛠  google_reauth_start called")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("google_reauth_start")
+    if not Path(CREDENTIALS_FILE).exists():
+        raise MCPToolError(FailureKind.USER_ERROR,
+                           f"credentials.json not found at {CREDENTIALS_FILE}",
+                           {"tool": "google_reauth_start"})
+
+    import urllib.parse as _up
+    _reauth_flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+    _reauth_flow.redirect_uri = "urn:ietf:wg:oauth:2.0:oob"
+
+    raw_url, _ = _reauth_flow.authorization_url(
+        prompt="consent",
+        access_type="offline",
+        include_granted_scopes="true",
+    )
+
+    # Strip PKCE params — OOB does not support code_challenge
+    parsed = _up.urlparse(raw_url)
+    qs = _up.parse_qs(parsed.query, keep_blank_values=True)
+    qs.pop("code_challenge", None)
+    qs.pop("code_challenge_method", None)
+    auth_url = parsed._replace(query=_up.urlencode(qs, doseq=True)).geturl()
+
+    # Clear code_verifier from session so fetch_token won't send it
+    sess = _reauth_flow.oauth2session
+    for attr in ("_code_verifier", "code_verifier", "_pkce_verifier"):
+        if hasattr(sess, attr):
+            setattr(sess, attr, None)
+    if hasattr(sess, "_client"):
+        for attr in ("code_verifier", "_code_verifier"):
+            if hasattr(sess._client, attr):
+                setattr(sess._client, attr, None)
+
+    logger.info("✅ google_reauth_start: auth URL generated")
+    return json.dumps({
+        "status":       "awaiting_code",
+        "auth_url":     auth_url,
+        "instructions": (
+            "1. Open the auth_url in your browser\n"
+            "2. Sign in and approve access\n"
+            "3. If you see an 'unverified app' warning: click Advanced → Go to mcp-platform (unsafe)\n"
+            "4. Copy the authorisation code shown by Google\n"
+            "5. Call google_reauth_complete with the code"
+        ),
+    }, indent=2)
+
+
+@mcp.tool()
+@check_tool_enabled(category="google")
+@tool_meta(
+    tags=["auth","google"],
+    triggers=["complete google auth","google auth code","finish google reauth","submit auth code"],
+    idempotent=False,
+    template='use google_reauth_complete: code=""',
+    intent_category="google",
+)
+def google_reauth_complete(code: str) -> str:
+    """
+    Step 2 of 2: Complete Google OAuth re-authorisation.
+
+    Takes the authorisation code from google_reauth_start and exchanges it for
+    a token, writing token.json. All Google tools will work immediately after.
+
+    Args:
+        code (str, required): The authorisation code shown by Google after approving access.
+
+    Returns:
+        JSON with:
+        - status: "authorised"
+        - token_file: Path where token.json was written
+        - scopes: List of granted scopes
+    """
+    global _reauth_flow, _cached_creds
+    logger.info("🛠  google_reauth_complete called")
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("google_reauth_complete")
+    if not code or not code.strip():
+        raise MCPToolError(FailureKind.USER_ERROR, "code must not be empty",
+                           {"tool": "google_reauth_complete"})
+    if _reauth_flow is None:
+        raise MCPToolError(FailureKind.USER_ERROR,
+                           "No auth flow in progress — call google_reauth_start first",
+                           {"tool": "google_reauth_complete"})
+
+    try:
+        clean_code = "".join(code.split())  # strip any whitespace/newlines
+
+        # Ensure no code_verifier is sent — OOB does not support PKCE.
+        # The library may have stored a verifier internally; patch it out at every level.
+        sess = _reauth_flow.oauth2session
+        for attr in ("_code_verifier", "code_verifier", "_pkce_verifier"):
+            if hasattr(sess, attr):
+                setattr(sess, attr, None)
+        if hasattr(sess, "_client"):
+            cli = sess._client
+            for attr in ("code_verifier", "_code_verifier"):
+                if hasattr(cli, attr):
+                    setattr(cli, attr, None)
+            # Patch prepare_request_body to strip code_verifier from token POST
+            if hasattr(cli, "prepare_request_body"):
+                _orig_prb = cli.prepare_request_body
+                def _patched_prb(*a, **kw):
+                    kw.pop("code_verifier", None)
+                    return _orig_prb(*a, **kw)
+                cli.prepare_request_body = _patched_prb
+
+        _reauth_flow.fetch_token(code=clean_code)
+        creds = _reauth_flow.credentials
+        _reauth_flow = None  # clear after use
+
+        with open(TOKEN_FILE, "w") as f:
+            f.write(creds.to_json())
+
+        # Clear credential cache so next tool call loads the fresh token
+        _cached_creds = None
+
+        # Remove the pending auth flag so the UI stops showing the banner
+        _auth_pending = PROJECT_ROOT / "auth_pending.json"
+        if _auth_pending.exists():
+            _auth_pending.unlink()
+
+        scopes = list(creds.scopes) if creds.scopes else SCOPES
+        logger.info(f"✅ google_reauth_complete: token written to {TOKEN_FILE}")
+        return json.dumps({
+            "status":     "authorised",
+            "token_file": TOKEN_FILE,
+            "scopes":     scopes,
+            "summary":    "Google authorisation complete — all Google tools are now available",
+        }, indent=2)
+
+    except Exception as e:
+        _reauth_flow = None
+        logger.error(f"❌ google_reauth_complete failed: {e}")
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR,
+                           f"Token exchange failed: {e}",
+                           {"tool": "google_reauth_complete"})
+
 
 @mcp.tool()
 def list_capabilities(filter_tags: str | None = None) -> str:
@@ -1522,22 +2489,6 @@ if __name__ == "__main__":
     # ── OAuth startup validation ───────────────────────────────────────────────
     _creds_path = Path(CREDENTIALS_FILE)
     _token_path = Path(TOKEN_FILE)
-    _auth_script = PROJECT_ROOT / "auth_google.py"
-
-    def _run_auth_script():
-        """Run auth_google.py to obtain a fresh token. Returns True on success."""
-        if not _auth_script.exists():
-            logger.error(f"❌ auth_google.py not found at {_auth_script} — run it manually from the project root")
-            return False
-        logger.info("🌐 Launching auth_google.py for browser-based OAuth...")
-        import subprocess as _sp
-        result = _sp.run([sys.executable, str(_auth_script)], capture_output=False)
-        if result.returncode == 0:
-            logger.info("🔑 OAuth complete — token.json written")
-            return True
-        else:
-            logger.error(f"❌ auth_google.py exited with code {result.returncode} — Google tools will be unavailable")
-            return False
 
     if not _creds_path.exists():
         logger.info("🔑 credentials.json not found — skipping OAuth validation (no Google integration configured)")
@@ -1557,10 +2508,23 @@ if __name__ == "__main__":
             logger.error(f"❌ credentials.json could not be read: {_e} — download a fresh copy from Google Cloud Console")
 
         if _creds_valid:
-            _run_auth = False
+            _AUTH_PENDING_FILE = PROJECT_ROOT / "auth_pending.json"
+
+            def _trigger_reauth(reason: str):
+                logger.warning(f"🔑 token.json: ❌ {reason}")
+                try:
+                    result = json.loads(google_reauth_start())
+                    auth_url = result.get("auth_url", "")
+                    with open(_AUTH_PENDING_FILE, "w") as _f:
+                        json.dump({"auth_url": auth_url, "reason": reason}, _f)
+                    logger.warning("🔑 Re-authorisation required. Open this URL in your browser:")
+                    logger.warning(f"🔑 {auth_url}")
+                    logger.warning("🔑 Then call google_reauth_complete with the code from the browser.")
+                except Exception as _e:
+                    logger.error(f"🔑 Could not generate auth URL: {_e}")
+
             if not _token_path.exists():
-                logger.warning("🔑 token.json: ❌ missing")
-                _run_auth = True
+                _trigger_reauth("missing")
             else:
                 try:
                     from google.oauth2.credentials import Credentials as _Creds
@@ -1575,16 +2539,10 @@ if __name__ == "__main__":
                                 _f.write(_tok.to_json())
                             logger.info("🔑 token.json: ✅ refreshed successfully")
                         except Exception as _e:
-                            logger.warning(f"🔑 token.json: ❌ refresh failed ({_e})")
-                            _run_auth = True
+                            _trigger_reauth(f"refresh failed ({_e})")
                     else:
-                        logger.warning("🔑 token.json: ❌ invalid and cannot be refreshed")
-                        _run_auth = True
+                        _trigger_reauth("invalid and cannot be refreshed")
                 except Exception as _e:
-                    logger.warning(f"🔑 token.json: ❌ could not be read ({_e})")
-                    _run_auth = True
-
-            if _run_auth:
-                _run_auth_script()
+                    _trigger_reauth(f"could not be read ({_e})")
 
     mcp.run(transport="stdio")

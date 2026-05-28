@@ -225,6 +225,48 @@ let editingSessionId       = null;
 let selectionMode          = false;
 let selectedSessionIds     = new Set();
 
+// Google re-auth state — persists across session loads
+let _googleAuthUrl = null;
+
+// Check for pending Google auth immediately on page load — before any session_loaded fires
+fetch('/auth_pending.json').then(r => r.ok ? r.json() : null).then(d => {
+    if (d && d.auth_url) {
+        _googleAuthUrl = d.auth_url;
+        _showGoogleAuthBanner(d.auth_url);
+    }
+}).catch(() => {});  // file absent = no auth pending, ignore
+
+function _showGoogleAuthBanner(authUrl) {
+    // Remove any existing banner first
+    const existing = document.getElementById('googleAuthBanner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'googleAuthBanner';
+    banner.style.cssText = [
+        'background:var(--warning-bg,#2a1f00)',
+        'border:1px solid var(--warning-border,#f0a500)',
+        'color:var(--text,#e0e0e0)',
+        'border-radius:8px',
+        'padding:12px 16px',
+        'margin:8px 0',
+        'font-size:0.9rem',
+        'line-height:1.5',
+    ].join(';');
+    banner.innerHTML = `
+        <div style="font-weight:600;margin-bottom:6px;color:var(--text,#e0e0e0);">🔑 Google re-authorisation required</div>
+        <div style="margin-bottom:8px;color:var(--text,#e0e0e0);">Open this URL in your browser, approve access, then paste the authorisation code into the chat:</div>
+        <div style="word-break:break-all;background:var(--code-bg,#111);padding:6px 8px;border-radius:4px;margin-bottom:8px;font-size:0.8rem;">
+            <a href="${authUrl}" target="_blank" style="color:var(--accent,#4af);">${authUrl}</a>
+        </div>
+        <button onclick="document.getElementById('googleAuthBanner').remove();_googleAuthUrl=null;"
+                style="font-size:0.75rem;padding:3px 8px;cursor:pointer;background:transparent;border:1px solid currentColor;border-radius:4px;opacity:0.7;color:var(--text,#e0e0e0);">
+            Dismiss
+        </button>`;
+    chat.appendChild(banner);
+    chat.scrollTop = chat.scrollHeight;
+}
+
 let logPanelOpen    = false;
 let logAutoscroll   = true;
 let logFilters      = new Set(['USER','ASSISTANT','DEBUG','INFO','WARNING','ERROR']);
@@ -1304,6 +1346,8 @@ ws.onmessage = (event) => {
             _pendingScrollMessageId = null;
             scrollToMessage(mid);
         }
+        // Re-inject Google auth banner if pending
+        if (_googleAuthUrl) _showGoogleAuthBanner(_googleAuthUrl);
         return;
     }
     if (data.type==='session_created') {
@@ -1350,6 +1394,12 @@ ws.onmessage = (event) => {
 
     if (data.type==="stop_banner") {
         hideThinking(); addStopBanner(); isProcessing=false; resetControlButtons(); return;
+    }
+
+    if (data.type==="google_auth_required") {
+        _googleAuthUrl = data.auth_url;
+        _showGoogleAuthBanner(data.auth_url);
+        return;
     }
 
     if (data.type==="assistant_message") {
@@ -1559,6 +1609,23 @@ function send() {
     if (isProcessing) return; // already stopping, ignore
     if (!text) return;
     if (ws.readyState!==WebSocket.OPEN) { status.textContent="Cannot send: WebSocket not connected"; return; }
+
+    // Intercept Google auth code — looks like "4/1Aeo..." — call reauth tool directly
+    if (_googleAuthUrl && /^4\/[0-9A-Za-z_\-]+$/.test(text)) {
+        input.value = "";
+        addMessage(text, "user", false);
+        addLocalLogEntry('USER', text);
+        isProcessing = true; setSendBtnStop(); status.textContent = "Processing…"; showThinking();
+        ws.send(JSON.stringify({
+            type: "user",
+            text: `use google_reauth_complete: code="${text}"`,
+            session_id: currentSessionId
+        }));
+        _googleAuthUrl = null;
+        const banner = document.getElementById('googleAuthBanner');
+        if (banner) banner.remove();
+        return;
+    }
 
     addMessage(text,"user",false);
     addLocalLogEntry('USER', text);

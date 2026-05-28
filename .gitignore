@@ -43,3 +43,4 @@ test.py
 /tests/unit/tests/
 /tests/integration/tests/
 /tests/e2e/tests/
+/auth_pending.json

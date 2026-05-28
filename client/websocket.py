@@ -383,8 +383,11 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 await broadcast_message("complete", {"stopped": False})
                 return
 
-            # Check if this looks like a new scheduling request
-            if await looks_like_scheduling_request(prompt, llm_fn=_schedule_parser._llm_fn):
+            # Check if this looks like a new scheduling request.
+            # Skip for explicit tool dispatch ("use <tool_name>[: ...]") — those must
+            # reach run_agent_wrapper where the explicit dispatch handler lives.
+            _explicit_dispatch = prompt.lstrip().lower().startswith("use ") and len(prompt.split()) >= 2
+            if not _explicit_dispatch and await looks_like_scheduling_request(prompt, llm_fn=_schedule_parser._llm_fn):
                 logger.info(f"⏰ Scheduling request detected: {prompt[:60]}")
                 try:
                     result_sc = await _schedule_parser.parse(prompt)
