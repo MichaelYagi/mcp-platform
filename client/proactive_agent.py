@@ -359,6 +359,8 @@ def _job_info(label: str) -> str:
         f"Args:      {json.dumps(args) if args else 'none'}\n"
         + sched_lines +
         f"Timezone:  {job['timezone']}\n"
+        + (f"LLM:       {job['llm_prompt']}\n" if job.get('llm_prompt') and "|" not in (job.get('llm_prompt') or '') else "") +
+        (("Pipeline:\n" + "\n".join(f"  {i+1}. {s.strip()}" for i, s in enumerate((job.get('llm_prompt') or '').split('|'))) + "\n") if job.get('llm_prompt') and "|" in (job.get('llm_prompt') or '') else "") +
         f"Status:    {'active' if job['enabled'] else 'paused'}\n"
         f"Created:   {job['created_at'][:16].replace('T',' ')}\n"
         f"Last run:  {job['last_run'][:16].replace('T',' ') if job['last_run'] else 'never'}\n"
@@ -408,7 +410,13 @@ class ScheduleConfirmation:
                 f"  Condition: {self.condition_tool}({cta_str}) → {self.condition_expr}\n"
                 f"  Polls:     {cron_to_human(self.condition_cron)}\n"
             )
-        llm_line = f"  LLM:       {self.llm_prompt}\n" if self.llm_prompt else ""
+        llm_line = ""
+        if self.llm_prompt:
+            if "|" in self.llm_prompt:
+                steps = [s.strip() for s in self.llm_prompt.split("|")]
+                llm_line = "  Pipeline:\n" + "\n".join(f"    {i+1}. {s}" for i, s in enumerate(steps)) + "\n"
+            else:
+                llm_line = f"  LLM:       {self.llm_prompt}\n"
         delivery = "this session" if self.deliver_to_session else "all clients (broadcast)"
         delivery_line = f"  Delivery:  {delivery}\n"
         return (
@@ -443,7 +451,7 @@ AVAILABLE TOOLS:
 
 OUTPUT — return exactly one of these shapes:
 
-Shape A — all fields resolved (cron trigger):
+Shape A — single tool, cron trigger:
 {{
   "status": "ready",
   "trigger_type": "cron",
@@ -453,11 +461,11 @@ Shape A — all fields resolved (cron trigger):
   "cron": "<5-field cron>",
   "timezone": "<IANA timezone, default America/Vancouver>",
   "human_schedule": "<plain English>",
-  "llm_prompt": "<optional instruction for the LLM after the tool runs, e.g. 'Write a short commentary about this photo including the location and mood'>",
+  "llm_prompt": "<optional: instruction to pass to the LLM after the tool runs, e.g. 'Summarize this and send it to Discord using discord_notify'>",
   "deliver_to_session": false
 }}
 
-Shape B — all fields resolved (condition trigger):
+Shape B — single tool, condition trigger:
 {{
   "status": "ready",
   "trigger_type": "condition",
@@ -470,9 +478,42 @@ Shape B — all fields resolved (condition trigger):
   "condition_cron": "<how often to poll, default */15 * * * *>",
   "timezone": "America/Vancouver",
   "human_schedule": "<plain English description>",
-  "llm_prompt": "<optional instruction for the LLM to execute with full tool access after condition fires — use this for compound actions like 'reply to the email AND send a chat message'>",
+  "llm_prompt": "<optional: instruction for LLM to execute after condition fires>",
   "deliver_to_session": false
 }}
+
+Shape D — tool pipeline (multiple tools in sequence), cron or once trigger:
+USE THIS when the user asks to call more than one tool, e.g. "get briefing AND send to Discord", "run X then do Y".
+The llm_prompt must be a pipe-separated list of `use <tool>` steps.
+Each step's output is automatically passed as input to the next step.
+{{
+  "status": "ready",
+  "trigger_type": "cron",
+  "label": "<3-5 word label>",
+  "tool": "",
+  "tool_args": {{}},
+  "cron": "<5-field cron, or omit if run_date is set>",
+  "run_date": "<ISO datetime if one-time, else null>",
+  "timezone": "America/Vancouver",
+  "human_schedule": "<plain English>",
+  "llm_prompt": "use get_day_briefing | use discord_notify",
+  "deliver_to_session": false
+}}
+
+Pipeline syntax rules:
+- Separate steps with |
+- Each step must start with `use <tool_name>`
+- Optionally add args: `use discord_notify: message="..."` 
+- If no args on a notification step, the previous result is passed automatically as message
+- Examples:
+  "use get_day_briefing | use discord_notify"
+  "use gmail_get_unread | use discord_notify"
+  "use calendar_get_today | use discord_notify: message=\"Today's events\""
+
+WHEN TO USE SHAPE D:
+- User mentions two or more tool actions: "get X and send to Discord", "run X then notify me", "call X and then Y"
+- Any time discord_notify is combined with another data-fetching tool
+- Any time the action requires getting data first then sending it somewhere
 
 CONDITION EXPRESSION NOTES:
 The expression is evaluated with these variables available:
@@ -502,7 +543,8 @@ STRICT RULES:
 3. NEVER default silently. Missing time or frequency = Shape C.
 4. cron must be valid 5-field cron.
 5. Return ONLY JSON. No preamble, no markdown fences.
-6. Set deliver_to_session=true when the user's request implies they want the result in the current conversation (e.g. 'show me', 'tell me', 'give me'). Set false for monitoring/alerting jobs."""
+6. Set deliver_to_session=true when the user's request implies they want the result in the current conversation (e.g. 'show me', 'tell me', 'give me'). Set false for monitoring/alerting jobs.
+7. When the request involves multiple tools or sending data somewhere after fetching it, ALWAYS use Shape D with pipe-separated `use <tool>` steps in llm_prompt."""
 
 
 class ScheduleParser:
@@ -580,7 +622,10 @@ class ScheduleParser:
                                  "Could you rephrase? e.g. 'Run get_day_briefing at 7:54am today'"
                     )
 
-            required = ["label", "tool", "human_schedule"]
+            required = ["label", "human_schedule"]
+            # tool is only required when there's no llm_prompt (compound jobs use llm_prompt alone)
+            if not data.get("llm_prompt"):
+                required.append("tool")
             if ttype == "cron":
                 required.append("cron")
             elif ttype == "once":
@@ -594,7 +639,7 @@ class ScheduleParser:
                 )
             return ScheduleConfirmation(
                 label=data["label"],
-                tool=data["tool"],
+                tool=data.get("tool") or "",
                 tool_args=data.get("tool_args", {}),
                 trigger_type=ttype,
                 cron=data.get("cron"),
@@ -605,6 +650,7 @@ class ScheduleParser:
                 timezone=data.get("timezone", self._tz),
                 human_schedule=data["human_schedule"],
                 original_request=original,
+                llm_prompt=data.get("llm_prompt") or None,
                 run_date=data.get("run_date") or None,
                 end_date=data.get("end_date") or None,
                 deliver_to_session=bool(data.get("deliver_to_session", False)),
@@ -779,31 +825,107 @@ class AgentScheduler:
                 logger.warning(f"⏰ Job {job['id']} has no tool and no llm_prompt — skipping")
                 return
 
+            # ── Pipeline detection ────────────────────────────────────────────
+            # If llm_prompt contains pipe-separated `use <tool>` steps, execute
+            # them in sequence without any LLM involvement.
+            # Format: "use tool_a | use tool_b: arg='...' | use tool_c"
+            # Each step's output is available to the next via {previous_result}.
+            _PIPE_STEP_RE = re.compile(
+                r'use\s+(\w+)(?:\s*:\s*(.*))?', re.IGNORECASE
+            )
+            _is_pipeline = (
+                llm_prompt and
+                "|" in llm_prompt and
+                all(_PIPE_STEP_RE.match(s.strip()) for s in llm_prompt.split("|") if s.strip())
+            )
+
             tool_result = None
-            if tool:
-                args = json.loads(job["tool_args"] or "{}")
-                tool_result = await self._execute_fn(tool, args)
 
-            if llm_prompt:
-                # Build full prompt with condition result and tool result as context
-                context_parts = []
-                if condition_result:
-                    context_parts.append(f"Condition check result:\n{condition_result}")
-                if tool_result:
-                    context_parts.append(f"Action tool result:\n{tool_result}")
-                context = "\n\n".join(context_parts)
-                full_prompt = f"{llm_prompt}\n\n{context}".strip() if context else llm_prompt
+            if _is_pipeline:
+                # Execute each step in sequence
+                steps = [s.strip() for s in llm_prompt.split("|") if s.strip()]
+                previous_result = condition_result or None
+                for step_idx, step in enumerate(steps):
+                    m = _PIPE_STEP_RE.match(step)
+                    if not m:
+                        continue
+                    step_tool = m.group(1)
+                    step_args_str = (m.group(2) or "").strip()
 
-                if self._agent_fn:
-                    # Full agent run — LLM has tool access for compound actions
-                    result = await self._agent_fn(full_prompt)
-                elif self._llm_fn:
-                    # Fallback: bare LLM (no tool access)
-                    result = await self._llm_fn(full_prompt)
-                else:
-                    result = tool_result or "No result."
+                    # Parse key=value args from the step
+                    step_args: dict = {}
+                    if step_args_str:
+                        try:
+                            # Try JSON first
+                            step_args = json.loads(step_args_str)
+                        except (json.JSONDecodeError, ValueError):
+                            # Parse key="value" or key='value' pairs
+                            # Use a more robust regex that handles content with apostrophes
+                            import re as _re2
+                            # Match key="..." (double quotes, handles escaped quotes)
+                            for _m in _re2.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', step_args_str):
+                                step_args[_m.group(1)] = _m.group(2).replace('\\"', '"')
+                            # Match key='...' (single quotes) only if no double-quoted matches
+                            if not step_args:
+                                for _m in _re2.finditer(r"(\w+)\s*=\s*'((?:[^'\\]|\\.)*)'", step_args_str):
+                                    step_args[_m.group(1)] = _m.group(2).replace("\\'", "'")
+
+                    # If the step has no args and we have a previous result,
+                    # inject it as the message for notification tools
+                    if previous_result and not step_args:
+                        if any(kw in step_tool.lower() for kw in ("notify", "send", "reply", "post")):
+                            step_args = {"message": str(previous_result)}
+
+                    # Also: if the step has a message arg that looks like a
+                    # placeholder (short, no spaces), replace with previous result
+                    elif previous_result and "message" in step_args:
+                        msg_val = str(step_args["message"])
+                        if len(msg_val) < 50 and previous_result and msg_val.lower() in (
+                            "today's schedule", "the result", "the briefing",
+                            "today", "result", "briefing", "summary"
+                        ):
+                            step_args["message"] = str(previous_result)
+
+                    logger.info(f"⏰ Pipeline step {step_idx + 1}/{len(steps)}: {step_tool}({step_args})")
+                    try:
+                        previous_result = await self._execute_fn(step_tool, step_args)
+                        if previous_result and previous_result.startswith(f"Tool '{step_tool}' not found"):
+                            # Log available tools to diagnose lookup failure
+                            logger.error(f"⏰ Pipeline: tool '{step_tool}' not found — check tool is registered and server started correctly")
+                        logger.info(f"⏰ Pipeline step {step_idx + 1} completed: {str(previous_result)[:100]}")
+                    except Exception as _step_err:
+                        logger.error(f"⏰ Pipeline step {step_idx + 1} ({step_tool}) failed: {_step_err}")
+                        previous_result = f"Error in step {step_idx + 1} ({step_tool}): {_step_err}"
+                        break
+
+                result = previous_result or "Pipeline completed with no output."
+
             else:
-                result = tool_result
+                # Original single-tool or LLM-based execution
+                if tool:
+                    args = json.loads(job["tool_args"] or "{}")
+                    tool_result = await self._execute_fn(tool, args)
+
+                if llm_prompt:
+                    # Build full prompt with condition result and tool result as context
+                    context_parts = []
+                    if condition_result:
+                        context_parts.append(f"Condition check result:\n{condition_result}")
+                    if tool_result:
+                        context_parts.append(f"Action tool result:\n{tool_result}")
+                    context = "\n\n".join(context_parts)
+                    full_prompt = f"{llm_prompt}\n\n{context}".strip() if context else llm_prompt
+
+                    if self._agent_fn:
+                        # Full agent run — LLM has tool access for compound actions
+                        result = await self._agent_fn(full_prompt)
+                    elif self._llm_fn:
+                        # Fallback: bare LLM (no tool access)
+                        result = await self._llm_fn(full_prompt)
+                    else:
+                        result = tool_result or "No result."
+                else:
+                    result = tool_result
 
             # Deliver to specific session or broadcast to all clients
             if job.get("deliver_to_session") and job.get("session_id") and self._session_manager:

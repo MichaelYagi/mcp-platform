@@ -1013,6 +1013,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 except Exception as e:
                     logger.error(f"[_tool_executor] {tool_name} error: {e}")
                     return f"Tool {tool_name} error: {e}"
+        available = [t.name for t in tools]
+        logger.error(f"[_tool_executor] '{tool_name}' not found. Available ({len(available)}): {', '.join(available[:20])}")
         return f"Tool '{tool_name}' not found."
 
     async def _scheduler_llm_fn(prompt: str) -> str:
@@ -1027,10 +1029,18 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
     async def _scheduler_agent_fn(prompt: str) -> str:
         """Full agent run for scheduled jobs with llm_prompt — gives the LLM tool access
-        so it can execute compound actions (e.g. reply to email AND send chat message).
+        so it can execute compound actions (e.g. get briefing AND send to Discord).
+        Multi-agent and A2A are suppressed — scheduler jobs always use single-agent execution.
         """
         _state = {"messages": [], "loop_count": 0}
-        result = await run_agent_wrapper(prompt, _state)
+        result = await run_agent_wrapper(
+            agent,
+            _state,
+            prompt,
+            logger,
+            tools,
+            suppress_multi_agent=True,
+        )
         if isinstance(result, dict):
             msgs = result.get("messages", [])
             if msgs:
@@ -1505,7 +1515,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         return result_str
 
     # Create enhanced agent runner with multi-agent support
-    async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None):
+    async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None, suppress_multi_agent=False):
         """Enhanced agent runner with multi-agent, A2A, and skills support"""
 
         # Bail immediately if a stop was requested — before any pre-checks
@@ -2046,7 +2056,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 logger.warning(f"⚠️ Context tracking failed: {e}")
 
         # Check if A2A should be used (highest priority)
+        _is_explicit = user_message.lstrip().lower().startswith("use ")
         use_a2a = (
+                not suppress_multi_agent and
+                not _is_explicit and
                 A2A_STATE["enabled"] and
                 MULTI_AGENT_AVAILABLE and
                 orchestrator and
@@ -2086,6 +2099,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
         # Check if multi-agent should be used (second priority)
         use_multi = (
+                not suppress_multi_agent and
+                not _is_explicit and
                 MULTI_AGENT_STATE["enabled"] and
                 MULTI_AGENT_AVAILABLE and
                 not use_a2a and

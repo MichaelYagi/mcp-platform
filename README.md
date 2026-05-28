@@ -722,6 +722,22 @@ The LLM classifies whether your message is a scheduling request, parses the inte
 - `gmail_get_unread` + *"summarize these emails and flag anything that needs a reply"*
 - `get_weather_tool` + *"write a friendly morning weather summary"*
 
+**Tool pipelines:** Chain multiple tools in sequence using `|` in the `llm_prompt`. Each step's output is automatically passed to the next step — no LLM required:
+
+```
+use get_day_briefing | use discord_notify
+use gmail_get_unread | use discord_notify
+use calendar_get_today | use discord_notify
+```
+
+When scheduling, just describe what you want:
+```
+Every day at 7am, use get_day_briefing then use discord_notify to send me the result
+At 8am today, use get_day_briefing then use discord_notify to send me today's schedule
+```
+
+The scheduler parser will automatically produce the pipe syntax.
+
 **Condition expressions** have access to rich context from the tool's JSON output:
 ```
 total_unread > 0       — fires when Gmail has unread emails
