@@ -1416,9 +1416,6 @@ def gmail_check_replied(thread_id: str, since_hours: Optional[float] = None) -> 
         raise MCPToolError(kind, f"Gmail API error: {e}",
                            {"tool": "gmail_check_replied", "thread_id": thread_id, "status": status})
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# GOOGLE CHAT TOOLS
 @tool_meta(
     tags=["read","email","calendar","external"],
     triggers=["my day","day briefing","morning briefing","today's summary",
