@@ -83,6 +83,7 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 - `code_assistant` - AI-powered code analysis, generation, and refactoring (12 tools)
 - `code_review` - Code review, search, and bug fixing (3 tools)
 - `code_runner` - Python/bash execution sandbox (4 tools)
+- `discord` - Discord channel notifications via webhook (2 tools) ⚠️ *Requires `DISCORD_WEBHOOK_URL`*
 - `github` - GitHub repo clone, browse, and cleanup ⚠️ *Requires `GITHUB_TOKEN` for private repos*
 - `google` - Gmail + Google Calendar (9 tools) ⚠️ *Requires one-time OAuth setup*
 - `image` - Image search, analysis, and AI generation (6 tools) ⚠️ *Requires `SERPER_API_KEY` for search; generation is free*
@@ -128,6 +129,7 @@ SHASHIN_API_KEY=your_key_here
 SERPER_API_KEY=your_key_here
 OLLAMA_TOKEN=your_token_here
 LANGSEARCH_API_KEY=your_key_here   # fallback search when Ollama weekly limit is reached
+DISCORD_WEBHOOK_URL=your_webhook_url_here
 
 # === A2A Protocol ===
 A2A_ENDPOINTS=http://localhost:8010
@@ -170,6 +172,7 @@ SERPER_API_KEY=<key>
 | Feature | Required env vars | Additional setup |
 |---------|-------------------|------------------|
 | Gmail + Google Calendar | — | One-time Google OAuth setup |
+| Discord notifications | `DISCORD_WEBHOOK_URL` | Create webhook in Discord channel settings |
 | RAG ingestion & search | — | Ollama running + `bge-large` pulled |
 | Plex media library | `PLEX_URL`, `PLEX_TOKEN` | Plex Media Server running |
 | Web search (primary) | `OLLAMA_TOKEN` | Ollama account + API key |
