@@ -1063,6 +1063,74 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 return _m.group(1).replace("\\'", "'")
         return s
 
+    async def _run_pipeline(pipe_parts: list, tools_list: list) -> str:
+        """Execute a pipe-separated tool chain and return the final result string."""
+        import re as _pre
+        import time as _ptime
+        _STEP_RE = _pre.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pre.IGNORECASE | _pre.DOTALL)
+        _NOTIF = ("discord_notify", "gmail_send_email", "gmail_reply_tool")
+        previous = None
+        steps = [s.strip() for s in pipe_parts if s.strip()]
+        for idx, step in enumerate(steps):
+            m = _STEP_RE.match(step)
+            if not m:
+                continue
+            tool_name = m.group(1)
+            args_str = (m.group(2) or "").strip()
+
+            # Parse args
+            args: dict = {}
+            if args_str:
+                try:
+                    import json as _jj2
+                    args = _jj2.loads(args_str)
+                except Exception:
+                    for km in _pre.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', args_str):
+                        args[km.group(1)] = km.group(2).replace('\\"', '"')
+
+            # Inject previous result
+            if previous and not args:
+                if any(k in tool_name for k in _NOTIF):
+                    args = {"message": str(previous)}
+            elif previous and args:
+                is_email = "email" in tool_name
+                content_key = "body" if is_email else "message"
+                if not any(k in args for k in ("message", "body", "content", "text")):
+                    args[content_key] = str(previous)
+                elif is_email and "message" in args and "body" not in args:
+                    args["body"] = args.pop("message")
+
+            # Find tool
+            tool = next((t for t in tools_list if t.name == tool_name), None)
+            if not tool:
+                previous = f"Tool '{tool_name}' not found"
+                logger.error(f"🔀 Pipeline step {idx+1}: {tool_name} not found")
+                break
+
+            logger.info(f"🔀 Pipeline step {idx+1}/{len(steps)}: {tool_name}({args})")
+            t0 = _ptime.time()
+            try:
+                if args and any('\n' in str(v) or len(str(v)) > 200 for v in args.values()):
+                    if tool_name == "gmail_send_email" and args.get("body"):
+                        args = dict(args)
+                        args["html"] = True
+                        args["body"] = _md_to_html(args["body"])
+                    previous = _unwrap_tool_result(await tool.ainvoke(args))
+                else:
+                    arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
+                    previous = await _invoke_tool_directly(tool, arg_str, logger)
+                logger.info(f"🔀 Pipeline step {idx+1} done in {_ptime.time()-t0:.2f}s")
+            except Exception as err:
+                logger.error(f"🔀 Pipeline step {idx+1} failed: {err}")
+                previous = f"Error in {tool_name}: {err}"
+                break
+
+        # Clean UI result
+        last_tool = steps[-1].split()[1].split(":")[0] if steps and len(steps[-1].split()) > 1 else ""
+        if any(nt in last_tool for nt in _NOTIF):
+            return "Job completed."
+        return str(previous) if previous else "Done."
+
     async def _tool_executor(tool_name: str, args: dict) -> str:
         """Execute a named tool via the same path as direct dispatch."""
         _current_tools = mcp_agent._tools
@@ -1617,78 +1685,15 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             all(_PIPE_STEP_RE.match(p) for p in _pipe_parts)
         )
         if _is_pipeline:
-            import time as _pipe_time
-            logger.info(f"🔀 Pipeline dispatch: {len(_pipe_parts)} steps")
-            _previous_result = None
-            _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool")
-            for _step_idx, _step in enumerate(_pipe_parts):
-                _m = _PIPE_STEP_RE.match(_step)
-                if not _m:
-                    continue
-                _step_tool_name = _m.group(1)
-                _step_args_str = (_m.group(2) or "").strip()
-
-                # Parse key=value args
-                _step_args: dict = {}
-                if _step_args_str:
-                    try:
-                        import json as _jj
-                        _step_args = _jj.loads(_step_args_str)
-                    except Exception:
-                        for _km in _pipe_re.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', _step_args_str):
-                            _step_args[_km.group(1)] = _km.group(2).replace('\\"', '"')
-
-                # Inject previous result as content arg if missing
-                if _previous_result and not _step_args:
-                    if any(k in _step_tool_name for k in _NOTIF_TOOLS):
-                        _step_args = {"message": str(_previous_result)}
-                elif _previous_result and _step_args:
-                    _is_email = "email" in _step_tool_name
-                    _content_key = "body" if _is_email else "message"
-                    if not any(k in _step_args for k in ("message", "body", "content", "text")):
-                        _step_args[_content_key] = str(_previous_result)
-                    elif _is_email and "message" in _step_args and "body" not in _step_args:
-                        _step_args["body"] = _step_args.pop("message")
-
-                # Find and execute the tool
-                _step_tool = next((t for t in tools if t.name == _step_tool_name), None)
-                if not _step_tool:
-                    _previous_result = f"Tool '{_step_tool_name}' not found"
-                    logger.error(f"🔀 Pipeline step {_step_idx+1}: {_step_tool_name} not found")
-                    break
-
-                logger.info(f"🔀 Pipeline step {_step_idx+1}/{len(_pipe_parts)}: {_step_tool_name}({_step_args})")
-                _step_start = _pipe_time.time()
-                try:
-                    if _step_args and any('\n' in str(v) or len(str(v)) > 200 for v in _step_args.values()):
-                        # Auto-convert markdown to HTML for email
-                        if _step_tool_name == "gmail_send_email" and _step_args.get("body"):
-                            _step_args = dict(_step_args)
-                            _step_args["html"] = True
-                            _step_args["body"] = _md_to_html(_step_args["body"])
-                        _raw = await _step_tool.ainvoke(_step_args)
-                        _previous_result = _unwrap_tool_result(_raw)
-                    else:
-                        _arg_str = " ".join(f'{k}="{v}"' for k, v in _step_args.items()) if _step_args else ""
-                        _previous_result = await _invoke_tool_directly(_step_tool, _arg_str, logger)
-                    logger.info(f"🔀 Pipeline step {_step_idx+1} done in {_pipe_time.time()-_step_start:.2f}s")
-                except Exception as _step_err:
-                    logger.error(f"🔀 Pipeline step {_step_idx+1} failed: {_step_err}")
-                    _previous_result = f"Error in {_step_tool_name}: {_step_err}"
-                    break
-
-            # Show clean result — for notification pipelines just confirm sent
-            _last_tool = _pipe_parts[-1].split()[1].split(":")[0] if len(_pipe_parts[-1].split()) > 1 else ""
-            if any(nt in _last_tool for nt in _NOTIF_TOOLS):
-                _pipeline_result = f"✅ Sent via {_last_tool}"
-            else:
-                _pipeline_result = str(_previous_result) if _previous_result else "Done."
-
+            _pipeline_result = await _run_pipeline(_pipe_parts, tools)
             conversation_state["messages"].append(HumanMessage(content=user_message))
             conversation_state["messages"].append(AIMessage(content=_pipeline_result))
-            yield {"type": "token", "content": _pipeline_result}
-            yield {"type": "complete", "model": "pipeline", "multi_agent": False, "a2a": False}
-            return
+            return {
+                "messages": conversation_state["messages"],
+                "current_model": "pipeline",
+                "multi_agent": False,
+                "a2a": False,
+            }
 
         explicit_tool, explicit_arg = parse_explicit_tool(user_message, tools)
         if explicit_tool:
@@ -2149,7 +2154,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         conversation_state["messages"].append(AIMessage(content=_fu_text))
                         return {
                             "messages": conversation_state["messages"],
-                            "current_model": getattr(active_llm, "model", model_name)
+                            "current_model": model_name
                         }
                 except Exception as _fu_err:
                     logger.warning(f"[vision follow-up] 🖼️ Failed: {_fu_err} — falling through to agent")
