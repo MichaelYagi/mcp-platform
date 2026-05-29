@@ -1009,7 +1009,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         def _embed_image(m):
             alt = m.group(1)
             url = m.group(2)
-            # Embed local network images as base64
             if url.startswith("http://192.168.") or url.startswith("http://10.") or url.startswith("http://172."):
                 try:
                     with _urllib.urlopen(url, timeout=10) as _resp:
@@ -1019,66 +1018,68 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     _b64_data = _b64.b64encode(_data).decode()
                     src = f"data:{_ct};base64,{_b64_data}"
                 except Exception:
-                    src = url  # fallback to URL if fetch fails
+                    src = url
             else:
                 src = url
             return f'<img src="{src}" alt="{alt}" style="max-width:100%;border-radius:4px;margin:8px 0;"><br>'
 
         html = md
-        # Images: ![alt](url) → <img> with base64 embedding for local URLs
         html = _re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', _embed_image, html)
-        # Links: [text](url) → <a href="url">text</a>
         html = _re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', html)
-        # Bold: **text** → <strong>text</strong>
         html = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
-        # Italic: *text* → <em>text</em>
         html = _re.sub(r'\*(.+?)\*', r'<em>\1</em>', html)
-        # Headers
         html = _re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=_re.MULTILINE)
         html = _re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=_re.MULTILINE)
         html = _re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=_re.MULTILINE)
-        # Newlines → <br>
         html = html.replace('\n', '<br>\n')
-
         return f"""<html><body style="font-family:sans-serif;max-width:700px;margin:auto;padding:16px;color:#222;">
 {html}
 </body></html>"""
 
+    def _unwrap_tool_result(raw) -> str:
+        """Extract plain text from TextContent objects or lists."""
+        if raw is None:
+            return ""
+        if hasattr(raw, 'text'):
+            return raw.text
+        if hasattr(raw, 'content'):
+            return _unwrap_tool_result(raw.content)
+        if isinstance(raw, list):
+            parts = []
+            for item in raw:
+                if hasattr(item, 'text'):
+                    parts.append(item.text)
+                elif isinstance(item, dict):
+                    parts.append(item.get('text', str(item)))
+                else:
+                    parts.append(str(item))
+            return "\n".join(parts)
+        s = str(raw)
+        # Handle stringified TextContent: [TextContent(type='text', text='...', ...)]
+        if s.startswith("[TextContent(") or s.startswith("TextContent("):
+            import re as _re_tc
+            _m = _re_tc.search(r"text='(.*?)'(?:,\s*annotations|\))", s, _re_tc.DOTALL)
+            if _m:
+                return _m.group(1).replace("\\'", "'")
+        return s
+
     async def _tool_executor(tool_name: str, args: dict) -> str:
-        """Execute a named tool via the same path as direct dispatch.
-        Routes through _invoke_tool_directly for TextContent handling,
-        then _process_tool_result for formatting — identical to 'use <tool>'."""
-        # Use mcp_agent._tools directly to always get the current live tool list
+        """Execute a named tool via the same path as direct dispatch."""
         _current_tools = mcp_agent._tools
 
         # Auto-convert markdown to HTML for gmail_send_email
         if tool_name == "gmail_send_email" and args.get("body"):
-            args = dict(args)  # don't mutate original
+            args = dict(args)
             args["html"] = True
             args["body"] = _md_to_html(args["body"])
 
         for tool in _current_tools:
             if tool.name == tool_name:
                 try:
-                    # For pipeline calls with complex string values, invoke tool directly
                     if args and any('\n' in str(v) or len(str(v)) > 200 for v in args.values()):
-                        result_str = await tool.ainvoke(args)
-                        if hasattr(result_str, 'content'):
-                            result_str = result_str.content
-                        if isinstance(result_str, list):
-                            result_str = "\n".join(
-                                item.get("text", str(item)) if isinstance(item, dict) else str(item)
-                                for item in result_str
-                            )
-                        return str(result_str)
-                    if args:
-                        arg_str = " ".join(
-                            f'{k}="{v}"' if isinstance(v, str) and '"' not in str(v) and '\n' not in str(v)
-                            else f"{k}='{json.dumps(v)}'"
-                            for k, v in args.items()
-                        )
-                    else:
-                        arg_str = ""
+                        raw = await tool.ainvoke(args)
+                        return _unwrap_tool_result(raw)
+                    arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
                     result_str = await _invoke_tool_directly(tool, arg_str, logger)
                     return await _process_tool_result(tool_name, result_str, arg_str, llm)
                 except Exception as e:

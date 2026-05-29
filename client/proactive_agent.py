@@ -922,62 +922,35 @@ class AgentScheduler:
                     logger.info(f"⏰ Pipeline step {step_idx + 1}/{len(steps)}: {step_tool}({step_args})")
                     try:
                         previous_result = await self._execute_fn(step_tool, step_args)
-                        if previous_result and str(previous_result).startswith(f"Tool '{step_tool}' not found"):
+                        if previous_result and previous_result.startswith(f"Tool '{step_tool}' not found"):
+                            # Log available tools to diagnose lookup failure
                             logger.error(f"⏰ Pipeline: tool '{step_tool}' not found — check tool is registered and server started correctly")
-                        # Extract text from TextContent objects
-                        if hasattr(previous_result, 'content'):
-                            previous_result = previous_result.content
-                        if isinstance(previous_result, list):
-                            _texts = []
-                            for _item in previous_result:
-                                if hasattr(_item, 'text'):
-                                    _texts.append(_item.text)
-                                elif isinstance(_item, dict):
-                                    _texts.append(_item.get('text', str(_item)))
-                                else:
-                                    _texts.append(str(_item))
-                            previous_result = "\n".join(_texts)
-                        elif isinstance(previous_result, str) and previous_result.startswith("[TextContent("):
-                            import re as _re_tc
-                            _tc_match = _re_tc.search(r"text='(.*?)'(?:,\s*annotations|\))", previous_result, _re_tc.DOTALL)
-                            if _tc_match:
-                                previous_result = _tc_match.group(1).replace("\\'", "'")
                         logger.info(f"⏰ Pipeline step {step_idx + 1} completed: {str(previous_result)[:100]}")
                     except Exception as _step_err:
                         logger.error(f"⏰ Pipeline step {step_idx + 1} ({step_tool}) failed: {_step_err}")
                         previous_result = f"Error in step {step_idx + 1} ({step_tool}): {_step_err}"
                         break
 
-                # Use the first step result for UI display, not the final notification status
-                _notification_tools = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
-                _steps_list = [s.strip() for s in llm_prompt.split("|") if s.strip()]
-                _data_results = []
-                _final_result = previous_result
-                # Walk back to find the last non-notification result
-                # (re-run steps to collect data result — use stored previous_result from step 1)
-                # Simpler: if last step is a notification tool, use a summary instead
-                if _steps_list and any(
-                    _nt in _steps_list[-1] for _nt in _notification_tools
-                ):
-                    _label = job.get("label", "job")
-                    _last_tool = _steps_list[-1].split()[1].split(":")[0] if len(_steps_list[-1].split()) > 1 else "notification"
-                    result = f"✅ Sent via {_last_tool}"
+                _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
+                _last_step = steps[-1] if steps else ""
+                _last_tool_name = _last_step.split()[1].split(":")[0] if len(_last_step.split()) > 1 else ""
+                if any(_nt in _last_tool_name for _nt in _NOTIF_TOOLS):
+                    result = "Job completed."
                 else:
-                    result = previous_result or "Pipeline completed with no output."
+                    result = previous_result or "Job completed."
 
             else:
                 # Original single-tool or LLM-based execution
                 if tool:
                     args = json.loads(job["tool_args"] or "{}")
                     tool_result = await self._execute_fn(tool, args)
+                    result = tool_result
 
-                if llm_prompt:
-                    # Build full prompt with condition result and tool result as context
+                if llm_prompt and not tool:
+                    # Pure LLM job (no tool) — llm_prompt is the entire instruction
                     context_parts = []
                     if condition_result:
                         context_parts.append(f"Condition check result:\n{condition_result}")
-                    if tool_result:
-                        context_parts.append(f"Action tool result:\n{tool_result}")
                     context = "\n\n".join(context_parts)
                     full_prompt = f"{llm_prompt}\n\n{context}".strip() if context else llm_prompt
 
@@ -989,8 +962,8 @@ class AgentScheduler:
                         result = await self._llm_fn(full_prompt)
                     else:
                         result = tool_result or "No result."
-                else:
-                    result = tool_result
+                elif not tool:
+                    result = tool_result or "No result."
 
             # Deliver to specific session or broadcast to all clients
             if job.get("deliver_to_session") and job.get("session_id") and self._session_manager:

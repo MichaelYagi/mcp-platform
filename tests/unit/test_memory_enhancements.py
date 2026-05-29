@@ -205,11 +205,13 @@ class TestBroadcastProactiveResult:
                 "label": "Morning Briefing",
                 "result": "Here is your briefing."
             })
-        mock_bcast.assert_called_once()
-        call_args = mock_bcast.call_args
-        assert call_args[0][0] == "assistant_message"
-        # Label is no longer prefixed — result is broadcast directly
-        assert "Here is your briefing." in call_args[0][1]["text"]
+        # broadcast_message is called twice: assistant_message + complete
+        assert mock_bcast.call_count == 2
+        first_call = mock_bcast.call_args_list[0]
+        assert first_call[0][0] == "assistant_message"
+        assert "Here is your briefing." in first_call[0][1]["text"]
+        second_call = mock_bcast.call_args_list[1]
+        assert second_call[0][0] == "complete"
 
     @pytest.mark.asyncio
     async def test_scheduled_error_broadcasts_warning(self):
@@ -220,10 +222,14 @@ class TestBroadcastProactiveResult:
                 "label": "Daily Summary",
                 "error": "connection timeout"
             })
-        mock_bcast.assert_called_once()
-        text = mock_bcast.call_args[0][1]["text"]
+        # broadcast_message is called twice: assistant_message + complete
+        assert mock_bcast.call_count == 2
+        first_call = mock_bcast.call_args_list[0]
+        text = first_call[0][1]["text"]
         assert "Daily Summary" in text
         assert "connection timeout" in text
+        second_call = mock_bcast.call_args_list[1]
+        assert second_call[0][0] == "complete"
 
     @pytest.mark.asyncio
     async def test_unknown_type_does_not_broadcast(self):
