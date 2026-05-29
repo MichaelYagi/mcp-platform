@@ -1065,7 +1065,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
     async def _run_pipeline(pipe_parts: list, tools_list: list) -> str:
         """Execute a pipe-separated tool chain using _tool_executor for each step.
-        Reuses the same execution path as the scheduler pipeline."""
+        Identical execution path to the scheduler pipeline — no extra transformation."""
         import re as _pre
         _STEP_RE = _pre.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pre.IGNORECASE | _pre.DOTALL)
         _NOTIF = ("discord_notify", "gmail_send_email", "gmail_reply_tool")
@@ -1078,7 +1078,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             tool_name = m.group(1)
             args_str = (m.group(2) or "").strip()
 
-            # Parse args
+            # Parse explicit args from step
             args: dict = {}
             if args_str:
                 try:
@@ -1088,34 +1088,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     for km in _pre.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', args_str):
                         args[km.group(1)] = km.group(2).replace('\\"', '"')
 
-            # Unwrap and extract best text from previous result
-            if previous:
-                previous = _unwrap_tool_result(previous)
-                if isinstance(previous, str) and previous.strip().startswith("{"):
-                    try:
-                        import json as _pj
-                        _parsed = _pj.loads(previous)
-                        if isinstance(_parsed, dict):
-                            _text_val = (
-                                _parsed.get("summary") or
-                                _parsed.get("text") or
-                                (
-                                    _parsed.get("calendar", {}).get("text", "") + "\n" +
-                                    _parsed.get("email", {}).get("text", "") + "\n" +
-                                    _parsed.get("weather", {}).get("text", "")
-                                )
-                            ).strip()
-                            if _text_val:
-                                # Decode any escaped sequences (\\n → newline, \\u00b0 → °)
-                                try:
-                                    _text_val = _text_val.encode('utf-8').decode('unicode_escape').encode('latin-1').decode('utf-8')
-                                except Exception:
-                                    _text_val = _text_val.replace('\\n', '\n').replace('\\t', '\t')
-                                previous = _text_val
-                    except Exception:
-                        pass
-
-            # Inject previous result if no content arg present
+            # Inject previous result — same logic as proactive_agent._fire_job
             if previous and not args:
                 if any(k in tool_name for k in _NOTIF):
                     args = {"message": str(previous)}
@@ -1134,7 +1107,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 elif "email" in tool_name and "message" in args and "body" not in args:
                     args["body"] = args.pop("message")
 
-            # Execute via _tool_executor — same path as scheduler
+            # Execute via _tool_executor — identical to scheduler path
             logger.info(f"🔀 Pipeline step {idx+1}/{len(steps)}: {tool_name}({args})")
             previous = await _tool_executor(tool_name, args)
             logger.info(f"🔀 Pipeline step {idx+1} done: {str(previous)[:80]}")
@@ -1144,6 +1117,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         if any(nt in last_tool for nt in _NOTIF):
             return "Job completed."
         return str(previous) if previous else "Done."
+
 
     async def _tool_executor(tool_name: str, args: dict) -> str:
         """Execute a named tool via the same path as direct dispatch."""
