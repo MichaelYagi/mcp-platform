@@ -42,6 +42,7 @@ _agent_scheduler    = None
 _schedule_parser    = None
 _confirmation_tracker = None
 _inactivity_watcher = None
+_last_session_id    = None  # Most recently active session — for proactive result persistence
 # Per-session tracking: set of session_ids currently processing a query.
 # Replaces the single IS_PROCESSING bool which blocked ALL connections
 # when any one tab was busy. Each connection now only blocks itself.
@@ -77,20 +78,42 @@ async def broadcast_proactive_result(data: dict):
     if data.get("type") == "scheduled_result":
         label = data.get("label", "Scheduled job")
         result = data.get("result", "")
-        text = result
+        text = f"⏰ **{label}**\n{result}" if result else f"⏰ **{label}** completed."
+
+        # Save to session so it persists on refresh
+        try:
+            import os as _os
+            _max = int(_os.getenv("MAX_MESSAGE_HISTORY", 30))
+            _sm = getattr(_agent_scheduler, "_session_manager", None) if _agent_scheduler else None
+            if _sm:
+                _session_id = data.get("session_id") or _last_session_id
+                if _session_id:
+                    _sm.add_message(_session_id, "assistant", text, _max, "proactive")
+        except Exception:
+            pass
+
         await broadcast_message("assistant_message", {
             "text": text,
             "model": "proactive",
             "multi_agent": False,
             "a2a": False,
         })
+        await broadcast_message("complete", {"stopped": False})
     elif data.get("type") == "scheduled_error":
         label = data.get("label", "Scheduled job")
         error = data.get("error", "unknown error")
-        await broadcast_message("assistant_message", {
-            "text": f"⚠️ Scheduled job **{label}** failed: {error}",
-            "model": "system",
-        })
+        text = f"⚠️ Scheduled job **{label}** failed: {error}"
+        try:
+            import os as _os
+            _max = int(_os.getenv("MAX_MESSAGE_HISTORY", 30))
+            _sm = getattr(_agent_scheduler, "_session_manager", None) if _agent_scheduler else None
+            if _sm and hasattr(_sm, "get_active_session_ids"):
+                for _sid in _sm.get_active_session_ids():
+                    _sm.add_message(_sid, "assistant", text, _max, "proactive")
+        except Exception:
+            pass
+        await broadcast_message("assistant_message", {"text": text, "model": "system"})
+        await broadcast_message("complete", {"stopped": False})
 
 
 async def process_query(websocket, prompt, original_prompt, agent_ref, conversation_state, run_agent_fn, logger, tools,
@@ -672,6 +695,10 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
 
                 logger.info(f"📥 Loaded {len(conversation_state['messages'])} messages from session {session_id}")
 
+                # Track most recently active session for proactive result persistence
+                global _last_session_id
+                _last_session_id = session_id
+
                 await websocket.send(json.dumps({
                     "type": "session_loaded",
                     "session_id": session_id,
@@ -1086,6 +1113,35 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         await broadcast_message("assistant_message", {"text": result})
                         await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                         continue
+
+                # Handle :jobs cancel here so we can also remove from APScheduler
+                if prompt.startswith(":jobs") and any(
+                    w in prompt.lower() for w in ("cancel", "delete", "remove")
+                ):
+                    from client.proactive_agent import handle_jobs_command, find_job_by_label, list_jobs
+                    _jobs_response = handle_jobs_command(prompt)
+                    if _agent_scheduler:
+                        try:
+                            parts = prompt.split(None, 2)
+                            label_or_all = parts[2].strip() if len(parts) > 2 else ""
+                            if label_or_all.lower() in ("all", "*"):
+                                for _j in list_jobs():
+                                    _agent_scheduler.remove_job(_j["id"])
+                            else:
+                                _j = find_job_by_label(label_or_all)
+                                if not _j:
+                                    try:
+                                        _jid = int(label_or_all)
+                                        _agent_scheduler.remove_job(_jid)
+                                    except (ValueError, TypeError):
+                                        pass
+                                else:
+                                    _agent_scheduler.remove_job(_j["id"])
+                        except Exception as _rem_err:
+                            logger.warning(f"⏰ APScheduler remove_job failed: {_rem_err}")
+                    await broadcast_message("assistant_message", {"text": _jobs_response})
+                    await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                    continue
 
                 # Handle :jobs cancel here so we can also remove from APScheduler
                 if prompt.startswith(":jobs") and any(

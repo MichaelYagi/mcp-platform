@@ -205,12 +205,46 @@ def discord_notify(
     # Build content — prepend bold title if provided
     content = f"**{title}**\n{message}" if title else message
 
-    payload: dict = {"content": content}
+    # Extract local image URLs from markdown: ![](http://192.168.x.x/...)
+    import re as _re
+    import urllib.request as _urllib
+    _LOCAL_IMG_RE = _re.compile(
+        r'!\[[^\]]*\]\((http://(?:192\.168\.|10\.|172\.(?:1[6-9]|2\d|3[01])\.)[^\s)]+)\)'
+    )
+    local_images = _LOCAL_IMG_RE.findall(content)
+
+    # Strip markdown image syntax from the text content
+    clean_content = _LOCAL_IMG_RE.sub("", content).strip()
+
+    payload: dict = {"content": clean_content}
     if username:
         payload["username"] = username
 
     try:
-        resp = httpx.post(webhook_url, json=payload, timeout=10)
+        if local_images:
+            # Fetch the first local image and upload as a file attachment
+            img_url = local_images[0]
+            try:
+                with _urllib.urlopen(img_url, timeout=10) as _resp:
+                    img_data = _resp.read()
+                    content_type = _resp.headers.get("Content-Type", "image/jpeg").split(";")[0]
+
+                ext = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif",
+                       "image/webp": "webp"}.get(content_type, "jpg")
+                filename = f"photo.{ext}"
+
+                resp = httpx.post(
+                    webhook_url,
+                    data={"payload_json": json.dumps(payload)},
+                    files={"file": (filename, img_data, content_type)},
+                    timeout=30,
+                )
+            except Exception as _img_err:
+                logger.warning(f"⚠️  discord_notify: image fetch failed ({_img_err}), sending text only")
+                resp = httpx.post(webhook_url, json=payload, timeout=10)
+        else:
+            resp = httpx.post(webhook_url, json=payload, timeout=10)
+
         if resp.status_code not in (200, 204):
             raise MCPToolError(
                 FailureKind.UPSTREAM_ERROR,
@@ -221,7 +255,7 @@ def discord_notify(
         return json.dumps({
             "status":  "sent",
             "channel": webhook_name,
-            "content": content,
+            "content": clean_content,
         }, indent=2)
 
     except MCPToolError:
