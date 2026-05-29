@@ -8,7 +8,7 @@
   </marker>
 </defs>
 <style>
-text { fill: #e0e0e0; }
+text { fill: #e0e0e0; font-family: 'Anthropic Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 text.th { fill: #ffffff; }
 text.ts { fill: #b0b0b0; }
 line, path { stroke: #666666; }
@@ -35,7 +35,7 @@ line.arr, path.arr { stroke: #888888; }
 .c-green text.th { fill: #c0dd97; }
 .c-green text.ts { fill: #97c459; }
 </style>
-<text x="360" y="26" text-anchor="middle" font-family="Anthropic Sans, sans-serif" font-size="16" font-weight="500" fill="#ffffff">WebSocket message flow</text>
+<text x="360" y="26" text-anchor="middle" font-size="16" font-weight="500" fill="#ffffff">WebSocket message flow</text>
 <g class="c-amber"><rect x="30" y="44" width="12" height="12" rx="2" stroke-width="0.5"/></g>
 <text class="ts" x="48" y="54">LLM involved</text>
 <g class="c-teal"><rect x="148" y="44" width="12" height="12" rx="2" stroke-width="0.5"/></g>
@@ -59,7 +59,7 @@ line.arr, path.arr { stroke: #888888; }
 <text class="ts" x="350" y="332" text-anchor="middle">user message</text>
 <line x1="350" y1="338" x2="350" y2="356" class="arr" marker-end="url(#arrow)"/>
 <rect x="60" y="352" width="570" height="350" rx="8" fill="none" stroke="#444" stroke-width="0.5" stroke-dasharray="5 3"/>
-<text class="ts" x="74" y="368">process_query()  &#x2014;  asyncio background task</text>
+<text class="ts" x="74" y="368">process_query() &#x2014; asyncio background task</text>
 <g class="node c-teal"><rect x="74" y="374" width="230" height="52" rx="8" stroke-width="0.5"/><text class="th" x="189" y="393" text-anchor="middle" dominant-baseline="central">History question?</text><text class="ts" x="189" y="410" text-anchor="middle" dominant-baseline="central">Answer directly &#x2014; no LLM</text></g>
 <g class="node c-teal"><rect x="320" y="374" width="230" height="52" rx="8" stroke-width="0.5"/><text class="th" x="435" y="393" text-anchor="middle" dominant-baseline="central">Scheduling request?</text><text class="ts" x="435" y="410" text-anchor="middle" dominant-baseline="central">ScheduleParser &#xB7; confirm flow</text></g>
 <path d="M550 400 L695 400 L695 928 L490 928" fill="none" stroke="#666" stroke-width="0.8" marker-end="url(#arrow)"/>
@@ -68,7 +68,7 @@ line.arr, path.arr { stroke: #888888; }
 <text class="ts" x="362" y="438">no</text>
 <g class="node c-purple"><rect x="175" y="446" width="350" height="44" rx="8" stroke-width="0.5"/><text class="th" x="350" y="468" text-anchor="middle" dominant-baseline="central">Inject persistent memory</text></g>
 <line x1="350" y1="490" x2="350" y2="510" class="arr" marker-end="url(#arrow)"/>
-<g class="node c-amber"><rect x="175" y="510" width="350" height="52" rx="8" stroke-width="0.5"/><text class="th" x="350" y="529" text-anchor="middle" dominant-baseline="central">&#x1F916;  run_agent_fn()</text><text class="ts" x="350" y="547" text-anchor="middle" dominant-baseline="central">Full prompt loop  (A2A / multi / single)</text></g>
+<g class="node c-amber"><rect x="175" y="510" width="350" height="52" rx="8" stroke-width="0.5"/><text class="th" x="350" y="529" text-anchor="middle" dominant-baseline="central">&#x1F916; run_agent_fn()</text><text class="ts" x="350" y="547" text-anchor="middle" dominant-baseline="central">Full prompt loop (A2A / multi / single)</text></g>
 <line x1="350" y1="562" x2="350" y2="582" class="arr" marker-end="url(#arrow)"/>
 <g class="node c-teal"><rect x="175" y="582" width="350" height="44" rx="8" stroke-width="0.5"/><text class="th" x="350" y="604" text-anchor="middle" dominant-baseline="central">Scan ToolMessages for images</text></g>
 <line x1="350" y1="626" x2="350" y2="646" class="arr" marker-end="url(#arrow)"/>
