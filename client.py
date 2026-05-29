@@ -1134,7 +1134,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 try:
                     if args and any('\n' in str(v) or len(str(v)) > 200 for v in args.values()):
                         raw = await tool.ainvoke(args)
-                        return _unwrap_tool_result(raw)
+                        result_str = _unwrap_tool_result(raw)
+                        arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
+                        return await _process_tool_result(tool_name, result_str, arg_str, llm)
                     arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
                     result_str = await _invoke_tool_directly(tool, arg_str, logger)
                     return await _process_tool_result(tool_name, result_str, arg_str, llm)

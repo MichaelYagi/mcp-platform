@@ -229,12 +229,14 @@ let selectedSessionIds     = new Set();
 let _googleAuthUrl = null;
 
 // Check for pending Google auth immediately on page load — before any session_loaded fires
-fetch('/auth_pending.json').then(r => r.ok ? r.json() : null).then(d => {
-    if (d && d.auth_url) {
-        _googleAuthUrl = d.auth_url;
-        _showGoogleAuthBanner(d.auth_url);
-    }
-}).catch(() => {});  // file absent = no auth pending, ignore
+if (typeof fetch !== 'undefined') {
+    fetch('/auth_pending.json').then(r => r.ok ? r.json() : null).then(d => {
+        if (d && d.auth_url) {
+            _googleAuthUrl = d.auth_url;
+            _showGoogleAuthBanner(d.auth_url);
+        }
+    }).catch(() => {});  // file absent = no auth pending, ignore
+}
 
 function _showGoogleAuthBanner(authUrl) {
     // Remove any existing banner first

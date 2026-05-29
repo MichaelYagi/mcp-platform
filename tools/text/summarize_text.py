@@ -53,11 +53,18 @@ def summarize_text(text: str | None = None,
                    style: str = "medium") -> dict:
 
     full_text = load_text(text, file_path)
+
+    # Decode unicode escapes (e.g. \u2014 → —, \u00b0 → °)
+    try:
+        import json as _json
+        full_text = _json.loads(f'"{full_text.replace(chr(34), chr(92)+chr(34)).replace(chr(10), chr(92)+"n")}"')
+    except Exception:
+        pass
+
     chunks = split_text(full_text)["chunks"]
     instruction = STYLE_INSTRUCTIONS.get(style, STYLE_INSTRUCTIONS["medium"])
 
     # Concatenate chunks up to MAX_CHARS for a single-pass summary.
-    # This avoids per-chunk LLM calls that compete with the client model.
     combined = ""
     for chunk in chunks:
         if len(combined) + len(chunk) > MAX_CHARS:
@@ -77,11 +84,18 @@ def summarize_text(text: str | None = None,
         f"({'truncated' if truncated else 'full'}), style={style!r}"
     )
 
-    summary = _call_ollama(prompt, timeout=120.0)
+    summary = _call_ollama(prompt, timeout=180.0)
 
     if not summary:
-        # Fallback: return the beginning of the text
-        summary = full_text[:500]
+        summary = full_text
+
+    # Decode unicode escapes in output (e.g. \u2014 → —, \u00b0 → °)
+    try:
+        import json as _json
+        summary = _json.loads(f'"{summary.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34)).replace(chr(10), chr(92)+"n")}"')
+    except Exception:
+        # Manual fallback for common entities
+        summary = summary.replace('\\u2014', '—').replace('\\u2013', '–').replace('\\u00b0', '°').replace('\\u2019', "'").replace('\\u201c', '"').replace('\\u201d', '"')
 
     return {
         "summary": summary,
