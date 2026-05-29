@@ -375,10 +375,19 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         if _agent_scheduler:
                             _agent_scheduler.add_job(job_id)
                         _confirmation_tracker.clear(_session_key)
+                        _tool_line = f"  Tool: `{pending.tool}`\n" if pending.tool else ""
+                        _pipeline_line = ""
+                        if pending.llm_prompt and "|" in pending.llm_prompt:
+                            _steps = [s.strip() for s in pending.llm_prompt.split("|")]
+                            _pipeline_line = "  Pipeline: " + " → ".join(
+                                s.split()[1].split(":")[0] if len(s.split()) > 1 else s
+                                for s in _steps
+                            ) + "\n"
                         response_text = (
                             f"✅ Scheduled: **{pending.label}**\n"
                             f"  Schedule: {pending.human_schedule}\n"
-                            f"  Tool: `{pending.tool}`\n"
+                            + _tool_line
+                            + _pipeline_line +
                             f"  Job ID: {job_id}\n\n"
                             f"Use `:jobs` to manage your scheduled jobs."
                         )
