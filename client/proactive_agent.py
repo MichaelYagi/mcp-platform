@@ -504,11 +504,13 @@ Pipeline syntax rules:
 - Separate steps with |
 - Each step must start with `use <tool_name>`
 - Optionally add args: `use discord_notify: message="..."` 
-- If no args on a notification step, the previous result is passed automatically as message
+- If no args on a notification step, the previous result is passed automatically as message/body
+- For gmail_send_email you MUST specify to and subject in the step args
 - Examples:
   "use get_day_briefing | use discord_notify"
   "use gmail_get_unread | use discord_notify"
-  "use calendar_get_today | use discord_notify: message=\"Today's events\""
+  "use shashin_random_tool | use gmail_send_email: to=\"michaeltyagi@gmail.com\" subject=\"Daily Photo\""
+  "use get_day_briefing | use gmail_send_email: to=\"michaeltyagi@gmail.com\" subject=\"Daily Briefing\""
 
 WHEN TO USE SHAPE D:
 - User mentions two or more tool actions: "get X and send to Discord", "run X then notify me", "call X and then Y"
@@ -555,7 +557,26 @@ class ScheduleParser:
         self._tz = default_timezone
 
     async def parse(self, user_message: str) -> ScheduleConfirmation | ScheduleClarification:
-        tool_list = "\n".join(f"  - {t}" for t in self._tools)
+        # Filter tool list to relevant tools only — reduces context for the LLM.
+        # Always include common scheduling tools; also include any tool mentioned by name.
+        _ALWAYS_INCLUDE = {
+            "get_day_briefing", "gmail_get_unread", "gmail_get_recent", "gmail_search",
+            "gmail_check_replied", "gmail_send_email", "gmail_reply_tool",
+            "calendar_get_today", "calendar_get_this_week", "calendar_create_event",
+            "discord_notify", "discord_list_webhooks",
+            "get_weather_tool", "get_location_tool", "get_time_tool",
+            "shashin_random_tool", "shashin_search_tool",
+            "web_search_tool", "rag_search_tool",
+        }
+        msg_lower = user_message.lower()
+        filtered = [
+            t for t in self._tools
+            if t in _ALWAYS_INCLUDE or t.lower() in msg_lower
+        ]
+        # Always have at least the always-include set that's available
+        if not filtered:
+            filtered = [t for t in self._tools if t in _ALWAYS_INCLUDE]
+        tool_list = "\n".join(f"  - {t}" for t in filtered)
         system = _PARSER_SYSTEM.format(tool_list=tool_list)
         try:
             raw = await self._llm_fn(system, user_message)
@@ -871,20 +892,32 @@ class AgentScheduler:
                                     step_args[_m.group(1)] = _m.group(2).replace("\\'", "'")
 
                     # If the step has no args and we have a previous result,
-                    # inject it as the message for notification tools
+                    # inject it as the message/body for notification tools
                     if previous_result and not step_args:
                         if any(kw in step_tool.lower() for kw in ("notify", "send", "reply", "post")):
-                            step_args = {"message": str(previous_result)}
+                            if "email" in step_tool.lower():
+                                # gmail_send_email needs to/subject/body — can't proceed without to
+                                logger.warning(f"⏰ Pipeline: {step_tool} requires 'to' and 'subject' args — specify them in the pipeline step")
+                                step_args = {"body": str(previous_result)}
+                            else:
+                                step_args = {"message": str(previous_result)}
 
-                    # Also: if the step has a message arg that looks like a
-                    # placeholder (short, no spaces), replace with previous result
-                    elif previous_result and "message" in step_args:
-                        msg_val = str(step_args["message"])
-                        if len(msg_val) < 50 and previous_result and msg_val.lower() in (
-                            "today's schedule", "the result", "the briefing",
-                            "today", "result", "briefing", "summary"
-                        ):
-                            step_args["message"] = str(previous_result)
+                    # If step has some args but missing content field, inject previous result
+                    elif previous_result and step_args:
+                        _is_email = "email" in step_tool.lower()
+                        _content_key = "body" if _is_email else "message"
+                        _content_keys = ("message", "body", "content", "text")
+                        _has_content = any(k in step_args for k in _content_keys)
+
+                        # Remove wrong content key if present (e.g. "message" on gmail_send_email)
+                        if _is_email and "message" in step_args and "body" not in step_args:
+                            step_args["body"] = step_args.pop("message")
+                            _has_content = True
+
+                        if not _has_content:
+                            step_args[_content_key] = str(previous_result)
+                        elif _is_email and not step_args.get("body"):
+                            step_args["body"] = str(previous_result)
 
                     logger.info(f"⏰ Pipeline step {step_idx + 1}/{len(steps)}: {step_tool}({step_args})")
                     try:

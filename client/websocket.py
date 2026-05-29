@@ -340,7 +340,6 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                             cron=pending.cron,
                             tool_args=pending.tool_args,
                             condition_tool=pending.condition_tool,
-                            condition_tool_args=getattr(pending, "condition_tool_args", {}),
                             condition_expr=pending.condition_expr,
                             condition_cron=pending.condition_cron,
                             timezone=pending.timezone,
@@ -384,11 +383,8 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                 await broadcast_message("complete", {"stopped": False})
                 return
 
-            # Check if this looks like a new scheduling request.
-            # Skip for explicit tool dispatch ("use <tool_name>[: ...]") — those must
-            # reach run_agent_wrapper where the explicit dispatch handler lives.
-            _explicit_dispatch = prompt.lstrip().lower().startswith("use ") and len(prompt.split()) >= 2
-            if not _explicit_dispatch and await looks_like_scheduling_request(prompt, llm_fn=_schedule_parser._llm_fn):
+            # Check if this looks like a new scheduling request
+            if await looks_like_scheduling_request(prompt, llm_fn=_schedule_parser._llm_fn):
                 logger.info(f"⏰ Scheduling request detected: {prompt[:60]}")
                 try:
                     result_sc = await _schedule_parser.parse(prompt)
@@ -1090,6 +1086,38 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         await broadcast_message("assistant_message", {"text": result})
                         await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                         continue
+
+                # Handle :jobs cancel here so we can also remove from APScheduler
+                if prompt.startswith(":jobs") and any(
+                    w in prompt.lower() for w in ("cancel", "delete", "remove")
+                ):
+                    from client.proactive_agent import handle_jobs_command, find_job_by_label, list_jobs
+                    _jobs_response = handle_jobs_command(prompt)
+                    # Also remove from APScheduler if scheduler is available
+                    if _agent_scheduler:
+                        try:
+                            parts = prompt.split(None, 2)
+                            label_or_all = parts[2].strip() if len(parts) > 2 else ""
+                            if label_or_all.lower() in ("all", "*"):
+                                for _j in list_jobs():
+                                    _agent_scheduler.remove_job(_j["id"])
+                            else:
+                                _j = find_job_by_label(label_or_all)
+                                # find_job_by_label may return None if already deleted
+                                # Try numeric ID too
+                                if not _j:
+                                    try:
+                                        _jid = int(label_or_all)
+                                        _agent_scheduler.remove_job(_jid)
+                                    except (ValueError, TypeError):
+                                        pass
+                                else:
+                                    _agent_scheduler.remove_job(_j["id"])
+                        except Exception as _rem_err:
+                            logger.warning(f"⏰ APScheduler remove_job failed: {_rem_err}")
+                    await broadcast_message("assistant_message", {"text": _jobs_response})
+                    await websocket.send(json.dumps({"type": "complete", "stopped": False}))
+                    continue
 
                 if prompt.startswith(":multi"):
                     from client.commands import handle_multi_agent_commands

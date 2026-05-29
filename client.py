@@ -1000,21 +1000,92 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
         return tool_result
 
+    def _md_to_html(md: str) -> str:
+        """Convert markdown to HTML for email sending.
+        Local network images are fetched and embedded as base64."""
+        import re as _re
+        import urllib.request as _urllib
+
+        def _embed_image(m):
+            alt = m.group(1)
+            url = m.group(2)
+            # Embed local network images as base64
+            if url.startswith("http://192.168.") or url.startswith("http://10.") or url.startswith("http://172."):
+                try:
+                    with _urllib.urlopen(url, timeout=10) as _resp:
+                        _data = _resp.read()
+                        _ct = _resp.headers.get("Content-Type", "image/jpeg").split(";")[0]
+                    import base64 as _b64
+                    _b64_data = _b64.b64encode(_data).decode()
+                    src = f"data:{_ct};base64,{_b64_data}"
+                except Exception:
+                    src = url  # fallback to URL if fetch fails
+            else:
+                src = url
+            return f'<img src="{src}" alt="{alt}" style="max-width:100%;border-radius:4px;margin:8px 0;"><br>'
+
+        html = md
+        # Images: ![alt](url) → <img> with base64 embedding for local URLs
+        html = _re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', _embed_image, html)
+        # Links: [text](url) → <a href="url">text</a>
+        html = _re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', html)
+        # Bold: **text** → <strong>text</strong>
+        html = _re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
+        # Italic: *text* → <em>text</em>
+        html = _re.sub(r'\*(.+?)\*', r'<em>\1</em>', html)
+        # Headers
+        html = _re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=_re.MULTILINE)
+        html = _re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=_re.MULTILINE)
+        html = _re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=_re.MULTILINE)
+        # Newlines → <br>
+        html = html.replace('\n', '<br>\n')
+
+        return f"""<html><body style="font-family:sans-serif;max-width:700px;margin:auto;padding:16px;color:#222;">
+{html}
+</body></html>"""
+
     async def _tool_executor(tool_name: str, args: dict) -> str:
         """Execute a named tool via the same path as direct dispatch.
         Routes through _invoke_tool_directly for TextContent handling,
         then _process_tool_result for formatting — identical to 'use <tool>'."""
-        for tool in tools:
+        # Use mcp_agent._tools directly to always get the current live tool list
+        _current_tools = mcp_agent._tools
+
+        # Auto-convert markdown to HTML for gmail_send_email
+        if tool_name == "gmail_send_email" and args.get("body"):
+            args = dict(args)  # don't mutate original
+            args["html"] = True
+            args["body"] = _md_to_html(args["body"])
+
+        for tool in _current_tools:
             if tool.name == tool_name:
-                arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
                 try:
+                    # For pipeline calls with complex string values, invoke tool directly
+                    if args and any('\n' in str(v) or len(str(v)) > 200 for v in args.values()):
+                        result_str = await tool.ainvoke(args)
+                        if hasattr(result_str, 'content'):
+                            result_str = result_str.content
+                        if isinstance(result_str, list):
+                            result_str = "\n".join(
+                                item.get("text", str(item)) if isinstance(item, dict) else str(item)
+                                for item in result_str
+                            )
+                        return str(result_str)
+                    if args:
+                        arg_str = " ".join(
+                            f'{k}="{v}"' if isinstance(v, str) and '"' not in str(v) and '\n' not in str(v)
+                            else f"{k}='{json.dumps(v)}'"
+                            for k, v in args.items()
+                        )
+                    else:
+                        arg_str = ""
                     result_str = await _invoke_tool_directly(tool, arg_str, logger)
                     return await _process_tool_result(tool_name, result_str, arg_str, llm)
                 except Exception as e:
                     logger.error(f"[_tool_executor] {tool_name} error: {e}")
                     return f"Tool {tool_name} error: {e}"
-        available = [t.name for t in tools]
-        logger.error(f"[_tool_executor] '{tool_name}' not found. Available ({len(available)}): {', '.join(available[:20])}")
+        available = [t.name for t in _current_tools]
+        logger.error(f"[_tool_executor] '{tool_name}' not found. Available ({len(available)}): {', '.join(available)}")
         return f"Tool '{tool_name}' not found."
 
     async def _scheduler_llm_fn(prompt: str) -> str:
