@@ -1,5 +1,5 @@
-<svg width="100%" viewBox="0 0 685.48 1080" role="img" style="display:block;outline:none;border:none;" xmlns="http://www.w3.org/2000/svg">
-<rect x="-2" y="-2" width="689.48" height="1084.0" fill="#111111"/>
+<svg width="100%" viewBox="0 0 685.48 1080" role="img" style="display:block;outline:none;border:none;; background:#111111;" xmlns="http://www.w3.org/2000/svg">
+<rect x="-2" y="-2" width="110%" height="110%" fill="#111111"/>
 <title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">MCP Platform Prompt Loop v4</title>
 <desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Prompt loop flowchart with LLM involvement clearly highlighted in amber.</desc>
 <text x="340" y="22" text-anchor="middle" font-family="Anthropic Sans, sans-serif" font-size="16" font-weight="500" fill="#ffffff">MCP platform prompt loop</text>

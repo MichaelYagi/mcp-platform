@@ -1,5 +1,5 @@
-<svg width="100%" viewBox="0 0 680 1010" role="img" style="display:block;outline:none;border:none;" xmlns="http://www.w3.org/2000/svg">
-<rect x="-2" y="-2" width="684.0" height="1014.0" fill="#111111"/>
+<svg width="100%" viewBox="0 0 680 1010" role="img" style="display:block;outline:none;border:none;; background:#111111;" xmlns="http://www.w3.org/2000/svg">
+<rect x="-2" y="-2" width="110%" height="110%" fill="#111111"/>
 <title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">MCP Platform Startup &amp; Initialisation Sequence</title>
 <desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Detailed sequence of everything that runs in main() before the prompt loop starts.</desc>
 <text x="340" y="22" text-anchor="middle" font-family="Anthropic Sans, sans-serif" font-size="16" font-weight="500" fill="#ffffff">Startup &amp; initialisation sequence</text>

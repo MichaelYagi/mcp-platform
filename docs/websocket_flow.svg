@@ -1,7 +1,7 @@
-<svg width="100%" viewBox="0 0 720 990" role="img" style="display:block;outline:none;border:none;" xmlns="http://www.w3.org/2000/svg">
+<svg width="100%" viewBox="0 0 720 990" role="img" style="display:block;outline:none;border:none;; background:#111111;" xmlns="http://www.w3.org/2000/svg">
 <title>WebSocket Message Flow</title>
 <desc>WebSocket message routing through websocket_handler and process_query.</desc>
-<rect x="-2" y="-2" width="724" height="994" fill="#111111"/>
+<rect x="-2" y="-2" width="110%" height="110%" fill="#111111"/>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
     <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
