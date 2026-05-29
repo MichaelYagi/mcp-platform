@@ -1064,9 +1064,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         return s
 
     async def _run_pipeline(pipe_parts: list, tools_list: list) -> str:
-        """Execute a pipe-separated tool chain and return the final result string."""
+        """Execute a pipe-separated tool chain using _tool_executor for each step.
+        Reuses the same execution path as the scheduler pipeline."""
         import re as _pre
-        import time as _ptime
         _STEP_RE = _pre.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pre.IGNORECASE | _pre.DOTALL)
         _NOTIF = ("discord_notify", "gmail_send_email", "gmail_reply_tool")
         previous = None
@@ -1088,42 +1088,56 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     for km in _pre.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', args_str):
                         args[km.group(1)] = km.group(2).replace('\\"', '"')
 
-            # Inject previous result
+            # Unwrap and extract best text from previous result
+            if previous:
+                previous = _unwrap_tool_result(previous)
+                if isinstance(previous, str) and previous.strip().startswith("{"):
+                    try:
+                        import json as _pj
+                        _parsed = _pj.loads(previous)
+                        if isinstance(_parsed, dict):
+                            _text_val = (
+                                _parsed.get("summary") or
+                                _parsed.get("text") or
+                                (
+                                    _parsed.get("calendar", {}).get("text", "") + "\n" +
+                                    _parsed.get("email", {}).get("text", "") + "\n" +
+                                    _parsed.get("weather", {}).get("text", "")
+                                )
+                            ).strip()
+                            if _text_val:
+                                # Decode any escaped sequences (\\n → newline, \\u00b0 → °)
+                                try:
+                                    _text_val = _text_val.encode('utf-8').decode('unicode_escape').encode('latin-1').decode('utf-8')
+                                except Exception:
+                                    _text_val = _text_val.replace('\\n', '\n').replace('\\t', '\t')
+                                previous = _text_val
+                    except Exception:
+                        pass
+
+            # Inject previous result if no content arg present
             if previous and not args:
                 if any(k in tool_name for k in _NOTIF):
                     args = {"message": str(previous)}
+                elif "email" in tool_name:
+                    args = {"body": str(previous)}
+                else:
+                    args = {"text": str(previous)}
             elif previous and args:
-                is_email = "email" in tool_name
-                content_key = "body" if is_email else "message"
-                if not any(k in args for k in ("message", "body", "content", "text")):
-                    args[content_key] = str(previous)
-                elif is_email and "message" in args and "body" not in args:
+                if not any(k in args for k in ("message", "body", "content", "text", "input")):
+                    if any(k in tool_name for k in _NOTIF):
+                        args["message"] = str(previous)
+                    elif "email" in tool_name:
+                        args["body"] = str(previous)
+                    else:
+                        args["text"] = str(previous)
+                elif "email" in tool_name and "message" in args and "body" not in args:
                     args["body"] = args.pop("message")
 
-            # Find tool
-            tool = next((t for t in tools_list if t.name == tool_name), None)
-            if not tool:
-                previous = f"Tool '{tool_name}' not found"
-                logger.error(f"🔀 Pipeline step {idx+1}: {tool_name} not found")
-                break
-
+            # Execute via _tool_executor — same path as scheduler
             logger.info(f"🔀 Pipeline step {idx+1}/{len(steps)}: {tool_name}({args})")
-            t0 = _ptime.time()
-            try:
-                if args and any('\n' in str(v) or len(str(v)) > 200 for v in args.values()):
-                    if tool_name == "gmail_send_email" and args.get("body"):
-                        args = dict(args)
-                        args["html"] = True
-                        args["body"] = _md_to_html(args["body"])
-                    previous = _unwrap_tool_result(await tool.ainvoke(args))
-                else:
-                    arg_str = " ".join(f'{k}="{v}"' for k, v in args.items()) if args else ""
-                    previous = await _invoke_tool_directly(tool, arg_str, logger)
-                logger.info(f"🔀 Pipeline step {idx+1} done in {_ptime.time()-t0:.2f}s")
-            except Exception as err:
-                logger.error(f"🔀 Pipeline step {idx+1} failed: {err}")
-                previous = f"Error in {tool_name}: {err}"
-                break
+            previous = await _tool_executor(tool_name, args)
+            logger.info(f"🔀 Pipeline step {idx+1} done: {str(previous)[:80]}")
 
         # Clean UI result
         last_tool = steps[-1].split()[1].split(":")[0] if steps and len(steps[-1].split()) > 1 else ""
