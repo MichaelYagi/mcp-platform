@@ -2592,5 +2592,7 @@ if (typeof module !== 'undefined' && module.exports) {
         send,
         toggleToolsPanel,
         setIsProcessing: (v) => { isProcessing = v; },
+        buildToolItem,
+        renderToolsPanel,
     };
 }

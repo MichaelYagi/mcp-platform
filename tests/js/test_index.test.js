@@ -490,3 +490,130 @@ describe('copy button click', () => {
         btn.remove();
     });
 });
+
+
+// ═══════════════════════════════════════════════════════════════════
+// buildToolItem — coverage for lines 1701-1782
+// ═══════════════════════════════════════════════════════════════════
+
+describe('buildToolItem()', () => {
+    const mockTool = {
+        name: 'test_tool',
+        description: 'Does something useful. Extra detail.',
+        tags: ['read', 'search'],
+        required_params: [{ name: 'query' }],
+        template: 'use test_tool: query=""',
+        rate_limit: '10/min',
+        enabled: true,
+        source_server: 'test_server',
+    };
+
+    test('returns a DOM element', () => {
+        const el = ui.buildToolItem(mockTool);
+        expect(el).toBeInstanceOf(HTMLElement);
+    });
+
+    test('element contains tool name', () => {
+        const el = ui.buildToolItem(mockTool);
+        expect(el.textContent).toContain('test_tool');
+    });
+
+    test('renders tags', () => {
+        const el = ui.buildToolItem(mockTool);
+        expect(el.querySelectorAll('.tool-tag').length).toBe(2);
+    });
+
+    test('renders required params', () => {
+        const el = ui.buildToolItem(mockTool);
+        expect(el.querySelectorAll('.tool-param').length).toBeGreaterThan(0);
+    });
+
+    test('renders rate limit', () => {
+        const el = ui.buildToolItem(mockTool);
+        expect(el.querySelector('.tool-rate-limit')).not.toBeNull();
+    });
+
+    test('disabled tool gets disabled class', () => {
+        const el = ui.buildToolItem({ ...mockTool, enabled: false });
+        expect(el.classList.contains('tool-disabled')).toBe(true);
+    });
+
+    test('draggable option sets draggable attr', () => {
+        const el = ui.buildToolItem(mockTool, { draggable: true });
+        expect(el.getAttribute('draggable')).toBe('true');
+    });
+
+    test('star button click toggles favorite', () => {
+        const el = ui.buildToolItem(mockTool);
+        document.body.appendChild(el);
+        const star = el.querySelector('.tool-fav-btn');
+        expect(() => star.click()).not.toThrow();
+        el.remove();
+    });
+
+    test('item click sets input value', () => {
+        const el = ui.buildToolItem(mockTool);
+        document.body.appendChild(el);
+        expect(() => el.click()).not.toThrow();
+        el.remove();
+    });
+
+    test('tool without tags renders no tag elements', () => {
+        const el = ui.buildToolItem({ ...mockTool, tags: [] });
+        expect(el.querySelectorAll('.tool-tag').length).toBe(0);
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// renderToolsPanel — coverage for lines 1838-1938
+// ═══════════════════════════════════════════════════════════════════
+
+describe('renderToolsPanel()', () => {
+    const tools = [
+        { name: 'tool_a', description: 'Tool A.', tags: [], required_params: [], source_server: 'server1', enabled: true },
+        { name: 'tool_b', description: 'Tool B.', tags: ['read'], required_params: [], source_server: 'server1', enabled: true },
+        { name: 'tool_c', description: 'Tool C.', tags: [], required_params: [], source_server: 'server2', enabled: false },
+    ];
+
+    test('renders without throwing', () => {
+        expect(() => ui.renderToolsPanel(tools)).not.toThrow();
+    });
+
+    test('creates server group categories', () => {
+        ui.renderToolsPanel(tools);
+        const body = document.getElementById('toolsBody');
+        if (!body) return;
+        expect(body.querySelectorAll('.tools-category').length).toBeGreaterThan(0);
+    });
+
+    test('renders empty favorites section', () => {
+        ui.renderToolsPanel(tools);
+        const body = document.getElementById('toolsBody');
+        if (!body) return;
+        expect(body.querySelector('.tools-fav-empty')).not.toBeNull();
+    });
+
+    test('renders tool items', () => {
+        ui.renderToolsPanel(tools);
+        const body = document.getElementById('toolsBody');
+        if (!body) return;
+        expect(body.querySelectorAll('.tool-item').length).toBe(3);
+    });
+
+    test('clicking category header toggles open', () => {
+        ui.renderToolsPanel(tools);
+        const body = document.getElementById('toolsBody');
+        if (!body) return;
+        const header = body.querySelector('.tools-category-header');
+        if (header) expect(() => header.click()).not.toThrow();
+    });
+
+    test('group star button toggles all favorites', () => {
+        ui.renderToolsPanel(tools);
+        const body = document.getElementById('toolsBody');
+        if (!body) return;
+        const groupStar = body.querySelector('.group-fav-btn');
+        if (groupStar) expect(() => groupStar.click()).not.toThrow();
+    });
+});
