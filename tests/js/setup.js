@@ -17,6 +17,12 @@ const path = require('path');
 const ROOT   = path.resolve(__dirname, '../../');
 const UI_DIR = path.join(ROOT, 'client/ui');
 
+// ── fetch ─────────────────────────────────────────────────────────────────────
+global.fetch = jest.fn().mockResolvedValue({
+    ok: false,
+    json: jest.fn().mockResolvedValue(null),
+});
+
 // ── localStorage ─────────────────────────────────────────────────────────────
 const localStorageMock = (() => {
     let store = {};

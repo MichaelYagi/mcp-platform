@@ -2589,5 +2589,8 @@ if (typeof module !== 'undefined' && module.exports) {
         updateProgressBar,
         toggleLogFilter,
         updateSystemStats,
+        send,
+        toggleToolsPanel,
+        setIsProcessing: (v) => { isProcessing = v; },
     };
 }

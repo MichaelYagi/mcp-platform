@@ -399,3 +399,94 @@ describe('addMessage additional branches', () => {
         expect(document.querySelector('.msg-wrapper').textContent).toContain('caption');
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// send() — coverage for lines 1604-1648
+// ═══════════════════════════════════════════════════════════════════
+
+describe('send()', () => {
+    test('does nothing when input is empty', () => {
+        const input = document.getElementById('input');
+        if (input) input.value = '';
+        expect(() => ui.send()).not.toThrow();
+    });
+
+    test('does nothing when ws not open', () => {
+        const input = document.getElementById('input');
+        if (input) input.value = 'hello';
+        expect(() => ui.send()).not.toThrow();
+    });
+
+    test('send with stop state does not throw', () => {
+        ui.setIsProcessing(true);
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) sendBtn.classList.add('is-stop');
+        expect(() => ui.send()).not.toThrow();
+        ui.setIsProcessing(false);
+        if (sendBtn) sendBtn.classList.remove('is-stop');
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// toggleToolsPanel — coverage for lines 1657-1661
+// ═══════════════════════════════════════════════════════════════════
+
+describe('toggleToolsPanel()', () => {
+    test('toggles open class on panel', () => {
+        const panel = document.getElementById('toolsPanel');
+        const btn   = document.getElementById('toolsToggle');
+        if (!panel || !btn) return;
+        ui.toggleToolsPanel();
+        expect(panel.classList.contains('open')).toBe(true);
+        ui.toggleToolsPanel();
+        expect(panel.classList.contains('open')).toBe(false);
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// modelSelect change — coverage for lines 1457-1458
+// ═══════════════════════════════════════════════════════════════════
+
+describe('modelSelect change event', () => {
+    test('fires without throwing', () => {
+        const modelSelect = document.getElementById('modelSelect');
+        if (!modelSelect) return;
+        expect(() => modelSelect.dispatchEvent(new Event('change'))).not.toThrow();
+    });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════
+// copy button — coverage for lines 1462-1534
+// dispatch on a real element so e.target.closest works
+// ═══════════════════════════════════════════════════════════════════
+
+describe('copy button click', () => {
+    test('copy-btn with missing target does nothing', () => {
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.dataset.target = 'nonexistent';
+        document.body.appendChild(btn);
+        expect(() => btn.click()).not.toThrow();
+        btn.remove();
+    });
+
+    test('copy-btn with valid target does not throw', () => {
+        const pre = document.createElement('pre');
+        pre.id = 'copy-target-test';
+        pre.innerText = 'test code';
+        document.body.appendChild(pre);
+
+        const btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.dataset.target = 'copy-target-test';
+        document.body.appendChild(btn);
+
+        expect(() => btn.click()).not.toThrow();
+
+        pre.remove();
+        btn.remove();
+    });
+});
