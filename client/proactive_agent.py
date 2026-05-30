@@ -772,7 +772,7 @@ async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
     # Direct pipeline dispatch — never a scheduling request
     # (only bypass if there are no time/schedule keywords in the message)
     _has_time = _re_sched.search(
-        r'\b(at\s+\d|every|daily|weekly|tomorrow|tonight|morning|minute|hours|seconds|pm|am|in\s+\d+\s+(minute|hour|day))',
+        r'\b(at\s+\d|every\b|daily\b|weekly\b|tomorrow\b|tonight\b|morning\b|minute\b|hours\b|seconds\b|pm\b|am\b|in\s+\d+\s+(minute|hour|day))',
         message, _re_sched.IGNORECASE
     )
     if message.lstrip().lower().startswith("use ") and "|" in message and not _has_time:

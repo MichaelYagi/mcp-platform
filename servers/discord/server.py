@@ -224,6 +224,9 @@ def discord_notify(
         if local_images:
             # Fetch the first local image and upload as a file attachment
             img_url = local_images[0]
+            # Prefer original resolution over thumbnail
+            if '/thumbnails/225/' in img_url:
+                img_url = img_url.replace('/thumbnails/225/', '/thumbnails/original/')
             try:
                 with _urllib.urlopen(img_url, timeout=10) as _resp:
                     img_data = _resp.read()
