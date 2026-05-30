@@ -1063,13 +1063,13 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 return _m.group(1).replace("\\'", "'")
         return s
 
-    async def _run_pipeline(pipe_parts: list, tools_list: list) -> str:
+    async def _run_pipeline(pipe_parts: list, tools_list: list, initial_result: str = None) -> str:
         """Execute a pipe-separated tool chain using _tool_executor for each step.
         Identical execution path to the scheduler pipeline — no extra transformation."""
         import re as _pre
         _STEP_RE = _pre.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pre.IGNORECASE | _pre.DOTALL)
         _NOTIF = ("discord_notify", "gmail_send_email", "gmail_reply_tool")
-        previous = None
+        previous = initial_result  # allow pre-seeding with condition check result
         steps = [s.strip() for s in pipe_parts if s.strip()]
         for idx, step in enumerate(steps):
             m = _STEP_RE.match(step)
@@ -1147,7 +1147,28 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         logger.error(f"[_tool_executor] '{tool_name}' not found. Available ({len(available)}): {', '.join(available)}")
         return f"Tool '{tool_name}' not found."
 
-    async def _scheduler_llm_fn(prompt: str) -> str:
+    async def _raw_tool_executor(tool_name: str, args: dict) -> str:
+        """Execute a tool and return raw JSON output — no LLM post-processing.
+        Used for condition checks so JSON fields like total_unread are parseable."""
+        _current_tools = mcp_agent._tools
+        for tool in _current_tools:
+            if tool.name == tool_name:
+                try:
+                    raw = await tool.ainvoke(args or {})
+                    result = _unwrap_tool_result(raw)
+                    # Decode literal \n \t escape sequences if present
+                    if isinstance(result, str) and '\\n' in result:
+                        try:
+                            import json as _rj
+                            result = _rj.loads(f'"{result.replace(chr(34), chr(92)+chr(34))}"')
+                        except Exception:
+                            result = result.replace('\\n', '\n').replace('\\t', '\t')
+                    logger.info(f"[_raw_tool_executor] {tool_name} raw result preview: {str(result)[:200]}")
+                    return result
+                except Exception as e:
+                    logger.error(f"[_raw_tool_executor] {tool_name} error: {e}")
+                    return f"Tool {tool_name} error: {e}"
+        return f"Tool '{tool_name}' not found."
         """LLM function for post-processing scheduled job results.
         Takes a plain prompt string (no system/user split) and returns the response.
         Used by AgentScheduler._fire_job when a job has an llm_prompt set.
@@ -1181,10 +1202,11 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     agent_scheduler = AgentScheduler(
         execute_fn=_tool_executor,
         broadcast_fn=broadcast_proactive_result,
-        llm_fn=_scheduler_llm_fn,
+        llm_fn=_llm_fn_for_memory,
         session_manager=session_manager,
         agent_fn=_scheduler_agent_fn,
     )
+    agent_scheduler._raw_execute_fn = _raw_tool_executor
     await agent_scheduler.start()
 
     tool_names = [t.name for t in mcp_agent._tools]
@@ -1664,6 +1686,86 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # directly and hand the result straight to the LLM for summarization.
         # This bypasses LangGraph tool-call generation entirely, which small
         # models (llama3.2:3b etc.) handle poorly.
+
+        # ── Condition dispatch ─────────────────────────────────────────
+        # "check <tool> if <expr> then use <tool2>" — run check tool, evaluate
+        # condition, only run action tool if condition is true.
+        import re as _cond_re
+        _COND_RE = _cond_re.compile(
+            r'^check\s+(\w+)(?::([^i]+))?\s+if\s+(.+?)\s+then\s+(.+)$',
+            _cond_re.IGNORECASE | _cond_re.DOTALL
+        )
+        _cond_match = _COND_RE.match(user_message.strip())
+        if _cond_match:
+            _check_tool_name = _cond_match.group(1).strip()
+            _check_args_str  = (_cond_match.group(2) or "").strip()
+            _cond_expr       = _cond_match.group(3).strip()
+            # Unescape HTML entities (browser may encode > as &gt; etc.)
+            import html as _html
+            _cond_expr = _html.unescape(_cond_expr)
+            _action_str      = _cond_match.group(4).strip()
+
+            # Parse check tool args
+            _check_args: dict = {}
+            if _check_args_str:
+                try:
+                    import json as _cj
+                    _check_args = _cj.loads(_check_args_str)
+                except Exception:
+                    for _km in _cond_re.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', _check_args_str):
+                        _check_args[_km.group(1)] = _km.group(2)
+
+            # Run check tool using raw executor (no LLM post-processing) to get parseable JSON
+            logger.info(f"🔍 Condition check: {_check_tool_name}({_check_args}) if {_cond_expr!r}")
+            _check_result = await _raw_tool_executor(_check_tool_name, _check_args)
+
+            # Evaluate condition
+            _cond_fired = False
+            try:
+                import json as _cj2
+                logger.info(f"🔍 Raw check result type={type(_check_result).__name__} repr={repr(_check_result[:100]) if isinstance(_check_result, str) else repr(_check_result)}")
+                _cond_data = _cj2.loads(_check_result) if isinstance(_check_result, str) else {}
+                _cond_vars = {"result": _check_result, "result_len": len(str(_check_result)), "data": _cond_data}
+                if isinstance(_cond_data, dict):
+                    for _k, _v in _cond_data.items():
+                        if isinstance(_v, (int, float, bool, str)):
+                            _cond_vars[_k] = _v
+                        elif isinstance(_v, list):
+                            _cond_vars[f"len_{_k}"] = len(_v)
+                elif isinstance(_cond_data, list):
+                    _cond_vars["result"] = len(_cond_data)
+                _cond_fired = bool(eval(_cond_expr, {"__builtins__": {}}, _cond_vars))
+            except Exception as _ce:
+                logger.warning(f"🔍 Condition eval failed: {_ce}")
+                _cond_fired = False
+
+            if _cond_fired:
+                logger.info(f"🔍 Condition TRUE — running action: {_action_str}")
+                # Extract human-readable text from JSON result if available
+                _action_input = _check_result
+                try:
+                    import json as _cj3
+                    _cd = _cj3.loads(_check_result)
+                    if isinstance(_cd, dict):
+                        _action_input = _cd.get("text") or _cd.get("summary") or _cd.get("message") or _check_result
+                except Exception:
+                    pass
+                # Parse action as pipeline or single use step
+                _action_parts = [p.strip() for p in _action_str.split("|") if p.strip()]
+                _action_result = await _run_pipeline(_action_parts, tools, initial_result=_action_input)
+                _cond_output = _action_result
+            else:
+                logger.info(f"🔍 Condition FALSE — no action taken")
+                _cond_output = "No unread emails — nothing to do."
+
+            conversation_state["messages"].append(HumanMessage(content=user_message))
+            conversation_state["messages"].append(AIMessage(content=_cond_output))
+            return {
+                "messages": conversation_state["messages"],
+                "current_model": "condition",
+                "multi_agent": False,
+                "a2a": False,
+            }
 
         # ── Pipeline dispatch ──────────────────────────────────────────
         # "use tool1 | use tool2: arg=val" runs tools in sequence without LLM.
@@ -2370,7 +2472,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         session_manager=session_manager,
         session_state_registry=session_state_registry,
         capability_registry=capability_registry,
-        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser, "llm_fn": _scheduler_llm_fn},
+        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser, "llm_fn": _llm_fn_for_memory},
         inactivity_watcher=inactivity_watcher,
         host="0.0.0.0",
         port=8765

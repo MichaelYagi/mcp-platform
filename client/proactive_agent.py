@@ -391,25 +391,28 @@ class ScheduleConfirmation:
     deliver_to_session: bool = False    # True = deliver to session_id, False = broadcast
 
     def render(self) -> str:
+        tool_line = f"  Tool:      {self.tool}\n" if self.tool else ""
         args_str = json.dumps(self.tool_args) if self.tool_args else "none"
+        args_line = f"  Args:      {args_str}\n" if self.tool_args else ""
+
         if self.trigger_type == "once":
-            sched = (
-                f"  Run once:  {self.human_schedule}\n"
-                f"  Date:      {self.run_date}\n"
-            )
+            sched = f"  Schedule:  {self.human_schedule}\n"
         elif self.trigger_type == "cron":
             end_line = f"  Ends:      {self.end_date}\n" if self.end_date else ""
-            sched = (
-                f"  Schedule:  {self.human_schedule}\n"
-                f"  Cron:      {self.cron}\n"
-                + end_line
-            )
+            sched = f"  Schedule:  {self.human_schedule}\n" + end_line
         else:
             cta_str = json.dumps(self.condition_tool_args) if self.condition_tool_args else "none"
             sched = (
                 f"  Condition: {self.condition_tool}({cta_str}) → {self.condition_expr}\n"
                 f"  Polls:     {cron_to_human(self.condition_cron)}\n"
             )
+
+        # Always show condition details if present (even for once trigger)
+        condition_line = ""
+        if self.condition_tool and self.trigger_type == "once":
+            cta_str = json.dumps(self.condition_tool_args) if self.condition_tool_args else "none"
+            condition_line = f"  Condition: {self.condition_tool}({cta_str}) → {self.condition_expr}\n"
+
         llm_line = ""
         if self.llm_prompt:
             if "|" in self.llm_prompt:
@@ -417,15 +420,15 @@ class ScheduleConfirmation:
                 llm_line = "  Pipeline:\n" + "\n".join(f"    {i+1}. {s}" for i, s in enumerate(steps)) + "\n"
             else:
                 llm_line = f"  LLM:       {self.llm_prompt}\n"
-        delivery = "this session" if self.deliver_to_session else "all clients (broadcast)"
-        delivery_line = f"  Delivery:  {delivery}\n"
+
         return (
             f"Here's what I'll schedule — confirm to proceed:\n\n"
             f"  Label:     {self.label}\n"
-            f"  Tool:      {self.tool}\n"
-            f"  Args:      {args_str}\n"
-            + sched +
-            llm_line +
+            + tool_line
+            + args_line
+            + sched
+            + condition_line
+            + llm_line +
             f"  Timezone:  {self.timezone}\n\n"
             f"Reply **yes** to confirm, **no** to cancel, or describe any changes."
         )
@@ -476,6 +479,7 @@ Shape B — single tool, condition trigger:
   "condition_tool_args": {{}},
   "condition_expr": "<Python expression — see notes below>",
   "condition_cron": "<how often to poll, default */15 * * * *>",
+  "run_date": "<ISO datetime if one-time check e.g. 2026-05-29T19:50:00, else null>",
   "timezone": "America/Vancouver",
   "human_schedule": "<plain English description>",
   "llm_prompt": "<optional: instruction for LLM to execute after condition fires>",
@@ -546,7 +550,8 @@ STRICT RULES:
 4. cron must be valid 5-field cron.
 5. Return ONLY JSON. No preamble, no markdown fences.
 6. Set deliver_to_session=true when the user's request implies they want the result in the current conversation (e.g. 'show me', 'tell me', 'give me'). Set false for monitoring/alerting jobs.
-7. When the request involves multiple tools or sending data somewhere after fetching it, ALWAYS use Shape D with pipe-separated `use <tool>` steps in llm_prompt."""
+7. When the request involves multiple tools or sending data somewhere after fetching it, ALWAYS use Shape D with pipe-separated `use <tool>` steps in llm_prompt.
+8. If the request says "today", "tonight", "at X pm today", or any specific one-time time, set run_date to the ISO datetime and set condition_cron to null for Shape B. This means check ONCE at that time, not repeatedly."""
 
 
 class ScheduleParser:
@@ -608,6 +613,43 @@ class ScheduleParser:
                 ttype = "once"
                 data["trigger_type"] = "once"
 
+            # Condition job with run_date = one-time check, not recurring poll
+            if ttype == "condition" and data.get("run_date"):
+                data["trigger_type"] = "once"
+                ttype = "once"
+                # Recalculate run_date using today's actual date (LLM often gets date wrong)
+                _rd = data["run_date"]
+                try:
+                    from datetime import date as _date_cond
+                    _time_part = _rd.split("T")[1][:5] if "T" in _rd else "00:00"
+                    _h, _m = map(int, _time_part.split(":"))
+                    data["run_date"] = f"{_date_cond.today().isoformat()}T{_h:02d}:{_m:02d}:00"
+                    _suffix = "am" if _h < 12 else "pm"
+                    _h12 = _h if 1 <= _h <= 12 else (12 if _h == 0 else _h - 12)
+                    data["human_schedule"] = f"Once at {_h12}:{_m:02d}{_suffix} today"
+                except Exception:
+                    pass
+
+            # Condition job with today signal but no run_date — extract from condition_cron
+            if ttype == "condition" and not data.get("run_date"):
+                import re as _re_cond
+                _one_time = _re_cond.search(
+                    r'\b(today|tonight|this\s+(morning|afternoon|evening|night)|just\s+once|one\s+time)\b',
+                    original, _re_cond.IGNORECASE
+                )
+                if _one_time and data.get("condition_cron"):
+                    _cron_parts = data["condition_cron"].strip().split()
+                    if len(_cron_parts) == 5 and _cron_parts[0].isdigit() and _cron_parts[1].isdigit():
+                        from datetime import date as _date2
+                        _rd = f"{_date2.today().isoformat()}T{int(_cron_parts[1]):02d}:{int(_cron_parts[0]):02d}:00"
+                        data["run_date"] = _rd
+                        data["trigger_type"] = "once"
+                        ttype = "once"
+                        _h, _m = int(_cron_parts[1]), int(_cron_parts[0])
+                        _suffix = "am" if _h < 12 else "pm"
+                        _h12 = _h if 1 <= _h <= 12 else (12 if _h == 0 else _h - 12)
+                        data["human_schedule"] = f"Once at {_h12}:{_m:02d}{_suffix} today"
+
             # Deterministic one-time detection — no LLM call needed
             if ttype == "cron" and data.get("cron"):
                 import re as _re_once
@@ -667,7 +709,7 @@ class ScheduleParser:
                 condition_tool=data.get("condition_tool"),
                 condition_tool_args=data.get("condition_tool_args", {}),
                 condition_expr=data.get("condition_expr"),
-                condition_cron=data.get("condition_cron", "*/15 * * * *"),
+                condition_cron=data.get("condition_cron") or "*/15 * * * *",
                 timezone=data.get("timezone", self._tz),
                 human_schedule=data["human_schedule"],
                 original_request=original,
@@ -734,6 +776,10 @@ async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
         message, _re_sched.IGNORECASE
     )
     if message.lstrip().lower().startswith("use ") and "|" in message and not _has_time:
+        return False
+
+    # Direct condition check — "check <tool> if <expr> then use <tool>" — never a scheduling request
+    if message.lstrip().lower().startswith("check ") and " then " in message.lower() and not _has_time:
         return False
 
     _time_pattern = _re_sched.search(
@@ -951,8 +997,68 @@ class AgentScheduler:
 
             else:
                 # Original single-tool or LLM-based execution
+
+                # For once-trigger jobs that have a condition_tool, run the check first
+                if tool and job.get("condition_tool") and not condition_result:
+                    _cond_tool = job["condition_tool"]
+                    _cond_args = json.loads(job.get("condition_tool_args") or "{}")
+                    _cond_expr = job.get("condition_expr") or ""
+                    logger.info(f"⏰ Running condition check: {_cond_tool}({_cond_args}) → {_cond_expr!r}")
+                    try:
+                        # Use raw execute (bypasses LLM formatting) to get parseable JSON
+                        _exec = getattr(self, '_raw_execute_fn', None) or self._execute_fn
+                        _cond_raw = await _exec(_cond_tool, _cond_args)
+                        _cond_vars = {"result": _cond_raw, "result_len": len(str(_cond_raw)), "data": {}}
+                        try:
+                            import json as _cj
+                            _cond_data = _cj.loads(_cond_raw) if isinstance(_cond_raw, str) else {}
+                            _cond_vars["data"] = _cond_data
+                            if isinstance(_cond_data, dict):
+                                for _k, _v in _cond_data.items():
+                                    if isinstance(_v, (int, float, bool, str)):
+                                        _cond_vars[_k] = _v
+                                    elif isinstance(_v, list):
+                                        _cond_vars[f"len_{_k}"] = len(_v)
+                            elif isinstance(_cond_data, list):
+                                _cond_vars["result"] = len(_cond_data)
+                            logger.info(f"⏰ Condition vars keys: {list(_cond_vars.keys())}")
+                        except Exception as _parse_err:
+                            logger.warning(f"⏰ Condition JSON parse failed: {_parse_err} — raw: {str(_cond_raw)[:100]}")
+                        _cond_fired = bool(eval(_cond_expr, {"__builtins__": {}}, _cond_vars)) if _cond_expr else True
+                    except Exception as _ce:
+                        logger.warning(f"⏰ Condition check failed: {_ce}")
+                        _cond_fired = False
+
+                    if not _cond_fired:
+                        logger.info(f"⏰ Condition FALSE — skipping action tool")
+                        result = "Condition not met — no action taken."
+                        # Skip to delivery
+                        if job.get("deliver_to_session") and job.get("session_id") and self._session_manager:
+                            try:
+                                import os as _os2
+                                _max2 = int(_os2.getenv("MAX_MESSAGE_HISTORY", 30))
+                                self._session_manager.add_message(job["session_id"], "assistant", result, _max2, "proactive")
+                            except Exception:
+                                pass
+                        await self._broadcast_fn({"type": "scheduled_result", "job_id": job["id"], "label": job["label"], "result": result, "session_id": job.get("session_id")})
+                        return
+
+                    condition_result = str(_cond_raw)
+
                 if tool:
                     args = json.loads(job["tool_args"] or "{}")
+                    # Inject condition result as message if no args specified
+                    if condition_result and not args:
+                        if any(k in tool for k in ("notify", "send", "email", "reply", "post")):
+                            # Extract human-readable text from JSON if available
+                            _msg = condition_result
+                            try:
+                                _cd = json.loads(condition_result)
+                                if isinstance(_cd, dict):
+                                    _msg = _cd.get("text") or _cd.get("summary") or _cd.get("message") or condition_result
+                            except Exception:
+                                pass
+                            args = {"message": _msg}
                     tool_result = await self._execute_fn(tool, args)
                     result = tool_result
 
@@ -1015,7 +1121,9 @@ class AgentScheduler:
         record_run(job["id"], is_check=True)
         try:
             condition_args = json.loads(job.get("condition_tool_args") or "{}")
-            result_raw = await self._execute_fn(job["condition_tool"], condition_args)
+            # Use raw execute (bypasses LLM formatting) to get parseable JSON
+            _exec = getattr(self, '_raw_execute_fn', None) or self._execute_fn
+            result_raw = await _exec(job["condition_tool"], condition_args)
 
             # Build evaluation context — try to give the expression as much
             # to work with as possible regardless of what the tool returned.
