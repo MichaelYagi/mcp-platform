@@ -977,15 +977,30 @@ class AgentScheduler:
 
                     logger.info(f"⏰ Pipeline step {step_idx + 1}/{len(steps)}: {step_tool}({step_args})")
                     try:
-                        previous_result = await self._execute_fn(step_tool, step_args)
-                        if previous_result and previous_result.startswith(f"Tool '{step_tool}' not found"):
-                            # Log available tools to diagnose lookup failure
+                        _NOTIF = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
+                        _is_notif = any(n in step_tool for n in _NOTIF)
+                        # Use raw executor for data steps (no LLM reformatting)
+                        # Use full executor for notification steps (handles HTML conversion etc.)
+                        _exec = self._execute_fn if _is_notif else (getattr(self, '_raw_execute_fn', None) or self._execute_fn)
+                        previous_result = await _exec(step_tool, step_args)
+                        if previous_result and str(previous_result).startswith(f"Tool '{step_tool}' not found"):
                             logger.error(f"⏰ Pipeline: tool '{step_tool}' not found — check tool is registered and server started correctly")
                         logger.info(f"⏰ Pipeline step {step_idx + 1} completed: {str(previous_result)[:100]}")
                     except Exception as _step_err:
                         logger.error(f"⏰ Pipeline step {step_idx + 1} ({step_tool}) failed: {_step_err}")
                         previous_result = f"Error in step {step_idx + 1} ({step_tool}): {_step_err}"
                         break
+
+                    # Extract best text from JSON results before passing to next step
+                    if previous_result and str(previous_result).strip().startswith("{"):
+                        try:
+                            _pd = json.loads(str(previous_result))
+                            if isinstance(_pd, dict):
+                                _tv = (_pd.get("text") or _pd.get("summary") or "").strip()
+                                if _tv:
+                                    previous_result = _tv
+                        except Exception:
+                            pass
 
                 _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
                 _last_step = steps[-1] if steps else ""
