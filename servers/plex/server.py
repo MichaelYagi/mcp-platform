@@ -597,6 +597,11 @@ def rag_rescan_no_subtitles() -> str:
 # TOOL 5: Get Ingestion Statistics (Monitoring)
 @mcp.tool()
 @check_tool_enabled(category="plex")
+@tool_meta(
+    tags=["read", "media"],
+    triggers=["plex stats", "ingestion stats", "plex progress", "how much plex is ingested"],
+    template='use plex_get_stats',
+)
 def plex_get_stats() -> str:
     """
     Get overall Plex ingestion statistics.
