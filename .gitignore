@@ -44,3 +44,4 @@ test.py
 /tests/integration/tests/
 /tests/e2e/tests/
 /auth_pending.json
+/apply_categories.py

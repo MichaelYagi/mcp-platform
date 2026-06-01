@@ -75,6 +75,7 @@ def tool_meta(
     web_search: bool = False,
     skills: bool = False,
     priority: int = 2,
+    category: str = "source",
 ) -> Any:
     """
     Decorator that attaches routing + capability metadata to an MCP tool function.
@@ -96,6 +97,7 @@ def tool_meta(
             "web_search":      web_search,
             "skills":          skills,
             "priority":        priority,
+            "category":        category,
         }
         setattr(fn, _META_ATTR, meta)
         # Do NOT set __wrapped__ — a self-referential __wrapped__ = fn
@@ -112,6 +114,8 @@ def tool_meta(
             doc_suffix += f"\n\n__intent_category__: {intent_category}"
         if tags:
             doc_suffix += f"\n\n__tags__: {','.join(tags)}"
+        if category and category != "source":
+            doc_suffix += f"\n\n__category__: {category}"
         if doc_suffix:
             if fn.__doc__:
                 fn.__doc__ = fn.__doc__.rstrip() + doc_suffix

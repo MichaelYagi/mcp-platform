@@ -427,7 +427,9 @@ def run_bash(
 
 @mcp.tool()
 @check_tool_enabled(category="code_runner")
-@tool_meta(tags=["write","code","system"],triggers=["install package","pip install","install library","install module","add package","install dependency","install python package"],idempotent=False,template='use pip_install: package=""',intent_category="code_runner")
+@tool_meta(tags=["write","code","system"],triggers=["install package","pip install","install library","install module","add package","install dependency","install python package"],idempotent=False,template='use pip_install: package=""',intent_category="code_runner",
+    category="sink"
+)
 def pip_install(
     package: str,
     upgrade: Optional[bool] = False,

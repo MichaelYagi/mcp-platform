@@ -241,7 +241,9 @@ def session_history_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["write","rag"],triggers=["add to rag","ingest url","add document","store in rag","save to rag","add content to rag","ingest document"],idempotent=False,template='use rag_add_tool: text="" [source=""] [chunk_size=""]')
+@tool_meta(tags=["write","rag"],triggers=["add to rag","ingest url","add document","store in rag","save to rag","add content to rag","ingest document"],idempotent=False,template='use rag_add_tool: text="" [source=""] [chunk_size=""]',
+    category="sink"
+)
 def rag_add_tool(text: str, source: str | None = None, chunk_size: int = 500) -> str:
     """
     Add text to the RAG vector database.
@@ -598,7 +600,9 @@ def rag_list_sources_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["destructive","rag"],triggers=["delete from rag","remove from rag","delete rag source","remove rag source"],idempotent=False,template='use rag_delete_source_tool: source=""')
+@tool_meta(tags=["destructive","rag"],triggers=["delete from rag","remove from rag","delete rag source","remove rag source"],idempotent=False,template='use rag_delete_source_tool: source=""',
+    category="sink"
+)
 def rag_delete_source_tool(source: str) -> str:
     """
     Delete all documents from a specific source from the RAG database.
@@ -663,7 +667,9 @@ def rag_delete_source_tool(source: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="rag")
-@tool_meta(tags=["destructive","rag"],triggers=["delete rag document","remove rag document","delete document by id"],idempotent=False,template='use rag_delete_document_tool: document_id=""')
+@tool_meta(tags=["destructive","rag"],triggers=["delete rag document","remove rag document","delete document by id"],idempotent=False,template='use rag_delete_document_tool: document_id=""',
+    category="sink"
+)
 def rag_delete_document_tool(document_id: str) -> str:
     """
     Delete a single document from the RAG database by its ID.

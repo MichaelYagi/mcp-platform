@@ -68,7 +68,9 @@ mcp = FastMCP("text-server")
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","ai"],triggers=["summarize","summarise","summary","tldr","tl;dr","r:(give me|write|create) a (short |brief |quick )?summ?ar(y|ize)","r:sum (up|this|it) up","r:summarize (this|the) (document|text|article|file|page)"],idempotent=True,template='use summarize_text_tool: [text=""] [file_path=""] [style=""]',text_fields=["summary"])
+@tool_meta(tags=["read","ai"],triggers=["summarize","summarise","summary","tldr","tl;dr","r:(give me|write|create) a (short |brief |quick )?summ?ar(y|ize)","r:sum (up|this|it) up","r:summarize (this|the) (document|text|article|file|page)"],idempotent=True,template='use summarize_text_tool: [text=""] [file_path=""] [style=""]',text_fields=["summary"],
+    category="transform"
+)
 def summarize_text_tool(text: Optional[str] = None,
                         file_path: Optional[str] = None,
                         style: Optional[str] = "medium") -> str:
@@ -98,7 +100,9 @@ def summarize_text_tool(text: Optional[str] = None,
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","ai"],triggers=["simplify","break down","eli5","r:explain (what|how|why|the concept of|the term)","r:explain (in simple|in depth|like i.?m? (?:5|five|a kid))","r:what (is|are|does) .+ mean"],idempotent=True,template='use explain_simplified_tool: concept=""')
+@tool_meta(tags=["read","ai"],triggers=["simplify","break down","eli5","r:explain (what|how|why|the concept of|the term)","r:explain (in simple|in depth|like i.?m? (?:5|five|a kid))","r:what (is|are|does) .+ mean"],idempotent=True,template='use explain_simplified_tool: concept=""',
+    category="transform"
+)
 def explain_simplified_tool(concept: str) -> str:
     """
     Explain complex concepts using the Ladder of Abstraction.
@@ -122,7 +126,9 @@ def explain_simplified_tool(concept: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","ai"],triggers=["contextualize","define","r:tell me (about|more about)","r:(give|provide) (me )?(background|context) on","r:what is (a |an |the )?[\\w\\s]+\\??$"],idempotent=True,template='use concept_contextualizer_tool: concept=""')
+@tool_meta(tags=["read","ai"],triggers=["contextualize","define","r:tell me (about|more about)","r:(give|provide) (me )?(background|context) on","r:what is (a |an |the )?[\\w\\s]+\\??$"],idempotent=True,template='use concept_contextualizer_tool: concept=""',
+    category="transform"
+)
 def concept_contextualizer_tool(concept: str) -> str:
     """
     Provide comprehensive context and background for a concept.
@@ -148,7 +154,9 @@ def concept_contextualizer_tool(concept: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read"],triggers=["read file","open file","load file","file contents","r:(analyze|show|display|read|open|load) (the |this |my )?file","r:contents? of (the |this )?file"],idempotent=True,template='use read_file_tool_handler: file_path=""',text_fields=["content"])
+@tool_meta(tags=["read"],triggers=["read file","open file","load file","file contents","r:(analyze|show|display|read|open|load) (the |this |my )?file","r:contents? of (the |this )?file"],idempotent=True,template='use read_file_tool_handler: file_path=""',text_fields=["content"],
+    category="transform"
+)
 def read_file_tool_handler(file_path: str) -> str:
     """
     Read any local file and return its contents for analysis or summarization.
@@ -359,7 +367,9 @@ def web_fetch_tool(url: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="text")
-@tool_meta(tags=["read","external","ai"],triggers=["summarize url","tldr url","r:summarize (this |the )?(page|url|link|article|webpage|website)","r:sum up (this |the )?(page|url|link|article)","r:what.s on (this |the )?(page|site|url)"],idempotent=True,template='use summarize_url_tool: url="" [style=""]',text_fields=["summary"])
+@tool_meta(tags=["read","external","ai"],triggers=["summarize url","tldr url","r:summarize (this |the )?(page|url|link|article|webpage|website)","r:sum up (this |the )?(page|url|link|article)","r:what.s on (this |the )?(page|site|url)"],idempotent=True,template='use summarize_url_tool: url="" [style=""]',text_fields=["summary"],
+    category="transform"
+)
 def summarize_url_tool(url: str, style: Optional[str] = "medium") -> str:
     """
     Fetch and summarize the content of a web page in a single step.

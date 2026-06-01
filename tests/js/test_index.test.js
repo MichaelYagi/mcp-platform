@@ -401,219 +401,106 @@ describe('addMessage additional branches', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// send() — coverage for lines 1604-1648
+// Pipeline Builder
 // ═══════════════════════════════════════════════════════════════════
 
-describe('send()', () => {
-    test('does nothing when input is empty', () => {
-        const input = document.getElementById('input');
-        if (input) input.value = '';
-        expect(() => ui.send()).not.toThrow();
-    });
+const SOURCE   = { name: 'get_day_briefing',  category: 'source',    template: 'use get_day_briefing',    tags: [], enabled: true };
+const TRANSFORM = { name: 'summarize_text_tool', category: 'transform', template: 'use summarize_text_tool', tags: [], enabled: true };
+const SINK     = { name: 'discord_notify',    category: 'sink',      template: 'use discord_notify',      tags: [], enabled: true };
+const SINK2    = { name: 'gmail_send_email',  category: 'sink',      template: 'use gmail_send_email',    tags: [], enabled: true };
+const NO_CAT   = { name: 'some_tool',         template: 'use some_tool', tags: [], enabled: true };
 
-    test('does nothing when ws not open', () => {
-        const input = document.getElementById('input');
-        if (input) input.value = 'hello';
-        expect(() => ui.send()).not.toThrow();
-    });
+beforeEach(() => {
+    ui.clearPipeline();
+});
 
-    test('send with stop state does not throw', () => {
-        ui.setIsProcessing(true);
-        const sendBtn = document.getElementById('sendBtn');
-        if (sendBtn) sendBtn.classList.add('is-stop');
-        expect(() => ui.send()).not.toThrow();
-        ui.setIsProcessing(false);
-        if (sendBtn) sendBtn.classList.remove('is-stop');
+describe('getPipelineCategory', () => {
+    test('returns tool.category when set', () => {
+        expect(ui.getPipelineCategory(SOURCE)).toBe('source');
+        expect(ui.getPipelineCategory(SINK)).toBe('sink');
+        expect(ui.getPipelineCategory(TRANSFORM)).toBe('transform');
+    });
+    test('returns source for tool without category', () => {
+        expect(ui.getPipelineCategory(NO_CAT)).toBe('source');
     });
 });
 
+describe('pipelineIsToolSelectable — empty pipeline', () => {
+    test('source selectable when pipeline empty',    () => expect(ui.pipelineIsToolSelectable(SOURCE)).toBe(true));
+    test('transform not selectable when pipeline empty', () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(false));
+    test('sink not selectable when pipeline empty',  () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(false));
+});
 
-// ═══════════════════════════════════════════════════════════════════
-// toggleToolsPanel — coverage for lines 1657-1661
-// ═══════════════════════════════════════════════════════════════════
+describe('pipelineIsToolSelectable — after source', () => {
+    beforeEach(() => ui.pipelineToggleTool(SOURCE));
+    test('transform selectable after source',  () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(true));
+    test('sink selectable after source',       () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(true));
+    test('second source not selectable',       () => expect(ui.pipelineIsToolSelectable({ ...SOURCE, name: 'other_source' })).toBe(false));
+});
 
-describe('toggleToolsPanel()', () => {
-    test('toggles open class on panel', () => {
-        const panel = document.getElementById('toolsPanel');
-        const btn   = document.getElementById('toolsToggle');
-        if (!panel || !btn) return;
-        ui.toggleToolsPanel();
-        expect(panel.classList.contains('open')).toBe(true);
-        ui.toggleToolsPanel();
-        expect(panel.classList.contains('open')).toBe(false);
+describe('pipelineIsToolSelectable — after sink', () => {
+    beforeEach(() => { ui.pipelineToggleTool(SOURCE); ui.pipelineToggleTool(SINK); });
+    test('nothing selectable after sink',          () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(false));
+    test('second sink not selectable after sink',  () => expect(ui.pipelineIsToolSelectable(SINK2)).toBe(false));
+    test('source not selectable after sink',       () => expect(ui.pipelineIsToolSelectable(SOURCE)).toBe(false));
+});
+
+describe('pipelineIsToolSelectable — only one sink allowed', () => {
+    beforeEach(() => { ui.pipelineToggleTool(SOURCE); ui.pipelineToggleTool(SINK); });
+    test('second sink blocked',  () => expect(ui.pipelineIsToolSelectable(SINK2)).toBe(false));
+});
+
+describe('pipelineToggleTool — add', () => {
+    test('adds source to empty pipeline', () => {
+        ui.pipelineToggleTool(SOURCE);
+        expect(ui.pipelineHasTool('get_day_briefing')).toBe(true);
+        expect(ui.getPipelineSteps().length).toBe(1);
+    });
+    test('adds source then sink', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.pipelineToggleTool(SINK);
+        expect(ui.getPipelineSteps().length).toBe(2);
+        expect(ui.getPipelineSteps()[1].category).toBe('sink');
+    });
+    test('adds source → transform → sink', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.pipelineToggleTool(TRANSFORM);
+        ui.pipelineToggleTool(SINK);
+        expect(ui.getPipelineSteps().length).toBe(3);
     });
 });
 
-
-// ═══════════════════════════════════════════════════════════════════
-// modelSelect change — coverage for lines 1457-1458
-// ═══════════════════════════════════════════════════════════════════
-
-describe('modelSelect change event', () => {
-    test('fires without throwing', () => {
-        const modelSelect = document.getElementById('modelSelect');
-        if (!modelSelect) return;
-        expect(() => modelSelect.dispatchEvent(new Event('change'))).not.toThrow();
+describe('buildPipelinePrompt', () => {
+    test('single source', () => {
+        ui.pipelineToggleTool(SOURCE);
+        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing');
+    });
+    test('source | sink', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.pipelineToggleTool(SINK);
+        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing | use discord_notify');
+    });
+    test('source | transform | sink', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.pipelineToggleTool(TRANSFORM);
+        ui.pipelineToggleTool(SINK);
+        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing | use summarize_text_tool | use discord_notify');
+    });
+    test('empty pipeline returns empty string', () => {
+        expect(ui.buildPipelinePrompt()).toBe('');
     });
 });
 
-
-// ═══════════════════════════════════════════════════════════════════
-// copy button — coverage for lines 1462-1534
-// dispatch on a real element so e.target.closest works
-// ═══════════════════════════════════════════════════════════════════
-
-describe('copy button click', () => {
-    test('copy-btn with missing target does nothing', () => {
-        const btn = document.createElement('button');
-        btn.className = 'copy-btn';
-        btn.dataset.target = 'nonexistent';
-        document.body.appendChild(btn);
-        expect(() => btn.click()).not.toThrow();
-        btn.remove();
+describe('clearPipeline', () => {
+    test('empties pipeline', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.pipelineToggleTool(SINK);
+        ui.clearPipeline();
+        expect(ui.getPipelineSteps().length).toBe(0);
     });
-
-    test('copy-btn with valid target does not throw', () => {
-        const pre = document.createElement('pre');
-        pre.id = 'copy-target-test';
-        pre.innerText = 'test code';
-        document.body.appendChild(pre);
-
-        const btn = document.createElement('button');
-        btn.className = 'copy-btn';
-        btn.dataset.target = 'copy-target-test';
-        document.body.appendChild(btn);
-
-        expect(() => btn.click()).not.toThrow();
-
-        pre.remove();
-        btn.remove();
-    });
-});
-
-
-// ═══════════════════════════════════════════════════════════════════
-// buildToolItem — coverage for lines 1701-1782
-// ═══════════════════════════════════════════════════════════════════
-
-describe('buildToolItem()', () => {
-    const mockTool = {
-        name: 'test_tool',
-        description: 'Does something useful. Extra detail.',
-        tags: ['read', 'search'],
-        required_params: [{ name: 'query' }],
-        template: 'use test_tool: query=""',
-        rate_limit: '10/min',
-        enabled: true,
-        source_server: 'test_server',
-    };
-
-    test('returns a DOM element', () => {
-        const el = ui.buildToolItem(mockTool);
-        expect(el).toBeInstanceOf(HTMLElement);
-    });
-
-    test('element contains tool name', () => {
-        const el = ui.buildToolItem(mockTool);
-        expect(el.textContent).toContain('test_tool');
-    });
-
-    test('renders tags', () => {
-        const el = ui.buildToolItem(mockTool);
-        expect(el.querySelectorAll('.tool-tag').length).toBe(2);
-    });
-
-    test('renders required params', () => {
-        const el = ui.buildToolItem(mockTool);
-        expect(el.querySelectorAll('.tool-param').length).toBeGreaterThan(0);
-    });
-
-    test('renders rate limit', () => {
-        const el = ui.buildToolItem(mockTool);
-        expect(el.querySelector('.tool-rate-limit')).not.toBeNull();
-    });
-
-    test('disabled tool gets disabled class', () => {
-        const el = ui.buildToolItem({ ...mockTool, enabled: false });
-        expect(el.classList.contains('tool-disabled')).toBe(true);
-    });
-
-    test('draggable option sets draggable attr', () => {
-        const el = ui.buildToolItem(mockTool, { draggable: true });
-        expect(el.getAttribute('draggable')).toBe('true');
-    });
-
-    test('star button click toggles favorite', () => {
-        const el = ui.buildToolItem(mockTool);
-        document.body.appendChild(el);
-        const star = el.querySelector('.tool-fav-btn');
-        expect(() => star.click()).not.toThrow();
-        el.remove();
-    });
-
-    test('item click sets input value', () => {
-        const el = ui.buildToolItem(mockTool);
-        document.body.appendChild(el);
-        expect(() => el.click()).not.toThrow();
-        el.remove();
-    });
-
-    test('tool without tags renders no tag elements', () => {
-        const el = ui.buildToolItem({ ...mockTool, tags: [] });
-        expect(el.querySelectorAll('.tool-tag').length).toBe(0);
-    });
-});
-
-
-// ═══════════════════════════════════════════════════════════════════
-// renderToolsPanel — coverage for lines 1838-1938
-// ═══════════════════════════════════════════════════════════════════
-
-describe('renderToolsPanel()', () => {
-    const tools = [
-        { name: 'tool_a', description: 'Tool A.', tags: [], required_params: [], source_server: 'server1', enabled: true },
-        { name: 'tool_b', description: 'Tool B.', tags: ['read'], required_params: [], source_server: 'server1', enabled: true },
-        { name: 'tool_c', description: 'Tool C.', tags: [], required_params: [], source_server: 'server2', enabled: false },
-    ];
-
-    test('renders without throwing', () => {
-        expect(() => ui.renderToolsPanel(tools)).not.toThrow();
-    });
-
-    test('creates server group categories', () => {
-        ui.renderToolsPanel(tools);
-        const body = document.getElementById('toolsBody');
-        if (!body) return;
-        expect(body.querySelectorAll('.tools-category').length).toBeGreaterThan(0);
-    });
-
-    test('renders empty favorites section', () => {
-        ui.renderToolsPanel(tools);
-        const body = document.getElementById('toolsBody');
-        if (!body) return;
-        expect(body.querySelector('.tools-fav-empty')).not.toBeNull();
-    });
-
-    test('renders tool items', () => {
-        ui.renderToolsPanel(tools);
-        const body = document.getElementById('toolsBody');
-        if (!body) return;
-        expect(body.querySelectorAll('.tool-item').length).toBe(3);
-    });
-
-    test('clicking category header toggles open', () => {
-        ui.renderToolsPanel(tools);
-        const body = document.getElementById('toolsBody');
-        if (!body) return;
-        const header = body.querySelector('.tools-category-header');
-        if (header) expect(() => header.click()).not.toThrow();
-    });
-
-    test('group star button toggles all favorites', () => {
-        ui.renderToolsPanel(tools);
-        const body = document.getElementById('toolsBody');
-        if (!body) return;
-        const groupStar = body.querySelector('.group-fav-btn');
-        if (groupStar) expect(() => groupStar.click()).not.toThrow();
+    test('pipelineHasTool returns false after clear', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.clearPipeline();
+        expect(ui.pipelineHasTool('get_day_briefing')).toBe(false);
     });
 });

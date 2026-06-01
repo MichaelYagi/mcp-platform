@@ -578,7 +578,9 @@ def gmail_get_email(message_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,template='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google")
+@tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,template='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google",
+    category="sink"
+)
 def gmail_send_email(
         to: str,
         subject: str,
@@ -977,7 +979,9 @@ def calendar_get_this_week() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","calendar","external"],triggers=["create event","schedule meeting","add to calendar","book appointment","new event","put on calendar","add meeting","schedule event"],idempotent=False,template='use calendar_create_event: summary="" start="" end="" [description=""] [location=""] [attendees=""] [all_day=""]',intent_category="google")
+@tool_meta(tags=["write","calendar","external"],triggers=["create event","schedule meeting","add to calendar","book appointment","new event","put on calendar","add meeting","schedule event"],idempotent=False,template='use calendar_create_event: summary="" start="" end="" [description=""] [location=""] [attendees=""] [all_day=""]',intent_category="google",
+    category="sink"
+)
 def calendar_create_event(
         summary: str,
         start: str,
@@ -1088,7 +1092,9 @@ def calendar_create_event(
 # SKILL MANAGEMENT
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","email","external"],triggers=["reply to email","reply to this email","respond to email","write a reply","respond to this","reply back"],idempotent=False,template='use gmail_reply_tool: message_id="" body="" [cc=""]',intent_category="google")
+@tool_meta(tags=["write","email","external"],triggers=["reply to email","reply to this email","respond to email","write a reply","respond to this","reply back"],idempotent=False,template='use gmail_reply_tool: message_id="" body="" [cc=""]',intent_category="google",
+    category="sink"
+)
 def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> str:
     """
     Reply to an existing Gmail message, threading it correctly.

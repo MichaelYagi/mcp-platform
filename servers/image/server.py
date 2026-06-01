@@ -496,7 +496,9 @@ def web_image_search_tool(query: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","ai image","create artwork","make art","r:(generate|create|make|draw|illustrate) (a |an )?(picture|image|artwork|illustration|photo) of","r:draw (me |a |an )?"],idempotent=False,template='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]')
+@tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","ai image","create artwork","make art","r:(generate|create|make|draw|illustrate) (a |an )?(picture|image|artwork|illustration|photo) of","r:draw (me |a |an )?"],idempotent=False,template='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]',
+    category="sink"
+)
 def generate_image_tool(
     prompt: str,
     width: Optional[int] = 1024,

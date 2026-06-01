@@ -132,7 +132,9 @@ def parse_github_url(url: str) -> Dict[str, str]:
 
 @mcp.tool()
 @check_tool_enabled(category="github")
-@tool_meta(tags=["write","external","code"],triggers=["clone repo","clone github","download repo","get repo","pull repo","fetch repository","grab repo","clone repository"],idempotent=False,template='use github_clone_repo: url="" [branch=""] [depth=""]',intent_category="github_review")
+@tool_meta(tags=["write","external","code"],triggers=["clone repo","clone github","download repo","get repo","pull repo","fetch repository","grab repo","clone repository"],idempotent=False,template='use github_clone_repo: url="" [branch=""] [depth=""]',intent_category="github_review",
+    category="sink"
+)
 def github_clone_repo(
         url: str,
         branch: Optional[str] = None,
@@ -303,7 +305,9 @@ def github_get_file_content(
 
 @mcp.tool()
 @check_tool_enabled(category="github")
-@tool_meta(tags=["destructive","external","code"],triggers=["cleanup repo","delete cloned repo","remove repo","remove cloned repo","clean up repo","delete repo clone"],idempotent=False,template='use github_cleanup_repo: local_path=""',intent_category="github_review")
+@tool_meta(tags=["destructive","external","code"],triggers=["cleanup repo","delete cloned repo","remove repo","remove cloned repo","clean up repo","delete repo clone"],idempotent=False,template='use github_cleanup_repo: local_path=""',intent_category="github_review",
+    category="sink"
+)
 def github_cleanup_repo(local_path: str) -> str:
     """
     Delete a cloned repository to free up disk space.

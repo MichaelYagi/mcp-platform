@@ -148,7 +148,9 @@ def analyze_code_file(file_path: str, language: str = "auto", deep_analysis: boo
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["write","code","ai"],triggers=["fix code","fix file","auto fix","fix this file","repair code","correct code","fix issues in file"],idempotent=False,template='use fix_code_file: file_path="" [auto_fix=""] [backup=""] [dry_run=""]',intent_category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["fix code","fix file","auto fix","fix this file","repair code","correct code","fix issues in file"],idempotent=False,template='use fix_code_file: file_path="" [auto_fix=""] [backup=""] [dry_run=""]',intent_category="code_assistant",
+    category="sink"
+)
 def fix_code_file(file_path: str, auto_fix: bool = True, backup: bool = True, dry_run: bool = True) -> str:
     """
     Automatically fix detected issues in a code file.
@@ -338,7 +340,9 @@ def generate_tests(file_path: str, test_framework: str = "auto", coverage_target
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["write","code","ai"],triggers=["refactor","modernize code","simplify code","refactor this","clean up code","restructure code","refactor this file"],idempotent=False,template='use refactor_code: file_path="" refactor_type="" [target=""] [preview=""]',intent_category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["refactor","modernize code","simplify code","refactor this","clean up code","restructure code","refactor this file"],idempotent=False,template='use refactor_code: file_path="" refactor_type="" [target=""] [preview=""]',intent_category="code_assistant",
+    category="sink"
+)
 def refactor_code(
     file_path: str,
     refactor_type: str,
@@ -400,7 +404,9 @@ def refactor_code(
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["read","code","ai"],triggers=["generate code","write code","create function","create class","code for me","write a function","write a class","generate a function","code this"],idempotent=True,template='use generate_code: description="" [language=""] [style=""] [include_tests=""] [include_docstrings=""] [framework=""] [output_file=""]',intent_category="code_assistant")
+@tool_meta(tags=["read","code","ai"],triggers=["generate code","write code","create function","create class","code for me","write a function","write a class","generate a function","code this"],idempotent=True,template='use generate_code: description="" [language=""] [style=""] [include_tests=""] [include_docstrings=""] [framework=""] [output_file=""]',intent_category="code_assistant",
+    category="sink"
+)
 def generate_code(
     description: str,
     language: str = "python",
@@ -780,7 +786,9 @@ def _get_ollama_llm(temperature: float = 0.1):
 
 @mcp.tool()
 @check_tool_enabled(category="code_assistant")
-@tool_meta(tags=["write","code","ai"],triggers=["extend code","add to file","add function","add tool","add method","follow pattern","extend this file","add to this server","add to this file"],idempotent=False,template='use extend_code: file_path="" description="" [write=""]',intent_category="code_assistant")
+@tool_meta(tags=["write","code","ai"],triggers=["extend code","add to file","add function","add tool","add method","follow pattern","extend this file","add to this server","add to this file"],idempotent=False,template='use extend_code: file_path="" description="" [write=""]',intent_category="code_assistant",
+    category="sink"
+)
 def extend_code(file_path: str, description: str, write: bool = False) -> str:
     """
     Add new code to an existing file that follows its conventions and patterns.

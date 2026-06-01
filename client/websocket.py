@@ -334,9 +334,14 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                     _run_date = getattr(pending, "run_date", None)
                     if getattr(pending, "trigger_type", None) == "once" and _run_date:
                         try:
-                            from datetime import datetime, timezone as _tz
+                            from datetime import datetime, timezone as _tz, date as _dt_date
                             import zoneinfo as _zi
                             _rd = datetime.fromisoformat(_run_date)
+                            # Always use today's actual date — LLM often gets the date wrong
+                            _today = _dt_date.today()
+                            _rd = _rd.replace(year=_today.year, month=_today.month, day=_today.day)
+                            _run_date = _rd.isoformat()
+                            pending.run_date = _run_date
                             if _rd.tzinfo is None:
                                 _rd = _rd.replace(tzinfo=_zi.ZoneInfo(pending.timezone or "America/Vancouver"))
                             if _rd < datetime.now(_tz.utc):
@@ -375,19 +380,10 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         if _agent_scheduler:
                             _agent_scheduler.add_job(job_id)
                         _confirmation_tracker.clear(_session_key)
-                        _tool_line = f"  Tool: `{pending.tool}`\n" if pending.tool else ""
-                        _pipeline_line = ""
-                        if pending.llm_prompt and "|" in pending.llm_prompt:
-                            _steps = [s.strip() for s in pending.llm_prompt.split("|")]
-                            _pipeline_line = "  Pipeline: " + " → ".join(
-                                s.split()[1].split(":")[0] if len(s.split()) > 1 else s
-                                for s in _steps
-                            ) + "\n"
                         response_text = (
                             f"✅ Scheduled: **{pending.label}**\n"
                             f"  Schedule: {pending.human_schedule}\n"
-                            + _tool_line
-                            + _pipeline_line +
+                            f"  Tool: `{pending.tool}`\n"
                             f"  Job ID: {job_id}\n\n"
                             f"Use `:jobs` to manage your scheduled jobs."
                         )
@@ -1009,13 +1005,17 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         # Extract sentinels from description (injected by @tool_meta into docstring)
                         _raw_desc = (tool.description or "").strip()
                         _template_from_meta = ""
+                        _category_from_meta = ""
                         # Strip all @tool_meta sentinels, capture example value
                         import re as _re_ws
                         _ex_m = _re_ws.search(r'\n\n__template__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
                         if _ex_m:
                             _template_from_meta = _ex_m.group(1).strip()
+                        _cat_m = _re_ws.search(r'\n\n__category__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
+                        if _cat_m:
+                            _category_from_meta = _cat_m.group(1).strip()
                         # Remove all sentinels from description shown in UI
-                        _raw_desc = _re_ws.sub(r'\n\n__(?:template|triggers|intent_category|tags)__:.*?(?=\n\n__|$)', '', _raw_desc, flags=_re_ws.DOTALL).strip()
+                        _raw_desc = _re_ws.sub(r'\n\n__(?:template|triggers|intent_category|tags|category)__:.*?(?=\n\n__|$)', '', _raw_desc, flags=_re_ws.DOTALL).strip()
 
                         tools_payload.append({
                             "name": tool.name,
@@ -1024,6 +1024,7 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "external": source in _external_names,
                             "template": _template_from_meta or _tool_examples.get(tool.name, ""),
                             "required_params": required_params,
+                            "category": _category_from_meta or None,
                         })
 
                     await websocket.send(json.dumps({

@@ -1697,10 +1697,181 @@ function removeFavorite(toolName) {
 }
 // ──────────────────────────────────────────────────────────────
 
+// ============================================================
+// PIPELINE BUILDER
+// ============================================================
+
+// Inject pipeline styles
+(function() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .pipeline-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            background: var(--bg-secondary, #1a1a1a);
+            border: 1px solid var(--accent, #00ff41);
+            border-radius: 4px;
+            font-size: 0.78rem;
+        }
+        .pipeline-bar-steps {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px;
+            flex: 1;
+        }
+        .pipe-step {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 0.75rem;
+            opacity: 0.9;
+            transition: opacity 0.15s;
+        }
+        .pipe-step:hover { opacity: 0.6; text-decoration: line-through; }
+        .pipe-step-source  { background: #1a3a2a; color: #4caf82; border: 1px solid #2d6b45; }
+        .pipe-step-transform { background: #1a2a3a; color: #5bafd6; border: 1px solid #2d5580; }
+        .pipe-step-sink    { background: #3a1a1a; color: #e07070; border: 1px solid #7a2d2d; }
+        .pipe-arrow { color: var(--text-muted, #666); font-size: 0.7rem; }
+        .pipeline-bar-hint {
+            font-size: 0.72rem;
+            color: var(--text-muted, #666);
+            flex-basis: 100%;
+            margin-top: 2px;
+        }
+        .pipeline-bar-actions { display: flex; gap: 5px; margin-left: auto; }
+        .pipeline-send-btn, .pipeline-clear-btn {
+            padding: 3px 10px;
+            border: 1px solid var(--accent, #00ff41);
+            background: transparent;
+            color: var(--accent, #00ff41);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .pipeline-send-btn:hover { background: var(--accent, #00ff41); color: #000; }
+        .pipeline-clear-btn { border-color: #666; color: #666; }
+        .pipeline-clear-btn:hover { border-color: #999; color: #999; }
+
+        .tool-pipeline-check {
+            width: 14px;
+            height: 14px;
+            cursor: pointer;
+            accent-color: var(--accent, #00ff41);
+            flex-shrink: 0;
+        }
+        .tool-pipeline-check:disabled { opacity: 0.25; cursor: not-allowed; }
+        .tool-in-pipeline {
+            border-left: 3px solid var(--accent, #00ff41) !important;
+            background: var(--bg-hover, rgba(255,255,255,0.04)) !important;
+        }
+        .tool-pipeline-greyed {
+            opacity: 0.35;
+            pointer-events: none;
+        }
+        .tool-pipeline-greyed .tool-pipeline-check {
+            pointer-events: auto;
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+let _pipelineSteps = []; // [{name, template, category}]
+
+function getPipelineCategory(tool) {
+    // Read from tool.category if server sends it, otherwise infer from tags
+    if (tool.category) return tool.category;
+    const tags = tool.tags || [];
+    if (tags.some(t => ['discord','notifications','email'].includes(t))) return 'sink';
+    return 'source';
+}
+
+function pipelineIsValidNext(category) {
+    if (_pipelineSteps.length === 0) return category === 'source';
+    const last = _pipelineSteps[_pipelineSteps.length - 1].category;
+    if (last === 'sink') return false;                      // nothing after sink
+    if (last === 'source') return category !== 'source';    // source → transform or sink only
+    if (last === 'transform') return category !== 'source'; // transform → transform or sink only
+    return false;
+}
+
+function pipelineIsToolSelectable(tool) {
+    const cat = getPipelineCategory(tool);
+    if (cat === 'sink' && _pipelineSteps.some(s => s.category === 'sink')) return false; // only one sink
+    if (_pipelineSteps.length === 0) return cat === 'source';
+    return pipelineIsValidNext(cat);
+}
+
+function pipelineHasTool(name) {
+    return _pipelineSteps.some(s => s.name === name);
+}
+
+function pipelineToggleTool(tool) {
+    const name = tool.name;
+    if (pipelineHasTool(name)) {
+        _pipelineSteps = _pipelineSteps.filter(s => s.name !== name);
+    } else {
+        _pipelineSteps.push({
+            name,
+            template: tool.template || `use ${name}`,
+            category: getPipelineCategory(tool),
+        });
+    }
+    const inputEl = document.getElementById('input');
+    if (inputEl) inputEl.value = buildPipelinePrompt();
+    updatePipelineUI();
+    renderToolsPanel(_allTools);
+}
+
+function buildPipelinePrompt() {
+    return _pipelineSteps.map(s => {
+        // Use template but strip leading "use " prefix handling
+        const t = s.template || `use ${s.name}`;
+        // Normalise: ensure it starts with "use "
+        return t.startsWith('use ') ? t : `use ${s.name}`;
+    }).join(' | ');
+}
+
+function updatePipelineUI() {
+    // Pipeline state is reflected in the input field only — no separate UI bar
+}
+
+function sendPipeline() {
+    if (_pipelineSteps.length === 0) return;
+    const prompt = buildPipelinePrompt();
+    const inputEl = document.getElementById('input');
+    if (inputEl) {
+        inputEl.value = prompt;
+        inputEl.focus();
+    }
+    _pipelineSteps = [];
+    updatePipelineUI();
+    renderToolsPanel(_allTools);
+}
+
+function clearPipeline() {
+    _pipelineSteps = [];
+    updatePipelineUI();
+    renderToolsPanel(_allTools);
+}
+
+
 function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false } = {}) {
     const item = document.createElement('div');
     const isDisabled = tool.enabled === false;
-    item.className = 'tool-item' + (isDisabled ? ' tool-disabled' : '');
+    const isInPipeline = pipelineHasTool(tool.name);
+
+    item.className = 'tool-item'
+        + (isDisabled ? ' tool-disabled' : '')
+        + (isInPipeline ? ' tool-in-pipeline' : '');
     if (isDraggable) {
         item.dataset.toolName = tool.name;
         item.setAttribute('draggable', 'true');
@@ -1767,16 +1938,7 @@ function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false 
 
     item.addEventListener('click', (e) => {
         if (e.target === starBtn) return;
-        const inputEl = document.getElementById('input');
-        inputEl.value = getToolPrompt(tool.name, params);
-        inputEl.focus();
-        const firstQuote = inputEl.value.indexOf('""');
-        if (firstQuote !== -1) {
-            inputEl.selectionStart = inputEl.selectionEnd = firstQuote + 1;
-        } else {
-            inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
-        }
-        if (window.innerWidth <= 768) toggleToolsPanel();
+        pipelineToggleTool(tool);
     });
 
     return item;
@@ -2594,5 +2756,13 @@ if (typeof module !== 'undefined' && module.exports) {
         setIsProcessing: (v) => { isProcessing = v; },
         buildToolItem,
         renderToolsPanel,
+        getPipelineCategory,
+        pipelineIsToolSelectable,
+        pipelineHasTool,
+        pipelineToggleTool,
+        buildPipelinePrompt,
+        clearPipeline,
+        getPipelineSteps: () => _pipelineSteps,
+        setPipelineSteps: (s) => { _pipelineSteps = s; },
     };
 }

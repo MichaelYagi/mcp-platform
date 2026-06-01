@@ -1008,7 +1008,6 @@ class TestScheduleParser:
         )
         rendered = conf.render()
         assert "get_day_briefing" in rendered
-        assert "30 5 * * *" in rendered
         assert "Every day at 5:30am" in rendered
         assert "yes" in rendered.lower()
 

@@ -286,7 +286,9 @@ def plex_find_unprocessed(limit: int = 5, rescan_no_subtitles: bool = False) -> 
 # TOOL 2: Ingest Multiple Items in Parallel (Batch Processing)
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media","rag"],triggers=["ingest items","ingest these","process these items","ingest plex items"],idempotent=False,template='use plex_ingest_items: item_ids=""',intent_category="ingest")
+@tool_meta(tags=["write","media","rag"],triggers=["ingest items","ingest these","process these items","ingest plex items"],idempotent=False,template='use plex_ingest_items: item_ids=""',intent_category="ingest",
+    category="sink"
+)
 async def plex_ingest_items(item_ids: str) -> str:
     """
     Ingest multiple Plex items in parallel (ASYNC) with STOP SIGNAL support.
@@ -448,7 +450,9 @@ async def plex_ingest_items(item_ids: str) -> str:
 # TOOL 3: Ingest Single Item (Granular Processing)
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media","rag"],triggers=["ingest one","ingest single"],idempotent=False,template='use plex_ingest_single: media_id=""',intent_category="ingest")
+@tool_meta(tags=["write","media","rag"],triggers=["ingest one","ingest single"],idempotent=False,template='use plex_ingest_single: media_id=""',intent_category="ingest",
+    category="sink"
+)
 async def plex_ingest_single(media_id: str) -> str:
     """
     Ingest a single Plex item with STOP SIGNAL support.
@@ -531,7 +535,9 @@ async def plex_ingest_single(media_id: str) -> str:
 # TOOL 4: All-in-One Ingestion (Original - Keep for Simple Queries)
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media","rag"],triggers=["ingest","start ingesting","ingest movies","ingest now","ingest batch"],idempotent=False,template="use plex_ingest_batch",intent_category="ingest")
+@tool_meta(tags=["write","media","rag"],triggers=["ingest","start ingesting","ingest movies","ingest now","ingest batch"],idempotent=False,template="use plex_ingest_batch",intent_category="ingest",
+    category="sink"
+)
 async def plex_ingest_batch(limit: int = 5, rescan_no_subtitles: bool = False) -> str:
     """
     Ingest the NEXT unprocessed Plex items into RAG (ALL-IN-ONE).
@@ -567,6 +573,7 @@ async def plex_ingest_batch(limit: int = 5, rescan_no_subtitles: bool = False) -
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
+@tool_meta(tags=["write","media","rag"], idempotent=False, template="use rag_rescan_no_subtitles", category="sink")
 def rag_rescan_no_subtitles() -> str:
     """
     Reset items that were marked as 'no subtitles' to allow re-scanning.
@@ -691,7 +698,9 @@ def get_tool_names_from_module():
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media"],triggers=["import plex history","import viewing history","import watch history"],idempotent=False,template='use import_plex_history [limit=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["write","media"],triggers=["import plex history","import viewing history","import watch history"],idempotent=False,template='use import_plex_history [limit=""]',intent_category="ml_recommendation",
+    category="sink"
+)
 def import_plex_history(limit: int = 50) -> dict:
     """
     Automatically import your Plex viewing history into the ML recommender
@@ -807,7 +816,9 @@ def import_plex_history(limit: int = 50) -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","ai"],triggers=["auto train","train from plex","train recommender from plex","auto train recommender"],idempotent=False,template='use auto_train_from_plex [import_limit=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["write","ai"],triggers=["auto train","train from plex","train recommender from plex","auto train recommender"],idempotent=False,template='use auto_train_from_plex [import_limit=""]',intent_category="ml_recommendation",
+    category="sink"
+)
 def auto_train_from_plex(import_limit: int = 50) -> dict:
     """
     ONE-CLICK: Import Plex history AND train the model automatically
@@ -873,7 +884,9 @@ Import more history or wait until you've watched more!
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","media"],triggers=["record viewing","i watched","mark as watched","log that i watched","add to watch history","record that i watched"],idempotent=False,template='use record_viewing: title="" genre="" year="" rating="" runtime="" [finished=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["write","media"],triggers=["record viewing","i watched","mark as watched","log that i watched","add to watch history","record that i watched"],idempotent=False,template='use record_viewing: title="" genre="" year="" rating="" runtime="" [finished=""]',intent_category="ml_recommendation",
+    category="sink"
+)
 def record_viewing(
         title: str,
         genre: str,
@@ -914,7 +927,9 @@ def record_viewing(
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["write","ai"],triggers=["train recommender","train model","train ml"],idempotent=False,template="use train_recommender",intent_category="ml_recommendation")
+@tool_meta(tags=["write","ai"],triggers=["train recommender","train model","train ml"],idempotent=False,template="use train_recommender",intent_category="ml_recommendation",
+    category="sink"
+)
 def train_recommender() -> dict:
     """
     Train the ML recommendation model on your viewing history
@@ -958,7 +973,9 @@ Keep recording what you watch with record_viewing()!
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","ai"],triggers=["recommend","get recommendations","what should i watch","suggest something to watch","movie recommendations","film recommendations","suggest a movie"],idempotent=False,template="use recommend_content",intent_category="ml_recommendation")
+@tool_meta(tags=["read","ai"],triggers=["recommend","get recommendations","what should i watch","suggest something to watch","movie recommendations","film recommendations","suggest a movie"],idempotent=False,template="use recommend_content",intent_category="ml_recommendation",
+    category="sink"
+)
 def recommend_content(
         available_items: list[dict]
 ) -> dict:
@@ -1041,7 +1058,9 @@ Finish Rate: {stats['finish_rate']}
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["destructive","ai"],triggers=["reset recommender","clear recommendations"],idempotent=False,template="use reset_recommender",intent_category="ml_recommendation")
+@tool_meta(tags=["destructive","ai"],triggers=["reset recommender","clear recommendations"],idempotent=False,template="use reset_recommender",intent_category="ml_recommendation",
+    category="sink"
+)
 def reset_recommender() -> dict:
     """
     ⚠️ DANGER: Clear all viewing history and retrain from scratch
@@ -1064,7 +1083,9 @@ def reset_recommender() -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="plex")
-@tool_meta(tags=["read","ai"],triggers=["auto recommend","recommend from plex","my best unwatched","best unwatched","what to watch next","suggest from plex"],idempotent=False,template='use auto_recommend_from_plex [limit=""] [genre_filter=""] [min_rating=""]',intent_category="ml_recommendation")
+@tool_meta(tags=["read","ai"],triggers=["auto recommend","recommend from plex","my best unwatched","best unwatched","what to watch next","suggest from plex"],idempotent=False,template='use auto_recommend_from_plex [limit=""] [genre_filter=""] [min_rating=""]',intent_category="ml_recommendation",
+    category="sink"
+)
 def auto_recommend_from_plex(
         limit: int = 20,
         genre_filter: str = "",

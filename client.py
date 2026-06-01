@@ -1068,7 +1068,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         Identical execution path to the scheduler pipeline — no extra transformation."""
         import re as _pre
         _STEP_RE = _pre.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pre.IGNORECASE | _pre.DOTALL)
-        _NOTIF = ("discord_notify", "gmail_send_email", "gmail_reply_tool")
+        _NOTIF = ("discord_notify", "gmail_reply_tool")
+        _EMAIL_SEND = ("gmail_send_email",)
         previous = initial_result  # allow pre-seeding with condition check result
         steps = [s.strip() for s in pipe_parts if s.strip()]
         for idx, step in enumerate(steps):
@@ -1088,33 +1089,80 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     for km in _pre.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', args_str):
                         args[km.group(1)] = km.group(2).replace('\\"', '"')
 
-            # Inject previous result — same logic as proactive_agent._fire_job
-            if previous and not args:
-                if any(k in tool_name for k in _NOTIF):
-                    args = {"message": str(previous)}
-                elif "email" in tool_name:
-                    args = {"body": str(previous)}
-                else:
-                    args = {"text": str(previous)}
-            elif previous and args:
-                if not any(k in args for k in ("message", "body", "content", "text", "input")):
-                    if any(k in tool_name for k in _NOTIF):
-                        args["message"] = str(previous)
-                    elif "email" in tool_name:
+            # Drop empty string values — unfilled template placeholders
+            args = {k: v for k, v in args.items() if v != ""}
+
+            # Inject previous result as content for next step
+            if previous:
+                _is_notif = any(k in tool_name for k in _NOTIF)
+                _is_email = "gmail_send" in tool_name or "gmail_reply" in tool_name
+                _has_content = any(k in args for k in ("message", "body", "content", "text", "input"))
+
+                # Try to extract structured fields from previous JSON result
+                _prev_data = {}
+                try:
+                    import json as _pj2
+                    _prev_str = str(previous).strip().strip("'\"").replace('\\n', '\n')
+                    if _prev_str.startswith('{'):
+                        _prev_data = _pj2.loads(_prev_str)
+                except Exception:
+                    pass
+
+                # Tool-specific injection from previous result fields
+                if tool_name == "gmail_reply_tool" and "message_id" not in args:
+                    _mid = _prev_data.get("id") or _prev_data.get("message_id")
+                    if _mid:
+                        args["message_id"] = str(_mid)
+                elif tool_name == "calendar_create_event":
+                    if "summary" not in args:
+                        args["summary"] = _prev_data.get("title") or _prev_data.get("summary") or str(previous)[:50]
+                    if "start" not in args:
+                        args["start"] = _prev_data.get("start") or _prev_data.get("date") or ""
+                    if "end" not in args:
+                        args["end"] = _prev_data.get("end") or _prev_data.get("date") or ""
+                elif tool_name == "create_note":
+                    if "title" not in args:
+                        args["title"] = _prev_data.get("title") or str(previous)[:80]
+                    if "parent_note_id" not in args:
+                        args.setdefault("parent_note_id", "root")
+                    if "content" not in args:
+                        args["content"] = str(previous)
+                elif tool_name == "scene_locator_tool":
+                    if "media_id" not in args:
+                        _mid = _prev_data.get("id") or _prev_data.get("media_id") or _prev_data.get("ratingKey")
+                        if _mid:
+                            args["media_id"] = str(_mid)
+                    if "query" not in args:
+                        args["query"] = str(previous)[:100]
+
+                # Generic content injection
+                if not _has_content:
+                    if _is_notif:
+                        _msg = str(previous)
+                        if "discord" in tool_name and len(_msg) > 1900:
+                            _msg = _msg[:1900] + "\n…(truncated)"
+                        args["message"] = _msg
+                    elif "gmail_send" in tool_name:
                         args["body"] = str(previous)
-                    else:
+                        if "subject" not in args:
+                            args["subject"] = "Message"
+                    elif _is_email:
+                        args["body"] = str(previous)
+                    elif tool_name not in ("gmail_reply_tool", "calendar_create_event",
+                                           "create_note", "scene_locator_tool"):
                         args["text"] = str(previous)
-                elif "email" in tool_name and "message" in args and "body" not in args:
+                elif "gmail_send" in tool_name and "message" in args and "body" not in args:
                     args["body"] = args.pop("message")
 
-            # Execute via _tool_executor — identical to scheduler path
+            # Execute via _tool_executor for all steps
+            _is_notif_step = any(k in tool_name for k in _NOTIF)
             logger.info(f"🔀 Pipeline step {idx+1}/{len(steps)}: {tool_name}({args})")
             previous = await _tool_executor(tool_name, args)
             logger.info(f"🔀 Pipeline step {idx+1} done: {str(previous)[:80]}")
 
         # Clean UI result
         last_tool = steps[-1].split()[1].split(":")[0] if steps and len(steps[-1].split()) > 1 else ""
-        if any(nt in last_tool for nt in _NOTIF):
+        if any(nt in last_tool for nt in _NOTIF) or any(nt in last_tool for nt in _EMAIL_SEND):
             return "Job completed."
         return str(previous) if previous else "Done."
 
@@ -1126,6 +1174,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # Auto-convert markdown to HTML for gmail_send_email
         if tool_name == "gmail_send_email" and args.get("body"):
             args = dict(args)
+            args["body"] = args["body"].replace('/thumbnails/225/', '/thumbnails/original/')
             args["html"] = True
             args["body"] = _md_to_html(args["body"])
 
@@ -1147,28 +1196,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         logger.error(f"[_tool_executor] '{tool_name}' not found. Available ({len(available)}): {', '.join(available)}")
         return f"Tool '{tool_name}' not found."
 
-    async def _raw_tool_executor(tool_name: str, args: dict) -> str:
-        """Execute a tool and return raw JSON output — no LLM post-processing.
-        Used for condition checks so JSON fields like total_unread are parseable."""
-        _current_tools = mcp_agent._tools
-        for tool in _current_tools:
-            if tool.name == tool_name:
-                try:
-                    raw = await tool.ainvoke(args or {})
-                    result = _unwrap_tool_result(raw)
-                    # Decode literal \n \t escape sequences if present
-                    if isinstance(result, str) and '\\n' in result:
-                        try:
-                            import json as _rj
-                            result = _rj.loads(f'"{result.replace(chr(34), chr(92)+chr(34))}"')
-                        except Exception:
-                            result = result.replace('\\n', '\n').replace('\\t', '\t')
-                    logger.info(f"[_raw_tool_executor] {tool_name} raw result preview: {str(result)[:200]}")
-                    return result
-                except Exception as e:
-                    logger.error(f"[_raw_tool_executor] {tool_name} error: {e}")
-                    return f"Tool {tool_name} error: {e}"
-        return f"Tool '{tool_name}' not found."
+    async def _scheduler_llm_fn(prompt: str) -> str:
         """LLM function for post-processing scheduled job results.
         Takes a plain prompt string (no system/user split) and returns the response.
         Used by AgentScheduler._fire_job when a job has an llm_prompt set.
@@ -1202,11 +1230,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     agent_scheduler = AgentScheduler(
         execute_fn=_tool_executor,
         broadcast_fn=broadcast_proactive_result,
-        llm_fn=_llm_fn_for_memory,
+        llm_fn=_scheduler_llm_fn,
         session_manager=session_manager,
         agent_fn=_scheduler_agent_fn,
     )
-    agent_scheduler._raw_execute_fn = _raw_tool_executor
     await agent_scheduler.start()
 
     tool_names = [t.name for t in mcp_agent._tools]
@@ -1700,9 +1727,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             _check_tool_name = _cond_match.group(1).strip()
             _check_args_str  = (_cond_match.group(2) or "").strip()
             _cond_expr       = _cond_match.group(3).strip()
-            # Unescape HTML entities (browser may encode > as &gt; etc.)
-            import html as _html
-            _cond_expr = _html.unescape(_cond_expr)
             _action_str      = _cond_match.group(4).strip()
 
             # Parse check tool args
@@ -1715,15 +1739,14 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     for _km in _cond_re.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', _check_args_str):
                         _check_args[_km.group(1)] = _km.group(2)
 
-            # Run check tool using raw executor (no LLM post-processing) to get parseable JSON
+            # Run check tool
             logger.info(f"🔍 Condition check: {_check_tool_name}({_check_args}) if {_cond_expr!r}")
-            _check_result = await _raw_tool_executor(_check_tool_name, _check_args)
+            _check_result = await _tool_executor(_check_tool_name, _check_args)
 
             # Evaluate condition
             _cond_fired = False
             try:
                 import json as _cj2
-                logger.info(f"🔍 Raw check result type={type(_check_result).__name__} repr={repr(_check_result[:100]) if isinstance(_check_result, str) else repr(_check_result)}")
                 _cond_data = _cj2.loads(_check_result) if isinstance(_check_result, str) else {}
                 _cond_vars = {"result": _check_result, "result_len": len(str(_check_result)), "data": _cond_data}
                 if isinstance(_cond_data, dict):
@@ -1741,18 +1764,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
             if _cond_fired:
                 logger.info(f"🔍 Condition TRUE — running action: {_action_str}")
-                # Extract human-readable text from JSON result if available
-                _action_input = _check_result
-                try:
-                    import json as _cj3
-                    _cd = _cj3.loads(_check_result)
-                    if isinstance(_cd, dict):
-                        _action_input = _cd.get("text") or _cd.get("summary") or _cd.get("message") or _check_result
-                except Exception:
-                    pass
                 # Parse action as pipeline or single use step
                 _action_parts = [p.strip() for p in _action_str.split("|") if p.strip()]
-                _action_result = await _run_pipeline(_action_parts, tools, initial_result=_action_input)
+                # Inject check result as first previous_result
+                _action_result = await _run_pipeline(_action_parts, tools, initial_result=_check_result)
                 _cond_output = _action_result
             else:
                 logger.info(f"🔍 Condition FALSE — no action taken")
@@ -2472,7 +2487,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         session_manager=session_manager,
         session_state_registry=session_state_registry,
         capability_registry=capability_registry,
-        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser, "llm_fn": _llm_fn_for_memory},
+        proactive_agent={"scheduler": agent_scheduler, "parser": schedule_parser, "llm_fn": _scheduler_llm_fn},
         inactivity_watcher=inactivity_watcher,
         host="0.0.0.0",
         port=8765
