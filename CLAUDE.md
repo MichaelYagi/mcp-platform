@@ -13,7 +13,7 @@ Local MCP runtime with a web UI, multi-agent orchestration, distributed tool ser
 pip install -r requirements.txt
 
 # Start the client (web UI at http://localhost:9000/client/ui/index.html)
-python client/client.py
+python client.py
 
 # Start A2A distributed server (separate terminal)
 python a2a_server.py
@@ -54,7 +54,7 @@ black .           # format
 
 ### Entry Points & Runtime
 
-- **`client/client.py`** — main entry point; discovers and starts all MCP servers, wires up LangGraph agent, starts HTTP + WebSocket servers. Contains `_process_tool_result()` (shared post-processing for all tool results) used by both `_tool_executor` (scheduler path) and `run_agent_wrapper` (direct dispatch path).
+- **`client.py`** (root) — main entry point; discovers and starts all MCP servers, wires up LangGraph agent, starts HTTP + WebSocket servers. Contains `_process_tool_result()` (shared post-processing for all tool results) used by both `_tool_executor` (scheduler path) and `run_agent_wrapper` (direct dispatch path).
 - **`client/websocket.py`** — WebSocket handler (ports 8765/8766); per-session task tracking with `SESSION_TASKS` dict; proactive agent singletons live here
 - **`client/langgraph.py`** — LangGraph agent creation and execution; query routing; conversation RAG retrieval; the `run_agent()` function is the core inference loop
 - **`a2a_server.py`** — A2A distributed mode server (default: port 8010)
@@ -70,7 +70,7 @@ black .           # format
 | `code_runner` | 4 | Python/bash execution sandbox |
 | `discord` | 2 | Webhook notifications — requires `DISCORD_WEBHOOK_URL` |
 | `github` | 4 | Repo clone, browse, cleanup |
-| `google` | 9 | Gmail + Google Calendar — requires OAuth (`servers/google/credentials.json`) |
+| `google` | 13 | Gmail + Google Calendar — requires OAuth (`servers/google/credentials.json`) |
 | `image` | 6 | Image search, analysis, AI generation |
 | `location` | 3 | Weather, time, location |
 | `plex` | 18 | Media library + ML recommendations |
@@ -79,7 +79,7 @@ black .           # format
 | `text` | 8 | Text processing and web search |
 | `trilium` | 11 | Trilium notes integration |
 
-Total: 92 tools. Primary model: `qwen2.5:14b-instruct-q4_K_M` via Ollama.
+Total: 95 tools. Primary model: `qwen2.5:14b-instruct-q4_K_M` via Ollama.
 
 ### Tool System
 
@@ -97,11 +97,11 @@ def my_function(...):
 
 **`client/tool_meta.py`** is the single source of truth for tool metadata — adding `@tool_meta` is all that's needed to register a tool for routing, capability tracking, and UI display.
 
-Errors use `MCPToolError` with `FailureKind` enum. Output formatting via `JsonFormatter`.
+Errors use `MCPToolError` with `FailureKind` enum — canonical definitions in `client/metrics.py`. Each server's `try/except` import block provides local fallback stubs so servers can run standalone. `JsonFormatter` (also `client/metrics.py`) is used for structured log output.
 
 ### Tool Result Post-Processing
 
-`_process_tool_result()` in `client/client.py` is the single shared function for all tool result handling. It covers:
+`_process_tool_result()` in `client.py` (root) is the single shared function for all tool result handling. It covers:
 1. Plain text passthrough
 2. Image vision routing
 3. Pre-built summary passthrough

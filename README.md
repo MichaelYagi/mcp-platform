@@ -84,12 +84,12 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 - `code_review` - Code review, search, and bug fixing (3 tools)
 - `code_runner` - Python/bash execution sandbox (4 tools)
 - `discord` - Discord channel notifications via webhook (2 tools) ⚠️ *Requires `DISCORD_WEBHOOK_URL`*
-- `github` - GitHub repo clone, browse, and cleanup ⚠️ *Requires `GITHUB_TOKEN` for private repos*
-- `google` - Gmail + Google Calendar (9 tools) ⚠️ *Requires one-time OAuth setup*
+- `github` - GitHub repo clone, browse, and cleanup (4 tools) ⚠️ *Requires `GITHUB_TOKEN` for private repos*
+- `google` - Gmail + Google Calendar (13 tools) ⚠️ *Requires one-time OAuth setup*
 - `image` - Image search, analysis, and AI generation (6 tools) ⚠️ *Requires `SERPER_API_KEY` for search; generation is free*
 - `location` - Weather, time, location (3 tools)
 - `plex` - Media library + ML recommendations (18 tools) ⚠️ *Requires `PLEX_URL`, `PLEX_TOKEN`*
-- `rag` - Vector search and management (7 tools) ⚠️ *Requires Ollama + `bge-large`*
+- `rag` - Vector search and management (8 tools) ⚠️ *Requires Ollama + `bge-large`*
 - `system` - System info and processes (3 tools)
 - `text` - Text processing and web search (8 tools)
 - `trilium` - Trilium notes integration (11 tools) ⚠️ *Requires `TRILIUM_URL`, `TRILIUM_TOKEN`*
@@ -409,8 +409,9 @@ servers/
 ├── code_assistant/   12 tools  - AI-powered code analysis, generation, and refactoring
 ├── code_review/       3 tools  - Code review, search, and bug fixing
 ├── code_runner/       4 tools  - Python/bash execution sandbox
+├── discord/           2 tools  - Discord channel notifications [requires DISCORD_WEBHOOK_URL]
 ├── github/            4 tools  - GitHub repo clone, browse, and cleanup
-├── google/            9 tools  - Gmail + Google Calendar       [requires OAuth]
+├── google/           13 tools  - Gmail + Google Calendar       [requires OAuth]
 ├── image/             6 tools  - Image search, analysis, AI generation
 ├── location/          3 tools  - Weather, time, location
 ├── plex/             18 tools  - Media + ML recommendations    [requires PLEX_URL + PLEX_TOKEN]
@@ -420,7 +421,7 @@ servers/
 └── trilium/          11 tools  - Trilium notes integration     [requires TRILIUM_URL + TRILIUM_TOKEN]
 ```
 
-Total: 89 tools across 12 servers
+Total: 95 tools across 13 servers
 
 ### Concurrency & Parallelism
 
