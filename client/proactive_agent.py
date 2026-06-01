@@ -775,7 +775,8 @@ async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
         r'\b(at\s+\d|every\b|daily\b|weekly\b|tomorrow\b|tonight\b|morning\b|minute\b|hours\b|seconds\b|pm\b|am\b|in\s+\d+\s+(minute|hour|day))',
         message, _re_sched.IGNORECASE
     )
-    if message.lstrip().lower().startswith("use ") and "|" in message and not _has_time:
+    # Direct tool call — never a scheduling request unless it has time/schedule keywords
+    if message.lstrip().lower().startswith("use ") and not _has_time:
         return False
 
     # Direct condition check — "check <tool> if <expr> then use <tool>" — never a scheduling request
