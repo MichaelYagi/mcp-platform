@@ -298,12 +298,7 @@ async def inject_relevant_skills_into_messages(
 
     # Conversational queries never need skills
     if intent.is_conversational:
-        logger.info("📚 Query doesn't need tools - skipping skill injection")
-        return messages
-
-    # Only inject skills when the matched intent has skills enabled
-    if not intent.needs_skills:
-        logger.info("📚 Query doesn't need tools - skipping skill injection")
+        logger.info("📚 Conversational query — skipping skill injection")
         return messages
 
     # ═══════════════════════════════════════════════════════════
