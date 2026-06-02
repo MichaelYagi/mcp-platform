@@ -1740,11 +1740,11 @@ def create_langgraph_agent(llm_with_tools, tools):
                             raw_content = raw_content[:end]
                         raw_content = raw_content.replace("\\n", "\n").replace("\\'", "'")
 
-                # If 0 results, fall back to web_search_tool
+                # If 0 results, fall back to web_image_search_tool
                 if "Found 0 photo" in raw_content or "0 photo(s)" in raw_content:
-                    logger.info("[LangGraph] 🔄 Shashin returned 0 results — falling back to web_search_tool")
-                    web_search = next((t for t in tools if t.name == "web_search_tool"), None)
-                    if web_search:
+                    logger.info("[LangGraph] 🔄 Shashin returned 0 results — falling back to web_image_search_tool")
+                    web_image_search = next((t for t in tools if t.name == "web_image_search_tool"), None)
+                    if web_image_search:
                         _search_term = ""
                         for m in reversed(state.get("messages", [])):
                             if hasattr(m, "tool_calls") and m.tool_calls:
@@ -1756,7 +1756,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 break
                         if _search_term:
                             try:
-                                web_result = await web_search.ainvoke({"query": _search_term})
+                                web_result = await web_image_search.ainvoke({"query": _search_term})
                                 web_text = web_result if isinstance(web_result, str) else str(web_result)
                                 return {
                                     "messages": [AIMessage(content=web_text)],
@@ -1767,7 +1767,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                                     "current_model": get_model_name(base_llm)
                                 }
                             except Exception as _wb_err:
-                                logger.warning(f"[LangGraph] ⚠️ Web search fallback failed: {_wb_err}")
+                                logger.warning(f"[LangGraph] ⚠️ web_image_search_tool fallback failed: {_wb_err}")
 
                 return {
                     "messages": [AIMessage(content=raw_content)],
