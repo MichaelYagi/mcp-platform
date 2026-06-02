@@ -171,7 +171,7 @@ def _shashin_get(path: str) -> dict:
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","vision","ai"],triggers=["analyze image","describe image","image analysis","vision analysis","r:what(?: is|.?s) in (this|the) image","r:(look at|analyze|describe) (this |the )?image","r:what does this image (show|contain|depict)"],idempotent=True,template='use analyze_image_tool: [image_url=""] [image_file_path=""] [image_base64=""] [query=""]')
+@tool_meta(tags=["read","vision","ai"],triggers=["analyze image","describe image","image analysis","vision analysis","r:what(?: is|.?s) in (this|the) image","r:(look at|analyze|describe) (this |the )?image","r:what does this image (show|contain|depict)"],idempotent=True,template='use analyze_image_tool: [image_url=""] [image_file_path=""] [image_base64=""] [query=""]',pipe_targets={"image_url":"image_url","image_base64":"image_base64"})
 def analyze_image_tool(
     image_url: Optional[str] = None,
     image_file_path: Optional[str] = None,
@@ -306,7 +306,7 @@ def shashin_search_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","media"],triggers=["random photo","surprise me","r:show me a random (photo|image|picture)"],idempotent=False,template="use shashin_random_tool",intent_category="shashin_random")
+@tool_meta(tags=["read","media"],triggers=["random photo","surprise me","r:show me a random (photo|image|picture)"],idempotent=False,template="use shashin_random_tool",intent_category="shashin_random",output_type="image_id")
 def shashin_random_tool() -> str:
     """
     Fetch metadata for a random image from the Shashin gallery.
@@ -353,7 +353,7 @@ def shashin_random_tool() -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","vision","media","ai"],triggers=["analyze photo","describe photo","photo details","analyze shashin photo","r:what(?: is|.?s) in (this|the) photo","r:what does this photo (show|contain|depict)"],idempotent=True,template='use shashin_analyze_tool: image_id="" [query=""] [use_thumbnail=""]',intent_category="shashin_analyze")
+@tool_meta(tags=["read","vision","media","ai"],triggers=["analyze photo","describe photo","photo details","analyze shashin photo","r:what(?: is|.?s) in (this|the) photo","r:what does this photo (show|contain|depict)"],idempotent=True,template='use shashin_analyze_tool: image_id="" [query=""] [use_thumbnail=""]',intent_category="shashin_analyze",pipe_targets={"image_id":"image_id"})
 def shashin_analyze_tool(
     image_id: str,
     use_thumbnail: bool = True,
@@ -410,7 +410,7 @@ def shashin_analyze_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","find image of","image search","find a photo of","show picture of","search for image","find photo","show me what","r:what (does|do) (he|she|it|they|[\\w\\s]+?) look like( today)?"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search")
+@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","find image of","image search","find a photo of","show picture of","search for image","find photo","show me what","r:what (does|do) (he|she|it|they|[\\w\\s]+?) look like( today)?"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search",output_type="image_url")
 def web_image_search_tool(query: str) -> str:
     """
     Search the web for images using Google Images (via Serper).
@@ -497,8 +497,7 @@ def web_image_search_tool(query: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="image")
 @tool_meta(tags=["write","ai","generate"],triggers=["generate image","create image","make image","ai image","create artwork","make art","r:(generate|create|make|draw|illustrate) (a |an )?(picture|image|artwork|illustration|photo) of","r:draw (me |a |an )?"],idempotent=False,template='use generate_image_tool: prompt="" [width=""] [height=""] [seed=""] [model=""]',
-    category="sink"
-)
+output_type="image_url")
 def generate_image_tool(
     prompt: str,
     width: Optional[int] = 1024,

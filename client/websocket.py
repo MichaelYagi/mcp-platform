@@ -1013,17 +1013,24 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                         # Extract sentinels from description (injected by @tool_meta into docstring)
                         _raw_desc = (tool.description or "").strip()
                         _template_from_meta = ""
-                        _category_from_meta = ""
-                        # Strip all @tool_meta sentinels, capture example value
-                        import re as _re_ws
+                        _output_type_from_meta = "text"
+                        _pipe_targets_from_meta = {}
+                        # Strip all @tool_meta sentinels, capture values
+                        import re as _re_ws, json as _json_ws
                         _ex_m = _re_ws.search(r'\n\n__template__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
                         if _ex_m:
                             _template_from_meta = _ex_m.group(1).strip()
-                        _cat_m = _re_ws.search(r'\n\n__category__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
-                        if _cat_m:
-                            _category_from_meta = _cat_m.group(1).strip()
+                        _ot_m = _re_ws.search(r'\n\n__output_type__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
+                        if _ot_m:
+                            _output_type_from_meta = _ot_m.group(1).strip()
+                        _pt_m = _re_ws.search(r'\n\n__pipe_targets__: (.+?)(?=\n\n__|$)', _raw_desc, _re_ws.DOTALL)
+                        if _pt_m:
+                            try:
+                                _pipe_targets_from_meta = _json_ws.loads(_pt_m.group(1).strip())
+                            except Exception:
+                                pass
                         # Remove all sentinels from description shown in UI
-                        _raw_desc = _re_ws.sub(r'\n\n__(?:template|triggers|intent_category|tags|category)__:.*?(?=\n\n__|$)', '', _raw_desc, flags=_re_ws.DOTALL).strip()
+                        _raw_desc = _re_ws.sub(r'\n\n__(?:template|triggers|intent_category|tags|output_type|pipe_targets)__:.*?(?=\n\n__|$)', '', _raw_desc, flags=_re_ws.DOTALL).strip()
 
                         tools_payload.append({
                             "name": tool.name,
@@ -1032,7 +1039,8 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                             "external": source in _external_names,
                             "template": _template_from_meta or _tool_examples.get(tool.name, ""),
                             "required_params": required_params,
-                            "category": _category_from_meta or None,
+                            "output_type": _output_type_from_meta,
+                            "pipe_targets": _pipe_targets_from_meta,
                         })
 
                     await websocket.send(json.dumps({

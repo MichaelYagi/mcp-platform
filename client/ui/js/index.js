@@ -1632,6 +1632,7 @@ function send() {
     addMessage(text,"user",false);
     addLocalLogEntry('USER', text);
     input.value=""; lastSentMessage=text;
+    if (_pipelineSteps.length > 0) { _pipelineSteps = []; renderToolsPanel(_allTools); }
 
     if (text===":stop") {
         ws.send(JSON.stringify({type:"user",text:":stop"}));
@@ -1784,30 +1785,24 @@ function removeFavorite(toolName) {
     document.head.appendChild(style);
 })();
 
-let _pipelineSteps = []; // [{name, template, category}]
-
-function getPipelineCategory(tool) {
-    // Read from tool.category if server sends it, otherwise infer from tags
-    if (tool.category) return tool.category;
-    const tags = tool.tags || [];
-    if (tags.some(t => ['discord','notifications','email'].includes(t))) return 'sink';
-    return 'source';
-}
-
-function pipelineIsValidNext(category) {
-    if (_pipelineSteps.length === 0) return category === 'source';
-    const last = _pipelineSteps[_pipelineSteps.length - 1].category;
-    if (last === 'sink') return false;                      // nothing after sink
-    if (last === 'source') return category !== 'source';    // source → transform or sink only
-    if (last === 'transform') return category !== 'source'; // transform → transform or sink only
-    return false;
-}
+let _pipelineSteps = []; // [{name, template, outputType}]
 
 function pipelineIsToolSelectable(tool) {
-    const cat = getPipelineCategory(tool);
-    if (cat === 'sink' && _pipelineSteps.some(s => s.category === 'sink')) return false; // only one sink
-    if (_pipelineSteps.length === 0) return cat === 'source';
-    return pipelineIsValidNext(cat);
+    if (_pipelineSteps.length === 0) return true;
+    const last = _pipelineSteps[_pipelineSteps.length - 1];
+    return (last.outputType || "text") !== "none";
+}
+
+function _stripPipeTargetParams(template, pipeTargets, prevOutputType) {
+    if (!template || !pipeTargets || !prevOutputType || prevOutputType === "none") return template;
+    let result = template;
+    for (const [param, accepts] of Object.entries(pipeTargets)) {
+        if (accepts === prevOutputType) {
+            result = result.replace(new RegExp(`\\s*\\[${param}=["'][^"']*["']\\]`, 'g'), '');
+            result = result.replace(new RegExp(`\\s*${param}=["'][^"']*["']`, 'g'), '');
+        }
+    }
+    return result.trim();
 }
 
 function pipelineHasTool(name) {
@@ -1819,10 +1814,15 @@ function pipelineToggleTool(tool) {
     if (pipelineHasTool(name)) {
         _pipelineSteps = _pipelineSteps.filter(s => s.name !== name);
     } else {
+        let template = tool.template || `use ${name}`;
+        if (_pipelineSteps.length > 0) {
+            const prev = _pipelineSteps[_pipelineSteps.length - 1];
+            template = _stripPipeTargetParams(template, tool.pipe_targets || {}, prev.outputType || "text");
+        }
         _pipelineSteps.push({
             name,
-            template: tool.template || `use ${name}`,
-            category: getPipelineCategory(tool),
+            template,
+            outputType: tool.output_type || "text",
         });
     }
     const inputEl = document.getElementById('input');
@@ -1868,10 +1868,12 @@ function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false 
     const item = document.createElement('div');
     const isDisabled = tool.enabled === false;
     const isInPipeline = pipelineHasTool(tool.name);
+    const isIncompatible = !isInPipeline && !isDisabled && !pipelineIsToolSelectable(tool);
 
     item.className = 'tool-item'
         + (isDisabled ? ' tool-disabled' : '')
-        + (isInPipeline ? ' tool-in-pipeline' : '');
+        + (isInPipeline ? ' tool-in-pipeline' : '')
+        + (isIncompatible ? ' tool-incompatible' : '');
     if (isDraggable) {
         item.dataset.toolName = tool.name;
         item.setAttribute('draggable', 'true');
@@ -1885,11 +1887,23 @@ function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false 
         const optMatches = tool.template.matchAll(/\[(\w+)=["'][^"']*["']\]/g);
         for (const m of optMatches) optionalParams.push(m[1]);
     }
-    const paramsHtml = (params.length || optionalParams.length)
+    // Determine which params are satisfied by the previous pipeline step
+    const pipelineIdx = _pipelineSteps.findIndex(s => s.name === tool.name);
+    const pipedParams = new Set();
+    if (pipelineIdx > 0) {
+        const prevOutputType = _pipelineSteps[pipelineIdx - 1].outputType || "text";
+        const targets = tool.pipe_targets || {};
+        for (const [param, accepts] of Object.entries(targets)) {
+            if (accepts === prevOutputType) pipedParams.add(param);
+        }
+    }
+    const visibleParams = params.filter(p => !pipedParams.has(p.name));
+    const visibleOptional = optionalParams.filter(p => !pipedParams.has(p));
+    const paramsHtml = (visibleParams.length || visibleOptional.length)
         ? `<div class="tool-item-params">${
-            params.map(p => `<span class="tool-param">${p.name}</span>`).join('')
+            visibleParams.map(p => `<span class="tool-param">${p.name}</span>`).join('')
           }${
-            optionalParams.map(p => `<span class="tool-param tool-param-optional">[${p}]</span>`).join('')
+            visibleOptional.map(p => `<span class="tool-param tool-param-optional">[${p}]</span>`).join('')
           }</div>`
         : '';
 
@@ -2756,9 +2770,8 @@ if (typeof module !== 'undefined' && module.exports) {
         setIsProcessing: (v) => { isProcessing = v; },
         buildToolItem,
         renderToolsPanel,
-        getPipelineCategory,
-        pipelineIsToolSelectable,
         pipelineHasTool,
+        pipelineIsToolSelectable,
         pipelineToggleTool,
         buildPipelinePrompt,
         clearPipeline,

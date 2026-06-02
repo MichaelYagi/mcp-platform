@@ -343,8 +343,7 @@ def get_note_by_id(note_id: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="trilium")
 @tool_meta(tags=["write","notes"],triggers=["create note","new note","add note"],idempotent=False,template='use create_note: parent_note_id="" title="" [content=""] [note_type=""]',
-    category="sink"
-)
+output_type="none",pipe_targets={"content":"text"})
 def create_note(
     parent_note_id: str,
     title: str,
@@ -396,8 +395,7 @@ def create_note(
 @mcp.tool()
 @check_tool_enabled(category="trilium")
 @tool_meta(tags=["write","notes"],triggers=["update note","edit note","change note content","modify note","rewrite note","update note body"],idempotent=False,template='use update_note_content: note_id="" content=""',
-    category="sink"
-)
+output_type="none",pipe_targets={"content":"text"})
 def update_note_content(note_id: str, content: str) -> str:
     """
     Update the content of an existing note.
@@ -450,8 +448,7 @@ def update_note_content(note_id: str, content: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="trilium")
 @tool_meta(tags=["write","notes"],triggers=["rename note","update note title","change note name","rename note title"],idempotent=False,template='use update_note_title: note_id="" title=""',
-    category="sink"
-)
+output_type="none")
 def update_note_title(note_id: str, title: str) -> str:
     """
     Update the title of an existing note.
@@ -484,8 +481,7 @@ def update_note_title(note_id: str, title: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="trilium")
 @tool_meta(tags=["destructive","notes"],triggers=["delete note","remove note"],idempotent=False,template='use delete_note: note_id=""',
-    category="sink"
-)
+output_type="none")
 def delete_note(note_id: str) -> str:
     """
     Delete a note (move to trash).
@@ -522,8 +518,7 @@ def delete_note(note_id: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="trilium")
 @tool_meta(tags=["write","notes"],triggers=["add label to note","tag note","label note","add tag to note","tag this note"],idempotent=False,template='use add_label_to_note: note_id="" label="" [value=""]',
-    category="sink"
-)
+output_type="none")
 def add_label_to_note(note_id: str, label: str, value: Optional[str] = None) -> str:
     """
     Add a label (attribute) to a note.

@@ -579,8 +579,7 @@ def gmail_get_email(message_id: str) -> str:
 @mcp.tool()
 @check_tool_enabled(category="google")
 @tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,template='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google",
-    category="sink"
-)
+output_type="none",pipe_targets={"body":"text"})
 def gmail_send_email(
         to: str,
         subject: str,
@@ -980,8 +979,7 @@ def calendar_get_this_week() -> str:
 @mcp.tool()
 @check_tool_enabled(category="google")
 @tool_meta(tags=["write","calendar","external"],triggers=["create event","schedule meeting","add to calendar","book appointment","new event","put on calendar","add meeting","schedule event"],idempotent=False,template='use calendar_create_event: summary="" start="" end="" [description=""] [location=""] [attendees=""] [all_day=""]',intent_category="google",
-    category="sink"
-)
+output_type="none")
 def calendar_create_event(
         summary: str,
         start: str,
@@ -1093,8 +1091,7 @@ def calendar_create_event(
 @mcp.tool()
 @check_tool_enabled(category="google")
 @tool_meta(tags=["write","email","external"],triggers=["reply to email","reply to this email","respond to email","write a reply","respond to this","reply back"],idempotent=False,template='use gmail_reply_tool: message_id="" body="" [cc=""]',intent_category="google",
-    category="sink"
-)
+output_type="none",pipe_targets={"body":"text"})
 def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> str:
     """
     Reply to an existing Gmail message, threading it correctly.
@@ -1650,7 +1647,7 @@ _reauth_flow = None
     idempotent=False,
     template="use google_reauth_start | use google_reauth_complete: code=\"\"",
     intent_category="google",
-)
+output_type="none")
 def google_reauth_start() -> str:
     """
     Step 1 of 2: Begin Google OAuth re-authorisation.
@@ -1726,7 +1723,7 @@ def google_reauth_start() -> str:
     idempotent=False,
     template='use google_reauth_complete: code=""',
     intent_category="google",
-)
+output_type="none")
 def google_reauth_complete(code: str) -> str:
     """
     Step 2 of 2: Complete Google OAuth re-authorisation.

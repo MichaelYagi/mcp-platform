@@ -1,4 +1,5 @@
 import json
+import time
 import urllib.parse
 import requests
 from typing import Optional
@@ -87,8 +88,12 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
     """
     query = city
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={requests.utils.quote(query)}&count=10&language=en&format=json"
-    resp = requests.get(url, timeout=5)
-    data = resp.json()
+    try:
+        resp = requests.get(url, timeout=5)
+        text = resp.text.strip()
+        data = json.loads(text) if text else {}
+    except Exception:
+        return None
 
     results = data.get("results", [])
     if not results:
@@ -269,13 +274,29 @@ def get_weather(
         f"&timezone={requests.utils.quote(timezone)}"
     )
 
-    try:
-        response = requests.get(url, timeout=10)
-        data = response.json()
-    except Exception as e:
+    last_err = None
+    data = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, timeout=10)
+            if not response.ok:
+                last_err = f"HTTP {response.status_code}"
+                time.sleep(1.5)
+                continue
+            text = response.text.strip()
+            if not text:
+                last_err = f"Empty response (HTTP {response.status_code})"
+                time.sleep(1.5)
+                continue
+            data = json.loads(text)
+            break
+        except Exception as e:
+            last_err = str(e)
+            time.sleep(1.5)
+    if data is None:
         return json.dumps({
             "error": "request_failed",
-            "message": str(e),
+            "message": last_err,
             "city": geo["city"],
             "state": geo["state"],
             "country": geo["country"],

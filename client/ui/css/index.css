@@ -647,6 +647,11 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     transition: background 0.15s;
     border-left: 2px solid transparent;
 }
+.tool-item.tool-incompatible {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+}
 .tool-item:hover {
     background: rgba(86,156,214,0.1);
     border-left-color: #569cd6;

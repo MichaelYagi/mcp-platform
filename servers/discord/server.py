@@ -156,8 +156,7 @@ def _resolve_webhook(webhook: Optional[str]) -> str:
     idempotent=False,
     template='use discord_notify: message="" [webhook=""] [username=""] [title=""]',
     intent_category="discord",
-    category="sink"
-)
+output_type="none",pipe_targets={"message":"text"})
 def discord_notify(
     message: str,
     webhook: Optional[str] = None,
