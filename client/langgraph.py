@@ -2146,6 +2146,12 @@ def create_langgraph_agent(llm_with_tools, tools):
                             _matched.append(_t)
                         elif _needs_web and hasattr(_t, "name") and _t.name == "web_search_tool":
                             _matched.append(_t)
+                    # If a more specific search tool (e.g. web_image_search_tool) is already
+                    # bound, drop the generic web_search_tool — the LLM will otherwise ignore
+                    # the specific tool and fall back to the generic one.
+                    _specific_search_tools = {"web_image_search_tool"}
+                    if any(getattr(_t, "name", "") in _specific_search_tools for _t in _matched):
+                        _matched = [_t for _t in _matched if getattr(_t, "name", "") != "web_search_tool"]
                     if _matched:
                         _tag_str = ",".join(sorted(_tag_set)) or "web"
                         logger.info(f"🎯 LLM routing → tags={list(_tag_set)}, {len(_matched)} tools bound")

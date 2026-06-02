@@ -410,7 +410,7 @@ def shashin_analyze_tool(
 
 @mcp.tool()
 @check_tool_enabled(category="image")
-@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","find image of","image search","find a photo of","show picture of","search for image","find photo","show me what","r:what (does|do) (he|she|it|they|[\\w\\s]+?) look like( today)?"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search",output_type="image_url")
+@tool_meta(tags=["read","search","external"],triggers=["show me a picture of","show me pictures of","show me photos of","find image of","image search","find a photo of","show picture of","search for image","find photo","show me what","pictures of him","photos of him","pictures of her","photos of her","r:show me (pictures?|photos?|images?) of (him|her|them|it)","r:what (does|do) (he|she|it|they|[\\w\\s]+?) look like( today)?"],idempotent=True,template='use web_image_search_tool: query=""',intent_category="web_image_search",output_type="image_url")
 def web_image_search_tool(query: str) -> str:
     """
     Search the web for images using Google Images (via Serper).
