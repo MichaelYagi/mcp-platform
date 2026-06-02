@@ -404,87 +404,94 @@ describe('addMessage additional branches', () => {
 // Pipeline Builder
 // ═══════════════════════════════════════════════════════════════════
 
-const SOURCE   = { name: 'get_day_briefing',  category: 'source',    template: 'use get_day_briefing',    tags: [], enabled: true };
-const TRANSFORM = { name: 'summarize_text_tool', category: 'transform', template: 'use summarize_text_tool', tags: [], enabled: true };
-const SINK     = { name: 'discord_notify',    category: 'sink',      template: 'use discord_notify',      tags: [], enabled: true };
-const SINK2    = { name: 'gmail_send_email',  category: 'sink',      template: 'use gmail_send_email',    tags: [], enabled: true };
-const NO_CAT   = { name: 'some_tool',         template: 'use some_tool', tags: [], enabled: true };
+// Tools use output_type / pipe_targets — category field is gone.
+const SOURCE    = { name: 'get_day_briefing',    output_type: 'text', pipe_targets: {},                  template: 'use get_day_briefing',             tags: [], enabled: true };
+const TRANSFORM = { name: 'summarize_text_tool', output_type: 'text', pipe_targets: { text: 'text' },    template: 'use summarize_text_tool: text=""',  tags: [], enabled: true };
+const SINK      = { name: 'discord_notify',      output_type: 'none', pipe_targets: { message: 'text' }, template: 'use discord_notify: message=""',    tags: [], enabled: true };
+const SINK2     = { name: 'gmail_send_email',    output_type: 'none', pipe_targets: { body: 'text' },    template: 'use gmail_send_email: body=""',     tags: [], enabled: true };
+const IMG_SRC   = { name: 'generate_image_tool', output_type: 'image_url', pipe_targets: {},             template: 'use generate_image_tool',           tags: [], enabled: true };
+const IMG_SINK  = { name: 'analyze_image_tool',  output_type: 'text', pipe_targets: { image_url: 'image_url' }, template: 'use analyze_image_tool: image_url=""', tags: [], enabled: true };
 
 beforeEach(() => {
     ui.clearPipeline();
 });
 
-describe('getPipelineCategory', () => {
-    test('returns tool.category when set', () => {
-        expect(ui.getPipelineCategory(SOURCE)).toBe('source');
-        expect(ui.getPipelineCategory(SINK)).toBe('sink');
-        expect(ui.getPipelineCategory(TRANSFORM)).toBe('transform');
-    });
-    test('returns source for tool without category', () => {
-        expect(ui.getPipelineCategory(NO_CAT)).toBe('source');
-    });
-});
-
 describe('pipelineIsToolSelectable — empty pipeline', () => {
-    test('source selectable when pipeline empty',    () => expect(ui.pipelineIsToolSelectable(SOURCE)).toBe(true));
-    test('transform not selectable when pipeline empty', () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(false));
-    test('sink not selectable when pipeline empty',  () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(false));
+    test('any tool selectable when pipeline empty', () => {
+        expect(ui.pipelineIsToolSelectable(SOURCE)).toBe(true);
+        expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(true);
+        expect(ui.pipelineIsToolSelectable(SINK)).toBe(true);
+    });
 });
 
-describe('pipelineIsToolSelectable — after source', () => {
+describe('pipelineIsToolSelectable — after text-producing tool', () => {
     beforeEach(() => ui.pipelineToggleTool(SOURCE));
-    test('transform selectable after source',  () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(true));
-    test('sink selectable after source',       () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(true));
-    test('second source not selectable',       () => expect(ui.pipelineIsToolSelectable({ ...SOURCE, name: 'other_source' })).toBe(false));
+    test('transform selectable after text producer',     () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(true));
+    test('sink selectable after text producer',          () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(true));
+    test('another source selectable after text producer',() => expect(ui.pipelineIsToolSelectable({ ...SOURCE, name: 'other' })).toBe(true));
 });
 
-describe('pipelineIsToolSelectable — after sink', () => {
+describe('pipelineIsToolSelectable — after none-producing tool (sink)', () => {
     beforeEach(() => { ui.pipelineToggleTool(SOURCE); ui.pipelineToggleTool(SINK); });
-    test('nothing selectable after sink',          () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(false));
-    test('second sink not selectable after sink',  () => expect(ui.pipelineIsToolSelectable(SINK2)).toBe(false));
-    test('source not selectable after sink',       () => expect(ui.pipelineIsToolSelectable(SOURCE)).toBe(false));
-});
-
-describe('pipelineIsToolSelectable — only one sink allowed', () => {
-    beforeEach(() => { ui.pipelineToggleTool(SOURCE); ui.pipelineToggleTool(SINK); });
-    test('second sink blocked',  () => expect(ui.pipelineIsToolSelectable(SINK2)).toBe(false));
+    test('nothing selectable after none-producer',  () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(false));
+    test('second sink not selectable after sink',   () => expect(ui.pipelineIsToolSelectable(SINK2)).toBe(false));
+    test('source not selectable after sink',        () => expect(ui.pipelineIsToolSelectable(SOURCE)).toBe(false));
 });
 
 describe('pipelineToggleTool — add', () => {
-    test('adds source to empty pipeline', () => {
+    test('adds tool to empty pipeline', () => {
         ui.pipelineToggleTool(SOURCE);
         expect(ui.pipelineHasTool('get_day_briefing')).toBe(true);
         expect(ui.getPipelineSteps().length).toBe(1);
     });
-    test('adds source then sink', () => {
+    test('step stores outputType', () => {
         ui.pipelineToggleTool(SOURCE);
         ui.pipelineToggleTool(SINK);
         expect(ui.getPipelineSteps().length).toBe(2);
-        expect(ui.getPipelineSteps()[1].category).toBe('sink');
+        expect(ui.getPipelineSteps()[1].outputType).toBe('none');
     });
-    test('adds source → transform → sink', () => {
+    test('adds three-step chain', () => {
         ui.pipelineToggleTool(SOURCE);
         ui.pipelineToggleTool(TRANSFORM);
         ui.pipelineToggleTool(SINK);
         expect(ui.getPipelineSteps().length).toBe(3);
     });
+    test('removes tool when toggled again', () => {
+        ui.pipelineToggleTool(SOURCE);
+        ui.pipelineToggleTool(SOURCE);
+        expect(ui.pipelineHasTool('get_day_briefing')).toBe(false);
+    });
 });
 
 describe('buildPipelinePrompt', () => {
-    test('single source', () => {
+    test('single tool', () => {
         ui.pipelineToggleTool(SOURCE);
         expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing');
     });
-    test('source | sink', () => {
+    test('source | sink — pipe-target param stripped from sink', () => {
         ui.pipelineToggleTool(SOURCE);
         ui.pipelineToggleTool(SINK);
+        // message="" stripped because SOURCE output_type="text" matches SINK pipe_targets.message
         expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing | use discord_notify');
     });
-    test('source | transform | sink', () => {
+    test('source | transform | sink — pipe-target params stripped at each step', () => {
         ui.pipelineToggleTool(SOURCE);
         ui.pipelineToggleTool(TRANSFORM);
         ui.pipelineToggleTool(SINK);
+        // text="" stripped from transform, message="" stripped from sink
         expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing | use summarize_text_tool | use discord_notify');
+    });
+    test('image chain — image_url="" stripped from analyzer', () => {
+        ui.pipelineToggleTool(IMG_SRC);
+        ui.pipelineToggleTool(IMG_SINK);
+        // image_url="" stripped because IMG_SRC output_type="image_url" matches IMG_SINK pipe_targets.image_url
+        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use analyze_image_tool');
+    });
+    test('unmatched type — param not stripped', () => {
+        ui.pipelineToggleTool(IMG_SRC);
+        ui.pipelineToggleTool(SINK);
+        // image_url output doesn't match SINK's pipe_targets.message="text" — message stays
+        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use discord_notify: message=""');
     });
     test('empty pipeline returns empty string', () => {
         expect(ui.buildPipelinePrompt()).toBe('');

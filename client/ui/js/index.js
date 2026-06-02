@@ -1802,7 +1802,7 @@ function _stripPipeTargetParams(template, pipeTargets, prevOutputType) {
             result = result.replace(new RegExp(`\\s*${param}=["'][^"']*["']`, 'g'), '');
         }
     }
-    return result.trim();
+    return result.replace(/:\s*$/, '').trim();
 }
 
 function pipelineHasTool(name) {
