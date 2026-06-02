@@ -771,9 +771,12 @@ async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
 
     # Direct pipeline dispatch — never a scheduling request
     # (only bypass if there are no time/schedule keywords in the message)
+    # Strip quoted parameter values first so words like "Daily" inside
+    # query="Daily facts" don't trip the time-keyword check.
+    _msg_no_quotes = _re_sched.sub(r'["\'][^"\']*["\']', '', message)
     _has_time = _re_sched.search(
         r'\b(at\s+\d|every\b|daily\b|weekly\b|tomorrow\b|tonight\b|morning\b|minute\b|hours\b|seconds\b|pm\b|am\b|in\s+\d+\s+(minute|hour|day))',
-        message, _re_sched.IGNORECASE
+        _msg_no_quotes, _re_sched.IGNORECASE
     )
     # Direct tool call — never a scheduling request unless it has time/schedule keywords
     if message.lstrip().lower().startswith("use ") and not _has_time:
@@ -785,7 +788,7 @@ async def looks_like_scheduling_request(message: str, llm_fn=None) -> bool:
 
     _time_pattern = _re_sched.search(
         r'\b(at\s+\d{1,2}(:\d{2})?\s*(am|pm)|every\s+(day|morning|night|hour|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|daily|weekly|each\s+(day|morning|night)|\d{1,2}(:\d{2})?\s*(am|pm)\s+today|tomorrow\s+at)',
-        message, _re_sched.IGNORECASE
+        _msg_no_quotes, _re_sched.IGNORECASE
     )
     if _time_pattern:
         return True
