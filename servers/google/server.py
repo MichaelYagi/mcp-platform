@@ -1635,13 +1635,15 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
     _text_parts = [f"**Date:** {result['date']}"]
 
     _wd = result.get("weather")
-    if isinstance(_wd, dict):
+    if isinstance(_wd, dict) and _wd.get("forecast"):
         _city  = _wd.get("city", "")
         _state = _wd.get("state", "")
         _ctry  = _wd.get("country", "")
         _loc   = ", ".join(p for p in [_city, _state, _ctry] if p)
         _text_parts.append(f"\nWeather Briefing for {_loc}:")
-        for _day in _wd.get("forecast", []):
+        _cur = _wd.get("current", {})
+        _cur_humidity = _cur.get("humidity")  # e.g. "31%" — available from current conditions
+        for _idx, _day in enumerate(_wd.get("forecast", [])):
             _label = _day.get("day_label") or _day.get("date", "")
             _text_parts.append(f"\nForecast for {_label}:")
             _text_parts.append(f"Conditions: {_day.get('condition', 'N/A')}")
@@ -1655,8 +1657,8 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                 _text_parts.append(f"Low Temp: {_lo_c}°C ({_lo_f}°F)")
             if _fl_c is not None:
                 _text_parts.append(f"Feels Like: {_fl_c}°C ({_fl_f}°F)")
-            if _day.get("humidity"):
-                _text_parts.append(f"Humidity: {_day['humidity']}")
+            if _idx == 0 and _cur_humidity:
+                _text_parts.append(f"Humidity: {_cur_humidity}")
             if _day.get("sunrise"):
                 _text_parts.append(f"Sunrise: {_day['sunrise']}")
             if _day.get("sunset"):

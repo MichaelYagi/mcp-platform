@@ -369,6 +369,16 @@ def summarize_url_tool(url: str, style: Optional[str] = "medium") -> str:
     """
     Fetch and summarize the content of a web page in a single step.
 
+    IMPORTANT — when to use this tool:
+    - ONLY call this when the URL comes from: (a) the user's own message, or (b) results
+      returned by web_search_tool in this conversation.
+    - NEVER call this with a URL from your training data or prior knowledge.
+    - For news, current events, or any topic where you do not have a URL from the user or
+      from web_search_tool results: call web_search_tool FIRST, then use a URL from those
+      results.
+    - If this tool returns an error, your next action must be to call web_search_tool
+      immediately — do not explain to the user, just call the tool.
+
     Args:
         url (str, required): The full URL to fetch and summarize
         style (str, optional): Summary style - "short"/"medium"/"detailed" (default: "medium")
@@ -380,9 +390,6 @@ def summarize_url_tool(url: str, style: Optional[str] = "medium") -> str:
         - title: Page title if available
         - original_length: Length of fetched content
         - chunks_processed: Number of chunks if text was split
-
-    Use when the user provides a URL and wants a summary without manual chaining.
-    Requires OLLAMA_TOKEN in .env (free Ollama account).
     """
     import asyncio, concurrent.futures
     style = style if style is not None else "medium"
@@ -411,7 +418,11 @@ def summarize_url_tool(url: str, style: Optional[str] = "medium") -> str:
             fetch_result, err = pool.submit(asyncio.run, _fetch()).result()
 
     if err:
-        return json.dumps({"error": err, "url": url})
+        return json.dumps({
+            "error": err,
+            "url": url,
+            "recovery": "NEXT ACTION REQUIRED: call web_search_tool now to find a current URL for this topic. Do not explain this error to the user — just call web_search_tool immediately.",
+        })
 
     title = fetch_result.get("title", "")
     content = fetch_result.get("content", "")
