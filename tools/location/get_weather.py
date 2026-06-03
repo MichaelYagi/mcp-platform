@@ -260,7 +260,9 @@ def get_weather(
         "weather_code",
         "temperature_2m_max",
         "temperature_2m_min",
+        "apparent_temperature_max",
         "precipitation_probability_max",
+        "relative_humidity_2m_max",
         "sunrise",
         "sunset",
     ]
@@ -334,7 +336,9 @@ def get_weather(
     codes = daily.get("weather_code", [])
     max_temps = daily.get("temperature_2m_max", [])
     min_temps = daily.get("temperature_2m_min", [])
+    feels_max = daily.get("apparent_temperature_max", [])
     precip_probs = daily.get("precipitation_probability_max", [])
+    humidity_max = daily.get("relative_humidity_2m_max", [])
     sunrises = daily.get("sunrise", [])
     sunsets = daily.get("sunset", [])
 
@@ -370,6 +374,8 @@ def get_weather(
         except:
             relative_day = "unknown"
 
+        feels_c = feels_max[i] if i < len(feels_max) else None
+        hum = humidity_max[i] if i < len(humidity_max) else None
         forecast.append({
             "date": date_str,
             "day_label": _get_date_label(date_str, today),
@@ -381,6 +387,9 @@ def get_weather(
             "max_temp_f": _celsius_to_fahrenheit(max_c) if max_c is not None else None,
             "min_temp_c": min_c,
             "min_temp_f": _celsius_to_fahrenheit(min_c) if min_c is not None else None,
+            "feelslike_c": feels_c,
+            "feelslike_f": _celsius_to_fahrenheit(feels_c) if feels_c is not None else None,
+            "humidity": f"{round(hum)}%" if hum is not None else None,
             "sunrise": _fmt_sun(sunrises[i]) if i < len(sunrises) else None,
             "sunset":  _fmt_sun(sunsets[i])  if i < len(sunsets)  else None,
         })

@@ -1630,6 +1630,60 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
     if not result["errors"]:
         del result["errors"]
 
+    # Build a pre-formatted text so _process_tool_result returns it directly
+    # without LLM involvement, giving a consistent layout every time.
+    _text_parts = [f"**Date:** {result['date']}"]
+
+    _wd = result.get("weather")
+    if isinstance(_wd, dict):
+        _city  = _wd.get("city", "")
+        _state = _wd.get("state", "")
+        _ctry  = _wd.get("country", "")
+        _loc   = ", ".join(p for p in [_city, _state, _ctry] if p)
+        _text_parts.append(f"\nWeather Briefing for {_loc}:")
+        for _day in _wd.get("forecast", []):
+            _label = _day.get("day_label") or _day.get("date", "")
+            _text_parts.append(f"\nForecast for {_label}:")
+            _text_parts.append(f"Conditions: {_day.get('condition', 'N/A')}")
+            _text_parts.append(f"Precipitation Chance: {_day.get('precipitation_chance', 'N/A')}")
+            _hi_c = _day.get("max_temp_c"); _hi_f = _day.get("max_temp_f")
+            _lo_c = _day.get("min_temp_c"); _lo_f = _day.get("min_temp_f")
+            _fl_c = _day.get("feelslike_c"); _fl_f = _day.get("feelslike_f")
+            if _hi_c is not None:
+                _text_parts.append(f"High Temp: {_hi_c}°C ({_hi_f}°F)")
+            if _lo_c is not None:
+                _text_parts.append(f"Low Temp: {_lo_c}°C ({_lo_f}°F)")
+            if _fl_c is not None:
+                _text_parts.append(f"Feels Like: {_fl_c}°C ({_fl_f}°F)")
+            if _day.get("humidity"):
+                _text_parts.append(f"Humidity: {_day['humidity']}")
+            if _day.get("sunrise"):
+                _text_parts.append(f"Sunrise: {_day['sunrise']}")
+            if _day.get("sunset"):
+                _text_parts.append(f"Sunset: {_day['sunset']}")
+
+    _ed = result.get("email")
+    if isinstance(_ed, dict):
+        _total = _ed.get("total_unread", 0)
+        if _total == 0:
+            _text_parts.append("\nEmails: No unread emails")
+        else:
+            _text_parts.append(f"\nEmails: {_total} unread email(s)")
+            for _em in _ed.get("emails", [])[:5]:
+                _text_parts.append(f"  - {_em.get('subject','(no subject)')} — from {_em.get('from','')}")
+
+    _cd = result.get("calendar")
+    if isinstance(_cd, dict):
+        _count = _cd.get("count", 0)
+        if _count == 0:
+            _text_parts.append("\nCalendar: No events scheduled")
+        else:
+            _text_parts.append(f"\nCalendar: {_count} event(s)")
+            for _ev in _cd.get("events", [])[:5]:
+                _text_parts.append(f"  - {_ev.get('title','')} at {_ev.get('when','')}")
+
+    result["text"] = "\n".join(_text_parts)
+
     return json.dumps(result, indent=2)
 
 
