@@ -1738,10 +1738,13 @@ function removeFavorite(toolName) {
             transition: opacity 0.15s;
         }
         .pipe-step:hover { opacity: 0.6; text-decoration: line-through; }
-        .pipe-step-source  { background: #1a3a2a; color: #4caf82; border: 1px solid #2d6b45; }
-        .pipe-step-transform { background: #1a2a3a; color: #5bafd6; border: 1px solid #2d5580; }
-        .pipe-step-sink    { background: #3a1a1a; color: #e07070; border: 1px solid #7a2d2d; }
-        .pipe-arrow { color: var(--text-muted, #666); font-size: 0.7rem; }
+        .pipe-step-source      { background: #1a3a2a; color: #4caf82; border: 1px solid #2d6b45; }
+        .pipe-step-transform   { background: #1a2a3a; color: #5bafd6; border: 1px solid #2d5580; }
+        .pipe-step-sink        { background: #3a1a1a; color: #e07070; border: 1px solid #7a2d2d; }
+        .pipe-step-independent { background: #2a2a1a; color: #c8a84b; border: 1px dashed #7a6a2d; }
+        .pipe-arrow         { color: var(--text-muted, #666); font-size: 0.7rem; }
+        .pipe-arrow-broken  { color: #7a6a2d; font-size: 0.7rem; }
+        .pipe-discard-hint  { font-size: 0.68rem; color: #7a6a2d; font-style: italic; }
         .pipeline-bar-hint {
             font-size: 0.72rem;
             color: var(--text-muted, #666);
@@ -1790,14 +1793,29 @@ let _pipelineSteps = []; // [{name, template, outputType}]
 function pipelineIsToolSelectable(tool) {
     if (_pipelineSteps.length === 0) return true;
     const last = _pipelineSteps[_pipelineSteps.length - 1];
-    return (last.outputType || "text") !== "none";
+    const lastOutputType = last.outputType || "text";
+    if (lastOutputType === "none") return false;
+
+    const toolOutputType = tool.output_type || "text";
+    const pipeTargets = tool.pipe_targets || {};
+
+    // Sinks that declare pipe_targets accept piped input (discord_notify, gmail_send_email, etc.)
+    // Sinks with no pipe_targets are action tools (calendar_create_event, plex_ingest, etc.) — grey out
+    if (toolOutputType === "none") {
+        return Object.keys(pipeTargets).length > 0;
+    }
+
+    // Transform tools require a matching pipe_target type
+    return Object.values(pipeTargets).some(t => t === lastOutputType);
 }
 
-function _stripPipeTargetParams(template, pipeTargets, prevOutputType) {
+function _stripPipeTargetParams(template, pipeTargets, prevOutputType, isSink) {
     if (!template || !pipeTargets || !prevOutputType || prevOutputType === "none") return template;
     let result = template;
     for (const [param, accepts] of Object.entries(pipeTargets)) {
-        if (accepts === prevOutputType) {
+        // Sinks stringify whatever arrives — strip their content param regardless of type.
+        // Transforms only strip when the type matches exactly.
+        if (isSink || accepts === prevOutputType) {
             result = result.replace(new RegExp(`\\s*\\[${param}=["'][^"']*["']\\]`, 'g'), '');
             result = result.replace(new RegExp(`\\s*${param}=["'][^"']*["']`, 'g'), '');
         }
@@ -1817,12 +1835,15 @@ function pipelineToggleTool(tool) {
         let template = tool.template || `use ${name}`;
         if (_pipelineSteps.length > 0) {
             const prev = _pipelineSteps[_pipelineSteps.length - 1];
-            template = _stripPipeTargetParams(template, tool.pipe_targets || {}, prev.outputType || "text");
+            const isSink = (tool.output_type || "text") === "none";
+            template = _stripPipeTargetParams(template, tool.pipe_targets || {}, prev.outputType || "text", isSink);
         }
         _pipelineSteps.push({
             name,
             template,
-            outputType: tool.output_type || "text",
+            outputType:  tool.output_type || "text",
+            pipeTargets: tool.pipe_targets || {},
+            isSink:      (tool.output_type || "text") === "none",
         });
     }
     const inputEl = document.getElementById('input');
@@ -1841,7 +1862,7 @@ function buildPipelinePrompt() {
 }
 
 function updatePipelineUI() {
-    // Pipeline state is reflected in the input field only — no separate UI bar
+    // Greying of incompatible tools via renderToolsPanel is sufficient — no bar needed.
 }
 
 function sendPipeline() {
@@ -1892,9 +1913,10 @@ function buildToolItem(tool, { onFavoriteToggle, draggable: isDraggable = false 
     const pipedParams = new Set();
     if (pipelineIdx > 0) {
         const prevOutputType = _pipelineSteps[pipelineIdx - 1].outputType || "text";
+        const isSink = (tool.output_type || "text") === "none";
         const targets = tool.pipe_targets || {};
         for (const [param, accepts] of Object.entries(targets)) {
-            if (accepts === prevOutputType) pipedParams.add(param);
+            if (isSink || accepts === prevOutputType) pipedParams.add(param);
         }
     }
     const visibleParams = params.filter(p => !pipedParams.has(p.name));

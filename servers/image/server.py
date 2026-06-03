@@ -539,15 +539,26 @@ def generate_image_tool(
 
     import urllib.parse as _urlparse
     import random as _random
+    import re as _re_img
+
+    # Strip markdown so piped text (briefings, summaries) becomes a clean visual prompt.
+    # Pollinations.ai also has a URL length limit so keep it short.
+    _clean = prompt
+    _clean = _re_img.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', _clean)   # [text](url) → text
+    _clean = _re_img.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', _clean)   # **bold** / *italic*
+    _clean = _re_img.sub(r'#{1,6}\s*', '', _clean)                    # headings
+    _clean = _re_img.sub(r'[-•]\s+', ' ', _clean)                     # list bullets
+    _clean = _re_img.sub(r'\s+', ' ', _clean).strip()
+    _clean = _clean[:400]                                              # Pollinations URL limit
 
     _model = model or os.getenv("IMAGE_MODEL", "flux")
     _seed = seed if seed is not None else _random.randint(1, 2**31)
-    _encoded_prompt = _urlparse.quote(prompt)
+    _encoded_prompt = _urlparse.quote(_clean)
 
     params = f"width={width}&height={height}&model={_model}&seed={_seed}&nologo=true"
     api_url = f"https://image.pollinations.ai/prompt/{_encoded_prompt}?{params}"
 
-    logger.info(f"🛠 [server] generate_image_tool called — model={_model}, seed={_seed}, prompt={prompt!r}")
+    logger.info(f"🛠 [server] generate_image_tool called — model={_model}, seed={_seed}, prompt={_clean!r}")
 
     try:
         resp = requests.get(api_url, timeout=120)

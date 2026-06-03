@@ -1135,6 +1135,18 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     if "query" not in args:
                         args["query"] = str(previous)[:100]
 
+                # Resolve pipe_targets for this tool from its description sentinel
+                _tool_obj = next((t for t in tools_list if getattr(t, "name", "") == tool_name), None)
+                _pipe_targets: dict = {}
+                if _tool_obj and getattr(_tool_obj, "description", None):
+                    import re as _pt_re, json as _pt_json
+                    _pt_m = _pt_re.search(r'__pipe_targets__:\s*(\{[^}]*\})', _tool_obj.description)
+                    if _pt_m:
+                        try:
+                            _pipe_targets = _pt_json.loads(_pt_m.group(1))
+                        except Exception:
+                            pass
+
                 # Generic content injection
                 if not _has_content:
                     if _is_notif:
@@ -1150,7 +1162,37 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         args["body"] = str(previous)
                     elif tool_name not in ("gmail_reply_tool", "calendar_create_event",
                                            "create_note", "scene_locator_tool"):
-                        args["text"] = str(previous)
+                        # Only inject if the tool declares a matching pipe_targets entry.
+                        # Tools with no pipe_targets run independently — don't force-feed them.
+                        _text_param = next(
+                            (param for param, accepts in _pipe_targets.items() if accepts == "text"),
+                            None
+                        )
+                        _image_id_param = next(
+                            (param for param, accepts in _pipe_targets.items() if accepts == "image_id"),
+                            None
+                        )
+                        _image_url_param = next(
+                            (param for param, accepts in _pipe_targets.items() if accepts == "image_url"),
+                            None
+                        )
+                        if _image_id_param:
+                            _iid = _prev_data.get("image_id")
+                            if _iid:
+                                args[_image_id_param] = str(_iid)
+                        elif _image_url_param:
+                            _iurl = (_prev_data.get("image_url")
+                                     or _prev_data.get("image_source")
+                                     or _prev_data.get("url"))
+                            if not _iurl:
+                                # Previous result might be a bare URL string
+                                _prev_stripped = str(previous).strip()
+                                if _prev_stripped.startswith("http"):
+                                    _iurl = _prev_stripped
+                            if _iurl:
+                                args[_image_url_param] = str(_iurl)
+                        elif _text_param:
+                            args[_text_param] = str(previous)
                 elif "gmail_send" in tool_name and "message" in args and "body" not in args:
                     args["body"] = args.pop("message")
 
@@ -1159,6 +1201,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             logger.info(f"🔀 Pipeline step {idx+1}/{len(steps)}: {tool_name}({args})")
             previous = await _tool_executor(tool_name, args)
             logger.info(f"🔀 Pipeline step {idx+1} done: {str(previous)[:80]}")
+            # Abort pipeline if a non-final step errored — don't pass error strings downstream
+            if idx < len(steps) - 1 and str(previous).startswith("Error executing tool"):
+                logger.warning(f"🔀 Pipeline aborted at step {idx+1}: {str(previous)[:120]}")
+                return str(previous)
 
         # Clean UI result
         last_tool = steps[-1].split()[1].split(":")[0] if steps and len(steps[-1].split()) > 1 else ""

@@ -426,9 +426,9 @@ describe('pipelineIsToolSelectable — empty pipeline', () => {
 
 describe('pipelineIsToolSelectable — after text-producing tool', () => {
     beforeEach(() => ui.pipelineToggleTool(SOURCE));
-    test('transform selectable after text producer',     () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(true));
-    test('sink selectable after text producer',          () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(true));
-    test('another source selectable after text producer',() => expect(ui.pipelineIsToolSelectable({ ...SOURCE, name: 'other' })).toBe(true));
+    test('transform selectable after text producer',       () => expect(ui.pipelineIsToolSelectable(TRANSFORM)).toBe(true));
+    test('sink selectable after text producer',            () => expect(ui.pipelineIsToolSelectable(SINK)).toBe(true));
+    test('tool with no pipe_targets greyed out',           () => expect(ui.pipelineIsToolSelectable({ ...SOURCE, name: 'other', pipe_targets: {} })).toBe(false));
 });
 
 describe('pipelineIsToolSelectable — after none-producing tool (sink)', () => {
@@ -487,11 +487,12 @@ describe('buildPipelinePrompt', () => {
         // image_url="" stripped because IMG_SRC output_type="image_url" matches IMG_SINK pipe_targets.image_url
         expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use analyze_image_tool');
     });
-    test('unmatched type — param not stripped', () => {
+    test('sink strips content param regardless of type', () => {
         ui.pipelineToggleTool(IMG_SRC);
         ui.pipelineToggleTool(SINK);
-        // image_url output doesn't match SINK's pipe_targets.message="text" — message stays
-        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use discord_notify: message=""');
+        // SINK (output_type="none") strips its content param even when types differ —
+        // it will stringify whatever arrives (image URL sent as Discord message)
+        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use discord_notify');
     });
     test('empty pipeline returns empty string', () => {
         expect(ui.buildPipelinePrompt()).toBe('');
