@@ -1,0 +1,139 @@
+<svg width="100%" viewBox="0 0 780 1010" role="img" style="display:block;outline:none;border:none;background:#111111;" xmlns="http://www.w3.org/2000/svg">
+<rect x="-2" y="-2" width="110%" height="110%" fill="#111111"/>
+<title>Multi-Agent Orchestration</title>
+<defs>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+</defs>
+<style>
+text { fill: #e0e0e0; font-family: 'Anthropic Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.th { fill: #ffffff; }
+.ts { fill: #b0b0b0; }
+</style>
+
+<text x="390" y="22" text-anchor="middle" font-size="16" font-weight="500" fill="#ffffff">Multi-agent orchestration</text>
+<g transform="translate(0,30)">
+
+<!-- LEGEND -->
+<rect x="20" y="38" width="13" height="13" rx="3" fill="#3d2400" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="38" y="49" font-size="12" fill="#c2c0b6">LLM involved</text>
+<rect x="148" y="38" width="13" height="13" rx="3" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="166" y="49" font-size="12" fill="#c2c0b6">System / tools</text>
+
+<!-- 1. execute() -->
+<rect x="240" y="60" width="300" height="44" rx="8" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="390" y="82" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" class="th">execute(user_request)</text>
+<line x1="390" y1="104" x2="390" y2="128" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 2. Orchestrator LLM -->
+<rect x="110" y="128" width="560" height="56" rx="8" fill="#3d2400" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="390" y="148" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#fac775">Orchestrator LLM — _create_execution_plan()</text>
+<text x="390" y="167" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#ef9f27">produces subtask list with roles and dependencies</text>
+<line x1="390" y1="184" x2="390" y2="208" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 3. Subtasks returned? -->
+<rect x="270" y="208" width="240" height="44" rx="8" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="390" y="230" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" class="th">Subtasks returned?</text>
+<!-- yes down -->
+<line x1="390" y1="252" x2="390" y2="276" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="402" y="267" font-size="12" fill="#c2c0b6">yes</text>
+<!-- no right to fallback -->
+<line x1="510" y1="230" x2="548" y2="230" stroke="#9c9a92" stroke-width="0.8" marker-end="url(#arrow)"/>
+<text x="514" y="224" font-size="12" fill="#c2c0b6">no</text>
+
+<!-- 4. Fallback single agent -->
+<rect x="548" y="208" width="210" height="56" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="653" y="228" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="500" fill="#9fe1cb">_fallback_single_agent()</text>
+<text x="653" y="247" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">→ response dict (direct)</text>
+
+<!-- 5. DASHED GROUP: _execute_tasks() -->
+<rect x="22" y="276" width="736" height="542" rx="8" fill="none" stroke="#444444" stroke-width="0.5" stroke-dasharray="5 3"/>
+<text x="34" y="292" font-size="11" fill="#888888">Execution loop — _execute_tasks()</text>
+
+<!-- 5a. Find ready tasks -->
+<rect x="185" y="300" width="410" height="44" rx="6" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="390" y="322" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">Find ready tasks (no unmet dependencies)</text>
+<line x1="390" y1="344" x2="390" y2="368" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 5b. asyncio.gather -->
+<rect x="185" y="368" width="410" height="44" rx="6" fill="#0c447c" stroke="#85b7eb" stroke-width="0.5"/>
+<text x="390" y="390" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#b5d4f4">asyncio.gather() — concurrent batch</text>
+
+<!-- Split arrows from gather to RAG/no-RAG boxes -->
+<path d="M 390 412 L 390 426 L 165 426 L 165 438" fill="none" stroke="#9c9a92" stroke-width="0.8" marker-end="url(#arrow)"/>
+<path d="M 390 412 L 390 426 L 615 426 L 615 438" fill="none" stroke="#9c9a92" stroke-width="0.8" marker-end="url(#arrow)"/>
+
+<!-- 5cL. RAG query executor -->
+<rect x="40" y="438" width="250" height="44" rx="6" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="165" y="453" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="500" fill="#9fe1cb">RAG query</text>
+<text x="165" y="471" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">→ rag_executors</text>
+
+<!-- 5cR. General query executor -->
+<rect x="490" y="438" width="250" height="44" rx="6" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="615" y="453" text-anchor="middle" dominant-baseline="central" font-size="13" font-weight="500" fill="#9fe1cb">General query</text>
+<text x="615" y="471" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">→ no_rag_executors</text>
+
+<!-- Converge 5cL + 5cR into 5d -->
+<path d="M 165 482 L 165 500 L 390 500" fill="none" stroke="#9c9a92" stroke-width="0.8"/>
+<path d="M 615 482 L 615 500 L 390 500" fill="none" stroke="#9c9a92" stroke-width="0.8"/>
+<line x1="390" y1="500" x2="390" y2="508" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 5d. Agent executor with role sub-boxes -->
+<rect x="175" y="508" width="430" height="80" rx="6" fill="#3c3489" stroke="#afade0" stroke-width="0.5"/>
+<text x="390" y="526" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#cecbf6">Agent executor — role-specific tools</text>
+
+<!-- Role boxes (y=548, w=62, h=24, gap=4) -->
+<rect x="194" y="548" width="62" height="24" rx="4" fill="#0c447c" stroke="#85b7eb" stroke-width="0.5"/>
+<text x="225" y="560" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#b5d4f4">Researcher</text>
+<rect x="260" y="548" width="62" height="24" rx="4" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="291" y="560" text-anchor="middle" dominant-baseline="central" font-size="10" class="th">Coder</text>
+<rect x="326" y="548" width="62" height="24" rx="4" fill="#3d2400" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="357" y="560" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#fac775">Analyst</text>
+<rect x="392" y="548" width="62" height="24" rx="4" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="423" y="560" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#9fe1cb">Writer</text>
+<rect x="458" y="548" width="62" height="24" rx="4" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="489" y="560" text-anchor="middle" dominant-baseline="central" font-size="10" class="th">Planner</text>
+<rect x="524" y="548" width="62" height="24" rx="4" fill="#712b13" stroke="#f09983" stroke-width="0.5"/>
+<text x="555" y="560" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#f5c4b3">Plex</text>
+
+<line x1="390" y1="588" x2="390" y2="614" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 5e. Stop requested? -->
+<rect x="270" y="614" width="240" height="44" rx="6" fill="#712b13" stroke="#f09983" stroke-width="0.5"/>
+<text x="390" y="636" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#f5c4b3">Stop requested?</text>
+<!-- yes exit right -->
+<line x1="510" y1="636" x2="748" y2="636" stroke="#9c9a92" stroke-width="0.8" marker-end="url(#arrow)"/>
+<text x="514" y="629" font-size="12" fill="#c2c0b6">yes → return partial results</text>
+<!-- no down -->
+<line x1="390" y1="658" x2="390" y2="682" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="402" y="673" font-size="12" fill="#c2c0b6">no</text>
+
+<!-- 5f. Mark tasks done -->
+<rect x="175" y="682" width="430" height="44" rx="6" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="390" y="704" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">Mark tasks done · unlock dependents</text>
+<line x1="390" y1="726" x2="390" y2="750" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 5g. All tasks complete? -->
+<rect x="278" y="750" width="224" height="44" rx="6" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="390" y="772" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" class="th">All tasks complete?</text>
+<!-- no loop back left spine -->
+<path d="M 278 772 L 28 772 L 28 322 L 185 322" fill="none" stroke="#9c9a92" stroke-width="0.8" marker-end="url(#arrow)"/>
+<text x="60" y="769" font-size="12" fill="#c2c0b6">no ↺</text>
+<!-- yes exit down -->
+<line x1="390" y1="794" x2="390" y2="840" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="402" y="820" font-size="12" fill="#c2c0b6">yes</text>
+
+<!-- 6. Aggregate results LLM -->
+<rect x="155" y="840" width="470" height="56" rx="8" fill="#633806" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="390" y="860" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#fac775">_aggregate_results()</text>
+<text x="390" y="879" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#ef9f27">LLM synthesizes sub-results into final answer</text>
+<line x1="390" y1="896" x2="390" y2="920" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- 7. Final response dict -->
+<rect x="230" y="920" width="320" height="44" rx="8" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="390" y="935" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" class="th">Final response dict</text>
+<text x="390" y="953" text-anchor="middle" dominant-baseline="central" font-size="12" class="ts">{response · model · multi_agent}</text>
+
+</g>
+</svg>
