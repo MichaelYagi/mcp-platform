@@ -129,22 +129,67 @@ def _sess_conn() -> sqlite3.Connection:
 # ── Embedding helpers (same bge-large pipeline as conversation_rag) ───────────
 
 _embeddings_model = None
+_SBERT_MODEL = "all-MiniLM-L6-v2"  # 22 MB, 384-dim, CPU-native via sentence-transformers
+
+
+def _maybe_clear_stale_embeddings(current_model: str) -> None:
+    """If the stored embedding model name differs from *current_model*, null out
+    all stored embeddings to avoid comparing vectors from incompatible spaces."""
+    if not MEMORY_DB_PATH.exists():
+        return
+    try:
+        with _mem_conn() as conn:
+            row = conn.execute(
+                "SELECT value FROM memory_meta WHERE key='embedding_model'"
+            ).fetchone()
+            stored = row[0] if row else None
+            if stored and stored != current_model:
+                conn.execute("UPDATE memories SET embedding = NULL")
+                logger.info(
+                    f"Embedding model changed ({stored} → {current_model}), "
+                    "cleared stored embeddings — will re-embed on next consolidation"
+                )
+            conn.execute(
+                "INSERT OR REPLACE INTO memory_meta(key, value) VALUES('embedding_model', ?)",
+                (current_model,),
+            )
+    except Exception as e:
+        logger.warning(f"🧠 Embedding compat check failed: {e}")
+
 
 def _get_embeddings_model():
+    """Return the embedding model, preferring CPU-native sentence-transformers.
+
+    Falls back to Ollama bge-large if sentence-transformers is unavailable.
+    Clears stored embeddings when the model changes to prevent dimension mismatch.
+    """
     global _embeddings_model
     if _embeddings_model is None:
-        import os
-        from langchain_ollama import OllamaEmbeddings
-        base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
-        _embeddings_model = OllamaEmbeddings(model="bge-large", base_url=base_url)
+        try:
+            from sentence_transformers import SentenceTransformer
+            _embeddings_model = SentenceTransformer(_SBERT_MODEL)
+            _maybe_clear_stale_embeddings(f"sentence-transformers/{_SBERT_MODEL}")
+            logger.info(f"Memory embeddings: sentence-transformers/{_SBERT_MODEL} (CPU)")
+        except Exception as _e:
+            logger.info(f"sentence-transformers unavailable ({_e}), using bge-large via Ollama")
+            from langchain_ollama import OllamaEmbeddings
+            base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
+            _embeddings_model = OllamaEmbeddings(model="bge-large", base_url=base_url)
+            _maybe_clear_stale_embeddings("ollama/bge-large")
     return _embeddings_model
 
 
 def _embed(text: str) -> Optional[bytes]:
-    """Embed text and return as raw float32 bytes, or None on failure."""
+    """Embed *text* and return raw float32 bytes, or None on failure."""
     try:
         import numpy as np
-        vec = _get_embeddings_model().embed_query(text)
+        model = _get_embeddings_model()
+        if hasattr(model, "encode"):
+            # sentence-transformers API
+            vec = model.encode(text, normalize_embeddings=True)
+        else:
+            # langchain OllamaEmbeddings API
+            vec = model.embed_query(text)
         return np.array(vec, dtype=np.float32).tobytes()
     except Exception as e:
         logger.warning(f"🧠 Memory embedding failed: {e}")

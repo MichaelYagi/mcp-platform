@@ -348,6 +348,33 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
                 )
         return no_rag
 
+    # Signals that a request is likely multi-step and should go through planning.
+    _MULTI_STEP_SIGNALS = (
+        " then ", "and then", "after that", "followed by",
+        "step 1", "step 2", "first,", "second,", "in parallel",
+        "simultaneously", "multiple tasks",
+    )
+    # Domain keywords that benefit from role-specific routing.
+    _DOMAIN_KEYWORDS = (
+        "plex", "ingest", "calendar", "email", "github", "code review",
+        "analyze ", "research ", "write a report", "create a plan", "write report",
+    )
+
+    def _is_clearly_single_task(self, text: str) -> bool:
+        """Return True when a request is simple enough to skip orchestrator planning.
+
+        Conservative heuristic: only short, keyword-free requests with no
+        multi-step language.  Anything ambiguous goes through the orchestrator.
+        """
+        tl = text.lower()
+        if any(s in tl for s in self._MULTI_STEP_SIGNALS):
+            return False
+        if any(k in tl for k in self._DOMAIN_KEYWORDS):
+            return False
+        if len(text) > 300:
+            return False
+        return True
+
     def enable_a2a(self):
         """Enable Agent-to-Agent communication with advanced features"""
         if self.a2a_enabled:
@@ -778,8 +805,12 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
             current_model = "MCP Error"
 
         try:
-            # Step 1: Create execution plan
-            plan = await self._create_execution_plan(user_request, skill_context=skill_context)
+            # Step 1: Create execution plan (skip for obvious single-task requests).
+            if self._is_clearly_single_task(user_request):
+                self.logger.info("📊 Single-task heuristic matched — skipping orchestrator LLM call")
+                plan = None
+            else:
+                plan = await self._create_execution_plan(user_request, skill_context=skill_context)
 
             # Check stop after planning
             if is_stop_requested():
@@ -887,7 +918,9 @@ CRITICAL: Never make up item IDs! Only use IDs returned by plex_find_unprocessed
         """
 
         try:
-            response = await self.base_llm.ainvoke([
+            from client.langgraph import llm_ainvoke as _llm_ainvoke, _with_params as _wp
+            _plan_llm = _wp(self.base_llm, temperature=0.0, num_predict=300)
+            response = await _llm_ainvoke(_plan_llm, [
                 SystemMessage(content="You are an Orchestrator Agent coordinating multiple specialized agents."),
                 HumanMessage(content=planning_prompt)
             ])

@@ -114,7 +114,7 @@ class TestProcessingSessionsTracking:
         session_id = "track-session-123"
         processing_during = []
 
-        async def mock_run(agent, conv, msg, logger, tools, system_prompt):
+        async def mock_run(agent, conv, msg, logger, tools, system_prompt, **kwargs):
             processing_during.append(session_id in PROCESSING_SESSIONS)
             return {
                 "messages": conv.get("messages", []) + [AIMessage(content="ok")],
@@ -168,7 +168,7 @@ class TestCompleteMessageSent:
         from client.websocket import process_query, CONNECTED_WEBSOCKETS
         ws = AsyncMock()
 
-        async def mock_run(agent, conv, msg, logger, tools, system_prompt):
+        async def mock_run(agent, conv, msg, logger, tools, system_prompt, **kwargs):
             return {
                 "messages": conv.get("messages", []) + [AIMessage(content="done")],
                 "current_model": "test"
@@ -193,7 +193,7 @@ class TestCompleteMessageSent:
         from client.websocket import process_query, CONNECTED_WEBSOCKETS
         ws = AsyncMock()
 
-        async def mock_run(agent, conv, msg, logger, tools, system_prompt):
+        async def mock_run(agent, conv, msg, logger, tools, system_prompt, **kwargs):
             return {
                 "messages": conv.get("messages", []) + [AIMessage(content="response text")],
                 "current_model": "qwen2.5:14b"
@@ -236,7 +236,7 @@ class TestStopDuringQuery:
         ws = AsyncMock()
         agent_ran = []
 
-        async def mock_run(agent, conv, msg, logger, tools, system_prompt):
+        async def mock_run(agent, conv, msg, logger, tools, system_prompt, **kwargs):
             agent_ran.append(True)
             return {
                 "messages": conv.get("messages", []) + [AIMessage(content="ok")],

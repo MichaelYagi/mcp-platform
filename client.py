@@ -788,11 +788,18 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     )
 
     async def _llm_fn_for_memory(system: str, user: str) -> str:
-        """Thin wrapper — calls the same Ollama LLM used by the agent."""
+        """Background LLM call for memory consolidation.
+
+        Acquires the background lock so consolidation jobs don't compete with
+        each other or the scheduler, and caps output to 800 tokens (facts are
+        short; 4096 is wasteful).
+        """
         from langchain_core.messages import SystemMessage, HumanMessage
         from client.langgraph import llm_ainvoke as _llm_ainvoke
+        from client.ollama_lock import background_ollama_call
         msgs = [SystemMessage(content=system), HumanMessage(content=user)]
-        response = await _llm_ainvoke(llm, msgs)
+        async with background_ollama_call():
+            response = await _llm_ainvoke(llm, msgs, num_predict=800)
         return response.content if hasattr(response, "content") else str(response)
 
     inactivity_watcher = InactivityWatcher(_llm_fn_for_memory, session_manager)
@@ -972,14 +979,14 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         if list_lines:
             return "\n".join(list_lines)
 
-        # LLM summarization fallback
+        # LLM summarization fallback — cap at 400 tokens; summaries are short.
         try:
             from langchain_core.messages import SystemMessage, HumanMessage as _HM
             from client.langgraph import llm_ainvoke as _llm_ainvoke
             resp = await _llm_ainvoke(active_llm, [
                 SystemMessage(content=TOOL_RESULT_PRESENT.format(tool_name=tool_name)),
                 _HM(content=tool_result),
-            ])
+            ], num_predict=400)
             return resp.content if hasattr(resp, "content") else str(resp)
         except asyncio.CancelledError:
             logger.warning("🛑 _process_tool_result: LLM summarization cancelled")
@@ -1248,13 +1255,15 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         return f"Tool '{tool_name}' not found."
 
     async def _scheduler_llm_fn(prompt: str) -> str:
-        """LLM function for post-processing scheduled job results.
-        Takes a plain prompt string (no system/user split) and returns the response.
-        Used by AgentScheduler._fire_job when a job has an llm_prompt set.
+        """Background LLM call for scheduled-job post-processing.
+
+        Acquires the background lock and caps output to 600 tokens.
         """
         from langchain_core.messages import HumanMessage
         from client.langgraph import llm_ainvoke as _llm_ainvoke
-        response = await _llm_ainvoke(llm, [HumanMessage(content=prompt)])
+        from client.ollama_lock import background_ollama_call
+        async with background_ollama_call():
+            response = await _llm_ainvoke(llm, [HumanMessage(content=prompt)], num_predict=600)
         return response.content if hasattr(response, "content") else str(response)
 
     async def _scheduler_agent_fn(prompt: str) -> str:
@@ -1650,7 +1659,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         return _unwrap_tool_result(result)
 
     # Create enhanced agent runner with multi-agent support
-    async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None, suppress_multi_agent=False):
+    async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None, suppress_multi_agent=False, stream_callback=None):
         """Enhanced agent runner with multi-agent, A2A, and skills support"""
 
         # Bail immediately if a stop was requested — before any pre-checks
@@ -2307,7 +2316,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 llm,
                 MAX_MESSAGE_HISTORY,
                 session_state=session_state,
-                capability_registry=capability_registry
+                capability_registry=capability_registry,
+                stream_callback=stream_callback,
             )
 
     print("\n🚀 Starting MCP Agent with dual interface support")

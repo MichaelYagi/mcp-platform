@@ -466,13 +466,18 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
         except Exception:
             enriched_system_prompt = system_prompt
 
+        async def _stream_token(token: str):
+            """Forward a streamed token to all connected clients."""
+            await broadcast_message("stream_token", {"text": token})
+
         result = await run_agent_fn(
             agent,
             conversation_state,
             prompt,
             logger,
             tools,
-            enriched_system_prompt
+            enriched_system_prompt,
+            stream_callback=_stream_token,
         )
 
         # ═══════════════════════════════════════════════════════════════

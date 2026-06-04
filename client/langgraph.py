@@ -121,13 +121,92 @@ def _record_failure(kind: "FailureKind") -> None:
         metrics["failure_kinds"][kind.value] += 1
 
 
-async def llm_ainvoke(llm, messages, poll_interval: float = 0.5):
+import contextvars as _cv
+
+# When set, llm_ainvoke streams tokens to this async callable instead of
+# blocking until completion.  Set by run_agent() around agent.ainvoke() so
+# only the main inference (not routing pre-flight) is streamed.
+_stream_cb: _cv.ContextVar = _cv.ContextVar("_stream_cb", default=None)
+
+
+def _with_params(llm, **params):
+    """Return a Pydantic-copy of *llm* with overridden fields, best-effort.
+    Falls back to the original instance if the copy fails."""
+    for method in ("model_copy", "copy"):
+        fn = getattr(llm, method, None)
+        if fn is not None:
+            try:
+                return fn(update=params)
+            except Exception:
+                continue
+    return llm
+
+
+def _get_routing_llm(base_llm):
+    """Return an LLM tuned for the cheap pre-flight routing classification.
+
+    If LLM_ROUTING_MODEL is set, create a fresh ChatOllama pointed at that
+    (small) model.  Otherwise fall back to a capped copy of the main model.
+    Either way: temperature=0.0, num_predict=60, num_ctx=2048.
     """
-    Cancellable wrapper around llm.ainvoke().
-    Polls is_stop_requested() every poll_interval seconds and cancels
-    the underlying task if a stop is requested, raising asyncio.CancelledError.
-    All LLM calls in this module should use this instead of llm.ainvoke() directly.
+    routing_model = os.getenv("LLM_ROUTING_MODEL", "").strip()
+    if routing_model:
+        base_url = str(
+            getattr(base_llm, "base_url", None)
+            or os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+        ).rstrip("/")
+        try:
+            from langchain_ollama import ChatOllama as _CO
+            return _CO(
+                model=routing_model,
+                base_url=base_url,
+                temperature=0.0,
+                num_ctx=2048,
+                num_predict=60,
+            )
+        except Exception:
+            pass
+    return _with_params(base_llm, temperature=0.0, num_predict=60)
+
+
+async def llm_ainvoke(llm, messages, poll_interval: float = 0.5, num_predict: int | None = None):
     """
+    Cancellable wrapper around llm.ainvoke() / llm.astream().
+
+    When _stream_cb contextvar is set, streams tokens to the callback and
+    returns the fully-assembled AIMessage so callers see no API difference.
+
+    num_predict: if given, caps the token budget for this specific call via a
+    lightweight Pydantic copy of the LLM (avoids touching the shared instance).
+    """
+    if num_predict is not None:
+        llm = _with_params(llm, num_predict=num_predict)
+
+    cb = _stream_cb.get()
+    if cb is not None:
+        # Streaming path — collect chunks, forward text tokens to the UI callback.
+        chunks = []
+        async for chunk in llm.astream(messages):
+            if is_stop_requested():
+                raise asyncio.CancelledError("LLM call cancelled: stop requested")
+            chunks.append(chunk)
+            # Only forward human-readable text tokens, not tool-call JSON fragments.
+            token = chunk.content if hasattr(chunk, "content") else ""
+            if token and not getattr(chunk, "tool_call_chunks", None):
+                try:
+                    await cb(token)
+                except Exception:
+                    pass
+        if not chunks:
+            from langchain_core.messages import AIMessage
+            return AIMessage(content="")
+        # Merge chunks: preserves tool_calls, content, and all other fields.
+        merged = chunks[0]
+        for c in chunks[1:]:
+            merged = merged + c
+        return merged
+
+    # Non-streaming path (original).
     task = asyncio.create_task(llm.ainvoke(messages))
     try:
         while not task.done():
@@ -3062,7 +3141,7 @@ def create_langgraph_agent(llm_with_tools, tools):
 #                          ├── yes → execute_tool → call_llm (loop)
 #                          └── no  → [END]
 # agent.ainvoke runs the entire LangGraph graph to completion and returns the final state
-async def run_agent(agent, conversation_state, user_message, logger, tools, system_prompt, llm=None, max_history=20, session_state=None, capability_registry=None):
+async def run_agent(agent, conversation_state, user_message, logger, tools, system_prompt, llm=None, max_history=20, session_state=None, capability_registry=None, stream_callback=None):
     """
     Execute the agent with the given user message and track metrics
 
@@ -3217,7 +3296,8 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             if system_msg and system_msg.content:
                 _sys_snippet = system_msg.content[:1500]
             try:
-                _classify = await llm_ainvoke(_base_llm, [
+                _routing_llm = _get_routing_llm(_base_llm)
+                _classify = await llm_ainvoke(_routing_llm, [
                     SystemMessage(content=(
                         "You are a routing classifier. Reply ONLY with a JSON object. No preamble, no markdown."
                     )),
@@ -3321,7 +3401,7 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         #   SystemMessage — system prompt / tool usage guide
         #   Previous conversation history (truncated to max_history, default 20)
         #   The new HumanMessage with the user's input (appended just before in Step 2)
-        result = await agent.ainvoke({
+        _initial_state = {
             "messages": llm_messages,
             "tools": tool_registry,
             "llm": llm,
@@ -3331,10 +3411,18 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
             "research_source": "web",
             "session_state": session_state,
             "capability_registry": capability_registry,
-            "rag_fallback": preflight_rag_failed,  # skip trigger matching if RAG already failed
-            "context_sufficient": _context_sufficient,  # skip trigger matching if classifier says context is enough
-            "llm_tool_decision": _llm_tool_decision  # full routing decision from LLM classifier
-        })
+            "rag_fallback": preflight_rag_failed,
+            "context_sufficient": _context_sufficient,
+            "llm_tool_decision": _llm_tool_decision,
+        }
+        # Activate token streaming for the agent invocation only (routing above
+        # is already done at this point, so the callback won't fire for it).
+        _cb_reset = _stream_cb.set(stream_callback) if stream_callback is not None else None
+        try:
+            result = await agent.ainvoke(_initial_state)
+        finally:
+            if _cb_reset is not None:
+                _stream_cb.reset(_cb_reset)
 
         # STEP 4: Update conversation state
         # result["messages"] only contains llm_messages (the windowed slice).

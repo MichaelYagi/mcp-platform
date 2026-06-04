@@ -49,8 +49,15 @@ pip install -r requirements.txt
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
 ollama serve
-ollama pull qwen2.5:14b-instruct-q4_K_M
+ollama pull qwen2.5:14b-instruct-q4_K_M   # primary inference (recommended — any tool-calling model works)
+ollama pull qwen2.5:0.5b                  # routing classifier (fast pre-flight intent detection)
+ollama pull bge-large                     # RAG document embeddings
+ollama pull qwen3-vl:8b-instruct          # vision / image analysis
 ```
+
+> **GGUF alternative:** local GGUF files (e.g. from Hugging Face) work too — download the file and run `:gguf add <path_to_file>` in the prompt. No config editing needed.
+>
+> **sentence-transformers models** (memory embeddings + RAG reranker) download automatically on first use — no manual pull needed.
 
 ### Start the Client
 
@@ -153,10 +160,14 @@ DEFAULT_TIMEZONE=America/Vancouver
 ### Recommended Setup
 
 ```bash
-ollama pull qwen2.5:14b-instruct-q4_K_M   # recommended LLM
-ollama pull bge-large                       # required for RAG
-ollama pull qwen3-vl:8b-instruct           # required for image tools
+ollama pull qwen2.5:14b-instruct-q4_K_M   # primary inference — any tool-calling model works; 14b q4 is a good default
+ollama pull qwen2.5:0.5b                  # routing classifier — small/fast; set LLM_ROUTING_MODEL=qwen2.5:0.5b in .env
+ollama pull bge-large                     # required for RAG
+ollama pull qwen3-vl:8b-instruct          # required for image tools
+# sentence-transformers models (memory embeddings + reranker) auto-download on first use
 ```
+
+> **GGUF files:** download any GGUF (e.g. from Hugging Face) and run `:gguf add <path_to_file>` in the prompt — no config editing needed.
 
 Minimal `.env` to get started:
 

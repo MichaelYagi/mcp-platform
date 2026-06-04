@@ -79,7 +79,45 @@ black .           # format
 | `text` | 8 | Text processing and web search |
 | `trilium` | 11 | Trilium notes integration |
 
-Total: 95 tools. Primary model: `qwen2.5:14b-instruct-q4_K_M` via Ollama.
+Total: 95 tools.
+
+### Models
+
+Every model role is independent — swap any of them via `.env` without touching code.
+
+#### Setup — pulling models before first run
+
+Ollama models must be pulled manually. Python-side models (`sentence-transformers`) download automatically on first use and are cached in `~/.cache/huggingface/`.
+
+```bash
+# Primary inference (recommended — any Ollama model works, this is a good default)
+ollama pull qwen2.5:14b-instruct-q4_K_M
+
+# Routing classifier (small/fast — required if LLM_ROUTING_MODEL is set)
+ollama pull qwen2.5:0.5b
+
+# Vision
+ollama pull qwen3-vl:8b-instruct
+
+# RAG document embeddings
+ollama pull bge-large
+
+# sentence-transformers models (memory embeddings + RAG reranker) download automatically
+# on first use — no manual step needed, but requires an internet connection on first run.
+```
+
+#### Model roles
+
+| Role | Model | Where configured | Notes |
+|------|-------|-----------------|-------|
+| **Primary inference** | any Ollama model or local GGUF file (recommended: `qwen2.5:14b-instruct-q4_K_M`) | Ollama (auto-detected at startup) | Main agent reasoning, tool-call generation, and response synthesis. The platform picks whichever Ollama model was used last (`client/last_model.txt`), falling back to the first available model. Any model that supports tool-calling works; 14b q4 is the recommended balance of quality and speed on consumer hardware. Local GGUF files (e.g. downloaded from Hugging Face) are also supported — just download the file and run `:gguf add <path_to_gguf>` in the prompt; no config file editing needed. |
+| **Routing classifier** | `qwen2.5:0.5b` | `LLM_ROUTING_MODEL` in `.env` | Pre-flight intent classifier — runs before every query to decide which tools are needed and whether RAG is required. Uses `temperature=0.0` and `num_predict=60`. Falls back to a capped copy of the primary model if unset. A 0.5b model handles this well; latency drops from 2–10 s to under 0.5 s. |
+| **Vision** | `qwen3-vl:8b-instruct` | `OLLAMA_VISION_MODEL` in `.env` | Image analysis and vision follow-ups. Invoked by `client/vision.py`. |
+| **Memory embeddings** | `sentence-transformers/all-MiniLM-L6-v2` | hard-coded in `client/memory_consolidator.py` | CPU-native, 384-dim, ~22 MB. Downloads automatically on first use. Embeds personal memories in `data/memory.db`. Falls back to Ollama `bge-large` (1024-dim) if `sentence-transformers` is unavailable. Changing models triggers an automatic embedding-compat wipe so old vectors are re-embedded rather than compared across incompatible spaces. |
+| **RAG document embeddings** | `bge-large` via Ollama | hard-coded in `tools/rag/` | Embeds ingested documents and conversation turns in the `chunks` table of `data/sessions.db`. 1024-dim. Must be pulled with `ollama pull bge-large`. Used by `rag_add.py`, `rag_search.py`, `rag_vector_db.py`, and `conversation_rag.py`. |
+| **RAG reranker** | `cross-encoder/ms-marco-MiniLM-L-6-v2` | `tools/rag/rag_search.py:RERANKER_MODEL` | Cross-encoder reranker loaded via `sentence-transformers`. Downloads automatically on first use. Reranks the top-20 cosine candidates from `bge-large` before returning `top_k` results. Loaded eagerly at startup to avoid per-query overhead. Gracefully disabled if unavailable. |
+
+**Key constraint:** `bge-large` (RAG docs) and `all-MiniLM-L6-v2` (memory) are different models with different vector dimensions (1024 vs 384). Never mix their embeddings in the same cosine comparison — each pipeline uses its own table and its own model consistently.
 
 ### Tool System
 
