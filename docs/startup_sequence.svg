@@ -1,151 +1,99 @@
-<svg width="100%" viewBox="0 0 680 1010" role="img" style="display:block;outline:none;border:none;; background:#111111;" xmlns="http://www.w3.org/2000/svg">
+<svg width="100%" viewBox="0 0 680 970" role="img" style="display:block;outline:none;border:none;background:#111111;" xmlns="http://www.w3.org/2000/svg">
 <rect x="-2" y="-2" width="110%" height="110%" fill="#111111"/>
-<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">MCP Platform Startup &amp; Initialisation Sequence</title>
-<desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Detailed sequence of everything that runs in main() before the prompt loop starts.</desc>
-<text x="340" y="22" text-anchor="middle" font-family="Anthropic Sans, sans-serif" font-size="16" font-weight="500" fill="#ffffff">Startup &amp; initialisation sequence</text>
-<g transform="translate(0,30)">
+<title>MCP Platform Startup &amp; Initialisation Sequence</title>
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
     <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </marker>
 </defs>
 <style>
-text { fill: #e0e0e0; }
-text.th { fill: #ffffff; }
-text.ts { fill: #b0b0b0; }
-line, path { stroke: #666666; }
-line.arr, path.arr { stroke: #888888; }
-.c-teal rect, .c-teal circle { fill: #0a5c47; stroke: #1d9e75; }
-.c-teal text.th { fill: #9fe1cb; }
-.c-teal text.ts { fill: #5dcaa5; }
-.c-blue rect, .c-blue circle { fill: #0c2d52; stroke: #378add; }
-.c-blue text.th { fill: #b5d4f4; }
-.c-blue text.ts { fill: #85b7eb; }
-.c-amber rect, .c-amber circle { fill: #3d2400; stroke: #ef9f27; }
-.c-amber text.th { fill: #fac775; }
-.c-amber text.ts { fill: #ef9f27; }
-.c-gray rect, .c-gray circle { fill: #2a2a28; stroke: #5f5e5a; }
-.c-gray text.th { fill: #d3d1c7; }
-.c-gray text.ts { fill: #b4b2a9; }
-.c-purple rect, .c-purple circle { fill: #1a1640; stroke: #7f77dd; }
-.c-purple text.th { fill: #cecbf6; }
-.c-purple text.ts { fill: #afa9ec; }
-.c-coral rect, .c-coral circle { fill: #3d1408; stroke: #d85a30; }
-.c-coral text.th { fill: #f5c4b3; }
-.c-coral text.ts { fill: #f0997b; }
-.c-green rect, .c-green circle { fill: #0f2a05; stroke: #639922; }
-.c-green text.th { fill: #c0dd97; }
-.c-green text.ts { fill: #97c459; }
+text { fill: #e0e0e0; font-family: 'Anthropic Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.th { fill: #ffffff; }
+.ts { fill: #b0b0b0; }
 </style>
-
+<text x="340" y="22" text-anchor="middle" font-size="16" font-weight="500" fill="#ffffff">Startup &amp; initialisation sequence</text>
+<g transform="translate(0,30)">
 
 <!-- LEGEND -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"><rect x="30" y="18" width="14" height="14" rx="3" stroke-width="0.5" style="fill:rgb(99, 56, 6);stroke:rgb(239, 159, 39);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/></g>
-<text x="50" y="29" style="fill:rgb(194, 192, 182);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">LLM involved</text>
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"><rect x="150" y="18" width="14" height="14" rx="3" stroke-width="0.5" style="fill:rgb(8, 80, 65);stroke:rgb(93, 202, 165);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/></g>
-<text x="170" y="29" style="fill:rgb(194, 192, 182);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">System / tools</text>
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"><rect x="270" y="18" width="14" height="14" rx="3" stroke-width="0.5" style="fill:rgb(68, 68, 65);stroke:rgb(180, 178, 169);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/></g>
-<text x="290" y="29" style="fill:rgb(194, 192, 182);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Sequential step</text>
+<rect x="30" y="18" width="13" height="13" rx="3" fill="#3d2400" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="49" y="29" font-size="12" fill="#c2c0b6">LLM involved</text>
+<rect x="150" y="18" width="13" height="13" rx="3" fill="#0a5c47" stroke="#1d9e75" stroke-width="0.5"/>
+<text x="169" y="29" font-size="12" fill="#c2c0b6">System / tools</text>
+<rect x="268" y="18" width="13" height="13" rx="3" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="287" y="29" font-size="12" fill="#c2c0b6">Sequential step</text>
 
-<!-- 1. Logging -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="48" width="280" height="44" rx="8" stroke-width="0.5" style="fill:rgb(68, 68, 65);stroke:rgb(180, 178, 169);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="70" text-anchor="middle" dominant-baseline="central" style="fill:rgb(211, 209, 199);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Setup logging + event loop</text>
-</g>
-<line x1="340" y1="92" x2="340" y2="116" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 1. Setup logging -->
+<rect x="200" y="48" width="280" height="44" rx="8" fill="#444441" stroke="#b4b2a9" stroke-width="0.5"/>
+<text x="340" y="70" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" class="th">Setup logging + event loop</text>
+<line x1="340" y1="92" x2="340" y2="116" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 2. Server discovery -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="116" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(8, 80, 65);stroke:rgb(93, 202, 165);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="136" text-anchor="middle" dominant-baseline="central" style="fill:rgb(159, 225, 203);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Auto-discover MCP servers</text>
-  <text x="340" y="155" text-anchor="middle" dominant-baseline="central" style="fill:rgb(93, 202, 165);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">TCP checks · OAuth probes (parallel)</text>
-</g>
-<line x1="340" y1="172" x2="340" y2="196" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 2. Auto-discover MCP servers -->
+<rect x="200" y="116" width="280" height="56" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="340" y="136" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">Auto-discover MCP servers</text>
+<text x="340" y="155" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">TCP checks · OAuth probes (parallel)</text>
+<line x1="340" y1="172" x2="340" y2="196" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 3. LLM init -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="196" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(99, 56, 6);stroke:rgb(239, 159, 39);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="216" text-anchor="middle" dominant-baseline="central" style="fill:rgb(250, 199, 117);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">🤖  Load LLM</text>
-  <text x="340" y="235" text-anchor="middle" dominant-baseline="central" style="fill:rgb(239, 159, 39);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">Ollama or GGUF · select model</text>
-</g>
-<line x1="340" y1="252" x2="340" y2="276" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 3. Load LLM -->
+<rect x="200" y="196" width="280" height="56" rx="8" fill="#633806" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="340" y="216" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#fac775">🤖  Load LLM</text>
+<text x="340" y="235" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#ef9f27">Ollama or GGUF · select model</text>
+<line x1="340" y1="252" x2="340" y2="276" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
 <!-- 4. MCPAgent init -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="276" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(8, 80, 65);stroke:rgb(93, 202, 165);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="296" text-anchor="middle" dominant-baseline="central" style="fill:rgb(159, 225, 203);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">MCPAgent.initialize()</text>
-  <text x="340" y="315" text-anchor="middle" dominant-baseline="central" style="fill:rgb(93, 202, 165);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">Connect sessions · collect tools</text>
-</g>
-<line x1="340" y1="332" x2="340" y2="356" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<rect x="200" y="276" width="280" height="56" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="340" y="296" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">MCPAgent.initialize()</text>
+<text x="340" y="315" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">Connect sessions · collect tools</text>
+<line x1="340" y1="332" x2="340" y2="356" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
 <!-- 5. OAuth filter -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="356" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(113, 43, 19);stroke:rgb(240, 153, 123);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="376" text-anchor="middle" dominant-baseline="central" style="fill:rgb(245, 196, 179);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Filter OAuth-blocked tools</text>
-  <text x="340" y="395" text-anchor="middle" dominant-baseline="central" style="fill:rgb(240, 153, 123);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">Remove tools from servers needing sign-in</text>
-</g>
-<line x1="340" y1="412" x2="340" y2="436" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<rect x="200" y="356" width="280" height="56" rx="8" fill="#712b13" stroke="#f09983" stroke-width="0.5"/>
+<text x="340" y="376" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#f5c4b3">Filter OAuth-blocked tools</text>
+<text x="340" y="395" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#f09983">Remove tools from servers needing sign-in</text>
+<line x1="340" y1="412" x2="340" y2="436" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 6. Memory + session -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="436" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(60, 52, 137);stroke:rgb(175, 169, 236);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="456" text-anchor="middle" dominant-baseline="central" style="fill:rgb(206, 203, 246);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Memory + session init</text>
-  <text x="340" y="475" text-anchor="middle" dominant-baseline="central" style="fill:rgb(175, 169, 236);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">InactivityWatcher · SessionManager · nightly loop</text>
-</g>
-<line x1="340" y1="492" x2="340" y2="516" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 6. Memory + session init -->
+<rect x="200" y="436" width="280" height="56" rx="8" fill="#3c3489" stroke="#afade0" stroke-width="0.5"/>
+<text x="340" y="456" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#cecbf6">Memory + session init</text>
+<text x="340" y="475" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#afa9ec">InactivityWatcher · SessionManager · nightly loop</text>
+<line x1="340" y1="492" x2="340" y2="516" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 7. Scheduler -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="516" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(8, 80, 65);stroke:rgb(93, 202, 165);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="536" text-anchor="middle" dominant-baseline="central" style="fill:rgb(159, 225, 203);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Proactive scheduler start</text>
-  <text x="340" y="555" text-anchor="middle" dominant-baseline="central" style="fill:rgb(93, 202, 165);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">AgentScheduler · ScheduleParser</text>
-</g>
-<line x1="340" y1="572" x2="340" y2="596" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 7. Proactive scheduler -->
+<rect x="200" y="516" width="280" height="56" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="340" y="536" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">Proactive scheduler start</text>
+<text x="340" y="555" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">AgentScheduler · ScheduleParser</text>
+<line x1="340" y1="572" x2="340" y2="596" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 8. Skill discovery -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="596" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(8, 80, 65);stroke:rgb(93, 202, 165);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="616" text-anchor="middle" dominant-baseline="central" style="fill:rgb(159, 225, 203);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Distributed skills discovery</text>
-  <text x="340" y="635" text-anchor="middle" dominant-baseline="central" style="fill:rgb(93, 202, 165);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">DistributedSkillsManager · inject into prompt</text>
-</g>
-<line x1="340" y1="652" x2="340" y2="676" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 8. Distributed skills discovery -->
+<rect x="200" y="596" width="280" height="56" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="340" y="616" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">Distributed skills discovery</text>
+<text x="340" y="635" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">DistributedSkillsManager · inject into prompt</text>
+<line x1="340" y1="652" x2="340" y2="676" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 9. A2A registration — PARALLEL -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="676" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(8, 80, 65);stroke:rgb(93, 202, 165);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="696" text-anchor="middle" dominant-baseline="central" style="fill:rgb(159, 225, 203);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">A2A endpoint registration</text>
-  <text x="340" y="715" text-anchor="middle" dominant-baseline="central" style="fill:rgb(93, 202, 165);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">All endpoints discovered in parallel</text>
-</g>
-
+<!-- 9. A2A endpoint registration -->
+<rect x="200" y="676" width="280" height="56" rx="8" fill="#085041" stroke="#5dcaa5" stroke-width="0.5"/>
+<text x="340" y="696" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#9fe1cb">A2A endpoint registration</text>
+<text x="340" y="715" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5dcaa5">All endpoints discovered in parallel</text>
 <!-- parallel callout -->
-<rect x="496" y="682" width="150" height="44" rx="6" fill="none" stroke="var(--t)" stroke-width="0.5" stroke-dasharray="4 3" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-dasharray:4px, 3px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<text x="571" y="700" text-anchor="middle" style="fill:rgb(194, 192, 182);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">asyncio.gather()</text>
-<text x="571" y="716" text-anchor="middle" style="fill:rgb(194, 192, 182);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">concurrent discovery</text>
-<line x1="480" y1="704" x2="496" y2="704" stroke="var(--t)" stroke-width="0.5" stroke-dasharray="3 2" style="fill:rgb(0, 0, 0);stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-dasharray:3px, 2px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<rect x="496" y="682" width="152" height="44" rx="6" fill="none" stroke="#9c9a92" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="572" y="700" text-anchor="middle" font-size="12" fill="#c2c0b6">asyncio.gather()</text>
+<text x="572" y="716" text-anchor="middle" font-size="12" fill="#c2c0b6">concurrent discovery</text>
+<line x1="480" y1="704" x2="496" y2="704" stroke="#9c9a92" stroke-width="0.5" stroke-dasharray="3 2"/>
+<!-- Plex ML background task side note -->
+<line x1="200" y1="704" x2="34" y2="704" stroke="#9c9a92" stroke-width="0.5" stroke-dasharray="3 2"/>
+<rect x="10" y="682" width="168" height="44" rx="6" fill="none" stroke="#5f5e5a" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text x="94" y="700" text-anchor="middle" font-size="12" fill="#b4b2a9">Plex ML: import history</text>
+<text x="94" y="716" text-anchor="middle" font-size="12" fill="#b4b2a9">&amp; train (background task)</text>
+<line x1="340" y1="732" x2="340" y2="756" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<line x1="340" y1="732" x2="340" y2="756" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
+<!-- 10. Build agent + orchestrator -->
+<rect x="200" y="756" width="280" height="56" rx="8" fill="#633806" stroke="#ef9f27" stroke-width="0.5"/>
+<text x="340" y="776" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#fac775">🤖  Build agent + orchestrator</text>
+<text x="340" y="795" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#ef9f27">LangGraph agent · MultiAgentOrchestrator</text>
+<line x1="340" y1="812" x2="340" y2="836" stroke="#9c9a92" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-<!-- 10. Plex ML -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="756" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(68, 68, 65);stroke:rgb(180, 178, 169);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="776" text-anchor="middle" dominant-baseline="central" style="fill:rgb(211, 209, 199);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">Plex ML auto-train (if needed)</text>
-  <text x="340" y="795" text-anchor="middle" dominant-baseline="central" style="fill:rgb(180, 178, 169);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">Import history · train recommender</text>
-</g>
-<line x1="340" y1="812" x2="340" y2="836" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-
-<!-- 11. LangGraph + orchestrator -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="836" width="280" height="56" rx="8" stroke-width="0.5" style="fill:rgb(99, 56, 6);stroke:rgb(239, 159, 39);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="856" text-anchor="middle" dominant-baseline="central" style="fill:rgb(250, 199, 117);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">🤖  Build agent + orchestrator</text>
-  <text x="340" y="875" text-anchor="middle" dominant-baseline="central" style="fill:rgb(239, 159, 39);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">LangGraph agent · MultiAgentOrchestrator</text>
-</g>
-<line x1="340" y1="892" x2="340" y2="916" marker-end="url(#arrow)" style="fill:none;stroke:rgb(156, 154, 146);color:rgb(255, 255, 255);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-
-<!-- 12. Prompt loop -->
-<g style="fill:rgb(0, 0, 0);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-  <rect x="200" y="916" width="280" height="44" rx="8" stroke-width="0.5" style="fill:rgb(12, 68, 124);stroke:rgb(133, 183, 235);color:rgb(255, 255, 255);stroke-width:0.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-  <text x="340" y="938" text-anchor="middle" dominant-baseline="central" style="fill:rgb(181, 212, 244);stroke:none;color:rgb(255, 255, 255);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:&quot;Anthropic Sans&quot;, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:central">▶  Prompt loop starts</text>
-</g>
+<!-- 11. Prompt loop starts -->
+<rect x="200" y="836" width="280" height="44" rx="8" fill="#0c447c" stroke="#85b7eb" stroke-width="0.5"/>
+<text x="340" y="858" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#b5d4f4">▶  Prompt loop starts</text>
 
 </g>
 </svg>
