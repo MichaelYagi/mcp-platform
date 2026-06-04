@@ -423,24 +423,35 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
             if await looks_like_scheduling_request(prompt, llm_fn=_schedule_parser._llm_fn):
                 logger.info(f"⏰ Scheduling request detected: {prompt[:60]}")
                 try:
-                    result_sc = await _schedule_parser.parse(prompt)
+                    _parse_timeout = int(os.getenv("SCHEDULE_PARSE_TIMEOUT", "120"))
+                    result_sc = await asyncio.wait_for(
+                        _schedule_parser.parse(prompt),
+                        timeout=_parse_timeout
+                    )
                     from client.proactive_agent import ScheduleConfirmation, ScheduleClarification
                     if isinstance(result_sc, ScheduleConfirmation):
                         _confirmation_tracker.set_pending(_session_key, result_sc)
                         response_text = result_sc.render()
                     else:
                         response_text = result_sc.render()
+                except asyncio.TimeoutError:
+                    logger.error(f"⏰ ScheduleParser timed out after {_parse_timeout}s")
+                    response_text = "The scheduling request timed out. Please try again."
                 except Exception as parse_err:
                     logger.error(f"⏰ ScheduleParser failed: {parse_err}")
                     response_text = "I had trouble parsing that scheduling request. Try: 'Run [tool] every day at [time]'."
 
+                MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                 if session_manager and session_id:
-                    MAX_MESSAGE_HISTORY = int(os.getenv('MAX_MESSAGE_HISTORY', 30))
                     session_manager.add_message(session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "direct-answer")
+                elif session_manager and _last_session_id:
+                    # Fallback: save to most recently active session so it survives reconnect
+                    session_manager.add_message(_last_session_id, "assistant", response_text, MAX_MESSAGE_HISTORY, "direct-answer")
                 await broadcast_message("assistant_message", {
                     "text": response_text, "multi_agent": False, "a2a": False, "model": "proactive"
                 })
                 await broadcast_message("complete", {"stopped": False})
+                logger.info(f"⏰ Scheduling response delivered to {len(CONNECTED_WEBSOCKETS)} client(s)")
                 return
 
         # ═══════════════════════════════════════════════════════════════

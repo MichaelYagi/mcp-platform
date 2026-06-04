@@ -1461,13 +1461,19 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
 
         # Fetch enough days so that forecast[date_offset] is the target date.
         # e.g. date_offset=2, forecast_days=1 → fetch 3 days, take day index 2.
-        _fetch_days = date_offset + forecast_days
+        _fetch_days = max(1, date_offset + forecast_days)
         weather_raw = get_weather_fn(city, state, country, forecast_days=_fetch_days)
         weather_data = json.loads(weather_raw) if isinstance(weather_raw, str) else weather_raw
         # Trim forecast to start at date_offset so the first entry is the target day
         if date_offset > 0 and isinstance(weather_data, dict) and weather_data.get("forecast"):
             weather_data = dict(weather_data)
-            weather_data["forecast"] = weather_data["forecast"][date_offset:date_offset + forecast_days]
+            _full_forecast = weather_data["forecast"]
+            _sliced = _full_forecast[date_offset:date_offset + forecast_days]
+            if not _sliced:
+                # API returned fewer days than date_offset — use whatever is last available
+                logger.warning(f"⚠️  Weather forecast slice empty: date_offset={date_offset}, forecast_days={forecast_days}, api_returned={len(_full_forecast)}. Using last available day.")
+                _sliced = _full_forecast[-forecast_days:] if _full_forecast else []
+            weather_data["forecast"] = _sliced
         # Forward pre-rendered text if the weather tool produced one; otherwise build a fallback
         if isinstance(weather_data, dict) and not weather_data.get("text"):
             _cur = weather_data.get("current_conditions") or weather_data.get("current") or {}
@@ -1496,6 +1502,9 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         result["errors"]["weather"] = str(e)
 
     # ── Unread email ──────────────────────────────────────────────────────────
+    if not GOOGLE_AVAILABLE:
+        result["errors"]["email"] = "Google API libraries not installed"
+        result["errors"]["calendar"] = "Google API libraries not installed"
     if GOOGLE_AVAILABLE:
         try:
             service = _gmail_service()
@@ -1610,6 +1619,11 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
     _text_parts = [f"**Date:** {result['date']}"]
 
     _wd = result.get("weather")
+    _weather_err = (result.get("errors") or {}).get("weather")
+    if _weather_err:
+        _text_parts.append(f"\nWeather: unavailable ({_weather_err})")
+    elif isinstance(_wd, dict) and not _wd.get("forecast"):
+        _text_parts.append("\nWeather: unavailable (no forecast data returned)")
     if isinstance(_wd, dict) and _wd.get("forecast"):
         _city  = _wd.get("city", "")
         _state = _wd.get("state", "")
@@ -1640,7 +1654,10 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                 _text_parts.append(f"Sunset: {_day['sunset']}")
 
     _ed = result.get("email")
-    if isinstance(_ed, dict):
+    _email_err = (result.get("errors") or {}).get("email")
+    if _email_err:
+        _text_parts.append(f"\nEmails: unavailable ({_email_err})")
+    elif isinstance(_ed, dict):
         _total = _ed.get("total_unread", 0)
         if _total == 0:
             _text_parts.append("\nEmails: No unread emails")
@@ -1648,9 +1665,14 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
             _text_parts.append(f"\nEmails: {_total} unread email(s)")
             for _em in _ed.get("emails", [])[:5]:
                 _text_parts.append(f"  - {_em.get('subject','(no subject)')} — from {_em.get('from','')}")
+    else:
+        _text_parts.append("\nEmails: unavailable")
 
     _cd = result.get("calendar")
-    if isinstance(_cd, dict):
+    _cal_err = (result.get("errors") or {}).get("calendar")
+    if _cal_err:
+        _text_parts.append(f"\nCalendar: unavailable ({_cal_err})")
+    elif isinstance(_cd, dict):
         _count = _cd.get("count", 0)
         if _count == 0:
             _text_parts.append("\nCalendar: No events scheduled")
