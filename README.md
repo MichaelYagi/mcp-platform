@@ -112,7 +112,7 @@ LLM_TEMPERATURE=0.3
 OLLAMA_NUM_CTX=8192          # KV cache / context window size
 OLLAMA_NUM_PREDICT=4096      # Max tokens the LLM will generate per response
 OLLAMA_REPEAT_PENALTY=1.1    # Penalise token repetition (1.0 = disabled)
-IMAGE_MODEL=gptimage-large   # Model used for AI image generation
+IMAGE_MODEL=flux             # Model used for AI image generation
 
 # === GGUF Configuration ===
 GGUF_GPU_LAYERS=-1
@@ -191,7 +191,6 @@ SERPER_API_KEY=<key>
 :jobs enable <label>   - Resume a scheduled job
 :jobs cancel <label>   - Delete a scheduled job
 :jobs info <label>     - Show full job detail
-:memory                - List all persistent memories
 :memory                        - List all memories
 :memory semantic               - List permanent memories only
 :memory episodic               - List session-derived memories
@@ -364,25 +363,15 @@ python -m pytest -k "session"    # filter by name
 ```
 tests/
 ├── conftest.py
-├── pytest.ini
-├── unit/
-│   ├── test_session_manager.py
-│   ├── test_models.py
-│   ├── test_context_tracker.py
-│   ├── test_intent_patterns.py
-│   └── test_code_review_tools.py
-├── integration/
-│   ├── test_websocket_flow.py
-│   └── test_langgraph_agent.py
-└── e2e/
-    └── test_full_conversation.py
+├── unit/         <- fast isolated unit tests
+├── integration/  <- multi-component tests
+└── e2e/          <- full conversation tests
 
-results/                    <- generated after running tests
+tests/results/    <- generated after running tests
 ├── junit.xml
 ├── coverage.xml
 ├── test-report.html
-├── coverage-report.html
-└── generate_html.py
+└── coverage-report.html
 ```
 
 ### CI/CD
@@ -540,41 +529,6 @@ use session_history_tool: session_id="<id>" [limit="20"] [order="asc"]
 ```
 
 Triggers: `first prompt`, `what did I ask`, `earlier in this session`, `summarise this session`, `session history`
-
-### Applying the `langgraph.py` patch
-
-Three changes are required:
-
-**1. `langgraph.py` — function signature** (line ~2785):
-```python
-# Before
-async def run_agent(..., capability_registry=None):
-
-# After
-async def run_agent(..., capability_registry=None, session_id=None):
-```
-
-**2. `langgraph.py` — replace STEP 1 through STEP 3 setup**
-
-Replace the block from `# STEP 1: Save the original SystemMessage` through `tool_registry = {tool.name: tool for tool in tools}` with the contents of `langgraph_patch.py`.
-
-**3. `websocket.py` — pass session_id at the call site** (line ~250):
-```python
-# Before
-result = await run_agent_fn(
-    agent, conversation_state, prompt, logger, tools, system_prompt
-)
-
-# After
-result = await run_agent_fn(
-    agent, conversation_state, prompt, logger, tools, system_prompt,
-    session_id=session_id
-)
-```
-
-**4. `servers/rag/server.py` — add `session_history_tool`**
-
-Append the contents of `session_history_tool.py` to `server.py` after the existing `rag_search_tool` function.
 
 ---
 
@@ -802,7 +756,7 @@ Using web_image_search_tool, show me a red panda
   netsh interface portproxy add v4tov4 listenport=11434 listenaddress=0.0.0.0 connectport=11434 connectaddress=<WSL_IP>
   New-NetFirewallRule -DisplayName "WSL2 Ollama" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 11434
   ```
-- WSL2 IP changes on reboot — use `results/Update-WSL2Proxies.ps1` via Task Scheduler to keep proxies current
+- WSL2 IP changes on reboot — re-run the portproxy commands above after each reboot
 
 **Ollama models not appearing:**
 - If `OLLAMA_BASE_URL` points to a LAN IP but Ollama is bound to `127.0.0.1` only, the model list will be empty
@@ -810,9 +764,41 @@ Using web_image_search_tool, show me a red panda
 - Verify: `ollama list`
 
 **Web UI not accessible from LAN:**
-- HTTP server (port 9000) and WebSockets (8765, 8766) bind to `0.0.0.0` inside WSL2 automatically
-- Windows needs port proxies — same pattern as Ollama above, applied to ports 9000, 8765, 8766
-- Use `results/Update-WSL2Proxies.ps1` to keep proxies updated after reboots
+
+The platform binds ports 9000 (HTTP), 8765, and 8766 (WebSockets) to `0.0.0.0` inside the process. Whether other devices on your LAN can reach those ports depends on your environment.
+
+*Native Linux:*
+- Should work out of the box — check your firewall allows inbound on those ports:
+  ```bash
+  sudo ufw allow 9000 && sudo ufw allow 8765 && sudo ufw allow 8766
+  ```
+
+*WSL2 on Windows:*
+WSL2 runs on a private virtual network (`172.x.x.x`) that is not directly routable from your LAN. Windows must forward LAN traffic to WSL2 using `netsh portproxy`. Run this in an elevated PowerShell each time the WSL2 IP changes (it changes on every reboot):
+
+```powershell
+# 1. Find your current WSL2 IP
+wsl hostname -I
+
+# 2. Add port forwarding for each port (replace <WSL_IP> with the IP above)
+netsh interface portproxy add v4tov4 listenport=9000  listenaddress=0.0.0.0 connectport=9000  connectaddress=<WSL_IP>
+netsh interface portproxy add v4tov4 listenport=8765  listenaddress=0.0.0.0 connectport=8765  connectaddress=<WSL_IP>
+netsh interface portproxy add v4tov4 listenport=8766  listenaddress=0.0.0.0 connectport=8766  connectaddress=<WSL_IP>
+
+# 3. Allow inbound through Windows Firewall (first time only)
+New-NetFirewallRule -DisplayName "MCP Platform 9000" -Direction Inbound -Protocol TCP -LocalPort 9000 -Action Allow
+New-NetFirewallRule -DisplayName "MCP Platform 8765" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Allow
+New-NetFirewallRule -DisplayName "MCP Platform 8766" -Direction Inbound -Protocol TCP -LocalPort 8766 -Action Allow
+```
+
+Access from LAN devices using your **Windows** LAN IP (e.g. `192.168.0.x`), not the WSL2 IP:
+```
+http://192.168.0.x:9000/client/ui/index.html
+```
+
+To find your Windows LAN IP: `ipconfig` → look for the `192.168.x.x` address on your main adapter.
+
+> Tip: if it stops working after a reboot, just re-run the `netsh interface portproxy add` commands — the firewall rules persist but the WSL2 IP will have changed.
 
 **Web UI won't load locally:**
 ```bash
@@ -837,7 +823,7 @@ netstat -an | grep LISTEN   # check ports 8765, 8766, 9000
 **Auto-RAG returning irrelevant context:**
 - Raise `min_score` threshold in `rag_search_tool` call inside `run_agent`
 - Check RAG store isn't polluted: `use rag_browse_tool`
-- Clear and re-ingest if needed: `use rag_clear_tool`
+- Remove a source: `use rag_delete_source_tool: source="<source>"`
 
 **session_history_tool not finding messages:**
 - Confirm the session ID in the system prompt matches the active session
