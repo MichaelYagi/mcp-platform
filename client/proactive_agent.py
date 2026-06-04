@@ -1179,7 +1179,11 @@ class AgentScheduler:
             # Also expose len(result) for raw string checks
             eval_ctx["result_len"] = len(str(result_raw))
 
-            triggered = bool(eval(job["condition_expr"], eval_ctx))
+            _expr = job["condition_expr"]
+            # Reject expressions containing function calls, dunder access, or imports
+            if any(tok in _expr for tok in ("(", ")", "__", "import", ";", "`")):
+                raise ValueError(f"Unsafe condition expression rejected: {_expr!r}")
+            triggered = bool(eval(_expr, eval_ctx))
             logger.debug(
                 f"⏰ Condition '{job['condition_expr']}' evaluated "
                 f"{'True' if triggered else 'False'} for job {job['id']}"

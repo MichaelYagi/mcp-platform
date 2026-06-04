@@ -8,13 +8,17 @@ Parallelism notes:
   use asyncio.gather() (unchanged).
 """
 
+import base64
+import httpx
 import json
 import logging
+import os
+import re as _re
 import socket
 import sys
 import asyncio
-import os
-import re as _re
+import time
+import uuid
 
 from pathlib import Path
 from urllib.parse import urlparse
@@ -172,6 +176,11 @@ GLOBAL_CONVERSATION_STATE = {
 
 _OAUTH_BROWSER_PATTERN = _re.compile(r'opening\s+browser.*?https?://([^/?#\s]+)', _re.IGNORECASE)
 _OAUTH_ERROR_PATTERN = _re.compile(r'(invalid_grant|unauthorized|oauth|token.*expired|auth.*required|could not locate runnable browser)', _re.IGNORECASE)
+_USE_STEP_RE = _re.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _re.IGNORECASE | _re.DOTALL)
+_COND_RE = _re.compile(r'^check\s+(\w+)(?::([^i]+))?\s+if\s+(.+?)\s+then\s+(.+)$', _re.IGNORECASE | _re.DOTALL)
+_KV_RE = _re.compile(r'(\w+)=(".*?"|\'.*?\'|[^\s,]+)')
+_URL_RE = _re.compile(r'(https?://\S+)')
+_PATH_RE = _re.compile(r'((?:/|[A-Za-z]:\\\\)\S+)')
 
 # ═════════════════════════════════════════════════════════════════════
 # A2A MULTI-ENDPOINT SUPPORT
@@ -496,7 +505,6 @@ async def auto_discover_servers(servers_dir: Path, logger):
         async def _probe_oauth(url: str) -> bool:
             """Return True if the endpoint requires OAuth (HTTP 401)."""
             try:
-                import httpx
                 async with httpx.AsyncClient(timeout=1.5) as hc:
                     r = await hc.get(url, headers={"Accept": "text/event-stream"})
                     return r.status_code == 401
@@ -561,6 +569,14 @@ async def main():
     logging_handler.setup_logging(CLIENT_LOG_FILE)
     logging.getLogger("mcp.client.streamable_http").setLevel(logging.WARNING)
     logging.getLogger("mcp.client.sse").setLevel(logging.WARNING)
+
+    # Suppress noisy websockets handshake failures that occur when a browser
+    # closes a connection mid-upgrade (normal on page refresh / reconnect).
+    class _WsHandshakeFilter(logging.Filter):
+        def filter(self, record):
+            return "opening handshake failed" not in record.getMessage()
+    logging.getLogger("websockets.server").addFilter(_WsHandshakeFilter())
+
     logger = logging.getLogger("mcp_client")
 
     # Set event loop for logging
@@ -743,7 +759,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     else:
                         fields[fname] = (py_type, None)
                 args_model = create_model(f"{t.name}Args", **fields) if fields else None
-                async def _run(**kwargs): return f"Tool {t.name} called"
+                async def _run(**kwargs):
+                    raise RuntimeError(f"Tool {t.name!r} is unavailable — MCP server '{source}' failed to initialize")
                 _run.__name__ = t.name
                 return StructuredTool(
                     name=t.name,
@@ -799,7 +816,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
     async def _process_image_result(tool_json: dict, tool_name: str) -> str:
         """Shared image post-processor for scheduled jobs. Fetches image, runs vision model."""
-        import httpx as _httpx_img, base64 as _b64_img
+        from client.vision import call_vision_model
 
         _img_src  = tool_json.get("image_source")
         _img_orig = tool_json.get("image_source_original") or _img_src
@@ -810,9 +827,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             _b64img = tool_json["image_base64"]
         elif _img_orig:
             try:
-                async with _httpx_img.AsyncClient(timeout=60.0) as _ic:
+                async with httpx.AsyncClient(timeout=60.0) as _ic:
                     _ir = await _ic.get(_img_orig)
-                _b64img = _b64_img.b64encode(_ir.content).decode()
+                _b64img = base64.b64encode(_ir.content).decode()
             except Exception as _fe:
                 logger.warning(f"[image result] Failed to fetch image: {_fe}")
 
@@ -828,33 +845,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     f"Describe this photo in 3-5 sentences. Include the setting, mood, "
                     f"and any notable subjects or details.\n\nPhoto metadata:\n{_meta_str}"
                 )
-                _ollama_url   = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-                _vision_model = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b-instruct")
-                async with _httpx_img.AsyncClient(timeout=300.0) as _vc:
-                    _vresp = await _vc.post(
-                        f"{_ollama_url}/api/chat",
-                        json={
-                            "model": _vision_model,
-                            "stream": False,
-                            "options": {"num_predict": 300, "repeat_penalty": 1.3, "temperature": 0.3},
-                            "messages": [{"role": "user", "content": _vision_prompt, "images": [_b64img]}]
-                        }
-                    )
-                summary_text = _vresp.json().get("message", {}).get("content", "").strip()
-                if summary_text:
-                    _sents = summary_text.split(". ")
-                    _seen: dict = {}
-                    _cut = len(_sents)
-                    for _si, _s in enumerate(_sents):
-                        _key = _s.strip().lower()[:60]
-                        if not _key:
-                            continue
-                        _seen[_key] = _seen.get(_key, 0) + 1
-                        if _seen[_key] >= 3:
-                            _cut = _si
-                            break
-                    if _cut < len(_sents):
-                        summary_text = ". ".join(_sents[:_cut]).rstrip(".") + "."
+                summary_text = await call_vision_model(_b64img, _vision_prompt, num_predict=300)
             except Exception as _ve:
                 logger.warning(f"[image result] Vision failed: {_ve}")
                 summary_text = None
@@ -887,8 +878,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         """Shared post-processor for tool results.
         Handles images, plain text, structured JSON, lists, and LLM summarization.
         Used by both _tool_executor (scheduler) and run_agent_wrapper (direct dispatch)."""
-        import re as _re4, uuid as _tmsg_uuid
-
         # Plain text passthrough
         _is_plain_text = not tool_result.strip().startswith(("{", "["))
         if _is_plain_text:
@@ -1003,7 +992,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     def _md_to_html(md: str) -> str:
         """Convert markdown to HTML for email sending.
         Local network images are fetched and embedded as base64."""
-        import re as _re
         import urllib.request as _urllib
 
         def _embed_image(m):
@@ -1014,8 +1002,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     with _urllib.urlopen(url, timeout=10) as _resp:
                         _data = _resp.read()
                         _ct = _resp.headers.get("Content-Type", "image/jpeg").split(";")[0]
-                    import base64 as _b64
-                    _b64_data = _b64.b64encode(_data).decode()
+                    _b64_data = base64.b64encode(_data).decode()
                     src = f"data:{_ct};base64,{_b64_data}"
                 except Exception:
                     src = url
@@ -1057,17 +1044,22 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         s = str(raw)
         # Handle stringified TextContent: [TextContent(type='text', text='...', ...)]
         if s.startswith("[TextContent(") or s.startswith("TextContent("):
-            import re as _re_tc
-            _m = _re_tc.search(r"text='(.*?)'(?:,\s*annotations|\))", s, _re_tc.DOTALL)
+            _m = _re.search(r"text='(.*?)'(?:,\s*annotations|\))", s, _re.DOTALL)
             if _m:
-                return _m.group(1).replace("\\'", "'")
+                text = _m.group(1).replace("\\'", "'")
+                # Unescape Python string escapes written into the repr (\n, \t, etc.)
+                try:
+                    if "\\n" in text or "\\t" in text:
+                        text = text.encode("utf-8").decode("unicode_escape").encode("latin-1").decode("utf-8")
+                except Exception:
+                    pass
+                return text
         return s
 
     async def _run_pipeline(pipe_parts: list, tools_list: list, initial_result: str = None) -> str:
         """Execute a pipe-separated tool chain using _tool_executor for each step.
         Identical execution path to the scheduler pipeline — no extra transformation."""
-        import re as _pre
-        _STEP_RE = _pre.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pre.IGNORECASE | _pre.DOTALL)
+        _STEP_RE = _USE_STEP_RE
         _NOTIF = ("discord_notify", "gmail_reply_tool")
         _EMAIL_SEND = ("gmail_send_email",)
         previous = initial_result  # allow pre-seeding with condition check result
@@ -1086,7 +1078,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     import json as _jj2
                     args = _jj2.loads(args_str)
                 except Exception:
-                    for km in _pre.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', args_str):
+                    for km in _re.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', args_str):
                         args[km.group(1)] = km.group(2).replace('\\"', '"')
 
             # Drop empty string values — unfilled template placeholders
@@ -1202,13 +1194,17 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             previous = await _tool_executor(tool_name, args)
             logger.info(f"🔀 Pipeline step {idx+1} done: {str(previous)[:80]}")
             # Abort pipeline if a non-final step errored — don't pass error strings downstream
-            if idx < len(steps) - 1 and str(previous).startswith("Error executing tool"):
+            if idx < len(steps) - 1 and (str(previous).startswith("Tool ") and ("error:" in str(previous).lower() or "not found." in str(previous))):
                 logger.warning(f"🔀 Pipeline aborted at step {idx+1}: {str(previous)[:120]}")
                 return str(previous)
 
         # Clean UI result
         last_tool = steps[-1].split()[1].split(":")[0] if steps and len(steps[-1].split()) > 1 else ""
-        if any(nt in last_tool for nt in _NOTIF) or any(nt in last_tool for nt in _EMAIL_SEND):
+        _last_errored = (
+            str(previous).startswith("Tool ")
+            and ("error:" in str(previous).lower() or "not found." in str(previous))
+        )
+        if not _last_errored and (any(nt in last_tool for nt in _NOTIF) or any(nt in last_tool for nt in _EMAIL_SEND)):
             return "Job completed."
         return str(previous) if previous else "Done."
 
@@ -1236,8 +1232,17 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     result_str = await _invoke_tool_directly(tool, arg_str, logger)
                     return await _process_tool_result(tool_name, result_str, arg_str, llm)
                 except Exception as e:
-                    logger.error(f"[_tool_executor] {tool_name} error: {e}")
-                    return f"Tool {tool_name} error: {e}"
+                    err_str = str(e)
+                    try:
+                        from pydantic import ValidationError as _PydanticVE
+                        if isinstance(e, _PydanticVE):
+                            missing = [str(err["loc"][0]) for err in e.errors() if err.get("type") == "missing"]
+                            if missing:
+                                err_str = f"Missing required field(s): {', '.join(missing)}"
+                    except Exception:
+                        pass
+                    logger.error(f"[_tool_executor] {tool_name} error: {err_str}")
+                    return f"Tool {tool_name} error: {err_str}"
         available = [t.name for t in _current_tools]
         logger.error(f"[_tool_executor] '{tool_name}' not found. Available ({len(available)}): {', '.join(available)}")
         return f"Tool '{tool_name}' not found."
@@ -1424,41 +1429,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                         # Step 1: Import Plex history
                         try:
                             import_result_raw = await import_tool.ainvoke({"limit": 3000})
-
-                            # Extract JSON from TextContent string representation
-                            import re
-                            import json
-
-                            # Pattern: text='JSON_HERE'
-                            match = re.search(r"text='(.*?)'(?:,|\))", str(import_result_raw), re.DOTALL)
-
-                            if match:
-                                # Get the raw string (still escaped)
-                                escaped_json = match.group(1)
-
-                                # Use Python's string decoder to properly unescape
-                                # This handles \n, \", etc. correctly
-                                try:
-                                    # Decode escape sequences properly
-                                    import codecs
-                                    json_str = codecs.decode(escaped_json, 'unicode_escape')
-
-                                    # Now parse the JSON
-                                    import_result = json.loads(json_str)
-                                    logger.info(f"   ✅ Successfully parsed result")
-                                except Exception as e:
-                                    logger.error(f"   ❌ Failed to decode/parse: {e}")
-                                    # Try a simpler approach - just replace common escapes
-                                    json_str = escaped_json.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
-                                    try:
-                                        import_result = json.loads(json_str)
-                                        logger.info(f"   ✅ Successfully parsed with fallback method")
-                                    except:
-                                        logger.error(f"   ❌ Both parsing methods failed")
-                                        logger.error(f"   Raw: {escaped_json[:200]}")
-                                        import_result = {}
-                            else:
-                                logger.error(f"   ❌ Could not extract JSON from result")
+                            try:
+                                import_result = json.loads(_unwrap_tool_result(import_result_raw))
+                            except Exception:
                                 import_result = {}
 
                             # Parse result
@@ -1473,33 +1446,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                                 if can_train:
                                     logger.info("   🤖 Training ML model...")
                                     train_result_raw = await train_tool.ainvoke({})
-
-                                    # Extract JSON from TextContent (same as import)
-                                    import re
-                                    import json
-                                    import codecs
-
-                                    match = re.search(r"text='(.*?)'(?:,|\))", str(train_result_raw), re.DOTALL)
-
-                                    if match:
-                                        escaped_json = match.group(1)
-
-                                        try:
-                                            json_str = codecs.decode(escaped_json, 'unicode_escape')
-                                            train_result = json.loads(json_str)
-                                            logger.info(f"   ✅ Successfully parsed train result")
-                                        except Exception as e:
-                                            logger.error(f"   ❌ Failed to decode/parse train result: {e}")
-                                            json_str = escaped_json.replace('\\n', '\n').replace('\\"', '"').replace('\\\\',
-                                                                                                                     '\\')
-                                            try:
-                                                train_result = json.loads(json_str)
-                                                logger.info(f"   ✅ Parsed train result with fallback")
-                                            except:
-                                                logger.error(f"   ❌ Train result parsing failed completely")
-                                                train_result = {}
-                                    else:
-                                        logger.error(f"   ❌ Could not extract JSON from train result")
+                                    try:
+                                        train_result = json.loads(_unwrap_tool_result(train_result_raw))
+                                    except Exception:
                                         train_result = {}
 
                                     if isinstance(train_result, dict):
@@ -1632,7 +1581,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
           - If arg_str is empty, calls with no args (for zero-arg tools).
         """
         import inspect as _inspect
-        import uuid as _uuid
 
         # Get schema info
         first_param = None
@@ -1651,8 +1599,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         else:
             # Check for key=value syntax: "key1=val1 key2=val2" or "key1=val1, key2=val2"
             # Simple pattern: word=anything-up-to-next-word= or end
-            _kv_re = _re.compile(r'(\w+)=(".*?"|\'.*?\'|[^\s,]+)')
-            kv_matches = _kv_re.findall(arg_str)
+            kv_matches = _KV_RE.findall(arg_str)
             if kv_matches:
                 tool_args = {}
                 for k, v in kv_matches:
@@ -1668,10 +1615,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             else:
                 # If arg contains a URL or file path with preceding text, extract it
                 # e.g. "describe this https://..." or "convert this /path/to/file.jpg"
-                _url_re   = _re.compile(r'(https?://\S+)')
-                _path_re  = _re.compile(r'((?:/|[A-Za-z]:\\\\)\S+)')
-                _url_match  = _url_re.search(arg_str)
-                _path_match = _path_re.search(arg_str)
+                _url_match  = _URL_RE.search(arg_str)
+                _path_match = _PATH_RE.search(arg_str)
                 _match = _url_match or _path_match
                 _is_image_param = first_param in ("image_url", "url", "image_file_path")
                 if _match and _is_image_param:
@@ -1702,42 +1647,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         logger.info(f"🎯 Direct tool dispatch: {tool.name}({tool_args})")
 
         result = await tool.ainvoke(tool_args)
-
-        # Unwrap TextContent / list results (mirrors langgraph's own unwrapping)
-        if isinstance(result, list) and result:
-            first = result[0]
-            # Prefer the .text attribute (mcp TextContent), then .content
-            if hasattr(first, 'text') and first.text is not None:
-                result = first.text
-            elif hasattr(first, 'content') and first.content is not None:
-                result = first.content
-            else:
-                # Last resort: pull text value out of the repr string
-                joined = str(first)
-                # Match text='...' with potentially escaped quotes inside
-                import re as _re2
-                m = _re2.search(r"text='(.*?)',\s*annotations=", joined, _re2.DOTALL)
-                if m:
-                    result = m.group(1)
-                else:
-                    result = joined
-
-        result_str = str(result)
-
-        # If the result is still a TextContent repr (unwrap failed), extract JSON directly
-        if result_str.startswith("[TextContent(") or result_str.startswith("TextContent("):
-            import re as _re3
-            m = _re3.search(r"text='(.*)',\s*annotations=", result_str, _re3.DOTALL)
-            if m:
-                result_str = m.group(1)
-            # Unescape Python string escapes (\n \t etc.) without corrupting UTF-8
-            try:
-                if "\\n" in result_str or "\\t" in result_str:
-                    result_str = result_str.encode("utf-8").decode("unicode_escape").encode("latin-1").decode("utf-8")
-            except Exception:
-                pass  # keep original if decode fails
-
-        return result_str
+        return _unwrap_tool_result(result)
 
     # Create enhanced agent runner with multi-agent support
     async def run_agent_wrapper(agent, conversation_state, user_message, logger, tools, system_prompt=None, suppress_multi_agent=False):
@@ -1763,11 +1673,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # ── Condition dispatch ─────────────────────────────────────────
         # "check <tool> if <expr> then use <tool2>" — run check tool, evaluate
         # condition, only run action tool if condition is true.
-        import re as _cond_re
-        _COND_RE = _cond_re.compile(
-            r'^check\s+(\w+)(?::([^i]+))?\s+if\s+(.+?)\s+then\s+(.+)$',
-            _cond_re.IGNORECASE | _cond_re.DOTALL
-        )
         _cond_match = _COND_RE.match(user_message.strip())
         if _cond_match:
             _check_tool_name = _cond_match.group(1).strip()
@@ -1782,7 +1687,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     import json as _cj
                     _check_args = _cj.loads(_check_args_str)
                 except Exception:
-                    for _km in _cond_re.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', _check_args_str):
+                    for _km in _re.finditer(r'(\w+)\s*=\s*"((?:[^"\\]|\\.)*)"', _check_args_str):
                         _check_args[_km.group(1)] = _km.group(2)
 
             # Run check tool
@@ -1817,7 +1722,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 _cond_output = _action_result
             else:
                 logger.info(f"🔍 Condition FALSE — no action taken")
-                _cond_output = "No unread emails — nothing to do."
+                _cond_output = "Condition not met — no action taken."
 
             conversation_state["messages"].append(HumanMessage(content=user_message))
             conversation_state["messages"].append(AIMessage(content=_cond_output))
@@ -1830,8 +1735,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
         # ── Pipeline dispatch ──────────────────────────────────────────
         # "use tool1 | use tool2: arg=val" runs tools in sequence without LLM.
-        import re as _pipe_re
-        _PIPE_STEP_RE = _pipe_re.compile(r'use\s+(\w+)(?:\s*:\s*(.*))?', _pipe_re.IGNORECASE | _pipe_re.DOTALL)
+        _PIPE_STEP_RE = _USE_STEP_RE
         _pipe_parts = [p.strip() for p in user_message.split("|") if p.strip()]
         _is_pipeline = (
             len(_pipe_parts) > 1 and
@@ -1851,7 +1755,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         explicit_tool, explicit_arg = parse_explicit_tool(user_message, tools)
         if explicit_tool:
             logger.info(f"🎯 Explicit tool dispatch: {explicit_tool.name!r} arg={explicit_arg!r}")
-            import uuid as _uuid2, time as _time
 
             # Always use the model from last_model.txt — the single source of truth
             # after a model switch. orchestrator.base_llm may lag behind.
@@ -1872,23 +1775,23 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 active_llm = orchestrator.base_llm if orchestrator and hasattr(orchestrator, 'base_llm') else llm
             logger.info(f"🤖 Explicit dispatch model: {getattr(active_llm, 'model', 'unknown')}")
 
-            start = _time.time()
+            start = time.time()
             try:
                 tool_result = await _invoke_tool_directly(explicit_tool, explicit_arg, logger)
-                _duration = _time.time() - start
+                _duration = time.time() - start
                 logger.info(f"✅ Direct tool {explicit_tool.name} completed in {_duration:.2f}s")
                 # Record into metrics so dashboard reflects direct dispatch calls
                 if _client_metrics is not None:
                     _client_metrics["tool_calls"][explicit_tool.name] += 1
-                    _client_metrics["tool_times"][explicit_tool.name].append((_time.time(), _duration))
+                    _client_metrics["tool_times"][explicit_tool.name].append((time.time(), _duration))
             except Exception as e:
-                _duration = _time.time() - start
+                _duration = time.time() - start
                 logger.error(f"❌ Direct tool {explicit_tool.name} failed: {e}")
                 tool_result = f"Error running {explicit_tool.name}: {e}"
                 if _client_metrics is not None:
                     _client_metrics["tool_calls"][explicit_tool.name] += 1
                     _client_metrics["tool_errors"][explicit_tool.name] += 1
-                    _client_metrics["tool_times"][explicit_tool.name].append((_time.time(), _duration))
+                    _client_metrics["tool_times"][explicit_tool.name].append((time.time(), _duration))
 
                 # ── Mid-session OAuth recovery ─────────────────────────────────
                 # If the error looks like an OAuth/auth failure, attempt re-auth
@@ -1977,8 +1880,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 summary_text = tool_result
 
                 # Persist with ToolMessage so image scanner still runs
-                import uuid as _pt_uuid
-                _pt_call_id = str(_pt_uuid.uuid4())
+                _pt_call_id = str(uuid.uuid4())
                 conversation_state["messages"].append(HumanMessage(content=user_message))
                 conversation_state["messages"].append(AIMessage(
                     content="",
@@ -1998,7 +1900,6 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             # ── Vision shortcut ─────────────────────────────────────────────
             # If the tool result has image_source, call Ollama vision directly
             # (same path as LangGraph) rather than summarising with text LLM.
-            import re as _re4
             try:
                 _tool_json = json.loads(tool_result)
             except Exception:
@@ -2010,8 +1911,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     _seed = _tool_json.get("seed", "")
                     _model_used = _tool_json.get("model", "")
                     summary_text = f"🌱 Seed: `{_seed}` · Model: `{_model_used}`"
-                    import uuid as _gen_uuid
-                    _gen_call_id = str(_gen_uuid.uuid4())
+                    _gen_call_id = str(uuid.uuid4())
                     conversation_state["messages"].append(HumanMessage(content=user_message))
                     conversation_state["messages"].append(AIMessage(
                         content="",
@@ -2029,7 +1929,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     }
 
                 logger.info("[direct dispatch] 🖼️ Image result — delegating to vision")
-                import httpx as _httpx2, base64 as _b642
+                from client.vision import call_vision_model as _call_vision
                 _img_src = _tool_json.get("image_source")
                 _img_orig = _tool_json.get("image_source_original") or _img_src
                 _b64img = _tool_json.get("image_base64")
@@ -2041,10 +1941,10 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     if not _b64img and _img_orig:
                         if _shashin_key and ("192.168." in _img_orig or "shashin" in _img_orig.lower()):
                             _fetch_hdrs = {"x-api-key": _shashin_key, "Content-Type": "application/json"}
-                        async with _httpx2.AsyncClient(timeout=60.0) as _hc:
+                        async with httpx.AsyncClient(timeout=60.0) as _hc:
                             _ir = await _hc.get(_img_orig, headers=_fetch_hdrs)
                             _ir.raise_for_status()
-                        _b64img = _b642.b64encode(_ir.content).decode("utf-8")
+                        _b64img = base64.b64encode(_ir.content).decode("utf-8")
                         logger.info(f"[direct dispatch] 🖼️ Fetched {len(_ir.content)} bytes for vision")
                     else:
                         logger.info("[direct dispatch] 🖼️ Using pre-encoded base64 image")
@@ -2098,54 +1998,15 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                     _specific_query = bool(_extra and len(_extra) > 3)
                     _num_predict = 1000 if _specific_query else 300
 
-                    # Call Ollama vision API directly
-                    _ollama_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-                    _vision_model = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b-instruct")
-                    logger.info(f"[direct dispatch] 🖼️ Calling vision model: {_vision_model} (num_predict={_num_predict}, query={bool(_extra)})")
-                    _vision_llm_start = _time.time()
-                    async with _httpx2.AsyncClient(timeout=300.0) as _vclient:
-                        _vresp = await _vclient.post(
-                            f"{_ollama_url}/api/chat",
-                            json={
-                                "model": _vision_model,
-                                "stream": False,
-                                "options": {
-                                    "num_predict": _num_predict,
-                                    "repeat_penalty": 1.3,
-                                    "temperature": 0.3,
-                                },
-                                "messages": [{
-                                    "role": "user",
-                                    "content": _vision_prompt,
-                                    "images": [_b64img]
-                                }]
-                            }
-                        )
-                        _vdata = _vresp.json()
+                    logger.info(f"[direct dispatch] 🖼️ Calling vision model (num_predict={_num_predict}, query={bool(_extra)})")
+                    _vision_llm_start = time.time()
+                    summary_text = await _call_vision(_b64img, _vision_prompt, num_predict=_num_predict)
                     if _client_metrics is not None:
                         _client_metrics["llm_calls"] += 1
-                        _client_metrics["llm_times"].append((_time.time(), _time.time() - _vision_llm_start))
-                    logger.info(f"[direct dispatch] 🖼️ Vision response status: {_vresp.status_code}, keys: {list(_vdata.keys()) if isinstance(_vdata, dict) else type(_vdata)}")
-                    summary_text = _vdata.get("message", {}).get("content", "").strip()
-                    # Detect and trim repetition loops — if any sentence repeats 3+ times, truncate before it
-                    if summary_text:
-                        _sentences = summary_text.split(". ")
-                        _seen_sentences: dict = {}
-                        _cutoff = len(_sentences)
-                        for _si, _sent in enumerate(_sentences):
-                            _key = _sent.strip().lower()[:60]
-                            if not _key:
-                                continue
-                            _seen_sentences[_key] = _seen_sentences.get(_key, 0) + 1
-                            if _seen_sentences[_key] >= 3:
-                                _cutoff = _si
-                                break
-                        if _cutoff < len(_sentences):
-                            summary_text = ". ".join(_sentences[:_cutoff]).rstrip(".") + "."
-                            logger.info(f"[direct dispatch] 🖼️ Trimmed repetition loop at sentence {_cutoff}")
+                        _client_metrics["llm_times"].append((time.time(), time.time() - _vision_llm_start))
                     if not summary_text:
-                        logger.warning(f"[direct dispatch] 🖼️ Vision returned empty content. Full response: {str(_vdata)[:500]}")
-                    logger.info(f"[direct dispatch] 🖼️ Vision description: {summary_text[:80]}")
+                        logger.warning("[direct dispatch] 🖼️ Vision returned empty content")
+                    logger.info(f"[direct dispatch] 🖼️ Vision description: {summary_text[:80] if summary_text else ''}")
 
 
                 except Exception as _ve:
@@ -2162,8 +2023,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
                 if summary_text:
                     summary_text += _shashin_link
-                    import uuid as _vis_uuid
-                    _vis_call_id = str(_vis_uuid.uuid4())
+                    _vis_call_id = str(uuid.uuid4())
                     conversation_state["messages"].append(HumanMessage(content=user_message))
                     conversation_state["messages"].append(AIMessage(
                         content="",
@@ -2189,8 +2049,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
             # Persist the exchange in conversation history.
             # Include a ToolMessage so websocket image/place scanner finds image_source.
-            import uuid as _tmsg_uuid
-            _tool_call_id = str(_tmsg_uuid.uuid4())
+            _tool_call_id = str(uuid.uuid4())
             conversation_state["messages"].append(HumanMessage(content=user_message))
             conversation_state["messages"].append(AIMessage(
                 content="",
@@ -2275,32 +2134,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 conversation_state.pop("_last_vision_tool_result", None)
             if _is_visual_followup:
                 logger.info("[vision follow-up] 🖼️ Visual question detected — re-invoking vision")
-                import httpx as _httpx_fu, base64 as _b64_fu, uuid as _uuid_fu, time as _time_fu
-                _fu_prompt = user_message
-                _fu_num_predict = 1000
-                _ollama_url_fu = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-                _vision_model_fu = os.getenv("OLLAMA_VISION_MODEL", "qwen3-vl:8b-instruct")
+                from client.vision import call_vision_model as _call_vision_fu
                 try:
-                    async with _httpx_fu.AsyncClient(timeout=300.0) as _fvc:
-                        _fvr = await _fvc.post(
-                            f"{_ollama_url_fu}/api/chat",
-                            json={
-                                "model": _vision_model_fu,
-                                "stream": False,
-                                "options": {
-                                    "num_predict": _fu_num_predict,
-                                    "repeat_penalty": 1.3,
-                                    "temperature": 0.3,
-                                },
-                                "messages": [{
-                                    "role": "user",
-                                    "content": _fu_prompt,
-                                    "images": [_last_b64]
-                                }]
-                            }
-                        )
-                    _fvdata = _fvr.json()
-                    _fu_text = _fvdata.get("message", {}).get("content", "").strip()
+                    _fu_text = await _call_vision_fu(_last_b64, user_message, num_predict=1000)
                     if _fu_text:
                         logger.info(f"[vision follow-up] 🖼️ Got response: {_fu_text[:80]}")
                         conversation_state["messages"].append(HumanMessage(content=user_message))
@@ -2577,6 +2413,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             from client.websocket import broadcast_message as _ws_broadcast
             await _ws_broadcast("google_auth_required", {"auth_url": auth_url})
             logger.info("🔑 Google auth URL broadcast to UI")
+            _AUTH_PENDING_FILE.unlink(missing_ok=True)
         except Exception as _e:
             logger.warning(f"🔑 Could not broadcast auth URL: {_e}")
 

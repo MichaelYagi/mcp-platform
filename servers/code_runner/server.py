@@ -42,46 +42,12 @@ except ImportError:
     try:
         from client.metrics import FailureKind, MCPToolError, JsonFormatter
     except ImportError:
-        from enum import Enum
-        class FailureKind(Enum):
-            RETRYABLE      = "retryable"
-            USER_ERROR     = "user_error"
-            UPSTREAM_ERROR = "upstream_error"
-            INTERNAL_ERROR = "internal_error"
-        class MCPToolError(Exception):
-            def __init__(self, kind, message, detail=None):
-                self.kind = kind; self.message = message; self.detail = detail or {}
-                super().__init__(message)
-        JsonFormatter = None
+        from servers.error_fallback import FailureKind, MCPToolError, JsonFormatter
 
 from mcp.server.fastmcp import FastMCP
 
-LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.handlers.clear()
-
-formatter = JsonFormatter() if JsonFormatter is not None else logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-
-file_handler = logging.FileHandler(LOG_DIR / "mcp-server.log", encoding="utf-8")
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-
-root_logger.addHandler(file_handler)
-root_logger.addHandler(console_handler)
-
-logging.getLogger("mcp").setLevel(logging.DEBUG)
-logging.getLogger("mcp_code_runner_server").setLevel(logging.INFO)
-
-logger = logging.getLogger("mcp_code_runner_server")
+from servers.logging_setup import setup_server_logging
+logger = setup_server_logging("mcp_code_runner_server", PROJECT_ROOT, JsonFormatter)
 logger.info("🚀 Code Runner server logging initialized")
 
 mcp = FastMCP("code-runner-server")

@@ -155,11 +155,19 @@ async def lifespan(app: FastAPI):
     # Create sessions for all servers (not just "local")
     await client.create_all_sessions()
 
-    # Get the first session (or create a combined session)
-    # We'll use the client directly instead of storing a single session
-    app.state.client = client
+    # Build tool→session index once at startup to avoid per-request list_tools() calls
+    tool_session_map: dict = {}
+    for session_name, session in client.sessions.items():
+        try:
+            for t in await session.list_tools():
+                tool_session_map[t.name] = session
+        except Exception as _e:
+            print(f"⚠️  Could not index tools for session {session_name}: {_e}")
 
-    print(f"✅ MCP session ready with {len(mcp_servers)} tool categories")
+    app.state.client = client
+    app.state.tool_session_map = tool_session_map
+
+    print(f"✅ MCP session ready with {len(mcp_servers)} tool categories, {len(tool_session_map)} tools indexed")
     yield
 
     # Cleanup on shutdown
@@ -305,28 +313,20 @@ Use the 'a2a.discover' method to get full tool descriptions and schemas."""
 async def a2a_handler(req: RPCRequest, request: Request):
     client = request.app.state.client
 
-    if req.method == "a2a.discover":
-        # Collect tools from all sessions
-        all_tools = []
-        for session_name, session in client.sessions.items():
-            tools = await session.list_tools()
-            all_tools.extend(tools)
+    tool_session_map = request.app.state.tool_session_map
 
+    if req.method == "a2a.discover":
         return {
             "jsonrpc": "2.0",
             "id": req.id,
             "result": {
                 "tools": [
                     {
-                        "name": t.name,
-                        "description": t.description or "",
-                        "schema": (
-                            t.args_schema.schema()
-                            if hasattr(t, "args_schema") and t.args_schema
-                            else {"type": "object"}
-                        )
+                        "name": t_name,
+                        "description": "",
+                        "schema": {"type": "object"},
                     }
-                    for t in all_tools
+                    for t_name in tool_session_map
                 ]
             }
         }
@@ -335,18 +335,9 @@ async def a2a_handler(req: RPCRequest, request: Request):
         tool_name = req.params["tool"]
         args = req.params["arguments"]
 
-        # Find which session has this tool
-        tool = None
-        target_session = None
+        target_session = tool_session_map.get(tool_name)
 
-        for session_name, session in client.sessions.items():
-            tools = await session.list_tools()
-            tool = next((t for t in tools if t.name == tool_name), None)
-            if tool:
-                target_session = session
-                break
-
-        if tool is None or target_session is None:
+        if target_session is None:
             return {
                 "jsonrpc": "2.0",
                 "id": req.id,

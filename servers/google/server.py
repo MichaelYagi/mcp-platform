@@ -42,17 +42,7 @@ except ImportError:
     try:
         from client.metrics import FailureKind, MCPToolError, JsonFormatter
     except ImportError:
-        from enum import Enum
-        class FailureKind(Enum):
-            RETRYABLE      = "retryable"
-            USER_ERROR     = "user_error"
-            UPSTREAM_ERROR = "upstream_error"
-            INTERNAL_ERROR = "internal_error"
-        class MCPToolError(Exception):
-            def __init__(self, kind, message, detail=None):
-                self.kind = kind; self.message = message; self.detail = detail or {}
-                super().__init__(message)
-        JsonFormatter = None
+        from servers.error_fallback import FailureKind, MCPToolError, JsonFormatter
 
 # Google API imports
 try:
@@ -70,30 +60,8 @@ except ImportError:
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 
-LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-root_logger.handlers.clear()
-
-formatter = JsonFormatter() if JsonFormatter is not None else logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-
-file_handler = logging.FileHandler(LOG_DIR / "mcp-server.log", encoding="utf-8")
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
-
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-
-root_logger.addHandler(file_handler)
-root_logger.addHandler(console_handler)
-
-logging.getLogger("mcp").setLevel(logging.DEBUG)
-logging.getLogger("mcp_google_server").setLevel(logging.INFO)
-
-logger = logging.getLogger("mcp_google_server")
+from servers.logging_setup import setup_server_logging
+logger = setup_server_logging("mcp_google_server", PROJECT_ROOT, JsonFormatter)
 logger.info("🚀 Google server logging initialized")
 
 mcp = FastMCP("google-server")
@@ -578,7 +546,7 @@ def gmail_get_email(message_id: str) -> str:
 
 @mcp.tool()
 @check_tool_enabled(category="google")
-@tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,template='use gmail_send_email: to="" subject="" body="" [cc=""] [html=""]',intent_category="google",
+@tool_meta(tags=["write","email","external"],triggers=["send email","compose email","email someone","write email","draft email","send a message","compose a message"],idempotent=False,template='use gmail_send_email: to="" [subject=""] body="" [cc=""] [html=""]',intent_category="google",
 output_type="none",pipe_targets={"body":"text"})
 def gmail_send_email(
         to: str,
@@ -1491,8 +1459,15 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                 state   = loc.get("region")
                 country = loc.get("country")
 
-        weather_raw = get_weather_fn(city, state, country, forecast_days=forecast_days)
+        # Fetch enough days so that forecast[date_offset] is the target date.
+        # e.g. date_offset=2, forecast_days=1 → fetch 3 days, take day index 2.
+        _fetch_days = date_offset + forecast_days
+        weather_raw = get_weather_fn(city, state, country, forecast_days=_fetch_days)
         weather_data = json.loads(weather_raw) if isinstance(weather_raw, str) else weather_raw
+        # Trim forecast to start at date_offset so the first entry is the target day
+        if date_offset > 0 and isinstance(weather_data, dict) and weather_data.get("forecast"):
+            weather_data = dict(weather_data)
+            weather_data["forecast"] = weather_data["forecast"][date_offset:date_offset + forecast_days]
         # Forward pre-rendered text if the weather tool produced one; otherwise build a fallback
         if isinstance(weather_data, dict) and not weather_data.get("text"):
             _cur = weather_data.get("current_conditions") or weather_data.get("current") or {}
@@ -1657,7 +1632,7 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                 _text_parts.append(f"Low Temp: {_lo_c}°C ({_lo_f}°F)")
             if _fl_c is not None:
                 _text_parts.append(f"Feels Like: {_fl_c}°C ({_fl_f}°F)")
-            if _idx == 0 and _cur_humidity:
+            if _idx == 0 and _cur_humidity and date_offset == 0:
                 _text_parts.append(f"Humidity: {_cur_humidity}")
             if _day.get("sunrise"):
                 _text_parts.append(f"Sunrise: {_day['sunrise']}")

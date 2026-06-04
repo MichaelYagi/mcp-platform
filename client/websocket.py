@@ -1169,38 +1169,6 @@ async def websocket_handler(websocket, agent_ref, tools, logger, conversation_st
                     await websocket.send(json.dumps({"type": "complete", "stopped": False}))
                     continue
 
-                # Handle :jobs cancel here so we can also remove from APScheduler
-                if prompt.startswith(":jobs") and any(
-                    w in prompt.lower() for w in ("cancel", "delete", "remove")
-                ):
-                    from client.proactive_agent import handle_jobs_command, find_job_by_label, list_jobs
-                    _jobs_response = handle_jobs_command(prompt)
-                    # Also remove from APScheduler if scheduler is available
-                    if _agent_scheduler:
-                        try:
-                            parts = prompt.split(None, 2)
-                            label_or_all = parts[2].strip() if len(parts) > 2 else ""
-                            if label_or_all.lower() in ("all", "*"):
-                                for _j in list_jobs():
-                                    _agent_scheduler.remove_job(_j["id"])
-                            else:
-                                _j = find_job_by_label(label_or_all)
-                                # find_job_by_label may return None if already deleted
-                                # Try numeric ID too
-                                if not _j:
-                                    try:
-                                        _jid = int(label_or_all)
-                                        _agent_scheduler.remove_job(_jid)
-                                    except (ValueError, TypeError):
-                                        pass
-                                else:
-                                    _agent_scheduler.remove_job(_j["id"])
-                        except Exception as _rem_err:
-                            logger.warning(f"⏰ APScheduler remove_job failed: {_rem_err}")
-                    await broadcast_message("assistant_message", {"text": _jobs_response})
-                    await websocket.send(json.dumps({"type": "complete", "stopped": False}))
-                    continue
-
                 if prompt.startswith(":multi"):
                     from client.commands import handle_multi_agent_commands
                     result = await handle_multi_agent_commands(prompt, orchestrator, multi_agent_state)
@@ -1355,9 +1323,13 @@ async def start_websocket_server(agent, tools, logger, conversation_state, run_a
         _inactivity_watcher = inactivity_watcher
 
     async def handler(websocket):
+        # Each connection gets its own conversation state so concurrent tabs
+        # cannot corrupt each other's message history. session_loaded resets
+        # and repopulates from SQLite, so starting empty is correct.
+        conn_state = {"messages": [], "loop_count": 0}
         try:
             await websocket_handler(
-                websocket, [agent], tools, logger, conversation_state, run_agent_fn,
+                websocket, [agent], tools, logger, conn_state, run_agent_fn,
                 models_module, model_name, system_prompt,
                 orchestrator=orchestrator,
                 multi_agent_state=multi_agent_state,

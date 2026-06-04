@@ -108,7 +108,9 @@ Errors use `MCPToolError` with `FailureKind` enum — canonical definitions in `
 4. List builder for arrays
 5. LLM summarization fallback
 
-Do not add post-processing logic in `_tool_executor` or `run_agent_wrapper` directly — extend `_process_tool_result()` instead.
+Do not add post-processing logic in `_tool_executor` directly — extend `_process_tool_result()` instead.
+
+**Exception — vision results**: `run_agent_wrapper` contains its own inline vision processing path (image fetch → `client/vision.call_vision_model()`) that runs before `_process_tool_result`. This is intentional: vision inference needs access to conversation state (prompt construction, follow-up detection) that `_process_tool_result` does not have. If you add a new post-processing path that requires conversation state, add it in `run_agent_wrapper` before the `_process_tool_result` call. Otherwise extend `_process_tool_result`.
 
 ### Routing
 
@@ -168,6 +170,7 @@ All LLM prompt strings live in **`prompts/prompts.py`** and `prompts/system_prom
 | `OLLAMA_REPEAT_PENALTY` | Token repetition penalty (1.1; 1.0 = disabled) |
 | `LLM_MESSAGE_WINDOW` | Recent turns in direct context (default 6, recommend 15) |
 | `LLM_TEMPERATURE` | Inference temperature (0.3) |
+| `LLM_ROUTING_ENABLED` | Set to `false` to skip the pre-flight routing LLM call (saves 2-10s/query, trades routing accuracy for latency) |
 | `MAX_MESSAGE_HISTORY` | Max messages stored per session (30) |
 | `DISABLED_TOOLS` | Comma-separated `category:*` or `category:tool_name` |
 | `CONCURRENT_LIMIT` | Max concurrent tool calls (3) |

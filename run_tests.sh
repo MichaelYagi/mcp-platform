@@ -66,7 +66,7 @@ if [ "$JS_ONLY" = false ]; then
             --cov=client \
             --cov-report=xml:tests/results/coverage.xml \
             --cov-report=term-missing \
-            --cov-fail-under=22
+            --cov-fail-under=40
     fi
 fi
 

@@ -233,6 +233,15 @@ def prepare_metrics():
       - histogram         — bucket counts over last METRICS_WINDOW samples
       - times             — last 100 (timestamp, duration) pairs for sparklines
     """
+    # Trim time series lists to prevent unbounded growth
+    if len(metrics["agent_times"]) > METRICS_WINDOW:
+        metrics["agent_times"] = metrics["agent_times"][-METRICS_WINDOW:]
+    if len(metrics["llm_times"]) > METRICS_WINDOW:
+        metrics["llm_times"] = metrics["llm_times"][-METRICS_WINDOW:]
+    for _tn in list(metrics["tool_times"].keys()):
+        if len(metrics["tool_times"][_tn]) > METRICS_WINDOW:
+            metrics["tool_times"][_tn] = metrics["tool_times"][_tn][-METRICS_WINDOW:]
+
     tool_total_calls  = sum(metrics["tool_calls"].values())
     tool_total_errors = sum(metrics["tool_errors"].values())
     total_errors      = metrics["agent_errors"] + metrics["llm_errors"] + tool_total_errors

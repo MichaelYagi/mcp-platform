@@ -33,38 +33,8 @@ except Exception:
         def decorator(fn): return fn
         return decorator
 
-LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-# Create the root logger
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
-
-# Remove any existing handlers
-root_logger.handlers.clear()
-
-# Create formatter
-formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-
-# Create file handler
-file_handler = logging.FileHandler(LOG_DIR / "mcp-server.log", encoding="utf-8")
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
-
-# Create console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(formatter)
-
-# Add handlers to root logger
-root_logger.addHandler(file_handler)
-root_logger.addHandler(console_handler)
-
-# Disable propagation to avoid duplicate logs
-logging.getLogger("mcp").setLevel(logging.DEBUG)
-logging.getLogger("trilium_server").setLevel(logging.INFO)
-
-logger = logging.getLogger("trilium_server")
+from servers.logging_setup import setup_server_logging
+logger = setup_server_logging("mcp_trilium_server", PROJECT_ROOT, None)
 logger.info("🚀 Server logging initialized - writing to logs/trilium-server.log")
 
 mcp = FastMCP("trilium-server")

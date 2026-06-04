@@ -807,7 +807,7 @@ async def rag_node(state):
 
     try:
         result = await rag_search_tool.ainvoke({"query": user_message.content})
-        context = "RAG search results here"
+        context = str(result)
 
         augmented_messages = [
             SystemMessage(content=RAG_CONTEXT.format(context=context)),
@@ -1557,32 +1557,14 @@ def create_langgraph_agent(llm_with_tools, tools):
                     model_name = os.getenv("OLLAMA_VISION_MODEL") or get_model_name(base_llm)
                     logger.info(f"[LangGraph] 🖼️ Using vision model: {model_name}")
 
-                    import httpx
-                    payload = {
-                        "model": model_name,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": user_prompt,
-                                "images": [b64]
-                            }
-                        ],
-                        "stream": False
-                    }
                     # Check stop before committing to a potentially long vision inference
                     if is_stop_requested():
                         logger.warning("🛑 Vision call skipped: stop requested")
                         raise asyncio.CancelledError("Vision call cancelled: stop requested")
+                    from client.vision import call_vision_model as _call_vision_lg
                     start_time = time.time()
-                    async with httpx.AsyncClient(timeout=300.0) as hc:
-                        vision_resp = await hc.post(
-                            f"{ollama_url}/api/chat",
-                            json=payload
-                        )
-                        vision_resp.raise_for_status()
-
+                    vision_text = await _call_vision_lg(b64, user_prompt, num_predict=300)
                     duration = time.time() - start_time
-                    vision_text = vision_resp.json()["message"]["content"]
                     logger.info(f"[LangGraph] 🖼️ Vision response in {duration:.2f}s: {vision_text[:80]}")
 
                     # Prepend location and date/time to the chat bubble
@@ -3214,11 +3196,14 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
         # does this query need external knowledge, or can it be answered from
         # conversation history? Skip RAG entirely for follow-ups — RAG will
         # always fail on them and may incorrectly set rag_fallback=True.
+        # Set LLM_ROUTING_ENABLED=false in .env to skip this call and save
+        # 2-10 seconds per query (trades routing accuracy for latency).
         _needs_rag = True
         _context_sufficient = False
         _llm_tool_decision: dict = {}
+        _llm_routing_enabled = os.getenv("LLM_ROUTING_ENABLED", "true").lower() not in ("false", "0", "no")
         _prior_ai_msgs = [m for m in non_system_msgs if isinstance(m, AIMessage)]
-        if user_message and llm:
+        if _llm_routing_enabled and user_message and llm:
             _base_llm = llm.bound if hasattr(llm, "bound") else llm
             # Include recent conversation history if available
             _recent_history = ""
