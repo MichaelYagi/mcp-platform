@@ -473,6 +473,7 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 
 /* Grid wrapper aligns statusRow and themeWrapper under their respective columns */
 #inputArea {
+    position: relative;
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 0 0.5rem;
@@ -1320,4 +1321,49 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
     background: color-mix(in srgb, #00ff41 10%, transparent);
     color: #00ff41;
     border-color: color-mix(in srgb, #00ff41 25%, transparent);
+}
+
+/* ── Command autocomplete ── */
+.cmd-autocomplete {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    max-height: 260px;
+    overflow-y: auto;
+    background: var(--bg-secondary, #1e1e1e);
+    border: 1px solid var(--input-border, #3a3a3a);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.45);
+    z-index: 200;
+    display: none;
+}
+.cmd-autocomplete-item {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--input-border, #2a2a2a);
+    transition: background 0.1s;
+}
+.cmd-autocomplete-item:last-child { border-bottom: none; }
+.cmd-autocomplete-item:hover,
+.cmd-autocomplete-item.selected {
+    background: var(--bg-hover, rgba(255,255,255,0.07));
+}
+.cmd-autocomplete-cmd {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--send-btn, #4a9eff);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.cmd-autocomplete-desc {
+    font-size: 0.78rem;
+    color: var(--text-muted, #888);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

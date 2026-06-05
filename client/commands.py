@@ -544,5 +544,14 @@ async def handle_command(
         except ImportError:
             return (True, "⚠️ proactive_agent not available", None, None)
 
+    # Memory commands
+    if command.startswith(":memory"):
+        try:
+            from client.memory_consolidator import handle_memory_command
+            result = handle_memory_command(command)
+            return (True, result, None, None)
+        except ImportError:
+            return (True, "⚠️ memory_consolidator not available", None, None)
+
     # Command not recognized
     return (False, None, None, None)

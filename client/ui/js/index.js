@@ -1794,13 +1794,15 @@ let _pipelinePrefix = ""; // free text typed before the first tool was clicked
 // When the user manually edits the input, clear pipeline state if the text no
 // longer matches the generated pipeline prompt — this un-greys incompatible tools.
 input.addEventListener('input', () => {
-    if (_pipelineSteps.length === 0) return;
-    if (input.value.trim() !== buildPipelinePrompt().trim()) {
+    if (_pipelineSteps.length > 0 && input.value.trim() !== buildPipelinePrompt().trim()) {
         _pipelineSteps = [];
         _pipelinePrefix = "";
         updatePipelineUI();
         renderToolsPanel(_allTools);
     }
+    const val = input.value;
+    if (val.startsWith(':')) _showCmdDropdown(val);
+    else _hideCmdDropdown();
 });
 
 function pipelineIsToolSelectable(tool) {
@@ -2181,8 +2183,154 @@ function getToolPrompt(toolName, params) {
     return `use ${toolName}`;
 }
 
+// ============================================================
+// COMMAND AUTOCOMPLETE
+// ============================================================
+const _CMD_LIST = [
+    { command: ':commands',                description: 'List all available commands' },
+    { command: ':stop',                    description: 'Stop current operation' },
+    { command: ':stats',                   description: 'Show performance metrics' },
+    { command: ':tools',                   description: 'List available tools' },
+    { command: ':tools --all',             description: 'List all tools including disabled' },
+    { command: ':tool ',                   description: 'Get description of a specific tool' },
+    { command: ':model',                   description: 'List available models' },
+    { command: ':model ',                  description: 'Switch to a model by name' },
+    { command: ':models',                  description: 'List available models (legacy)' },
+    { command: ':gguf list',               description: 'List registered GGUF models' },
+    { command: ':gguf add ',               description: 'Register a GGUF model file' },
+    { command: ':gguf remove ',            description: 'Remove a GGUF model by alias' },
+    { command: ':metrics',                 description: 'Show LLM and agent performance metrics' },
+    { command: ':metrics comparative',     description: 'Show comparative metrics across models' },
+    { command: ':health',                  description: 'Health overview of all servers and tools' },
+    { command: ':memory',                  description: 'List all persistent memories' },
+    { command: ':memory semantic',         description: 'Show permanent memories only' },
+    { command: ':memory episodic',         description: 'Show session-derived memories' },
+    { command: ':memory forget ',          description: 'Delete a memory by ID' },
+    { command: ':memory clear',            description: 'Delete all episodic memories' },
+    { command: ':memory clear session ',   description: 'Delete memories from one session' },
+    { command: ':memory consolidate',      description: 'Extract memories from current session' },
+    { command: ':memory dedup',            description: 'Remove duplicate memories' },
+    { command: ':memory add ',             description: 'Manually add a memory fact' },
+    { command: ':jobs',                    description: 'List all scheduled jobs' },
+    { command: ':jobs pause ',             description: 'Pause a scheduled job' },
+    { command: ':jobs enable ',            description: 'Resume a paused job' },
+    { command: ':jobs cancel ',            description: 'Delete a scheduled job' },
+    { command: ':jobs cancel all',         description: 'Delete ALL scheduled jobs' },
+    { command: ':jobs info ',              description: 'Show full job detail' },
+    { command: ':multi on',                description: 'Enable multi-agent mode' },
+    { command: ':multi off',               description: 'Disable multi-agent mode' },
+    { command: ':multi status',            description: 'Show multi-agent mode status' },
+    { command: ':a2a on',                  description: 'Enable agent-to-agent mode' },
+    { command: ':a2a off',                 description: 'Disable agent-to-agent mode' },
+    { command: ':a2a status',              description: 'Check A2A system status' },
+    { command: ':routing',                 description: 'Show query routing statistics' },
+    { command: ':routing reset',           description: 'Reset routing statistics' },
+    { command: ':sync',                    description: 'Sync agent to last used model' },
+    { command: ':env',                     description: 'Show environment configuration' },
+    { command: ':sessions',                description: 'List all available sessions' },
+    { command: ':clear sessions',          description: 'Clear all chat history' },
+    { command: ':clear session ',          description: 'Clear a specific session' },
+];
+
+let _cmdDropdownVisible = false;
+let _cmdSelectedIdx     = -1;
+let _cmdFilteredList    = [];
+
+function _getCmdDropdownEl() {
+    let el = document.getElementById('cmdAutocomplete');
+    if (!el) {
+        el = document.createElement('div');
+        el.id        = 'cmdAutocomplete';
+        el.className = 'cmd-autocomplete';
+        const inputArea = document.getElementById('inputArea');
+        inputArea.insertBefore(el, inputArea.firstChild);
+    }
+    return el;
+}
+
+function _renderCmdDropdown() {
+    const el = _getCmdDropdownEl();
+    if (_cmdFilteredList.length === 0) { _hideCmdDropdown(); return; }
+    el.innerHTML = _cmdFilteredList.map((item, i) => {
+        const cls = i === _cmdSelectedIdx ? ' selected' : '';
+        return `<div class="cmd-autocomplete-item${cls}" data-idx="${i}">
+            <span class="cmd-autocomplete-cmd">${escapeHtml(item.command.trimEnd())}</span>
+            <span class="cmd-autocomplete-desc">${escapeHtml(item.description)}</span>
+        </div>`;
+    }).join('');
+    el.style.display = 'block';
+    _cmdDropdownVisible = true;
+    if (_cmdSelectedIdx >= 0) {
+        const sel = el.querySelector('.cmd-autocomplete-item.selected');
+        if (sel) sel.scrollIntoView({ block: 'nearest' });
+    }
+    el.querySelectorAll('.cmd-autocomplete-item').forEach(itemEl => {
+        itemEl.addEventListener('mousedown', e => {
+            e.preventDefault();
+            _selectCmdItem(parseInt(itemEl.dataset.idx, 10));
+        });
+    });
+}
+
+function _showCmdDropdown(typed) {
+    const lower = typed.toLowerCase();
+    _cmdFilteredList = _CMD_LIST.filter(c => c.command.toLowerCase().startsWith(lower));
+    _cmdSelectedIdx  = _cmdFilteredList.length > 0 ? 0 : -1;
+    _renderCmdDropdown();
+}
+
+function _hideCmdDropdown() {
+    const el = document.getElementById('cmdAutocomplete');
+    if (el) el.style.display = 'none';
+    _cmdDropdownVisible = false;
+    _cmdSelectedIdx     = -1;
+    _cmdFilteredList    = [];
+}
+
+function _selectCmdItem(idx) {
+    if (idx < 0 || idx >= _cmdFilteredList.length) return;
+    const cmd = _cmdFilteredList[idx].command;
+    input.value = cmd;
+    input.focus();
+    input.setSelectionRange(cmd.length, cmd.length);
+    _hideCmdDropdown();
+}
+
+input.addEventListener('blur', () => setTimeout(_hideCmdDropdown, 150));
+
 sendBtn.addEventListener('click', send);
-input.addEventListener("keydown", (e) => { if (e.key==="Enter"&&!e.shiftKey) { e.preventDefault(); send(); } });
+input.addEventListener("keydown", (e) => {
+    if (_cmdDropdownVisible) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _cmdSelectedIdx = Math.min(_cmdSelectedIdx + 1, _cmdFilteredList.length - 1);
+            _renderCmdDropdown();
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _cmdSelectedIdx = Math.max(_cmdSelectedIdx - 1, 0);
+            _renderCmdDropdown();
+            return;
+        }
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            _selectCmdItem(_cmdSelectedIdx >= 0 ? _cmdSelectedIdx : 0);
+            return;
+        }
+        if (e.key === 'Enter' && !e.shiftKey && _cmdSelectedIdx >= 0) {
+            e.preventDefault();
+            _selectCmdItem(_cmdSelectedIdx);
+            return;
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            _hideCmdDropdown();
+            return;
+        }
+    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
 document.getElementById('toolsToggle').addEventListener('click', toggleToolsPanel);
 const _toolsCloseBtn = document.getElementById('toolsCloseBtn');
 if (_toolsCloseBtn) _toolsCloseBtn.addEventListener('click', toggleToolsPanel);
