@@ -1496,7 +1496,10 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                     _lines.append(f"  {_day_label}: {_day_desc} {_day_hi}/{_day_lo}".strip())
             weather_data["text"] = "\n".join(l for l in _lines if l)
         result["weather"] = weather_data
-        logger.info("✅ Weather fetched")
+        if isinstance(weather_data, dict) and weather_data.get("error"):
+            logger.warning(f"⚠️  Weather API error: {weather_data.get('error')} — {weather_data.get('message', '')}")
+        else:
+            logger.info("✅ Weather fetched")
     except Exception as e:
         logger.warning(f"⚠️  Weather failed: {e}")
         result["errors"]["weather"] = str(e)
@@ -1623,7 +1626,8 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
     if _weather_err:
         _text_parts.append(f"\nWeather: unavailable ({_weather_err})")
     elif isinstance(_wd, dict) and not _wd.get("forecast"):
-        _text_parts.append("\nWeather: unavailable (no forecast data returned)")
+        _api_err = _wd.get("message") or _wd.get("error") or "no forecast data returned"
+        _text_parts.append(f"\nWeather: unavailable ({_api_err})")
     if isinstance(_wd, dict) and _wd.get("forecast"):
         _city  = _wd.get("city", "")
         _state = _wd.get("state", "")
