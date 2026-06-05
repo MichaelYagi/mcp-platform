@@ -15,6 +15,7 @@ Key behavioral facts about the stop mechanism:
 Tests are written to match the actual behavior, not idealized behavior.
 """
 import asyncio
+import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -184,7 +185,12 @@ class TestRunAgentEntryStop:
 class TestCallModelNodeStop:
 
     async def test_stop_after_classifier_halts_main_llm_call(self):
-        """Stop fires in classifier — main LLM call sees stop in llm_ainvoke → CancelledError."""
+        """Stop fires in classifier — main LLM call sees stop in llm_ainvoke → CancelledError.
+
+        LLM_ROUTING_MODEL is cleared so the mock handles the routing classifier
+        (call 1, sets stop) and the subsequent main LLM call hits llm_ainvoke's
+        polling loop with stop already set, raising CancelledError immediately.
+        """
         clear_stop()
 
         call_count = 0
@@ -192,19 +198,17 @@ class TestCallModelNodeStop:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                # Classifier sets stop and returns context_sufficient=true
-                # (context_sufficient=true skips confidence check)
                 request_stop()
                 return AIMessage(content='{"context_sufficient": true, "needs_rag": false, "needs_web_search": false, "tool_tags": []}')
-            # Main LLM call — llm_ainvoke polls and fires CancelledError before this returns
             await asyncio.sleep(5)
             return AIMessage(content="never")
 
-        llm, bound = make_mock_llm(side_effect=llm_side_effect)
-        agent = create_langgraph_agent(bound, [])
+        with patch.dict(os.environ, {"LLM_ROUTING_MODEL": ""}):
+            llm, bound = make_mock_llm(side_effect=llm_side_effect)
+            agent = create_langgraph_agent(bound, [])
 
-        with pytest.raises(asyncio.CancelledError):
-            await invoke(agent, llm=llm)
+            with pytest.raises(asyncio.CancelledError):
+                await invoke(agent, llm=llm)
         clear_stop()
 
     async def test_stop_set_before_graph_entry_aborts_call_model(self):
@@ -254,7 +258,12 @@ class TestRoutingClassifierStop:
 class TestMainLlmCallStop:
 
     async def test_stop_during_main_llm_call_cancels(self):
-        """Stop fires mid-inference during main LLM call — CancelledError raised."""
+        """Stop fires mid-inference during main LLM call — CancelledError raised.
+
+        LLM_ROUTING_MODEL is cleared so the mock handles both the routing
+        classifier (call 1, fast) and the main LLM inference (call 2, slow),
+        allowing llm_ainvoke's polling loop to catch the stop signal.
+        """
         clear_stop()
 
         call_count = 0
@@ -269,11 +278,12 @@ class TestMainLlmCallStop:
             await asyncio.sleep(5)
             return AIMessage(content="never")
 
-        llm, bound = make_mock_llm(side_effect=llm_side_effect)
-        agent = create_langgraph_agent(bound, [])
+        with patch.dict(os.environ, {"LLM_ROUTING_MODEL": ""}):
+            llm, bound = make_mock_llm(side_effect=llm_side_effect)
+            agent = create_langgraph_agent(bound, [])
 
-        with pytest.raises(asyncio.CancelledError):
-            await invoke(agent, llm=llm)
+            with pytest.raises(asyncio.CancelledError):
+                await invoke(agent, llm=llm)
 
         clear_stop()
 
@@ -516,7 +526,11 @@ class TestIngestNodeStop:
 class TestNonToolLlmPathStop:
 
     async def test_stop_during_main_llm_inference_cancels(self):
-        """Stop fires mid-inference during general knowledge LLM call."""
+        """Stop fires mid-inference during general knowledge LLM call.
+
+        LLM_ROUTING_MODEL is cleared so the mock handles both the routing
+        classifier (call 1, fast) and the main LLM inference (call 2, slow).
+        """
         clear_stop()
 
         call_count = 0
@@ -529,11 +543,12 @@ class TestNonToolLlmPathStop:
             await asyncio.sleep(5)
             return AIMessage(content="never")
 
-        llm, bound = make_mock_llm(side_effect=llm_side_effect)
-        agent = create_langgraph_agent(bound, [])
+        with patch.dict(os.environ, {"LLM_ROUTING_MODEL": ""}):
+            llm, bound = make_mock_llm(side_effect=llm_side_effect)
+            agent = create_langgraph_agent(bound, [])
 
-        with pytest.raises(asyncio.CancelledError):
-            await invoke(agent, message="What is photosynthesis?", llm=llm)
+            with pytest.raises(asyncio.CancelledError):
+                await invoke(agent, message="What is photosynthesis?", llm=llm)
 
         clear_stop()
 

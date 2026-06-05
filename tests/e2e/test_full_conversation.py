@@ -23,7 +23,7 @@ class TestFullConversation:
         # Track responses across turns
         responses = []
 
-        async def mock_run_agent(agent, conv_state, user_msg, logger, tools, system_prompt):
+        async def mock_run_agent(agent, conv_state, user_msg, logger, tools, system_prompt, **kwargs):
             response_text = f"Response to: {user_msg}"
             responses.append(response_text)
             msg = AIMessage(content=response_text)
@@ -170,7 +170,7 @@ class TestFullConversation:
         # Pre-create the session as websocket_handler would
         session_id = session_manager.create_session()
 
-        async def mock_run_agent(agent, conv_state, user_msg, logger, tools, system_prompt):
+        async def mock_run_agent(agent, conv_state, user_msg, logger, tools, system_prompt, **kwargs):
             return {
                 "messages": conv_state.get("messages", []) + [AIMessage(content="OK")],
                 "current_model": "test-model"

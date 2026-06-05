@@ -1789,6 +1789,19 @@ function removeFavorite(toolName) {
 })();
 
 let _pipelineSteps = []; // [{name, template, outputType}]
+let _pipelinePrefix = ""; // free text typed before the first tool was clicked
+
+// When the user manually edits the input, clear pipeline state if the text no
+// longer matches the generated pipeline prompt — this un-greys incompatible tools.
+input.addEventListener('input', () => {
+    if (_pipelineSteps.length === 0) return;
+    if (input.value.trim() !== buildPipelinePrompt().trim()) {
+        _pipelineSteps = [];
+        _pipelinePrefix = "";
+        updatePipelineUI();
+        renderToolsPanel(_allTools);
+    }
+});
 
 function pipelineIsToolSelectable(tool) {
     if (_pipelineSteps.length === 0) return true;
@@ -1829,9 +1842,22 @@ function pipelineHasTool(name) {
 
 function pipelineToggleTool(tool) {
     const name = tool.name;
+    const inputEl = document.getElementById('input');
     if (pipelineHasTool(name)) {
         _pipelineSteps = _pipelineSteps.filter(s => s.name !== name);
+        // When the last tool is removed, restore the original prefix text.
+        if (_pipelineSteps.length === 0) {
+            if (inputEl) inputEl.value = _pipelinePrefix;
+            _pipelinePrefix = "";
+        } else {
+            if (inputEl) inputEl.value = buildPipelinePrompt();
+        }
     } else {
+        // On the very first tool click, capture whatever is already in the
+        // input so it isn't lost when the tool template is inserted.
+        if (_pipelineSteps.length === 0 && inputEl) {
+            _pipelinePrefix = inputEl.value.trim();
+        }
         let template = tool.template || `use ${name}`;
         if (_pipelineSteps.length > 0) {
             const prev = _pipelineSteps[_pipelineSteps.length - 1];
@@ -1845,20 +1871,18 @@ function pipelineToggleTool(tool) {
             pipeTargets: tool.pipe_targets || {},
             isSink:      (tool.output_type || "text") === "none",
         });
+        if (inputEl) inputEl.value = buildPipelinePrompt();
     }
-    const inputEl = document.getElementById('input');
-    if (inputEl) inputEl.value = buildPipelinePrompt();
     updatePipelineUI();
     renderToolsPanel(_allTools);
 }
 
 function buildPipelinePrompt() {
-    return _pipelineSteps.map(s => {
-        // Use template but strip leading "use " prefix handling
+    const tools = _pipelineSteps.map(s => {
         const t = s.template || `use ${s.name}`;
-        // Normalise: ensure it starts with "use "
         return t.startsWith('use ') ? t : `use ${s.name}`;
     }).join(' | ');
+    return _pipelinePrefix ? `${_pipelinePrefix} ${tools}` : tools;
 }
 
 function updatePipelineUI() {
@@ -1874,12 +1898,16 @@ function sendPipeline() {
         inputEl.focus();
     }
     _pipelineSteps = [];
+    _pipelinePrefix = "";
     updatePipelineUI();
     renderToolsPanel(_allTools);
 }
 
 function clearPipeline() {
+    const inputEl = document.getElementById('input');
+    if (inputEl && _pipelinePrefix) inputEl.value = _pipelinePrefix;
     _pipelineSteps = [];
+    _pipelinePrefix = "";
     updatePipelineUI();
     renderToolsPanel(_allTools);
 }

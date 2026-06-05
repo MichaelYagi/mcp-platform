@@ -8,6 +8,8 @@ Comprehensive tests for client/proactive_agent.py covering:
   - handle_jobs_command (:jobs list/pause/enable/cancel/info)
   - AgentScheduler._check_condition — condition eval, validation, context building
   - once-trigger past-date guard
+  - ScheduleParser one-time detection: explicit am/pm, military time, ambiguous
+    nearest-future, recurrence guard, tomorrow date when time has passed
 """
 import asyncio
 import json
@@ -496,3 +498,232 @@ class TestConditionExpressionGuard:
     def test_safe_expressions_pass(self):
         for expr in self.SAFE:
             assert self._is_safe(expr), f"Should pass: {expr!r}"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ScheduleParser — one-time time-resolution logic
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestScheduleParserTimeResolution:
+    """
+    Tests for the deterministic time-parsing block inside ScheduleParser.parse().
+
+    We feed the parser a fake LLM response whose cron is deliberately wrong
+    and verify that the correct time is read from the original prompt instead.
+    The LLM function is stubbed so no real inference happens.
+    """
+
+    def _make_llm_fn(self, cron: str, label: str = "Test Job"):
+        """Return an async LLM stub that emits a ready JSON with the given cron."""
+        import json as _json
+
+        async def _llm(system: str, user_message: str) -> str:
+            return _json.dumps({
+                "status": "ready",
+                "trigger_type": "cron",
+                "cron": cron,
+                "label": label,
+                "tool": "get_day_briefing",
+                "human_schedule": "placeholder",
+            })
+
+        return _llm
+
+    async def _parse(self, prompt: str, cron: str):
+        """Run ScheduleParser.parse() with a stubbed LLM."""
+        from client.proactive_agent import ScheduleParser
+        parser = ScheduleParser(
+            llm_fn=self._make_llm_fn(cron),
+            available_tools=["get_day_briefing", "discord_notify"],
+        )
+        return await parser.parse(prompt)
+
+    # ── Explicit am/pm overrides wrong LLM cron ─────────────────────
+
+    @pytest.mark.asyncio
+    async def test_explicit_ampm_overrides_cron(self):
+        """'At 4:03pm' — LLM cron says 4:15, prompt must win."""
+        from client.proactive_agent import ScheduleConfirmation
+        result = await self._parse("At 4:03pm, use get_day_briefing", cron="15 16 * * *")
+        assert isinstance(result, ScheduleConfirmation)
+        assert "4:03" in result.human_schedule
+        assert "T16:03:00" in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_explicit_am(self):
+        result = await self._parse("At 9:30am use get_day_briefing", cron="45 9 * * *")
+        from client.proactive_agent import ScheduleConfirmation
+        assert isinstance(result, ScheduleConfirmation)
+        assert "9:30" in result.human_schedule
+        assert "T09:30:00" in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_12pm_noon(self):
+        result = await self._parse("At 12:00pm use get_day_briefing", cron="0 11 * * *")
+        from client.proactive_agent import ScheduleConfirmation
+        assert isinstance(result, ScheduleConfirmation)
+        assert "T12:00:00" in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_12am_midnight(self):
+        result = await self._parse("At 12:00am use get_day_briefing", cron="0 1 * * *")
+        from client.proactive_agent import ScheduleConfirmation
+        assert isinstance(result, ScheduleConfirmation)
+        assert "T00:00:00" in result.run_date
+
+    # ── Military (24-hour) time ──────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_military_time(self):
+        result = await self._parse("At 16:03 use get_day_briefing", cron="15 17 * * *")
+        from client.proactive_agent import ScheduleConfirmation
+        assert isinstance(result, ScheduleConfirmation)
+        assert "T16:03:00" in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_military_time_20_30(self):
+        result = await self._parse("At 20:30 use get_day_briefing", cron="0 21 * * *")
+        from client.proactive_agent import ScheduleConfirmation
+        assert isinstance(result, ScheduleConfirmation)
+        assert "T20:30:00" in result.run_date
+
+    # ── Ambiguous time — nearest future ─────────────────────────────
+    # These tests compute the expected result dynamically so they pass
+    # regardless of when the test suite runs (no frozen-clock dependency).
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_picks_nearest_future_hour(self):
+        """'at 3' resolves to whichever 3 o'clock is next from now."""
+        from datetime import datetime, date, timedelta
+        from client.proactive_agent import ScheduleConfirmation
+
+        result = await self._parse("at 3 use get_day_briefing", cron="0 3 * * *")
+        assert isinstance(result, ScheduleConfirmation)
+
+        now = datetime.now()
+        cur_min = now.hour * 60 + now.minute
+        am_until = (3 * 60 - cur_min) % (24 * 60)
+        pm_until = (15 * 60 - cur_min) % (24 * 60)
+        expected_h = 3 if am_until <= pm_until else 15
+        past = (expected_h * 60) <= cur_min
+        expected_date = (date.today() + timedelta(days=1) if past else date.today()).isoformat()
+
+        assert f"T{expected_h:02d}:00:00" in result.run_date
+        assert expected_date in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_picks_nearest_future_2(self):
+        """'at 2' resolves to whichever 2 o'clock is next from now."""
+        from datetime import datetime, date, timedelta
+        from client.proactive_agent import ScheduleConfirmation
+
+        result = await self._parse("at 2 use get_day_briefing", cron="0 14 * * *")
+        assert isinstance(result, ScheduleConfirmation)
+
+        now = datetime.now()
+        cur_min = now.hour * 60 + now.minute
+        am_until = (2 * 60 - cur_min) % (24 * 60)
+        pm_until = (14 * 60 - cur_min) % (24 * 60)
+        expected_h = 2 if am_until <= pm_until else 14
+        past = (expected_h * 60) <= cur_min
+        expected_date = (date.today() + timedelta(days=1) if past else date.today()).isoformat()
+
+        assert f"T{expected_h:02d}:00:00" in result.run_date
+        assert expected_date in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_with_minutes(self):
+        """'at 3:30' resolves to whichever 3:30 is next from now."""
+        from datetime import datetime, date, timedelta
+        from client.proactive_agent import ScheduleConfirmation
+
+        result = await self._parse("at 3:30 use get_day_briefing", cron="30 3 * * *")
+        assert isinstance(result, ScheduleConfirmation)
+
+        now = datetime.now()
+        cur_min = now.hour * 60 + now.minute
+        am_until = (3 * 60 + 30 - cur_min) % (24 * 60)
+        pm_until = (15 * 60 + 30 - cur_min) % (24 * 60)
+        expected_h = 3 if am_until <= pm_until else 15
+        past = (expected_h * 60 + 30) <= cur_min
+        expected_date = (date.today() + timedelta(days=1) if past else date.today()).isoformat()
+
+        assert f"T{expected_h:02d}:30:00" in result.run_date
+        assert expected_date in result.run_date
+
+    # ── Recurrence guard — daily keywords stay as cron ───────────────
+
+    @pytest.mark.asyncio
+    async def test_every_day_stays_cron(self):
+        """'every day at 3pm' must NOT be converted to once."""
+        from client.proactive_agent import ScheduleConfirmation, ScheduleClarification
+        from client.proactive_agent import ScheduleParser
+        import json as _json
+
+        async def _llm(system, user_message):
+            return _json.dumps({
+                "status": "ready",
+                "trigger_type": "cron",
+                "cron": "0 15 * * *",
+                "label": "Daily",
+                "tool": "get_day_briefing",
+                "human_schedule": "Every day at 3pm",
+            })
+
+        parser = ScheduleParser(llm_fn=_llm, available_tools=["get_day_briefing"])
+        result = await parser.parse("every day at 3pm use get_day_briefing")
+        assert isinstance(result, ScheduleConfirmation)
+        assert result.trigger_type == "cron"
+        assert result.run_date is None
+
+    @pytest.mark.asyncio
+    async def test_daily_keyword_stays_cron(self):
+        from client.proactive_agent import ScheduleConfirmation, ScheduleParser
+        import json as _json
+
+        async def _llm(system, user_message):
+            return _json.dumps({
+                "status": "ready",
+                "trigger_type": "cron",
+                "cron": "0 7 * * *",
+                "label": "Morning",
+                "tool": "get_day_briefing",
+                "human_schedule": "Daily at 7am",
+            })
+
+        parser = ScheduleParser(llm_fn=_llm, available_tools=["get_day_briefing"])
+        result = await parser.parse("daily at 7am use get_day_briefing")
+        assert isinstance(result, ScheduleConfirmation)
+        assert result.trigger_type == "cron"
+
+    # ── today/tomorrow label ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_future_time_labeled_today(self):
+        """11:59pm is virtually always in the future → should say today."""
+        from datetime import date, datetime
+        from client.proactive_agent import ScheduleConfirmation
+
+        if datetime.now().hour == 23 and datetime.now().minute >= 59:
+            pytest.skip("Skipped: test runs too close to midnight")
+
+        result = await self._parse("At 11:59pm use get_day_briefing", cron="59 23 * * *")
+        assert isinstance(result, ScheduleConfirmation)
+        assert "today" in result.human_schedule
+        assert date.today().isoformat() in result.run_date
+
+    @pytest.mark.asyncio
+    async def test_past_time_labeled_tomorrow(self):
+        """1:00am is past for 23 of 24 hours → should say tomorrow."""
+        from datetime import date, datetime, timedelta
+        from client.proactive_agent import ScheduleConfirmation
+
+        if datetime.now().hour == 0:
+            pytest.skip("Skipped: test runs between midnight and 1am")
+
+        result = await self._parse("At 1:00am use get_day_briefing", cron="0 1 * * *")
+        assert isinstance(result, ScheduleConfirmation)
+        assert "tomorrow" in result.human_schedule
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        assert tomorrow in result.run_date

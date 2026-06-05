@@ -662,17 +662,81 @@ class ScheduleParser:
                     len(_cron_parts) == 5 and
                     _cron_parts[2] != "*" and _cron_parts[3] != "*"
                 )
-                if _one_time_signals or _is_specific_date:
+                # Bare time expression with no recurrence keywords → implicitly "today".
+                # e.g. "At 3:53pm, use get_day_briefing" has no "every"/"daily" signal,
+                # so a cron with wildcards on all day fields means once today.
+                _has_recurrence = bool(_re_once.search(
+                    r'\b(every|daily|nightly|weekly|monthly|each\s+(day|morning|afternoon|evening|night|week|month)|recurring|always|forever)\b',
+                    original, _re_once.IGNORECASE
+                ))
+                _is_wildcard_day = (
+                    len(_cron_parts) == 5 and
+                    _cron_parts[2] == "*" and _cron_parts[3] == "*" and _cron_parts[4] == "*"
+                )
+                _is_bare_time_once = _is_wildcard_day and not _has_recurrence
+                if _one_time_signals or _is_specific_date or _is_bare_time_once:
                     ttype = "once"
                     data["trigger_type"] = "once"
                     _run_date = None
-                    if len(_cron_parts) >= 2 and _cron_parts[0].isdigit() and _cron_parts[1].isdigit():
-                        from datetime import date as _date
-                        _run_date = f"{_date.today().isoformat()}T{int(_cron_parts[1]):02d}:{int(_cron_parts[0]):02d}:00"
-                        _h, _m = int(_cron_parts[1]), int(_cron_parts[0])
+                    from datetime import date as _date, timedelta as _td, datetime as _dtnow
+
+                    # ── Resolve the intended time from the original prompt ──────
+                    # Priority: explicit am/pm → unambiguous 24-hr → ambiguous
+                    # (nearest future) → LLM cron fallback.
+                    # The LLM-generated cron can drift from what the user typed,
+                    # so the prompt text is authoritative whenever parseable.
+                    _h = _m = None
+
+                    _apt = _re_once.search(
+                        r'\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b',
+                        original, _re_once.IGNORECASE
+                    )
+                    if _apt:
+                        # Explicit 12-hour with am/pm
+                        _h = int(_apt.group(1))
+                        _m = int(_apt.group(2) or 0)
+                        _ampm = _apt.group(3).lower()
+                        if _ampm == 'pm' and _h != 12:
+                            _h += 12
+                        elif _ampm == 'am' and _h == 12:
+                            _h = 0
+                    else:
+                        _milt = _re_once.search(r'\b(1[3-9]|2[0-3]):([0-5]\d)\b', original)
+                        if _milt:
+                            # Unambiguous 24-hour (13:00-23:59)
+                            _h, _m = int(_milt.group(1)), int(_milt.group(2))
+                        else:
+                            # Ambiguous "at N" / "at N:MM" — pick nearest future am or pm
+                            _ambt = _re_once.search(
+                                r'\bat\s+(\d{1,2})(?::(\d{2}))?\b',
+                                original, _re_once.IGNORECASE
+                            )
+                            if _ambt and 1 <= int(_ambt.group(1)) <= 12:
+                                _raw_h = int(_ambt.group(1))
+                                _raw_m = int(_ambt.group(2) or 0)
+                                _now = _dtnow.now()
+                                _cur_min = _now.hour * 60 + _now.minute
+                                _am_h = _raw_h % 12        # 12am → 0, others unchanged
+                                _pm_h = _raw_h % 12 + 12   # 12pm → 12, others + 12
+                                # Minutes until each occurrence, wrapping past midnight
+                                _am_until = (_am_h * 60 + _raw_m - _cur_min) % (24 * 60)
+                                _pm_until = (_pm_h * 60 + _raw_m - _cur_min) % (24 * 60)
+                                _h = _am_h if _am_until <= _pm_until else _pm_h
+                                _m = _raw_m
+                            elif len(_cron_parts) >= 2 and _cron_parts[0].isdigit() and _cron_parts[1].isdigit():
+                                # LLM cron fallback
+                                _h, _m = int(_cron_parts[1]), int(_cron_parts[0])
+
+                    if _h is not None:
+                        # Use tomorrow if the resolved time has already passed today
+                        _now2 = _dtnow.now()
+                        _past = (_h * 60 + _m) <= (_now2.hour * 60 + _now2.minute)
+                        _run_date_base = _date.today() + _td(days=1) if _past else _date.today()
+                        _day_label = "tomorrow" if _past else "today"
+                        _run_date = f"{_run_date_base.isoformat()}T{_h:02d}:{_m:02d}:00"
                         _suffix = "am" if _h < 12 else "pm"
                         _h12 = _h if 1 <= _h <= 12 else (12 if _h == 0 else _h - 12)
-                        data["human_schedule"] = f"Once at {_h12}:{_m:02d}{_suffix} today"
+                        data["human_schedule"] = f"Once at {_h12}:{_m:02d}{_suffix} {_day_label}"
                     if _run_date:
                         data["run_date"] = _run_date
 

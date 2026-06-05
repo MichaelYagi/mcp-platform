@@ -414,6 +414,10 @@ const IMG_SINK  = { name: 'analyze_image_tool',  output_type: 'text', pipe_targe
 
 beforeEach(() => {
     ui.clearPipeline();
+    // Also clear the input so that a prefix restored by clearPipeline()
+    // isn't captured as the prefix for the next test.
+    const input = document.getElementById('input');
+    if (input) input.value = '';
 });
 
 describe('pipelineIsToolSelectable — empty pipeline', () => {
