@@ -238,11 +238,11 @@ One-time setup. After completing these steps the server runs headlessly.
 2. Enable **Gmail API** and **Google Calendar API**
 3. Create an OAuth **Desktop app** client and download `credentials.json`
 4. Place at `servers/google/credentials.json`
-5. Publish app to **In Production** (prevents token expiry every 7 days)
+5. Publish app to **In Production** — this is required. Apps left in "Testing" mode have tokens that expire every 7 days, causing `invalid_grant` errors on scheduled jobs
 6. Run: `.venv/bin/python auth_google.py`
 7. Restart: `python client.py`
 
-> ⚠️ If token becomes invalid: delete `servers/google/token.json` and re-run step 6.
+**If the token expires later:** the platform detects it on the next Google tool call and shows a re-authorisation banner in the UI with a link. Click the link, approve access, paste the authorisation code into the chat — no server restart needed. Alternatively, delete `servers/google/token.json` and re-run step 6.
 
 ---
 
@@ -823,9 +823,11 @@ netstat -an | grep LISTEN   # check ports 8765, 8766, 9000
 - To confirm which provider is being used, check logs for `🔍 Ollama web search` vs `🔍 LangSearch web search`
 
 
+**Google / OAuth issues:**
 - Confirm `servers/google/token.json` exists — if not, re-run `auth_google.py`
 - Confirm Gmail API and Calendar API are enabled in Google Cloud Console
-- Confirm OAuth app is published to **In Production**
+- Confirm OAuth app is published to **In Production** (Testing mode tokens expire every 7 days)
+- `invalid_grant` at runtime: the re-auth banner will appear in the UI automatically — follow the link, approve, paste the code into chat
 
 **RAG not working:**
 - Ensure Ollama is running: `ollama serve`
