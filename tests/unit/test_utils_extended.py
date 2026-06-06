@@ -14,9 +14,6 @@ from unittest.mock import patch, MagicMock
 
 @pytest.mark.unit
 class TestGetPublicIp:
-    def test_always_fails():
-        assert False, "CI failure detection check — delete this"
-
     def test_returns_ip_string_on_success(self):
         from client.utils import get_public_ip
         with patch("requests.get") as mock_get:
