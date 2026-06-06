@@ -359,14 +359,14 @@ def gmail_get_unread(max_results: int = 25) -> str:
     lines = []
     for _i, em in enumerate(emails, 1):
         _summary = _summaries.get(_i) or (em["preview"][:120] + "…" if len(em["preview"]) > 120 else em["preview"])
-        lines.append(f"{_i}. {em['subject']}")
-        lines.append(f"   From:    {em['from']}")
-        lines.append(f"   Date:    {em['date']}")
-        lines.append(f"   Summary: {_summary}")
+        lines.append(f"{_i}. **{em['subject']}**")
+        lines.append(f"   **From:** {em['from']}")
+        lines.append(f"   **Date:** {em['date']}")
+        lines.append(f"   **Summary:** {_summary}")
         if em.get("id"):
-            lines.append(f"   ID:      {em['id']}")
+            lines.append(f"   **ID:** {em['id']}")
         if em.get("link"):
-            lines.append(f"   Link:    {em['link']}")
+            lines.append(f"   **Link:** {em['link']}")
         lines.append("")
 
     return json.dumps({
@@ -458,14 +458,14 @@ def gmail_get_recent(max_results: int = 10) -> str:
         lines = []
         for _i, em in enumerate(emails, 1):
             _summary = _summaries.get(_i) or (em["preview"][:120] + "…" if len(em["preview"]) > 120 else em["preview"])
-            lines.append(f"{_i}. {em['subject']}")
-            lines.append(f"   From:    {em['from']}")
-            lines.append(f"   Date:    {em['date']}")
-            lines.append(f"   Summary: {_summary}")
+            lines.append(f"{_i}. **{em['subject']}**")
+            lines.append(f"   **From:** {em['from']}")
+            lines.append(f"   **Date:** {em['date']}")
+            lines.append(f"   **Summary:** {_summary}")
             if em.get("id"):
-                lines.append(f"   ID:      {em['id']}")
+                lines.append(f"   **ID:** {em['id']}")
             if em.get("link"):
-                lines.append(f"   Link:    {em['link']}")
+                lines.append(f"   **Link:** {em['link']}")
             lines.append("")
 
         logger.info(f"✅ Fetched {len(emails)} recent emails")
@@ -856,20 +856,20 @@ def calendar_get_today() -> str:
     else:
         lines = []
         for i, ev in enumerate(events, 1):
-            lines.append(f"{i}. {ev['title']}")
-            lines.append(f"   - When: {ev['when']}")
+            lines.append(f"{i}. **{ev['title']}**")
+            lines.append(f"   **When:** {ev['when']}")
             if ev.get("notes"):
-                lines.append(f"   - Notes: {ev['notes'][:200]}")
+                lines.append(f"   **Notes:** {ev['notes'][:200]}")
             if ev.get("location"):
-                lines.append(f"   - Location: {ev['location']}")
+                lines.append(f"   **Location:** {ev['location']}")
             if ev.get("attendees"):
-                lines.append(f"   - Attendees: {ev['attendees']}")
+                lines.append(f"   **Attendees:** {ev['attendees']}")
             if ev.get("organizer"):
-                lines.append(f"   - Organizer: {ev['organizer']}")
+                lines.append(f"   **Organizer:** {ev['organizer']}")
             if ev.get("meet_link"):
-                lines.append(f"   - Meet: {ev['meet_link']}")
+                lines.append(f"   **Meet:** {ev['meet_link']}")
             if ev.get("calendar_link"):
-                lines.append(f"   - Calendar Link: {ev['calendar_link']}")
+                lines.append(f"   **Calendar:** {ev['calendar_link']}")
         text_out = "\n".join(lines)
 
     return json.dumps({
@@ -999,22 +999,22 @@ def calendar_get_this_week() -> str:
     total = sum(len(v) for v in by_day.values())
     lines = []
     for day in sorted(by_day.keys()):
-        lines.append(day_labels[day])
+        lines.append(f"**{day_labels[day]}**")
         for i, ev in enumerate(by_day[day], 1):
-            lines.append(f"  {i}. {ev['title']}")
-            lines.append(f"     - When: {ev['when']}")
+            lines.append(f"  {i}. **{ev['title']}**")
+            lines.append(f"     **When:** {ev['when']}")
             if ev.get("notes"):
-                lines.append(f"     - Notes: {ev['notes'][:200]}")
+                lines.append(f"     **Notes:** {ev['notes'][:200]}")
             if ev.get("location"):
-                lines.append(f"     - Location: {ev['location']}")
+                lines.append(f"     **Location:** {ev['location']}")
             if ev.get("attendees"):
-                lines.append(f"     - Attendees: {ev['attendees']}")
+                lines.append(f"     **Attendees:** {ev['attendees']}")
             if ev.get("organizer"):
-                lines.append(f"     - Organizer: {ev['organizer']}")
+                lines.append(f"     **Organizer:** {ev['organizer']}")
             if ev.get("meet_link"):
-                lines.append(f"     - Meet: {ev['meet_link']}")
+                lines.append(f"     **Meet:** {ev['meet_link']}")
             if ev.get("calendar_link"):
-                lines.append(f"     - Calendar Link: {ev['calendar_link']}")
+                lines.append(f"     **Calendar:** {ev['calendar_link']}")
         lines.append("")
 
     return json.dumps({
@@ -1375,16 +1375,16 @@ def gmail_search(query: str, max_results: int = 20) -> str:
 
         lines = []
         for i, m in enumerate(messages, 1):
-            lines.append(f"{i}. {m['subject']}")
-            lines.append(f"   From:    {m['from']}")
-            lines.append(f"   Date:    {m['date']}")
-            lines.append(f"   Snippet: {m['snippet'][:120]}{'…' if len(m['snippet']) > 120 else ''}")
+            lines.append(f"{i}. **{m['subject']}**")
+            lines.append(f"   **From:** {m['from']}")
+            lines.append(f"   **Date:** {m['date']}")
+            lines.append(f"   **Snippet:** {m['snippet'][:120]}{'…' if len(m['snippet']) > 120 else ''}")
             if m.get("id"):
-                lines.append(f"   ID:      {m['id']}")
+                lines.append(f"   **ID:** {m['id']}")
             if m.get("thread_id"):
-                lines.append(f"   Thread:  {m['thread_id']}")
+                lines.append(f"   **Thread:** {m['thread_id']}")
             if m.get("link"):
-                lines.append(f"   Link:    {m['link']}")
+                lines.append(f"   **Link:** {m['link']}")
             lines.append("")
 
         logger.info(f"✅ gmail_search returned {len(messages)} messages for query={query!r}")
@@ -1778,21 +1778,21 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
                             logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
                     events.sort(key=lambda e: e.get("start", ""))
                     _cal_lines = []
-                    for _ev in events:
-                        _cal_lines.append(f"• Event: {_ev['title']}")
-                        _cal_lines.append(f"  - When: {_ev['when']}")
+                    for _i_ev, _ev in enumerate(events, 1):
+                        _cal_lines.append(f"{_i_ev}. **{_ev['title']}**")
+                        _cal_lines.append(f"   **When:** {_ev['when']}")
                         if _ev.get("notes"):
-                            _cal_lines.append(f"  - Notes: {_ev['notes'][:200]}")
+                            _cal_lines.append(f"   **Notes:** {_ev['notes'][:200]}")
                         if _ev.get("location"):
-                            _cal_lines.append(f"  - Location: {_ev['location']}")
+                            _cal_lines.append(f"   **Location:** {_ev['location']}")
                         if _ev.get("organizer"):
-                            _cal_lines.append(f"  - Organizer: {_ev['organizer']}")
+                            _cal_lines.append(f"   **Organizer:** {_ev['organizer']}")
                         if _ev.get("attendees"):
-                            _cal_lines.append(f"  - Attendees: {_ev['attendees']}")
+                            _cal_lines.append(f"   **Attendees:** {_ev['attendees']}")
                         if _ev.get("meet_link"):
-                            _cal_lines.append(f"  - Meet Link: {_ev['meet_link']}")
+                            _cal_lines.append(f"   **Meet:** {_ev['meet_link']}")
                         if _ev.get("calendar_link"):
-                            _cal_lines.append(f"  - Calendar Link: {_ev['calendar_link']}")
+                            _cal_lines.append(f"   **Calendar:** {_ev['calendar_link']}")
                         _cal_lines.append("")
                     result["calendar"] = {
                         "date":   start_of_day.strftime("%Y-%m-%d"),
@@ -1810,89 +1810,94 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
 
     # Build a pre-formatted text so _process_tool_result returns it directly
     # without LLM involvement, giving a consistent layout every time.
-    _text_parts = [f"**Date:** {result['date']}"]
+    _text_parts = [f"## {result['date']}"]
 
     _wd = result.get("weather")
     _weather_err = (result.get("errors") or {}).get("weather")
     if _weather_err:
-        _text_parts.append(f"\nWeather: unavailable ({_weather_err})")
+        _text_parts.append(f"\n### Weather\nunavailable ({_weather_err})")
     elif isinstance(_wd, dict) and not _wd.get("forecast"):
         _api_err = _wd.get("message") or _wd.get("error") or "no forecast data returned"
-        _text_parts.append(f"\nWeather: unavailable ({_api_err})")
+        _text_parts.append(f"\n### Weather\nunavailable ({_api_err})")
     if isinstance(_wd, dict) and _wd.get("forecast"):
         _city  = _wd.get("city", "")
         _state = _wd.get("state", "")
         _ctry  = _wd.get("country", "")
         _loc   = ", ".join(p for p in [_city, _state, _ctry] if p)
-        _text_parts.append(f"\nWeather Briefing for {_loc}:")
+        _text_parts.append(f"\n### Weather — {_loc}")
         _cur = _wd.get("current", {})
-        _cur_humidity = _cur.get("humidity")  # e.g. "31%" — available from current conditions
+        _cur_humidity = _cur.get("humidity")
         for _idx, _day in enumerate(_wd.get("forecast", [])):
             _label = _day.get("day_label") or _day.get("date", "")
-            _text_parts.append(f"\nForecast for {_label}:")
-            _text_parts.append(f"Conditions: {_day.get('condition', 'N/A')}")
-            _text_parts.append(f"Precipitation Chance: {_day.get('precipitation_chance', 'N/A')}")
+            _text_parts.append(f"\n**{_label}**")
+            _text_parts.append(f"**Conditions:** {_day.get('condition', 'N/A')} · **Precipitation:** {_day.get('precipitation_chance', 'N/A')}")
             _hi_c = _day.get("max_temp_c"); _hi_f = _day.get("max_temp_f")
             _lo_c = _day.get("min_temp_c"); _lo_f = _day.get("min_temp_f")
             _fl_c = _day.get("feelslike_c"); _fl_f = _day.get("feelslike_f")
+            _temp_parts = []
             if _hi_c is not None:
-                _text_parts.append(f"High Temp: {_hi_c}°C ({_hi_f}°F)")
+                _temp_parts.append(f"**High:** {_hi_c}°C ({_hi_f}°F)")
             if _lo_c is not None:
-                _text_parts.append(f"Low Temp: {_lo_c}°C ({_lo_f}°F)")
+                _temp_parts.append(f"**Low:** {_lo_c}°C ({_lo_f}°F)")
             if _fl_c is not None:
-                _text_parts.append(f"Feels Like: {_fl_c}°C ({_fl_f}°F)")
+                _temp_parts.append(f"**Feels Like:** {_fl_c}°C ({_fl_f}°F)")
+            if _temp_parts:
+                _text_parts.append(" · ".join(_temp_parts))
+            _extra = []
             if _idx == 0 and _cur_humidity and date_offset == 0:
-                _text_parts.append(f"Humidity: {_cur_humidity}")
+                _extra.append(f"**Humidity:** {_cur_humidity}")
             if _day.get("sunrise"):
-                _text_parts.append(f"Sunrise: {_day['sunrise']}")
+                _extra.append(f"**Sunrise:** {_day['sunrise']}")
             if _day.get("sunset"):
-                _text_parts.append(f"Sunset: {_day['sunset']}")
+                _extra.append(f"**Sunset:** {_day['sunset']}")
+            if _extra:
+                _text_parts.append(" · ".join(_extra))
 
     _ed = result.get("email")
     _email_err = (result.get("errors") or {}).get("email")
     if _email_err:
-        _text_parts.append(f"\nEmails: unavailable ({_email_err})")
+        _text_parts.append(f"\n### Emails\nunavailable ({_email_err})")
     elif isinstance(_ed, dict):
         _total = _ed.get("total_unread", 0)
         if _total == 0:
-            _text_parts.append("\nEmails: No unread emails")
+            _text_parts.append("\n### Emails\nNo unread emails")
         else:
-            _text_parts.append(f"\nEmails: {_total} unread email(s)")
+            _text_parts.append(f"\n### Emails — {_total} unread")
             _briefing_emails = _ed.get("emails", [])[:5]
             _briefing_summaries = _summarise_emails(_briefing_emails)
             for _bi, _em in enumerate(_briefing_emails, 1):
                 _summary = _briefing_summaries.get(_bi) or (_em.get("preview", "")[:120])
-                _text_parts.append(f"  {_bi}. {_em.get('subject', '(no subject)')}")
-                _text_parts.append(f"     From:    {_em.get('from', '')}")
-                _text_parts.append(f"     Date:    {_em.get('date', '')}")
+                _text_parts.append(f"\n{_bi}. **{_em.get('subject', '(no subject)')}**")
+                _text_parts.append(f"   **From:** {_em.get('from', '')}")
+                _text_parts.append(f"   **Date:** {_em.get('date', '')}")
                 if _summary:
-                    _text_parts.append(f"     Summary: {_summary}")
+                    _text_parts.append(f"   **Summary:** {_summary}")
                 if _em.get("link"):
-                    _text_parts.append(f"     Link:    {_em['link']}")
+                    _text_parts.append(f"   **Link:** {_em['link']}")
     else:
-        _text_parts.append("\nEmails: unavailable")
+        _text_parts.append("\n### Emails\nunavailable")
 
     _cd = result.get("calendar")
     _cal_err = (result.get("errors") or {}).get("calendar")
     if _cal_err:
-        _text_parts.append(f"\nCalendar: unavailable ({_cal_err})")
+        _text_parts.append(f"\n### Calendar\nunavailable ({_cal_err})")
     elif isinstance(_cd, dict):
         _count = _cd.get("count", 0)
         if _count == 0:
-            _text_parts.append("\nCalendar: No events scheduled")
+            _text_parts.append("\n### Calendar\nNo events scheduled")
         else:
-            _text_parts.append(f"\nCalendar: {_count} event(s)")
+            _text_parts.append(f"\n### Calendar — {_count} event(s)")
             for _ci, _ev in enumerate(_cd.get("events", [])[:5], 1):
-                _text_parts.append(f"  {_ci}. {_ev.get('title', '')}")
-                _text_parts.append(f"     When:     {_ev.get('when', '')}")
+                _text_parts.append(f"\n{_ci}. **{_ev.get('title', '')}**")
+                _text_parts.append(f"   **When:** {_ev.get('when', '')}")
                 if _ev.get("location"):
-                    _text_parts.append(f"     Location: {_ev['location']}")
+                    _text_parts.append(f"   **Location:** {_ev['location']}")
                 if _ev.get("attendees"):
-                    _text_parts.append(f"     Attendees: {_ev['attendees']}")
+                    _text_parts.append(f"   **Attendees:** {_ev['attendees']}")
                 if _ev.get("meet_link"):
-                    _text_parts.append(f"     Meet:     {_ev['meet_link']}")
+                    _text_parts.append(f"   **Meet:** {_ev['meet_link']}")
                 if _ev.get("calendar_link"):
-                    _text_parts.append(f"     Calendar: {_ev['calendar_link']}")
+                    _text_parts.append(f"   **Calendar:** {_ev['calendar_link']}")
 
     result["text"] = "\n".join(_text_parts)
 

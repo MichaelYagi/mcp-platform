@@ -181,7 +181,8 @@ def _run_briefing(date_offset=0, forecast_days=1, max_emails=0, calendar_days=0,
          patch("servers.google.server.GOOGLE_AVAILABLE", True), \
          patch("servers.google.server._gmail_service", return_value=gmail_svc), \
          patch("servers.google.server._calendar_service", return_value=cal_svc), \
-         patch("servers.google.server._get_all_calendar_ids", return_value=["primary"]):
+         patch("servers.google.server._get_all_calendar_ids", return_value=["primary"]), \
+         patch.dict("os.environ", {"GOOGLE_APPS_SCRIPT_URL": ""}):
         from servers.google.server import get_day_briefing
         raw = get_day_briefing(
             date_offset=date_offset,
