@@ -327,7 +327,8 @@ class TestGetWeatherErrors:
              patch("tools.location.resolve_location.resolve_location",
                    return_value={"city": "Surrey", "state": "BC", "country": "Canada"}), \
              patch("requests.get", mock_requests_get), \
-             patch("time.sleep"):  # don't actually sleep in tests
+             patch("time.sleep"), \
+             patch.dict("os.environ", {"OPENWEATHER_API_KEY": ""}):
             from tools.location.get_weather import get_weather
             return json.loads(get_weather("Surrey", "BC", "Canada",
                                          forecast_days=forecast_days))
@@ -398,6 +399,205 @@ class TestGetWeatherErrors:
         mock_get = MagicMock(return_value=resp)
         result = self._call_with_request(mock_get, forecast_days=99)
         assert "forecast" in result or "error" in result
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2b. OpenWeatherMap fallback
+# ═══════════════════════════════════════════════════════════════════
+
+def _owm_current_response(temp=20.0, feels=18.0, humidity=55,
+                           weather_id=800, description="clear sky") -> dict:
+    return {
+        "weather": [{"id": weather_id, "description": description}],
+        "main": {"temp": temp, "feels_like": feels, "humidity": humidity},
+        "sys": {"sunrise": 1748880600, "sunset": 1748933400},
+        "rain": {},
+    }
+
+
+def _owm_forecast_response(temp=20.0, pop=0.1) -> dict:
+    today = date.today().isoformat()
+    return {
+        "list": [
+            {
+                "dt_txt": f"{today} 06:00:00",
+                "weather": [{"id": 800, "description": "clear sky"}],
+                "main": {"temp": temp - 2, "temp_min": temp - 4, "temp_max": temp,
+                         "feels_like": temp - 3, "humidity": 60},
+                "pop": pop,
+            },
+            {
+                "dt_txt": f"{today} 12:00:00",
+                "weather": [{"id": 800, "description": "clear sky"}],
+                "main": {"temp": temp, "temp_min": temp - 4, "temp_max": temp + 2,
+                         "feels_like": temp - 1, "humidity": 55},
+                "pop": pop,
+            },
+            {
+                "dt_txt": f"{today} 18:00:00",
+                "weather": [{"id": 801, "description": "few clouds"}],
+                "main": {"temp": temp - 1, "temp_min": temp - 4, "temp_max": temp + 2,
+                         "feels_like": temp - 2, "humidity": 58},
+                "pop": pop,
+            },
+        ]
+    }
+
+
+@pytest.mark.unit
+class TestOWMConditionMapper:
+
+    def test_clear_sky(self):
+        from tools.location.get_weather import _owm_condition
+        assert "☀️" in _owm_condition(800, "clear sky")
+
+    def test_few_clouds(self):
+        from tools.location.get_weather import _owm_condition
+        assert "🌤️" in _owm_condition(801, "few clouds")
+
+    def test_scattered_clouds(self):
+        from tools.location.get_weather import _owm_condition
+        assert "⛅" in _owm_condition(802, "scattered clouds")
+
+    def test_overcast(self):
+        from tools.location.get_weather import _owm_condition
+        assert "☁️" in _owm_condition(804, "overcast clouds")
+
+    def test_rain(self):
+        from tools.location.get_weather import _owm_condition
+        assert "🌧️" in _owm_condition(500, "light rain")
+
+    def test_thunderstorm(self):
+        from tools.location.get_weather import _owm_condition
+        assert "⛈️" in _owm_condition(200, "thunderstorm")
+
+    def test_snow(self):
+        from tools.location.get_weather import _owm_condition
+        assert "❄️" in _owm_condition(601, "snow")
+
+    def test_fog(self):
+        from tools.location.get_weather import _owm_condition
+        assert "🌫️" in _owm_condition(741, "fog")
+
+    def test_description_capitalised(self):
+        from tools.location.get_weather import _owm_condition
+        result = _owm_condition(800, "clear sky")
+        assert "Clear sky" in result
+
+
+@pytest.mark.unit
+class TestGetWeatherOWMFallback:
+    """OWM is used when Open-Meteo fails."""
+
+    def _call_owm_fallback(self, open_meteo_fail_resp, forecast_days=1) -> dict:
+        geo = _geo_response()
+
+        def _route_get(url, **kwargs):
+            if "open-meteo" in url or "geocoding-api" in url:
+                return open_meteo_fail_resp
+            if "openweathermap" in url and "forecast" in url:
+                return _make_requests_response(_owm_forecast_response())
+            if "openweathermap" in url:
+                return _make_requests_response(_owm_current_response())
+            return MagicMock(ok=False, status_code=500, text="")
+
+        with patch("tools.location.get_weather._geocode", return_value=geo), \
+             patch("tools.location.resolve_location.resolve_location",
+                   return_value={"city": "Surrey", "state": "BC", "country": "Canada"}), \
+             patch("requests.get", side_effect=_route_get), \
+             patch("time.sleep"), \
+             patch.dict("os.environ", {"OPENWEATHER_API_KEY": "test-owm-key"}):
+            from tools.location.get_weather import get_weather
+            return json.loads(get_weather("Surrey", "BC", "Canada",
+                                         forecast_days=forecast_days))
+
+    def test_owm_used_when_open_meteo_http_error(self):
+        bad = _make_requests_response({}, status=500)
+        result = self._call_owm_fallback(bad)
+        assert "forecast" in result
+        assert "error" not in result
+
+    def test_owm_used_when_open_meteo_api_error(self):
+        api_err = _make_requests_response({"error": True, "reason": "out of range"})
+        result = self._call_owm_fallback(api_err)
+        assert "forecast" in result
+        assert "error" not in result
+
+    def test_owm_result_has_current_conditions(self):
+        bad = _make_requests_response({}, status=503)
+        result = self._call_owm_fallback(bad)
+        cur = result.get("current", {})
+        assert "temperature_c" in cur
+        assert "humidity" in cur
+        assert "condition" in cur
+
+    def test_owm_result_has_forecast(self):
+        bad = _make_requests_response({}, status=503)
+        result = self._call_owm_fallback(bad)
+        assert isinstance(result.get("forecast"), list)
+        assert len(result["forecast"]) >= 1
+
+    def test_owm_forecast_day_has_required_fields(self):
+        bad = _make_requests_response({}, status=503)
+        result = self._call_owm_fallback(bad)
+        day = result["forecast"][0]
+        for field in ("date", "day_label", "condition", "precipitation_chance",
+                      "max_temp_c", "max_temp_f", "min_temp_c", "min_temp_f",
+                      "feelslike_c", "feelslike_f"):
+            assert field in day, f"Missing field: {field}"
+
+    def test_owm_today_gets_sunrise_sunset(self):
+        bad = _make_requests_response({}, status=503)
+        result = self._call_owm_fallback(bad)
+        today_entry = next(
+            (d for d in result["forecast"] if d.get("relative_day") == "today"), None
+        )
+        assert today_entry is not None
+        assert today_entry.get("sunrise") is not None
+        assert today_entry.get("sunset") is not None
+
+    def test_owm_condition_uses_emoji(self):
+        bad = _make_requests_response({}, status=503)
+        result = self._call_owm_fallback(bad)
+        condition = result["current"]["condition"]
+        assert any(e in condition for e in ("☀️", "🌤️", "⛅", "☁️", "🌧️", "⛈️", "❄️", "🌫️", "🌦️"))
+
+    def test_owm_city_state_country_preserved(self):
+        bad = _make_requests_response({}, status=503)
+        result = self._call_owm_fallback(bad)
+        assert result["city"] == "Surrey"
+        assert result["state"] == "British Columbia"
+        assert result["country"] == "Canada"
+
+    def test_error_returned_when_both_fail(self):
+        bad_om = _make_requests_response({}, status=500)
+
+        def _all_fail(url, **kwargs):
+            raise ConnectionError("all down")
+
+        geo = _geo_response()
+        with patch("tools.location.get_weather._geocode", return_value=geo), \
+             patch("tools.location.resolve_location.resolve_location",
+                   return_value={"city": "Surrey", "state": "BC", "country": "Canada"}), \
+             patch("requests.get", side_effect=_all_fail), \
+             patch("time.sleep"), \
+             patch.dict("os.environ", {"OPENWEATHER_API_KEY": "test-owm-key"}):
+            from tools.location.get_weather import get_weather
+            result = json.loads(get_weather("Surrey", "BC", "Canada"))
+        assert "error" in result
+
+    def test_no_owm_key_skips_fallback(self):
+        bad = _make_requests_response({}, status=500)
+        geo = _geo_response()
+        with patch("tools.location.get_weather._geocode", return_value=geo), \
+             patch("tools.location.resolve_location.resolve_location",
+                   return_value={"city": "Surrey", "state": "BC", "country": "Canada"}), \
+             patch("requests.get", return_value=bad), \
+             patch("time.sleep"), \
+             patch.dict("os.environ", {"OPENWEATHER_API_KEY": ""}):
+            from tools.location.get_weather import get_weather
+            result = json.loads(get_weather("Surrey", "BC", "Canada"))
+        assert "error" in result
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -94,7 +94,7 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 - `github` - GitHub repo clone, browse, and cleanup (4 tools) ⚠️ *Requires `GITHUB_TOKEN` for private repos*
 - `google` - Gmail + Google Calendar (13 tools) ⚠️ *Requires Google setup (Apps Script or OAuth — see [Google Setup](#google-setup))*
 - `image` - Image search, analysis, and AI generation (6 tools) ⚠️ *Requires `SERPER_API_KEY` for search; generation is free*
-- `location` - Weather, time, location (3 tools)
+- `location` - Weather, time, location (3 tools) — uses Open-Meteo (free, no key); falls back to OpenWeatherMap if `OPENWEATHER_API_KEY` is set
 - `plex` - Media library + ML recommendations (18 tools) ⚠️ *Requires `PLEX_URL`, `PLEX_TOKEN`*
 - `rag` - Vector search and management (8 tools) ⚠️ *Requires Ollama + `bge-large`*
 - `system` - System info and processes (3 tools)
@@ -136,6 +136,7 @@ SHASHIN_API_KEY=your_key_here
 SERPER_API_KEY=your_key_here
 OLLAMA_TOKEN=your_token_here
 LANGSEARCH_API_KEY=your_key_here   # fallback search when Ollama weekly limit is reached
+OPENWEATHER_API_KEY=your_key_here  # fallback weather when Open-Meteo is unavailable
 DISCORD_WEBHOOK_URL=your_webhook_url_here
 
 # === Google Apps Script (alternative to OAuth for Gmail/Calendar) ===

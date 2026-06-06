@@ -239,13 +239,18 @@ class TestUtils:
         with pytest.raises(FileNotFoundError):
             get_venv_python(temp_dir)
 
+    @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
     def test_start_http_server_returns_ip(self, temp_dir):
+        import socket
         from client.utils import start_http_server
 
-        # Start server on a random high port to avoid conflicts
-        result = start_http_server(port=19876)
+        # Grab a free port from the OS, release it, then use it
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            free_port = s.getsockname()[1]
+
+        result = start_http_server(port=free_port)
         assert isinstance(result, str)
-        # Should return a valid IP address
         parts = result.split(".")
         assert len(parts) == 4
 

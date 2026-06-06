@@ -1,4 +1,5 @@
 import json
+import os
 import time
 import urllib.parse
 import requests
@@ -80,11 +81,47 @@ def _get_date_label(date_str: str, today: date = None) -> str:
         return date_str
 
 
+def _geocode_nominatim(city: str, state: Optional[str] = None,
+                       country: Optional[str] = None):
+    """Geocode using Nominatim (OpenStreetMap) — free, no key required."""
+    params = {"city": city, "format": "json", "limit": 5, "addressdetails": 1}
+    if state:
+        params["state"] = state
+    if country:
+        params["country"] = country
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params=params,
+            headers={"User-Agent": "mcp-platform/1.0"},
+            timeout=8,
+        )
+        data = resp.json()
+        if not data:
+            return None
+        best = data[0]
+        addr = best.get("address", {})
+        resolved_city    = (addr.get("city") or addr.get("town") or
+                            addr.get("village") or city)
+        resolved_state   = addr.get("state")   or state   or ""
+        resolved_country = addr.get("country") or country or ""
+        return {
+            "lat": float(best["lat"]),
+            "lon": float(best["lon"]),
+            "city": resolved_city,
+            "state": resolved_state,
+            "country": resolved_country,
+            "timezone": "auto",
+        }
+    except Exception:
+        return None
+
+
 def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = None):
     """
-    Use Open-Meteo's geocoding API to resolve a city name to lat/lon.
-    Returns dict with lat, lon, resolved_city, resolved_state, resolved_country
-    or None on failure.
+    Resolve a city name to lat/lon, trying Open-Meteo geocoding first then
+    falling back to Nominatim (OpenStreetMap).
+    Returns dict with lat, lon, city, state, country, timezone or None on failure.
     """
     query = city
     url = f"https://geocoding-api.open-meteo.com/v1/search?name={requests.utils.quote(query)}&count=10&language=en&format=json"
@@ -93,11 +130,11 @@ def _geocode(city: str, state: Optional[str] = None, country: Optional[str] = No
         text = resp.text.strip()
         data = json.loads(text) if text else {}
     except Exception:
-        return None
+        return _geocode_nominatim(city, state, country)
 
     results = data.get("results", [])
     if not results:
-        return None
+        return _geocode_nominatim(city, state, country)
 
     # Province/state abbreviation → full name (lowercase for comparison)
     _ABBREV = {
@@ -184,6 +221,186 @@ def _fmt_sun(iso: str) -> str:
         return datetime.strptime(iso[:16], "%Y-%m-%dT%H:%M").strftime("%-I:%M %p")
     except Exception:
         return iso
+
+
+def _owm_condition(weather_id: int, description: str) -> str:
+    """Map OpenWeatherMap condition code + description to an emoji-prefixed string."""
+    desc = description.capitalize() if description else "Unknown"
+    if weather_id < 300:
+        return f"⛈️ {desc}"
+    if weather_id < 400:
+        return f"🌦️ {desc}"
+    if weather_id < 600:
+        return f"🌧️ {desc}"
+    if weather_id < 700:
+        return f"❄️ {desc}"
+    if weather_id < 800:
+        return f"🌫️ {desc}"
+    if weather_id == 800:
+        return f"☀️ {desc}"
+    if weather_id == 801:
+        return f"🌤️ {desc}"
+    if weather_id == 802:
+        return f"⛅ {desc}"
+    return f"☁️ {desc}"
+
+
+def _owm_fallback(lat: float, lon: float, api_key: str,
+                  forecast_days: int, geo: dict, timezone: str):
+    """
+    Fetch weather from OpenWeatherMap as a fallback when Open-Meteo is unavailable.
+    Returns a JSON string on success, or None if OWM also fails.
+    """
+    from collections import defaultdict
+
+    base = "https://api.openweathermap.org/data/2.5"
+    params = f"lat={lat}&lon={lon}&appid={api_key}&units=metric"
+
+    try:
+        cur_resp = requests.get(f"{base}/weather?{params}", timeout=10)
+        cur_resp.raise_for_status()
+        cur = cur_resp.json()
+    except Exception:
+        return None
+
+    try:
+        fc_resp = requests.get(f"{base}/forecast?{params}", timeout=10)
+        fc_resp.raise_for_status()
+        fc_data = fc_resp.json()
+    except Exception:
+        fc_data = None
+
+    # --- Current conditions ---
+    w0 = cur.get("weather", [{}])[0]
+    main = cur.get("main", {})
+
+    # Use nearest forecast entry's pop for current precipitation probability
+    cur_pop = 0
+    if fc_data:
+        first = fc_data.get("list", [{}])[0]
+        cur_pop = int(round(first.get("pop", 0) * 100))
+    elif cur.get("rain", {}).get("1h", 0) > 0:
+        cur_pop = 100
+
+    temp_c = main.get("temp")
+    feels_c = main.get("feels_like")
+    current_weather = {
+        "condition": _owm_condition(w0.get("id", 800), w0.get("description", "")),
+        "precipitation_chance": f"{cur_pop}%",
+        "temperature_c": temp_c,
+        "temperature_f": _celsius_to_fahrenheit(temp_c) if temp_c is not None else None,
+        "feelslike_c": feels_c,
+        "feelslike_f": _celsius_to_fahrenheit(feels_c) if feels_c is not None else None,
+        "humidity": f"{main.get('humidity', 0)}%",
+    }
+
+    # --- Today's sunrise/sunset from current weather response ---
+    sys_data = cur.get("sys", {})
+
+    def _fmt_unix_sun(ts):
+        if not ts:
+            return None
+        try:
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(timezone) if timezone and timezone != "auto" else None
+            dt = datetime.fromtimestamp(ts, tz=tz) if tz else datetime.utcfromtimestamp(ts)
+            return dt.strftime("%-I:%M %p")
+        except Exception:
+            return None
+
+    today_sunrise = _fmt_unix_sun(sys_data.get("sunrise"))
+    today_sunset  = _fmt_unix_sun(sys_data.get("sunset"))
+
+    # --- Derive local "today" date for relative labels ---
+    try:
+        from zoneinfo import ZoneInfo
+        _local_tz = ZoneInfo(timezone) if timezone and timezone != "auto" else None
+        today = datetime.now(_local_tz).date() if _local_tz else date.today()
+    except Exception:
+        today = date.today()
+
+    # --- Build daily forecast from 3-hour intervals ---
+    forecast = []
+    if fc_data:
+        day_entries = defaultdict(list)
+        for entry in fc_data.get("list", []):
+            day = entry.get("dt_txt", "")[:10]
+            if day:
+                day_entries[day].append(entry)
+
+        for date_str in sorted(day_entries.keys())[:forecast_days]:
+            entries = day_entries[date_str]
+
+            # Pick the entry closest to noon for representative conditions
+            noon_entry = min(
+                entries,
+                key=lambda e: abs(
+                    datetime.strptime(e["dt_txt"], "%Y-%m-%d %H:%M:%S").hour - 12
+                )
+            )
+            w_noon = noon_entry.get("weather", [{}])[0]
+            all_main = [e.get("main", {}) for e in entries]
+
+            max_c = max(
+                (m.get("temp_max", m.get("temp")) for m in all_main
+                 if m.get("temp_max") is not None or m.get("temp") is not None),
+                default=None
+            )
+            min_c = min(
+                (m.get("temp_min", m.get("temp")) for m in all_main
+                 if m.get("temp_min") is not None or m.get("temp") is not None),
+                default=None
+            )
+            max_pop = max((e.get("pop", 0) for e in entries), default=0)
+            feels_noon = noon_entry.get("main", {}).get("feels_like")
+
+            forecast_date = None
+            relative_day = "unknown"
+            try:
+                forecast_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                days_diff = (forecast_date - today).days
+                if days_diff == 0:
+                    relative_day = "today"
+                elif days_diff == 1:
+                    relative_day = "tomorrow"
+                elif days_diff == 2:
+                    relative_day = "day_after_tomorrow"
+                else:
+                    relative_day = f"{days_diff}_days_from_now"
+            except Exception:
+                pass
+
+            is_today = forecast_date == today if forecast_date else False
+
+            forecast.append({
+                "date": date_str,
+                "day_label": _get_date_label(date_str, today),
+                "relative_day": relative_day,
+                "condition": _owm_condition(w_noon.get("id", 800), w_noon.get("description", "")),
+                "precipitation_chance": f"{int(round(max_pop * 100))}%",
+                "max_temp_c": max_c,
+                "max_temp_f": _celsius_to_fahrenheit(max_c) if max_c is not None else None,
+                "min_temp_c": min_c,
+                "min_temp_f": _celsius_to_fahrenheit(min_c) if min_c is not None else None,
+                "feelslike_c": feels_noon,
+                "feelslike_f": _celsius_to_fahrenheit(feels_noon) if feels_noon is not None else None,
+                "sunrise": today_sunrise if is_today else None,
+                "sunset":  today_sunset  if is_today else None,
+            })
+
+    parts = [p for p in [geo["city"], geo["state"], geo["country"]] if p]
+    maps_query = ", ".join(parts)
+    return json.dumps({
+        "city": geo["city"],
+        "state": geo["state"],
+        "country": geo["country"],
+        "latitude": lat,
+        "longitude": lon,
+        "timezone": timezone,
+        "maps_link": f"[{maps_query}](https://maps.google.com/?q={urllib.parse.quote(maps_query)})",
+        "current": current_weather,
+        "forecast": forecast,
+    }, indent=2)
 
 
 def get_weather(
@@ -294,7 +511,13 @@ def get_weather(
         except Exception as e:
             last_err = str(e)
             time.sleep(1.5)
+    _owm_key = os.getenv("OPENWEATHER_API_KEY", "").strip()
+
     if data is None:
+        if _owm_key:
+            owm = _owm_fallback(lat, lon, _owm_key, forecast_days, geo, timezone)
+            if owm:
+                return owm
         return json.dumps({
             "error": "request_failed",
             "message": last_err,
@@ -304,6 +527,10 @@ def get_weather(
         }, indent=2)
 
     if "error" in data:
+        if _owm_key:
+            owm = _owm_fallback(lat, lon, _owm_key, forecast_days, geo, timezone)
+            if owm:
+                return owm
         return json.dumps({
             "error": "api_error",
             "message": data.get("reason", "Unknown error from Open-Meteo"),
@@ -314,6 +541,13 @@ def get_weather(
 
     current = data.get("current", {})
     daily = data.get("daily", {})
+
+    # Empty response (Open-Meteo returned no usable data)
+    if not current and not daily.get("time"):
+        if _owm_key:
+            owm = _owm_fallback(lat, lon, _owm_key, forecast_days, geo, timezone)
+            if owm:
+                return owm
 
     # --- Build current weather ---
     cur_temp_c = current.get("temperature_2m")

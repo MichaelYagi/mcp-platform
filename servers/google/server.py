@@ -1830,28 +1830,23 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         for _idx, _day in enumerate(_wd.get("forecast", [])):
             _label = _day.get("day_label") or _day.get("date", "")
             _text_parts.append(f"\n**{_label}**")
-            _text_parts.append(f"**Conditions:** {_day.get('condition', 'N/A')} · **Precipitation:** {_day.get('precipitation_chance', 'N/A')}")
+            _text_parts.append(f"**Conditions:** {_day.get('condition', 'N/A')}")
+            _text_parts.append(f"**Precipitation:** {_day.get('precipitation_chance', 'N/A')}")
             _hi_c = _day.get("max_temp_c"); _hi_f = _day.get("max_temp_f")
             _lo_c = _day.get("min_temp_c"); _lo_f = _day.get("min_temp_f")
             _fl_c = _day.get("feelslike_c"); _fl_f = _day.get("feelslike_f")
-            _temp_parts = []
             if _hi_c is not None:
-                _temp_parts.append(f"**High:** {_hi_c}°C ({_hi_f}°F)")
+                _text_parts.append(f"**High:** {_hi_c}°C ({_hi_f}°F)")
             if _lo_c is not None:
-                _temp_parts.append(f"**Low:** {_lo_c}°C ({_lo_f}°F)")
+                _text_parts.append(f"**Low:** {_lo_c}°C ({_lo_f}°F)")
             if _fl_c is not None:
-                _temp_parts.append(f"**Feels Like:** {_fl_c}°C ({_fl_f}°F)")
-            if _temp_parts:
-                _text_parts.append(" · ".join(_temp_parts))
-            _extra = []
+                _text_parts.append(f"**Feels Like:** {_fl_c}°C ({_fl_f}°F)")
             if _idx == 0 and _cur_humidity and date_offset == 0:
-                _extra.append(f"**Humidity:** {_cur_humidity}")
+                _text_parts.append(f"**Humidity:** {_cur_humidity}")
             if _day.get("sunrise"):
-                _extra.append(f"**Sunrise:** {_day['sunrise']}")
+                _text_parts.append(f"**Sunrise:** {_day['sunrise']}")
             if _day.get("sunset"):
-                _extra.append(f"**Sunset:** {_day['sunset']}")
-            if _extra:
-                _text_parts.append(" · ".join(_extra))
+                _text_parts.append(f"**Sunset:** {_day['sunset']}")
 
     _ed = result.get("email")
     _email_err = (result.get("errors") or {}).get("email")
