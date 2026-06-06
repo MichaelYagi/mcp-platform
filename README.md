@@ -138,6 +138,12 @@ OLLAMA_TOKEN=your_token_here
 LANGSEARCH_API_KEY=your_key_here   # fallback search when Ollama weekly limit is reached
 DISCORD_WEBHOOK_URL=your_webhook_url_here
 
+# === Google Apps Script (alternative to OAuth for Gmail/Calendar) ===
+# Paste PASTE_INTO_GOOGLE_APPS_SCRIPT.js into script.google.com, deploy as a Web App,
+# then set the URL with your SECRET_KEY appended as ?key=...
+# When set, get_day_briefing uses the script instead of OAuth.
+GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec?key=your_secret_key_here
+
 # === A2A Protocol ===
 A2A_ENDPOINTS=http://localhost:8010
 A2A_EXPOSED_TOOLS=
@@ -231,6 +237,24 @@ SERPER_API_KEY=<key>
 ```
 
 ### Google Setup
+
+**Option A — Google Apps Script (simpler, no OAuth)**
+
+1. Go to https://script.google.com and create a new project
+2. Delete all existing code and paste the contents of `PASTE_INTO_GOOGLE_APPS_SCRIPT.js`
+3. Replace `<SECRET_KEY>` in the script with any random string you choose (e.g. `x7k2mQp9`)
+4. Click **Deploy > New deployment > Web app**
+   - Execute as: **Me**
+   - Who has access: **Anyone**
+   - Click **Deploy** and copy the Web App URL
+5. Add to `.env`:
+   ```
+   GOOGLE_APPS_SCRIPT_URL=<Web App URL>?key=<your SECRET_KEY>
+   ```
+
+On subsequent script edits, use **Deploy > Manage deployments** and edit the existing deployment — do not create a new one or the URL will change.
+
+**Option B — Google OAuth (full access to all Google tools)**
 
 One-time setup. After completing these steps the server runs headlessly.
 

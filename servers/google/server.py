@@ -20,6 +20,7 @@ import inspect
 import json
 import logging
 import os
+import requests as _requests
 from datetime import datetime, timezone, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -167,6 +168,60 @@ def _not_available(tool_name: str) -> str:
     }, indent=2)
 
 
+def _script_post(payload: dict) -> dict:
+    """POST to the configured Apps Script endpoint. Extracts the key from the URL and includes it in the body."""
+    from urllib.parse import urlparse, parse_qs
+    url = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+    if not url:
+        raise RuntimeError("GOOGLE_APPS_SCRIPT_URL not set")
+    key = parse_qs(urlparse(url).query).get("key", [""])[0]
+    resp = _requests.post(url, json={**payload, "key": key}, timeout=15)
+    resp.raise_for_status()
+    data = resp.json()
+    if "error" in data:
+        raise RuntimeError(data["error"])
+    return data
+
+
+def _summarise_emails(emails: list) -> dict:
+    """Batch-summarise email previews via Ollama. Returns {1-based index: summary string}."""
+    summaries = {}
+    if not emails:
+        return summaries
+    try:
+        import time as _time_mod
+        import urllib.request as _urllib_req
+        _time_mod.sleep(1)
+        _ollama_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+        _model      = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
+        _batch_lines = [
+            f"{i}. From: {em['from']} | Subject: {em['subject']} | Snippet: {em['preview']}"
+            for i, em in enumerate(emails, 1)
+        ]
+        _prompt = (
+            "Summarise each email below in one short sentence (max 15 words). "
+            "Reply ONLY with numbered lines matching the input numbers, nothing else.\n\n"
+            + "\n".join(_batch_lines)
+        )
+        _payload = json.dumps({"model": _model, "prompt": _prompt, "stream": False}).encode()
+        _req = _urllib_req.Request(
+            f"{_ollama_url}/api/generate", data=_payload,
+            headers={"Content-Type": "application/json"}, method="POST",
+        )
+        with _urllib_req.urlopen(_req, timeout=120) as _resp:
+            _resp_text = json.loads(_resp.read().decode()).get("response", "")
+        for _line in _resp_text.strip().splitlines():
+            _line = _line.strip()
+            if _line and _line[0].isdigit():
+                _dot = _line.find(".")
+                if _dot != -1:
+                    summaries[int(_line[:_dot].strip())] = _line[_dot + 1:].strip()
+        logger.info(f"✅ Summarised {len(summaries)} emails in one LLM call")
+    except Exception as e:
+        logger.warning(f"⚠️  Email summarisation failed, using snippets: {e}")
+    return summaries
+
+
 def _parse_message_headers(headers: list) -> dict:
     """Extract common headers from a Gmail message header list."""
     result = {}
@@ -226,114 +281,99 @@ def gmail_get_unread(max_results: int = 25) -> str:
     """
     logger.info(f"🛠  gmail_get_unread called (max={max_results})")
 
-    if not GOOGLE_AVAILABLE:
-        return _not_available("gmail_get_unread")
+    # ── Data collection ───────────────────────────────────────────────────────
+    emails = []
+    total_unread = 0
 
-    try:
-        service = _gmail_service()
-        if not service:
-            raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
-                               {"tool": "gmail_get_unread"})
-
-        result = service.users().messages().list(
-            userId="me",
-            labelIds=["INBOX", "UNREAD"],
-            maxResults=max_results
-        ).execute()
-
-        messages = result.get("messages", [])
-        emails = []
-
-        for msg_ref in messages:
-            msg = service.users().messages().get(
-                userId="me",
-                id=msg_ref["id"],
-                format="metadata",
-                metadataHeaders=["From", "To", "Subject", "Date"]
-            ).execute()
-
-            headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
-            _msg_id = msg["id"]
-            emails.append({
-                "from":    headers.get("from", ""),
-                "subject": headers.get("subject", "(no subject)"),
-                "date":    headers.get("date", ""),
-                "preview": msg.get("snippet", ""),
-                "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
-                "id":      _msg_id,
-            })
-
-        import html as _html
-        for em in emails:
-            em["from"]    = _html.unescape(em["from"])
-            em["subject"] = _html.unescape(em["subject"])
-            em["preview"] = _html.unescape(em["preview"])
-
-        # Batch-summarise all snippets in one Ollama call
-        _summaries = {}
+    if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
         try:
-            import time as _time_mod
-            _time_mod.sleep(1)
-            import urllib.request as _urllib_req
-            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-            _model       = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
-            _batch_lines = []
-            for _i, _em in enumerate(emails, 1):
-                _batch_lines.append(f"{_i}. From: {_em['from']} | Subject: {_em['subject']} | Snippet: {_em['preview']}")
-            _prompt = (
-                "Summarise each email below in one short sentence (max 15 words). "
-                "Reply ONLY with numbered lines matching the input numbers, nothing else.\n\n"
-                + "\n".join(_batch_lines)
-            )
-            _payload = json.dumps({
-                "model": _model,
-                "prompt": _prompt,
-                "stream": False,
-            }).encode()
-            _req = _urllib_req.Request(
-                f"{_ollama_url}/api/generate",
-                data=_payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with _urllib_req.urlopen(_req, timeout=120) as _resp:
-                _resp_json = json.loads(_resp.read().decode())
-                _resp_text = _resp_json.get("response", "")
-            for _line in _resp_text.strip().splitlines():
-                _line = _line.strip()
-                if _line and _line[0].isdigit():
-                    _dot = _line.find(".")
-                    if _dot != -1:
-                        _idx = int(_line[:_dot].strip())
-                        _summaries[_idx] = _line[_dot + 1:].strip()
-            logger.info(f"✅ Summarised {len(_summaries)} emails in one LLM call")
-        except Exception as _sum_err:
-            logger.warning(f"⚠️  Email summarisation failed, using snippets: {_sum_err}")
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _resp = _requests.get(f"{_surl}{_sep}type=gmail&max_emails={max_results}", timeout=10)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise RuntimeError(_data["error"])
+            _msgs = _data.get("messages", [])
+            emails = [
+                {
+                    "from":    m.get("from", ""),
+                    "subject": m.get("subject", "(no subject)"),
+                    "date":    m.get("date", ""),
+                    "preview": m.get("preview", ""),
+                    "link":    m.get("link", ""),
+                    "id":      m.get("id", ""),
+                }
+                for m in _msgs
+            ]
+            total_unread = _data.get("unreadCount", len(emails))
+            logger.info(f"✅ Fetched {len(emails)} unread emails (Apps Script)")
+        except Exception as e:
+            logger.error(f"❌ gmail_get_unread (Apps Script) failed: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail fetch error: {e}",
+                               {"tool": "gmail_get_unread"})
+    else:
+        if not GOOGLE_AVAILABLE:
+            return _not_available("gmail_get_unread")
+        try:
+            service = _gmail_service()
+            if not service:
+                raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
+                                   {"tool": "gmail_get_unread"})
+            result = service.users().messages().list(
+                userId="me", labelIds=["INBOX", "UNREAD"], maxResults=max_results
+            ).execute()
+            for msg_ref in result.get("messages", []):
+                msg = service.users().messages().get(
+                    userId="me", id=msg_ref["id"], format="metadata",
+                    metadataHeaders=["From", "To", "Subject", "Date"]
+                ).execute()
+                headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
+                _msg_id = msg["id"]
+                emails.append({
+                    "from":    headers.get("from", ""),
+                    "subject": headers.get("subject", "(no subject)"),
+                    "date":    headers.get("date", ""),
+                    "preview": msg.get("snippet", ""),
+                    "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
+                    "id":      _msg_id,
+                })
+            total_unread = len(emails)
+            logger.info(f"✅ Fetched {len(emails)} unread emails")
+        except MCPToolError:
+            raise
+        except HttpError as e:
+            logger.error(f"❌ Gmail API error: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail API error: {e}",
+                               {"tool": "gmail_get_unread", "status": getattr(e, 'status_code', None)})
 
-        lines = []
-        for _i, em in enumerate(emails, 1):
-            _summary = _summaries.get(_i) or (em["preview"][:120] + "…" if len(em["preview"]) > 120 else em["preview"])
-            lines.append(f"{_i}. {em['subject']}")
-            lines.append(f"   From:    {em['from']}")
-            lines.append(f"   Date:    {em['date']}")
-            lines.append(f"   Summary: {_summary}")
+    # ── Shared output building ────────────────────────────────────────────────
+    import html as _html
+    for em in emails:
+        em["from"]    = _html.unescape(em["from"])
+        em["subject"] = _html.unescape(em["subject"])
+        em["preview"] = _html.unescape(em["preview"])
+
+    _summaries = _summarise_emails(emails)
+
+    lines = []
+    for _i, em in enumerate(emails, 1):
+        _summary = _summaries.get(_i) or (em["preview"][:120] + "…" if len(em["preview"]) > 120 else em["preview"])
+        lines.append(f"{_i}. {em['subject']}")
+        lines.append(f"   From:    {em['from']}")
+        lines.append(f"   Date:    {em['date']}")
+        lines.append(f"   Summary: {_summary}")
+        if em.get("id"):
             lines.append(f"   ID:      {em['id']}")
+        if em.get("link"):
             lines.append(f"   Link:    {em['link']}")
-            lines.append("")
+        lines.append("")
 
-        logger.info(f"✅ Fetched {len(emails)} unread emails")
-        return json.dumps({
-            "total_unread": len(emails),
-            "text":         "\n".join(lines),
-            "emails":       emails
-        }, indent=2)
-
-    except MCPToolError:
-        raise
-    except HttpError as e:
-        logger.error(f"❌ Gmail API error: {e}")
-        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail API error: {e}",
-                           {"tool": "gmail_get_unread", "status": getattr(e, 'status_code', None)})
+    return json.dumps({
+        "total_unread": total_unread,
+        "text":         "\n".join(lines),
+        "emails":       emails,
+    }, indent=2)
 
 
 @mcp.tool()
@@ -358,96 +398,63 @@ def gmail_get_recent(max_results: int = 10) -> str:
     """
     logger.info(f"🛠  gmail_get_recent called (max={max_results})")
 
-    if not GOOGLE_AVAILABLE:
+    if not GOOGLE_AVAILABLE and not os.getenv("GOOGLE_APPS_SCRIPT_URL"):
         return _not_available("gmail_get_recent")
 
     try:
-        service = _gmail_service()
-        if not service:
-            raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
-                               {"tool": "gmail_get_recent"})
-
-        result = service.users().messages().list(
-            userId="me",
-            labelIds=["INBOX"],
-            maxResults=max_results
-        ).execute()
-
-        messages = result.get("messages", [])
+        # ── Data collection ──────────────────────────────────────────────────
         emails = []
+        if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _resp = _requests.get(
+                f"{_surl}{_sep}type=gmail_recent&max_emails={max_results}", timeout=15)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise RuntimeError(_data["error"])
+            for _m in _data.get("messages", []):
+                emails.append({
+                    "from":    _m.get("from", ""),
+                    "subject": _m.get("subject", "(no subject)"),
+                    "date":    _m.get("date", ""),
+                    "preview": _m.get("preview", ""),
+                    "unread":  _m.get("unread", False),
+                    "link":    _m.get("link", ""),
+                    "id":      _m.get("id", ""),
+                })
+        else:
+            service = _gmail_service()
+            if not service:
+                raise MCPToolError(FailureKind.USER_ERROR,
+                                   "Could not authenticate with Google — check credentials.json and token.json",
+                                   {"tool": "gmail_get_recent"})
+            result = service.users().messages().list(
+                userId="me", labelIds=["INBOX"], maxResults=max_results).execute()
+            for msg_ref in result.get("messages", []):
+                msg = service.users().messages().get(
+                    userId="me", id=msg_ref["id"], format="metadata",
+                    metadataHeaders=["From", "To", "Subject", "Date"]).execute()
+                headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
+                _msg_id = msg["id"]
+                emails.append({
+                    "from":    headers.get("from", ""),
+                    "subject": headers.get("subject", "(no subject)"),
+                    "date":    headers.get("date", ""),
+                    "preview": msg.get("snippet", ""),
+                    "unread":  "UNREAD" in msg.get("labelIds", []),
+                    "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
+                    "id":      _msg_id,
+                })
 
-        for msg_ref in messages:
-            msg = service.users().messages().get(
-                userId="me",
-                id=msg_ref["id"],
-                format="metadata",
-                metadataHeaders=["From", "To", "Subject", "Date"]
-            ).execute()
-
-            headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
-            label_ids = msg.get("labelIds", [])
-            is_unread = "UNREAD" in label_ids
-            _msg_id = msg["id"]
-            emails.append({
-                "from":    headers.get("from", ""),
-                "subject": headers.get("subject", "(no subject)"),
-                "date":    headers.get("date", ""),
-                "preview": msg.get("snippet", ""),
-                "unread":  is_unread,
-                "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
-                "id":      _msg_id,
-                "title":   headers.get("subject", "(no subject)"),
-            })
-
+        # ── Shared output building ───────────────────────────────────────────
         import html as _html
         for em in emails:
-            em["from"]    = _html.unescape(em["from"])
-            em["subject"] = _html.unescape(em["subject"])
-            em["preview"] = _html.unescape(em["preview"])
-            em["title"]   = _html.unescape(em["title"])
+            em["from"]    = _html.unescape(em.get("from", ""))
+            em["subject"] = _html.unescape(em.get("subject", ""))
+            em["preview"] = _html.unescape(em.get("preview", ""))
 
-        # Batch-summarise all snippets in one Ollama call
-        _summaries = {}
-        try:
-            # Wait up to 5s for Ollama to be free before starting
-            import time as _time_mod
-            _time_mod.sleep(1)
-            import urllib.request as _urllib_req
-            _ollama_url  = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
-            _model       = os.getenv("OLLAMA_MODEL", "qwen2.5:14b-instruct-q4_K_M")
-            _batch_lines = []
-            for _i, _em in enumerate(emails, 1):
-                _batch_lines.append(f"{_i}. From: {_em['from']} | Subject: {_em['subject']} | Snippet: {_em['preview']}")
-            _prompt = (
-                "Summarise each email below in one short sentence (max 15 words). "
-                "Reply ONLY with numbered lines matching the input numbers, nothing else.\n\n"
-                + "\n".join(_batch_lines)
-            )
-            _payload = json.dumps({
-                "model": _model,
-                "prompt": _prompt,
-                "stream": False,
-            }).encode()
-            _req = _urllib_req.Request(
-                f"{_ollama_url}/api/generate",
-                data=_payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with _urllib_req.urlopen(_req, timeout=120) as _resp:
-                _resp_json = json.loads(_resp.read().decode())
-                _resp_text = _resp_json.get("response", "")
-            for _line in _resp_text.strip().splitlines():
-                _line = _line.strip()
-                if _line and _line[0].isdigit():
-                    _dot = _line.find(".")
-                    if _dot != -1:
-                        _idx = int(_line[:_dot].strip())
-                        _summaries[_idx] = _line[_dot + 1:].strip()
-            logger.info(f"✅ Summarised {len(_summaries)} emails in one LLM call")
-        except Exception as _sum_err:
-            logger.warning(f"⚠️  Email summarisation failed, using snippets: {_sum_err}")
-
+        _summaries = _summarise_emails(emails)
         lines = []
         for _i, em in enumerate(emails, 1):
             _summary = _summaries.get(_i) or (em["preview"][:120] + "…" if len(em["preview"]) > 120 else em["preview"])
@@ -455,23 +462,21 @@ def gmail_get_recent(max_results: int = 10) -> str:
             lines.append(f"   From:    {em['from']}")
             lines.append(f"   Date:    {em['date']}")
             lines.append(f"   Summary: {_summary}")
-            lines.append(f"   ID:      {em['id']}")
-            lines.append(f"   Link:    {em['link']}")
+            if em.get("id"):
+                lines.append(f"   ID:      {em['id']}")
+            if em.get("link"):
+                lines.append(f"   Link:    {em['link']}")
             lines.append("")
 
         logger.info(f"✅ Fetched {len(emails)} recent emails")
-        return json.dumps({
-            "count": len(emails),
-            "text":  "\n".join(lines),
-            "emails": emails
-        }, indent=2)
+        return json.dumps({"count": len(emails), "text": "\n".join(lines), "emails": emails}, indent=2)
 
     except MCPToolError:
         raise
-    except HttpError as e:
-        logger.error(f"❌ Gmail API error: {e}")
-        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail API error: {e}",
-                           {"tool": "gmail_get_recent", "status": getattr(e, 'status_code', None)})
+    except Exception as e:
+        logger.error(f"❌ Gmail recent error: {e}")
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail error: {e}",
+                           {"tool": "gmail_get_recent"})
 
 
 @mcp.tool()
@@ -500,7 +505,7 @@ def gmail_get_email(message_id: str) -> str:
     """
     logger.info(f"🛠  gmail_get_email called: {message_id}")
 
-    if not GOOGLE_AVAILABLE:
+    if not GOOGLE_AVAILABLE and not os.getenv("GOOGLE_APPS_SCRIPT_URL"):
         return _not_available("gmail_get_email")
 
     if not message_id or not message_id.strip():
@@ -508,16 +513,34 @@ def gmail_get_email(message_id: str) -> str:
                            {"tool": "gmail_get_email"})
 
     try:
+        if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _resp = _requests.get(f"{_surl}{_sep}type=gmail_message&id={message_id}", timeout=15)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise MCPToolError(FailureKind.USER_ERROR, _data["error"],
+                                   {"tool": "gmail_get_email", "message_id": message_id})
+            return json.dumps({
+                "from":    _data.get("from", ""),
+                "to":      _data.get("to", ""),
+                "cc":      _data.get("cc") or None,
+                "subject": _data.get("subject", "(no subject)"),
+                "date":    _data.get("date", ""),
+                "body":    _data.get("body", ""),
+                "link":    _data.get("link", f"https://mail.google.com/mail/u/0/#inbox/{message_id}"),
+                "id":      _data.get("id", message_id),
+            }, indent=2)
+
         service = _gmail_service()
         if not service:
-            raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
+            raise MCPToolError(FailureKind.USER_ERROR,
+                               "Could not authenticate with Google — check credentials.json and token.json",
                                {"tool": "gmail_get_email"})
 
         msg = service.users().messages().get(
-            userId="me",
-            id=message_id,
-            format="full"
-        ).execute()
+            userId="me", id=message_id, format="full").execute()
 
         payload = msg.get("payload", {})
         headers = _parse_message_headers(payload.get("headers", []))
@@ -536,12 +559,10 @@ def gmail_get_email(message_id: str) -> str:
 
     except MCPToolError:
         raise
-    except HttpError as e:
-        logger.error(f"❌ Gmail API error: {e}")
-        status = getattr(e, 'status_code', None)
-        kind = FailureKind.USER_ERROR if status == 404 else FailureKind.UPSTREAM_ERROR
-        raise MCPToolError(kind, f"Gmail API error: {e}",
-                           {"tool": "gmail_get_email", "message_id": message_id, "status": status})
+    except Exception as e:
+        logger.error(f"❌ Gmail get email error: {e}")
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail error: {e}",
+                           {"tool": "gmail_get_email", "message_id": message_id})
 
 
 @mcp.tool()
@@ -579,15 +600,31 @@ def gmail_send_email(
     """
     logger.info(f"🛠  gmail_send_email called: to={to}, subject={subject}")
 
-    if not GOOGLE_AVAILABLE:
-        return _not_available("gmail_send_email")
-
     if not to or not to.strip():
         raise MCPToolError(FailureKind.USER_ERROR, "to must not be empty",
                            {"tool": "gmail_send_email"})
     if not subject or not subject.strip():
         raise MCPToolError(FailureKind.USER_ERROR, "subject must not be empty",
                            {"tool": "gmail_send_email"})
+
+    if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+        try:
+            payload = {"type": "send_email", "to": to, "subject": subject, "body": body}
+            if cc:
+                payload["cc"] = cc
+            if html:
+                payload["htmlBody"] = body
+            _script_post(payload)
+            logger.info(f"✅ Email sent via Apps Script to {to}")
+            return json.dumps({"status": "sent", "to": to, "cc": cc or None, "subject": subject,
+                               "summary": f"Email sent to {to}: '{subject}'"}, indent=2)
+        except Exception as e:
+            logger.error(f"❌ Gmail send (Apps Script) failed: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail send error: {e}",
+                               {"tool": "gmail_send_email", "to": to, "subject": subject})
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("gmail_send_email")
 
     try:
         service = _gmail_service()
@@ -737,87 +774,110 @@ def calendar_get_today() -> str:
     """
     logger.info("🛠  calendar_get_today called")
 
-    if not GOOGLE_AVAILABLE:
-        return _not_available("calendar_get_today")
+    # ── Data collection ───────────────────────────────────────────────────────
+    events = []
+    date_label = ""
 
-    try:
-        service = _calendar_service()
-        if not service:
-            raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
+    if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+        try:
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _resp = _requests.get(f"{_surl}{_sep}type=calendar&offset=0&days=1", timeout=10)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise RuntimeError(_data["error"])
+            events = [
+                {
+                    "title":          e.get("title", ""),
+                    "when":           e.get("time", ""),
+                    "location":       e.get("location", ""),
+                    "notes":          e.get("notes", ""),
+                    "organizer":      e.get("organizer", ""),
+                    "attendees":      e.get("attendees", ""),
+                    "calendar_link":  e.get("calendarLink", ""),
+                }
+                for e in _data.get("events", [])
+            ]
+            date_label = _data.get("date", "")
+            logger.info(f"✅ Found {len(events)} events today (Apps Script)")
+        except Exception as e:
+            logger.error(f"❌ calendar_get_today (Apps Script) failed: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar fetch error: {e}",
+                               {"tool": "calendar_get_today"})
+    else:
+        if not GOOGLE_AVAILABLE:
+            return _not_available("calendar_get_today")
+        try:
+            service = _calendar_service()
+            if not service:
+                raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
+                                   {"tool": "calendar_get_today"})
+            try:
+                from zoneinfo import ZoneInfo
+                from tools.location.resolve_timezone import resolve_timezone
+                _tz = ZoneInfo(resolve_timezone(
+                    os.getenv("DEFAULT_CITY", ""), os.getenv("DEFAULT_STATE", ""), os.getenv("DEFAULT_COUNTRY", "")
+                ))
+            except Exception:
+                _tz = timezone.utc
+            now = datetime.now(_tz)
+            start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = start_of_day + timedelta(days=1)
+            calendar_ids = _get_all_calendar_ids(service)
+            seen_ids = set()
+            for cal_id in calendar_ids:
+                try:
+                    result = service.events().list(
+                        calendarId=cal_id,
+                        timeMin=start_of_day.isoformat(),
+                        timeMax=end_of_day.isoformat(),
+                        singleEvents=True, orderBy="startTime"
+                    ).execute()
+                    for e in result.get("items", []):
+                        if e["id"] not in seen_ids:
+                            seen_ids.add(e["id"])
+                            events.append(_format_event(e))
+                except Exception as _ce:
+                    logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
+            events.sort(key=lambda e: e.get("start", ""))
+            date_label = start_of_day.strftime("%A, %B %-d %Y")
+            logger.info(f"✅ Found {len(events)} events today across {len(calendar_ids)} calendar(s)")
+        except MCPToolError:
+            raise
+        except HttpError as e:
+            logger.error(f"❌ Calendar API error: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar API error: {e}",
                                {"tool": "calendar_get_today"})
 
-        try:
-            from zoneinfo import ZoneInfo
-            from tools.location.resolve_timezone import resolve_timezone
-            _city    = os.getenv("DEFAULT_CITY", "")
-            _state   = os.getenv("DEFAULT_STATE", "")
-            _country = os.getenv("DEFAULT_COUNTRY", "")
-            _tz_name = resolve_timezone(_city, _state, _country)
-            _tz = ZoneInfo(_tz_name)
-        except Exception:
-            _tz = timezone.utc
-        now = datetime.now(_tz)
-        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_of_day = start_of_day + timedelta(days=1)
+    # ── Shared output building ────────────────────────────────────────────────
+    if not events:
+        text_out = f"No events today ({date_label})."
+    else:
+        lines = []
+        for i, ev in enumerate(events, 1):
+            lines.append(f"{i}. {ev['title']}")
+            lines.append(f"   - When: {ev['when']}")
+            if ev.get("notes"):
+                lines.append(f"   - Notes: {ev['notes'][:200]}")
+            if ev.get("location"):
+                lines.append(f"   - Location: {ev['location']}")
+            if ev.get("attendees"):
+                lines.append(f"   - Attendees: {ev['attendees']}")
+            if ev.get("organizer"):
+                lines.append(f"   - Organizer: {ev['organizer']}")
+            if ev.get("meet_link"):
+                lines.append(f"   - Meet: {ev['meet_link']}")
+            if ev.get("calendar_link"):
+                lines.append(f"   - Calendar Link: {ev['calendar_link']}")
+        text_out = "\n".join(lines)
 
-        calendar_ids = _get_all_calendar_ids(service)
-        events = []
-        seen_ids = set()
-        for cal_id in calendar_ids:
-            try:
-                result = service.events().list(
-                    calendarId=cal_id,
-                    timeMin=start_of_day.isoformat(),
-                    timeMax=end_of_day.isoformat(),
-                    singleEvents=True,
-                    orderBy="startTime"
-                ).execute()
-                for e in result.get("items", []):
-                    if e["id"] not in seen_ids:
-                        seen_ids.add(e["id"])
-                        events.append(_format_event(e))
-            except Exception as _ce:
-                logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
-
-        events.sort(key=lambda e: e.get("start", ""))
-        logger.info(f"✅ Found {len(events)} events today across {len(calendar_ids)} calendar(s)")
-
-        # Build clean text output
-        date_label = start_of_day.strftime("%A, %B %-d %Y")
-        if not events:
-            text_out = f"No events today ({date_label})."
-        else:
-            lines = []
-            for i, ev in enumerate(events, 1):
-                lines.append(f"{i}. {ev['title']}")
-                lines.append(f"   - When: {ev['when']}")
-                if ev.get("notes"):
-                    lines.append(f"   - Notes: {ev['notes'][:200]}")
-                if ev.get("location"):
-                    lines.append(f"   - Location: {ev['location']}")
-                if ev.get("attendees"):
-                    lines.append(f"   - Attendees: {ev['attendees']}")
-                if ev.get("organizer"):
-                    lines.append(f"   - Organizer: {ev['organizer']}")
-                if ev.get("meet_link"):
-                    lines.append(f"   - Meet: {ev['meet_link']}")
-                if ev.get("calendar_link"):
-                    lines.append(f"   - Calendar Link: {ev['calendar_link']}")
-            text_out = "\n".join(lines)
-
-        return json.dumps({
-            "date":   start_of_day.strftime("%Y-%m-%d"),
-            "count":  len(events),
-            "text":   text_out,
-            "events": events
-        }, indent=2)
-
-    except MCPToolError:
-        raise
-    except HttpError as e:
-        logger.error(f"❌ Calendar API error: {e}")
-        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar API error: {e}",
-                           {"tool": "calendar_get_today"})
+    return json.dumps({
+        "date":   date_label,
+        "count":  len(events),
+        "text":   text_out,
+        "events": events,
+    }, indent=2)
 
 
 @mcp.tool()
@@ -840,108 +900,130 @@ def calendar_get_this_week() -> str:
     """
     logger.info("🛠  calendar_get_this_week called")
 
-    if not GOOGLE_AVAILABLE:
-        return _not_available("calendar_get_this_week")
-
+    # ── Timezone (shared) ─────────────────────────────────────────────────────
     try:
-        service = _calendar_service()
-        if not service:
-            raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
+        from zoneinfo import ZoneInfo
+        from tools.location.resolve_timezone import resolve_timezone
+        _tz = ZoneInfo(resolve_timezone(
+            os.getenv("DEFAULT_CITY", ""), os.getenv("DEFAULT_STATE", ""), os.getenv("DEFAULT_COUNTRY", "")
+        ))
+    except Exception:
+        _tz = timezone.utc
+    now = datetime.now(_tz)
+    monday = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    sunday = monday + timedelta(days=7)
+
+    # ── Data collection ───────────────────────────────────────────────────────
+    # Both paths produce a flat list of events; each event has a "start_date" (YYYY-MM-DD) for grouping
+    flat_events = []
+
+    if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+        try:
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _offset = -now.weekday()
+            _resp = _requests.get(f"{_surl}{_sep}type=calendar&offset={_offset}&days=7", timeout=10)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise RuntimeError(_data["error"])
+            for e in _data.get("events", []):
+                flat_events.append({
+                    "title":      e.get("title", ""),
+                    "when":          e.get("time", ""),
+                    "start_date":    e.get("startDate", ""),
+                    "location":      e.get("location", ""),
+                    "notes":         e.get("notes", ""),
+                    "organizer":     e.get("organizer", ""),
+                    "attendees":     e.get("attendees", ""),
+                    "calendar_link": e.get("calendarLink", ""),
+                })
+            logger.info(f"✅ Fetched {len(flat_events)} events this week (Apps Script)")
+        except Exception as e:
+            logger.error(f"❌ calendar_get_this_week (Apps Script) failed: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar fetch error: {e}",
+                               {"tool": "calendar_get_this_week"})
+    else:
+        if not GOOGLE_AVAILABLE:
+            return _not_available("calendar_get_this_week")
+        try:
+            service = _calendar_service()
+            if not service:
+                raise MCPToolError(FailureKind.USER_ERROR, "Could not authenticate with Google — check credentials.json and token.json",
+                                   {"tool": "calendar_get_this_week"})
+            calendar_ids = _get_all_calendar_ids(service)
+            seen_ids = set()
+            raw = []
+            for cal_id in calendar_ids:
+                try:
+                    result = service.events().list(
+                        calendarId=cal_id,
+                        timeMin=monday.isoformat(), timeMax=sunday.isoformat(),
+                        singleEvents=True, orderBy="startTime"
+                    ).execute()
+                    for e in result.get("items", []):
+                        if e["id"] not in seen_ids:
+                            seen_ids.add(e["id"])
+                            raw.append(e)
+                except Exception as _ce:
+                    logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
+            raw.sort(key=lambda e: (e.get("start") or {}).get("dateTime") or (e.get("start") or {}).get("date", ""))
+            for e in raw:
+                start = e.get("start", {})
+                start_date = (start.get("dateTime") or start.get("date", ""))[:10]
+                ev = _format_event(e)
+                ev["start_date"] = start_date
+                flat_events.append(ev)
+            logger.info(f"✅ Fetched {len(flat_events)} events this week across {len(calendar_ids)} calendar(s)")
+        except MCPToolError:
+            raise
+        except HttpError as e:
+            logger.error(f"❌ Calendar API error: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar API error: {e}",
                                {"tool": "calendar_get_this_week"})
 
-        try:
-            from zoneinfo import ZoneInfo
-            from tools.location.resolve_timezone import resolve_timezone
-            _city    = os.getenv("DEFAULT_CITY", "")
-            _state   = os.getenv("DEFAULT_STATE", "")
-            _country = os.getenv("DEFAULT_COUNTRY", "")
-            _tz_name = resolve_timezone(_city, _state, _country)
-            _tz = ZoneInfo(_tz_name)
-        except Exception:
-            _tz = timezone.utc
-        now = datetime.now(_tz)
-        days_since_monday = now.weekday()
-        monday = (now - timedelta(days=days_since_monday)).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        sunday = monday + timedelta(days=7)
-
-        calendar_ids = _get_all_calendar_ids(service)
-        raw_events = []
-        seen_ids = set()
-        for cal_id in calendar_ids:
+    # ── Shared output building ────────────────────────────────────────────────
+    from datetime import datetime as _dt
+    by_day = {}
+    day_labels = {}
+    for ev in flat_events:
+        day = ev.get("start_date") or "unknown"
+        if day not in by_day:
+            by_day[day] = []
             try:
-                result = service.events().list(
-                    calendarId=cal_id,
-                    timeMin=monday.isoformat(),
-                    timeMax=sunday.isoformat(),
-                    singleEvents=True,
-                    orderBy="startTime"
-                ).execute()
-                for e in result.get("items", []):
-                    if e["id"] not in seen_ids:
-                        seen_ids.add(e["id"])
-                        raw_events.append(e)
-            except Exception as _ce:
-                logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
+                day_labels[day] = _dt.fromisoformat(day).strftime("%A, %B %-d")
+            except Exception:
+                day_labels[day] = day
+        by_day[day].append(ev)
 
-        raw_events.sort(key=lambda e: (e.get("start") or {}).get("dateTime") or (e.get("start") or {}).get("date", ""))
+    total = sum(len(v) for v in by_day.values())
+    lines = []
+    for day in sorted(by_day.keys()):
+        lines.append(day_labels[day])
+        for i, ev in enumerate(by_day[day], 1):
+            lines.append(f"  {i}. {ev['title']}")
+            lines.append(f"     - When: {ev['when']}")
+            if ev.get("notes"):
+                lines.append(f"     - Notes: {ev['notes'][:200]}")
+            if ev.get("location"):
+                lines.append(f"     - Location: {ev['location']}")
+            if ev.get("attendees"):
+                lines.append(f"     - Attendees: {ev['attendees']}")
+            if ev.get("organizer"):
+                lines.append(f"     - Organizer: {ev['organizer']}")
+            if ev.get("meet_link"):
+                lines.append(f"     - Meet: {ev['meet_link']}")
+            if ev.get("calendar_link"):
+                lines.append(f"     - Calendar Link: {ev['calendar_link']}")
+        lines.append("")
 
-        # Group events by day
-        from datetime import datetime as _dt
-        by_day = {}  # "YYYY-MM-DD" -> list of formatted events
-        day_labels = {}  # "YYYY-MM-DD" -> "Monday Apr 1"
-        for e in raw_events:
-            start = e.get("start", {})
-            day = (start.get("dateTime") or start.get("date", ""))[:10]
-            if not day:
-                continue
-            ev = _format_event(e)
-            if day not in by_day:
-                by_day[day] = []
-                try:
-                    day_labels[day] = _dt.fromisoformat(day).strftime("%A, %B %-d")
-                except Exception:
-                    day_labels[day] = day
-            by_day[day].append(ev)
-
-        # Build a human-readable text block per day
-        total = sum(len(v) for v in by_day.values())
-        lines = []
-        for day in sorted(by_day.keys()):
-            lines.append(f"{day_labels[day]}")
-            for i, ev in enumerate(by_day[day], 1):
-                lines.append(f"  {i}. {ev['title']}")
-                lines.append(f"     - When: {ev['when']}")
-                if ev.get("notes"):
-                    lines.append(f"     - Notes: {ev['notes'][:200]}")
-                if ev.get("location"):
-                    lines.append(f"     - Location: {ev['location']}")
-                if ev.get("attendees"):
-                    lines.append(f"     - Attendees: {ev['attendees']}")
-                if ev.get("organizer"):
-                    lines.append(f"     - Organizer: {ev['organizer']}")
-                if ev.get("meet_link"):
-                    lines.append(f"     - Meet: {ev['meet_link']}")
-                if ev.get("calendar_link"):
-                    lines.append(f"     - Calendar Link: {ev['calendar_link']}")
-            lines.append("")
-
-        logger.info(f"✅ Found {total} events this week across {len(calendar_ids)} calendar(s)")
-        return json.dumps({
-            "week_start": monday.strftime("%Y-%m-%d"),
-            "week_end":   (sunday - timedelta(days=1)).strftime("%Y-%m-%d"),
-            "count":      total,
-            "text":       "\n".join(lines),
-            "by_day":     {day: by_day[day] for day in sorted(by_day.keys())},
-        }, indent=2)
-
-    except MCPToolError:
-        raise
-    except HttpError as e:
-        logger.error(f"❌ Calendar API error: {e}")
-        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar API error: {e}",
-                           {"tool": "calendar_get_this_week"})
+    return json.dumps({
+        "week_start": monday.strftime("%Y-%m-%d"),
+        "week_end":   (sunday - timedelta(days=1)).strftime("%Y-%m-%d"),
+        "count":      total,
+        "text":       "\n".join(lines),
+        "by_day":     {day: by_day[day] for day in sorted(by_day.keys())},
+    }, indent=2)
 
 
 @mcp.tool()
@@ -983,15 +1065,33 @@ def calendar_create_event(
     """
     logger.info(f"🛠  calendar_create_event called: {summary} @ {start}")
 
-    if not GOOGLE_AVAILABLE:
-        return _not_available("calendar_create_event")
-
     if not summary or not summary.strip():
         raise MCPToolError(FailureKind.USER_ERROR, "summary must not be empty",
                            {"tool": "calendar_create_event"})
     if not start or not end:
         raise MCPToolError(FailureKind.USER_ERROR, "start and end are required",
                            {"tool": "calendar_create_event"})
+
+    if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+        try:
+            payload = {"type": "create_event", "title": summary, "start": start, "end": end, "allDay": all_day}
+            if description:
+                payload["description"] = description
+            if location:
+                payload["location"] = location
+            if attendees:
+                payload["guests"] = ",".join(attendees) if isinstance(attendees, list) else attendees
+            _script_post(payload)
+            logger.info(f"✅ Calendar event created via Apps Script: {summary}")
+            return json.dumps({"status": "created", "title": summary, "start": start, "end": end,
+                               "summary": f"'{summary}' added to your calendar for {start}"}, indent=2)
+        except Exception as e:
+            logger.error(f"❌ Calendar create (Apps Script) failed: {e}")
+            raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Calendar create error: {e}",
+                               {"tool": "calendar_create_event", "summary": summary})
+
+    if not GOOGLE_AVAILABLE:
+        return _not_available("calendar_create_event")
 
     try:
         service = _calendar_service()
@@ -1082,7 +1182,7 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
     """
     logger.info(f"🛠  gmail_reply_tool called: message_id={message_id}")
 
-    if not GOOGLE_AVAILABLE:
+    if not GOOGLE_AVAILABLE and not os.getenv("GOOGLE_APPS_SCRIPT_URL"):
         return _not_available("gmail_reply_tool")
 
     if not message_id or not message_id.strip():
@@ -1093,6 +1193,17 @@ def gmail_reply_tool(message_id: str, body: str, cc: Optional[str] = None) -> st
                            {"tool": "gmail_reply_tool"})
 
     try:
+        if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+            _result = _script_post({"type": "reply_email", "message_id": message_id,
+                                    "body": body, **({"cc": cc} if cc else {})})
+            logger.info(f"✅ Reply sent via Apps Script: message_id={message_id}")
+            return json.dumps({
+                "status":  "sent",
+                "to":      _result.get("to", ""),
+                "subject": _result.get("subject", ""),
+                "summary": f"Reply sent to {_result.get('to', '')}: '{_result.get('subject', '')}'"
+            }, indent=2)
+
         service = _gmail_service()
         if not service:
             raise MCPToolError(FailureKind.USER_ERROR,
@@ -1197,7 +1308,7 @@ def gmail_search(query: str, max_results: int = 20) -> str:
     """
     logger.info(f"🛠  gmail_search called: query={query!r} max={max_results}")
 
-    if not GOOGLE_AVAILABLE:
+    if not GOOGLE_AVAILABLE and not os.getenv("GOOGLE_APPS_SCRIPT_URL"):
         return _not_available("gmail_search")
 
     if not query or not query.strip():
@@ -1205,42 +1316,62 @@ def gmail_search(query: str, max_results: int = 20) -> str:
                            {"tool": "gmail_search"})
 
     try:
-        service = _gmail_service()
-        if not service:
-            raise MCPToolError(FailureKind.USER_ERROR,
-                               "Could not authenticate with Google — check credentials.json and token.json",
-                               {"tool": "gmail_search"})
+        import html as _html
+        import urllib.parse as _urlparse
 
-        result = service.users().messages().list(
-            userId="me",
-            q=query,
-            maxResults=max_results
-        ).execute()
-
-        message_refs = result.get("messages", [])
+        # ── Data collection ──────────────────────────────────────────────────
         messages = []
+        if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _q = _urlparse.quote(query)
+            _resp = _requests.get(
+                f"{_surl}{_sep}type=gmail_search&query={_q}&max_results={max_results}", timeout=15)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise RuntimeError(_data["error"])
+            for _m in _data.get("messages", []):
+                messages.append({
+                    "id":        _m.get("id", ""),
+                    "thread_id": _m.get("thread_id", ""),
+                    "from":      _m.get("from", ""),
+                    "subject":   _m.get("subject", "(no subject)"),
+                    "date":      _m.get("date", ""),
+                    "snippet":   _m.get("snippet", ""),
+                    "unread":    _m.get("unread", False),
+                    "link":      _m.get("link", ""),
+                })
+        else:
+            service = _gmail_service()
+            if not service:
+                raise MCPToolError(FailureKind.USER_ERROR,
+                                   "Could not authenticate with Google — check credentials.json and token.json",
+                                   {"tool": "gmail_search"})
+            result = service.users().messages().list(
+                userId="me", q=query, maxResults=max_results).execute()
+            for ref in result.get("messages", []):
+                msg = service.users().messages().get(
+                    userId="me", id=ref["id"], format="metadata",
+                    metadataHeaders=["From", "To", "Subject", "Date"]).execute()
+                headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
+                _msg_id = msg["id"]
+                messages.append({
+                    "id":        _msg_id,
+                    "thread_id": msg.get("threadId", ""),
+                    "from":      headers.get("from", ""),
+                    "subject":   headers.get("subject", "(no subject)"),
+                    "date":      headers.get("date", ""),
+                    "snippet":   msg.get("snippet", ""),
+                    "unread":    "UNREAD" in msg.get("labelIds", []),
+                    "link":      f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
+                })
 
-        for ref in message_refs:
-            msg = service.users().messages().get(
-                userId="me",
-                id=ref["id"],
-                format="metadata",
-                metadataHeaders=["From", "To", "Subject", "Date"]
-            ).execute()
-
-            headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
-            import html as _html
-            _msg_id = msg["id"]
-            messages.append({
-                "id":        _msg_id,
-                "thread_id": msg.get("threadId", ""),
-                "from":      _html.unescape(headers.get("from", "")),
-                "subject":   _html.unescape(headers.get("subject", "(no subject)")),
-                "date":      headers.get("date", ""),
-                "snippet":   _html.unescape(msg.get("snippet", "")),
-                "unread":    "UNREAD" in msg.get("labelIds", []),
-                "link":      f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
-            })
+        # ── Shared output building ───────────────────────────────────────────
+        for m in messages:
+            m["from"]    = _html.unescape(m.get("from", ""))
+            m["subject"] = _html.unescape(m.get("subject", ""))
+            m["snippet"] = _html.unescape(m.get("snippet", ""))
 
         lines = []
         for i, m in enumerate(messages, 1):
@@ -1248,27 +1379,29 @@ def gmail_search(query: str, max_results: int = 20) -> str:
             lines.append(f"   From:    {m['from']}")
             lines.append(f"   Date:    {m['date']}")
             lines.append(f"   Snippet: {m['snippet'][:120]}{'…' if len(m['snippet']) > 120 else ''}")
-            lines.append(f"   ID:      {m['id']}")
-            lines.append(f"   Thread:  {m['thread_id']}")
-            lines.append(f"   Link:    {m['link']}")
+            if m.get("id"):
+                lines.append(f"   ID:      {m['id']}")
+            if m.get("thread_id"):
+                lines.append(f"   Thread:  {m['thread_id']}")
+            if m.get("link"):
+                lines.append(f"   Link:    {m['link']}")
             lines.append("")
 
         logger.info(f"✅ gmail_search returned {len(messages)} messages for query={query!r}")
         return json.dumps({
-            "query":         query,
-            "count":         len(messages),
-            "len_messages":  len(messages),  # Explicit alias for scheduler condition expressions
-            "messages":      messages,
-            "text":          "\n".join(lines) if lines else f"No messages found for query: {query}",
+            "query":        query,
+            "count":        len(messages),
+            "len_messages": len(messages),
+            "messages":     messages,
+            "text":         "\n".join(lines) if lines else f"No messages found for query: {query}",
         }, indent=2)
 
     except MCPToolError:
         raise
-    except HttpError as e:
+    except Exception as e:
         logger.error(f"❌ Gmail search error: {e}")
-        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail API error: {e}",
-                           {"tool": "gmail_search", "query": query,
-                            "status": getattr(e, "status_code", None)})
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail error: {e}",
+                           {"tool": "gmail_search", "query": query})
 
 
 @mcp.tool()
@@ -1311,7 +1444,7 @@ def gmail_check_replied(thread_id: str, since_hours: Optional[float] = None) -> 
     """
     logger.info(f"🛠  gmail_check_replied called: thread_id={thread_id} since_hours={since_hours}")
 
-    if not GOOGLE_AVAILABLE:
+    if not GOOGLE_AVAILABLE and not os.getenv("GOOGLE_APPS_SCRIPT_URL"):
         return _not_available("gmail_check_replied")
 
     if not thread_id or not thread_id.strip():
@@ -1319,60 +1452,66 @@ def gmail_check_replied(thread_id: str, since_hours: Optional[float] = None) -> 
                            {"tool": "gmail_check_replied"})
 
     try:
-        service = _gmail_service()
-        if not service:
-            raise MCPToolError(FailureKind.USER_ERROR,
-                               "Could not authenticate with Google — check credentials.json and token.json",
-                               {"tool": "gmail_check_replied"})
-
-        thread = service.users().threads().get(
-            userId="me",
-            id=thread_id,
-            format="metadata",
-            metadataFields="messages/id,messages/labelIds,messages/internalDate,messages/payload/headers"
-        ).execute()
-
-        cutoff_ms = None
-        if since_hours is not None:
-            cutoff_dt = datetime.now(timezone.utc) - timedelta(hours=since_hours)
-            cutoff_ms = int(cutoff_dt.timestamp() * 1000)
-
-        sent_messages = []
-        for msg in thread.get("messages", []):
-            label_ids = msg.get("labelIds", [])
-            if "SENT" not in label_ids:
-                continue
-            internal_date_ms = int(msg.get("internalDate", 0))
-            if cutoff_ms is not None and internal_date_ms < cutoff_ms:
-                continue
-            headers = {h["name"].lower(): h["value"]
-                       for h in (msg.get("payload") or {}).get("headers", [])}
-            sent_messages.append({
-                "id":   msg["id"],
-                "date": headers.get("date", ""),
-                "sent_at_ms": internal_date_ms,
-            })
-
-        sent_messages.sort(key=lambda m: m["sent_at_ms"])
-        replied = len(sent_messages) > 0
-        last_reply_at = None
-        if sent_messages:
-            from datetime import datetime as _dt
-            last_ms = sent_messages[-1]["sent_at_ms"]
-            last_reply_at = _dt.fromtimestamp(last_ms / 1000, tz=timezone.utc).isoformat()
-
-        if replied:
-            window_str = f" in the last {since_hours}h" if since_hours is not None else ""
-            text = f"You have sent {len(sent_messages)} reply/replies in this thread{window_str}. Last reply: {last_reply_at}."
+        if os.getenv("GOOGLE_APPS_SCRIPT_URL"):
+            _surl = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+            _sep = "&" if "?" in _surl else "?"
+            _url = f"{_surl}{_sep}type=gmail_check_replied&thread_id={thread_id}"
+            if since_hours is not None:
+                _url += f"&since_hours={since_hours}"
+            _resp = _requests.get(_url, timeout=15)
+            _resp.raise_for_status()
+            _data = _resp.json()
+            if "error" in _data:
+                raise MCPToolError(FailureKind.USER_ERROR, _data["error"],
+                                   {"tool": "gmail_check_replied", "thread_id": thread_id})
+            replied      = _data.get("replied", False)
+            reply_count  = _data.get("reply_count", 0)
+            last_reply_at = _data.get("last_reply_at")
         else:
-            window_str = f" in the last {since_hours}h" if since_hours is not None else ""
+            service = _gmail_service()
+            if not service:
+                raise MCPToolError(FailureKind.USER_ERROR,
+                                   "Could not authenticate with Google — check credentials.json and token.json",
+                                   {"tool": "gmail_check_replied"})
+            thread = service.users().threads().get(
+                userId="me", id=thread_id, format="metadata",
+                metadataFields="messages/id,messages/labelIds,messages/internalDate,messages/payload/headers"
+            ).execute()
+            cutoff_ms = None
+            if since_hours is not None:
+                cutoff_dt = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+                cutoff_ms = int(cutoff_dt.timestamp() * 1000)
+            sent_messages = []
+            for msg in thread.get("messages", []):
+                if "SENT" not in msg.get("labelIds", []):
+                    continue
+                internal_date_ms = int(msg.get("internalDate", 0))
+                if cutoff_ms is not None and internal_date_ms < cutoff_ms:
+                    continue
+                headers = {h["name"].lower(): h["value"]
+                           for h in (msg.get("payload") or {}).get("headers", [])}
+                sent_messages.append({"id": msg["id"], "date": headers.get("date", ""),
+                                      "sent_at_ms": internal_date_ms})
+            sent_messages.sort(key=lambda m: m["sent_at_ms"])
+            replied      = len(sent_messages) > 0
+            reply_count  = len(sent_messages)
+            last_reply_at = None
+            if sent_messages:
+                from datetime import datetime as _dt
+                last_ms = sent_messages[-1]["sent_at_ms"]
+                last_reply_at = _dt.fromtimestamp(last_ms / 1000, tz=timezone.utc).isoformat()
+
+        window_str = f" in the last {since_hours}h" if since_hours is not None else ""
+        if replied:
+            text = f"You have sent {reply_count} reply/replies in this thread{window_str}. Last reply: {last_reply_at}."
+        else:
             text = f"No reply found from you in this thread{window_str}."
 
-        logger.info(f"✅ gmail_check_replied: thread={thread_id} replied={replied} count={len(sent_messages)}")
+        logger.info(f"✅ gmail_check_replied: thread={thread_id} replied={replied} count={reply_count}")
         return json.dumps({
             "thread_id":    thread_id,
             "replied":      replied,
-            "reply_count":  len(sent_messages),
+            "reply_count":  reply_count,
             "last_reply_at": last_reply_at,
             "since_hours":  since_hours,
             "text":         text,
@@ -1380,12 +1519,10 @@ def gmail_check_replied(thread_id: str, since_hours: Optional[float] = None) -> 
 
     except MCPToolError:
         raise
-    except HttpError as e:
+    except Exception as e:
         logger.error(f"❌ gmail_check_replied error: {e}")
-        status = getattr(e, "status_code", None)
-        kind = FailureKind.USER_ERROR if status == 404 else FailureKind.UPSTREAM_ERROR
-        raise MCPToolError(kind, f"Gmail API error: {e}",
-                           {"tool": "gmail_check_replied", "thread_id": thread_id, "status": status})
+        raise MCPToolError(FailureKind.UPSTREAM_ERROR, f"Gmail error: {e}",
+                           {"tool": "gmail_check_replied", "thread_id": thread_id})
 
 @mcp.tool()
 @check_tool_enabled(category="google")
@@ -1504,115 +1641,169 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         logger.warning(f"⚠️  Weather failed: {e}")
         result["errors"]["weather"] = str(e)
 
-    # ── Unread email ──────────────────────────────────────────────────────────
-    if not GOOGLE_AVAILABLE:
-        result["errors"]["email"] = "Google API libraries not installed"
-        result["errors"]["calendar"] = "Google API libraries not installed"
-    if GOOGLE_AVAILABLE:
+    # ── Email + Calendar ──────────────────────────────────────────────────────
+    _script_url = os.getenv("GOOGLE_APPS_SCRIPT_URL", "").rstrip("/")
+
+    if _script_url:
+        # ── Apps Script path (no OAuth) ───────────────────────────────────────
+        # URL already contains ?key=... — append remaining params with &
+        _sep = "&" if "?" in _script_url else "?"
         try:
-            service = _gmail_service()
-            if service:
-                res = service.users().messages().list(
-                    userId="me", labelIds=["INBOX", "UNREAD"], maxResults=max_emails
-                ).execute()
-                messages = res.get("messages", [])
-                emails = []
-                for msg_ref in messages:
-                    msg = service.users().messages().get(
-                        userId="me", id=msg_ref["id"], format="metadata",
-                        metadataHeaders=["From", "Subject", "Date"]
-                    ).execute()
-                    headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
-                    _msg_id = msg["id"]
-                    emails.append({
-                        "from":    headers.get("from", ""),
-                        "subject": headers.get("subject", "(no subject)"),
-                        "date":    headers.get("date", ""),
-                        "preview": msg.get("snippet", ""),
-                        "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
-                        "id":      _msg_id,
-                    })
-                result["email"] = {"total_unread": len(emails), "emails": emails}
-                # Build pre-rendered text so the LLM doesn't have to improvise
-                _email_lines = []
-                for _i, _em in enumerate(emails, 1):
-                    _preview = _em["preview"][:120] + "…" if len(_em["preview"]) > 120 else _em["preview"]
-                    _email_lines.append(f"{_i}. {_em['subject']}")
-                    _email_lines.append(f"   From:    {_em['from']}")
-                    _email_lines.append(f"   Date:    {_em['date']}")
-                    _email_lines.append(f"   Preview: {_preview}")
-                    _email_lines.append(f"   Link:    {_em['link']}")
-                    _email_lines.append("")
-                result["email"]["text"] = "\n".join(_email_lines)
-                logger.info(f"✅ {len(emails)} unread emails fetched")
+            _resp = _requests.get(
+                f"{_script_url}{_sep}type=gmail&max_emails={max_emails}",
+                timeout=10
+            )
+            _resp.raise_for_status()
+            _gmail_data = _resp.json()
+            if "error" in _gmail_data:
+                raise RuntimeError(_gmail_data["error"])
+            _msgs = _gmail_data.get("messages", [])
+            emails = [
+                {
+                    "from":    m.get("from", ""),
+                    "subject": m.get("subject", "(no subject)"),
+                    "date":    m.get("date", ""),
+                    "id":      m.get("id", ""),
+                    "link":    m.get("link", ""),
+                    "preview": m.get("preview", ""),
+                }
+                for m in _msgs
+            ]
+            result["email"] = {"total_unread": _gmail_data.get("unreadCount", 0), "emails": emails}
+            logger.info(f"✅ {len(emails)} unread emails fetched (Apps Script)")
         except Exception as e:
-            logger.warning(f"⚠️  Gmail failed: {e}")
+            logger.warning(f"⚠️  Gmail (Apps Script) failed: {e}")
             result["errors"]["email"] = str(e)
 
-    # ── Calendar ──────────────────────────────────────────────────────────────
-    if GOOGLE_AVAILABLE:
         try:
-            service = _calendar_service()
-            if service:
-                try:
-                    from zoneinfo import ZoneInfo
-                    from tools.location.resolve_timezone import resolve_timezone
-                    _city    = os.getenv("DEFAULT_CITY", "")
-                    _state   = os.getenv("DEFAULT_STATE", "")
-                    _country = os.getenv("DEFAULT_COUNTRY", "")
-                    _tz_name = resolve_timezone(_city, _state, _country)
-                    _tz = ZoneInfo(_tz_name)
-                except Exception:
-                    _tz = timezone.utc
-                now = datetime.now(_tz)
-                start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=date_offset)
-                end_of_day = start_of_day + timedelta(days=calendar_days)
-                calendar_ids = _get_all_calendar_ids(service)
-                events = []
-                seen_ids = set()
-                for cal_id in calendar_ids:
-                    try:
-                        res = service.events().list(
-                            calendarId=cal_id,
-                            timeMin=start_of_day.isoformat(),
-                            timeMax=end_of_day.isoformat(),
-                            singleEvents=True,
-                            orderBy="startTime"
-                        ).execute()
-                        for e in res.get("items", []):
-                            if e["id"] not in seen_ids:
-                                seen_ids.add(e["id"])
-                                events.append(_format_event(e))
-                    except Exception as _ce:
-                        logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
-                events.sort(key=lambda e: e.get("start", ""))
-                _cal_lines = []
-                for _ev in events:
-                    _cal_lines.append(f"• Event: {_ev['title']}")
-                    _cal_lines.append(f"  - When: {_ev['when']}")
-                    if _ev.get("notes"):
-                        _cal_lines.append(f"  - Notes: {_ev['notes'][:200]}")
-                    if _ev.get("location"):
-                        _cal_lines.append(f"  - Location: {_ev['location']}")
-                    if _ev.get("organizer"):
-                        _cal_lines.append(f"  - Organizer: {_ev['organizer']}")
-                    if _ev.get("attendees"):
-                        _cal_lines.append(f"  - Attendees: {_ev['attendees']}")
-                    if _ev.get("meet_link"):
-                        _cal_lines.append(f"  - Meet Link: {_ev['meet_link']}")
-                    if _ev.get("calendar_link"):
-                        _cal_lines.append(f"  - Calendar Link: {_ev['calendar_link']}")
-                    _cal_lines.append("")
-                result["calendar"] = {
-                    "date":   start_of_day.strftime("%Y-%m-%d"),
-                    "count":  len(events),
-                    "text":   "\n".join(_cal_lines),
-                    "events": events,
+            _cresp = _requests.get(
+                f"{_script_url}{_sep}type=calendar&offset={date_offset}&days={calendar_days}",
+                timeout=10
+            )
+            _cresp.raise_for_status()
+            _cal_data = _cresp.json()
+            if "error" in _cal_data:
+                raise RuntimeError(_cal_data["error"])
+            _evs = _cal_data.get("events", [])
+            events = [
+                {
+                    "title":         e.get("title", ""),
+                    "when":          e.get("time", ""),
+                    "location":      e.get("location", ""),
+                    "notes":         e.get("notes", ""),
+                    "organizer":     e.get("organizer", ""),
+                    "attendees":     e.get("attendees", ""),
+                    "calendar_link": e.get("calendarLink", ""),
                 }
-                logger.info(f"✅ {len(events)} calendar events fetched")
+                for e in _evs
+            ]
+            result["calendar"] = {
+                "date":   _cal_data.get("date", ""),
+                "count":  len(events),
+                "events": events,
+            }
+            logger.info(f"✅ {len(events)} calendar events fetched (Apps Script)")
         except Exception as e:
-            logger.warning(f"⚠️  Calendar failed: {e}")
+            logger.warning(f"⚠️  Calendar (Apps Script) failed: {e}")
             result["errors"]["calendar"] = str(e)
+
+    else:
+        # ── OAuth path (fallback when Apps Script not configured) ─────────────
+        if not GOOGLE_AVAILABLE:
+            result["errors"]["email"] = "Google API libraries not installed"
+            result["errors"]["calendar"] = "Google API libraries not installed"
+        if GOOGLE_AVAILABLE:
+            try:
+                service = _gmail_service()
+                if service:
+                    res = service.users().messages().list(
+                        userId="me", labelIds=["INBOX", "UNREAD"], maxResults=max_emails
+                    ).execute()
+                    messages = res.get("messages", [])
+                    emails = []
+                    for msg_ref in messages:
+                        msg = service.users().messages().get(
+                            userId="me", id=msg_ref["id"], format="metadata",
+                            metadataHeaders=["From", "Subject", "Date"]
+                        ).execute()
+                        headers = _parse_message_headers(msg.get("payload", {}).get("headers", []))
+                        _msg_id = msg["id"]
+                        emails.append({
+                            "from":    headers.get("from", ""),
+                            "subject": headers.get("subject", "(no subject)"),
+                            "date":    headers.get("date", ""),
+                            "preview": msg.get("snippet", ""),
+                            "link":    f"https://mail.google.com/mail/u/0/#inbox/{_msg_id}",
+                            "id":      _msg_id,
+                        })
+                    result["email"] = {"total_unread": len(emails), "emails": emails}
+                    logger.info(f"✅ {len(emails)} unread emails fetched")
+            except Exception as e:
+                logger.warning(f"⚠️  Gmail failed: {e}")
+                result["errors"]["email"] = str(e)
+
+            try:
+                service = _calendar_service()
+                if service:
+                    try:
+                        from zoneinfo import ZoneInfo
+                        from tools.location.resolve_timezone import resolve_timezone
+                        _city    = os.getenv("DEFAULT_CITY", "")
+                        _state   = os.getenv("DEFAULT_STATE", "")
+                        _country = os.getenv("DEFAULT_COUNTRY", "")
+                        _tz_name = resolve_timezone(_city, _state, _country)
+                        _tz = ZoneInfo(_tz_name)
+                    except Exception:
+                        _tz = timezone.utc
+                    now = datetime.now(_tz)
+                    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=date_offset)
+                    end_of_day = start_of_day + timedelta(days=calendar_days)
+                    calendar_ids = _get_all_calendar_ids(service)
+                    events = []
+                    seen_ids = set()
+                    for cal_id in calendar_ids:
+                        try:
+                            res = service.events().list(
+                                calendarId=cal_id,
+                                timeMin=start_of_day.isoformat(),
+                                timeMax=end_of_day.isoformat(),
+                                singleEvents=True,
+                                orderBy="startTime"
+                            ).execute()
+                            for e in res.get("items", []):
+                                if e["id"] not in seen_ids:
+                                    seen_ids.add(e["id"])
+                                    events.append(_format_event(e))
+                        except Exception as _ce:
+                            logger.warning(f"⚠️  Could not fetch calendar {cal_id}: {_ce}")
+                    events.sort(key=lambda e: e.get("start", ""))
+                    _cal_lines = []
+                    for _ev in events:
+                        _cal_lines.append(f"• Event: {_ev['title']}")
+                        _cal_lines.append(f"  - When: {_ev['when']}")
+                        if _ev.get("notes"):
+                            _cal_lines.append(f"  - Notes: {_ev['notes'][:200]}")
+                        if _ev.get("location"):
+                            _cal_lines.append(f"  - Location: {_ev['location']}")
+                        if _ev.get("organizer"):
+                            _cal_lines.append(f"  - Organizer: {_ev['organizer']}")
+                        if _ev.get("attendees"):
+                            _cal_lines.append(f"  - Attendees: {_ev['attendees']}")
+                        if _ev.get("meet_link"):
+                            _cal_lines.append(f"  - Meet Link: {_ev['meet_link']}")
+                        if _ev.get("calendar_link"):
+                            _cal_lines.append(f"  - Calendar Link: {_ev['calendar_link']}")
+                        _cal_lines.append("")
+                    result["calendar"] = {
+                        "date":   start_of_day.strftime("%Y-%m-%d"),
+                        "count":  len(events),
+                        "text":   "\n".join(_cal_lines),
+                        "events": events,
+                    }
+                    logger.info(f"✅ {len(events)} calendar events fetched")
+            except Exception as e:
+                logger.warning(f"⚠️  Calendar failed: {e}")
+                result["errors"]["calendar"] = str(e)
 
     if not result["errors"]:
         del result["errors"]
@@ -1667,8 +1858,17 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
             _text_parts.append("\nEmails: No unread emails")
         else:
             _text_parts.append(f"\nEmails: {_total} unread email(s)")
-            for _em in _ed.get("emails", [])[:5]:
-                _text_parts.append(f"  - {_em.get('subject','(no subject)')} — from {_em.get('from','')}")
+            _briefing_emails = _ed.get("emails", [])[:5]
+            _briefing_summaries = _summarise_emails(_briefing_emails)
+            for _bi, _em in enumerate(_briefing_emails, 1):
+                _summary = _briefing_summaries.get(_bi) or (_em.get("preview", "")[:120])
+                _text_parts.append(f"  {_bi}. {_em.get('subject', '(no subject)')}")
+                _text_parts.append(f"     From:    {_em.get('from', '')}")
+                _text_parts.append(f"     Date:    {_em.get('date', '')}")
+                if _summary:
+                    _text_parts.append(f"     Summary: {_summary}")
+                if _em.get("link"):
+                    _text_parts.append(f"     Link:    {_em['link']}")
     else:
         _text_parts.append("\nEmails: unavailable")
 
@@ -1682,8 +1882,17 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
             _text_parts.append("\nCalendar: No events scheduled")
         else:
             _text_parts.append(f"\nCalendar: {_count} event(s)")
-            for _ev in _cd.get("events", [])[:5]:
-                _text_parts.append(f"  - {_ev.get('title','')} at {_ev.get('when','')}")
+            for _ci, _ev in enumerate(_cd.get("events", [])[:5], 1):
+                _text_parts.append(f"  {_ci}. {_ev.get('title', '')}")
+                _text_parts.append(f"     When:     {_ev.get('when', '')}")
+                if _ev.get("location"):
+                    _text_parts.append(f"     Location: {_ev['location']}")
+                if _ev.get("attendees"):
+                    _text_parts.append(f"     Attendees: {_ev['attendees']}")
+                if _ev.get("meet_link"):
+                    _text_parts.append(f"     Meet:     {_ev['meet_link']}")
+                if _ev.get("calendar_link"):
+                    _text_parts.append(f"     Calendar: {_ev['calendar_link']}")
 
     result["text"] = "\n".join(_text_parts)
 
