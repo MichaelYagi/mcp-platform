@@ -142,7 +142,7 @@ DISCORD_WEBHOOK_URL=your_webhook_url_here
 # Paste PASTE_INTO_GOOGLE_APPS_SCRIPT.js into script.google.com, deploy as a Web App,
 # then set the URL with your SECRET_KEY appended as ?key=...
 # When set, get_day_briefing uses the script instead of OAuth.
-GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec?key=your_secret_key_here
+GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec?key=<strong-random-secret-32-chars>
 
 # === A2A Protocol ===
 A2A_ENDPOINTS=http://localhost:8010
@@ -242,7 +242,9 @@ SERPER_API_KEY=<key>
 
 1. Go to https://script.google.com and create a new project
 2. Delete all existing code and paste the contents of `PASTE_INTO_GOOGLE_APPS_SCRIPT.js`
-3. Replace `<SECRET_KEY>` in the script with any random string you choose (e.g. `x7k2mQp9`)
+3. Replace `<SECRET_KEY>` in the script with a strong random secret (32+ characters).
+   Generate one: `python3 -c "import secrets; print(secrets.token_urlsafe(32))"`
+   Anyone who knows this key can read your emails and calendar — treat it like a password.
 4. Click **Deploy > New deployment > Web app**
    - Execute as: **Me**
    - Who has access: **Anyone**

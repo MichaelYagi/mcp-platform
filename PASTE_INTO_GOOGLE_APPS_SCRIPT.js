@@ -7,14 +7,15 @@
 // SETUP (one time):
 // 1. Go to https://script.google.com and create a new project
 // 2. Delete all existing code and paste this entire file
-// 3. Replace <SECRET_KEY> below with any random string you choose (e.g. "x7k2mQp9")
+// 3. Replace <SECRET_KEY> below with a strong random secret (32+ characters).
+//    Generate one in your terminal: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+//    Anyone who knows this key can read your emails and calendar — treat it like a password.
 // 4. Click Deploy > New deployment > Web app
 //      Execute as: Me
 //      Who has access: Anyone
 //    Click Deploy and copy the Web App URL
 // 5. In your .env file set:
 //      GOOGLE_APPS_SCRIPT_URL=<Web App URL>?key=<your SECRET_KEY>
-//    Example: GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec?key=x7k2mQp9
 // 6. On subsequent edits: Deploy > Manage deployments > edit the existing deployment
 //    (do not create a new one or the URL will change)
 
