@@ -92,7 +92,7 @@ Add to your MCP client config (e.g., `claude_desktop_config.json`):
 - `code_runner` - Python/bash execution sandbox (4 tools)
 - `discord` - Discord channel notifications via webhook (2 tools) ⚠️ *Requires `DISCORD_WEBHOOK_URL`*
 - `github` - GitHub repo clone, browse, and cleanup (4 tools) ⚠️ *Requires `GITHUB_TOKEN` for private repos*
-- `google` - Gmail + Google Calendar (13 tools) ⚠️ *Requires one-time OAuth setup*
+- `google` - Gmail + Google Calendar (13 tools) ⚠️ *Requires Google setup (Apps Script or OAuth — see [Google Setup](#google-setup))*
 - `image` - Image search, analysis, and AI generation (6 tools) ⚠️ *Requires `SERPER_API_KEY` for search; generation is free*
 - `location` - Weather, time, location (3 tools)
 - `plex` - Media library + ML recommendations (18 tools) ⚠️ *Requires `PLEX_URL`, `PLEX_TOKEN`*
@@ -141,7 +141,7 @@ DISCORD_WEBHOOK_URL=your_webhook_url_here
 # === Google Apps Script (alternative to OAuth for Gmail/Calendar) ===
 # Paste PASTE_INTO_GOOGLE_APPS_SCRIPT.js into script.google.com, deploy as a Web App,
 # then set the URL with your SECRET_KEY appended as ?key=...
-# When set, get_day_briefing uses the script instead of OAuth.
+# When set, ALL Google tools use the script instead of OAuth.
 GOOGLE_APPS_SCRIPT_URL=https://script.google.com/macros/s/.../exec?key=<strong-random-secret-32-chars>
 
 # === A2A Protocol ===
@@ -188,7 +188,7 @@ SERPER_API_KEY=<key>
 
 | Feature | Required env vars | Additional setup |
 |---------|-------------------|------------------|
-| Gmail + Google Calendar | — | One-time Google OAuth setup |
+| Gmail + Google Calendar | — | Google setup — Apps Script (simpler) or OAuth (see [Google Setup](#google-setup)) |
 | Discord notifications | `DISCORD_WEBHOOK_URL` | Create webhook in Discord channel settings |
 | RAG ingestion & search | — | Ollama running + `bge-large` pulled |
 | Plex media library | `PLEX_URL`, `PLEX_TOKEN` | Plex Media Server running |
@@ -238,7 +238,7 @@ SERPER_API_KEY=<key>
 
 ### Google Setup
 
-**Option A — Google Apps Script (simpler, no OAuth)**
+**Option A — Google Apps Script (simpler setup)**
 
 1. Go to https://script.google.com and create a new project
 2. Delete all existing code and paste the contents of `PASTE_INTO_GOOGLE_APPS_SCRIPT.js`
@@ -256,7 +256,7 @@ SERPER_API_KEY=<key>
 
 On subsequent script edits, use **Deploy > Manage deployments** and edit the existing deployment — do not create a new one or the URL will change.
 
-**Option B — Google OAuth (full access to all Google tools)**
+**Option B — Google OAuth**
 
 One-time setup. After completing these steps the server runs headlessly.
 
@@ -437,7 +437,7 @@ servers/
 ├── code_runner/       4 tools  - Python/bash execution sandbox
 ├── discord/           2 tools  - Discord channel notifications [requires DISCORD_WEBHOOK_URL]
 ├── github/            4 tools  - GitHub repo clone, browse, and cleanup
-├── google/           13 tools  - Gmail + Google Calendar       [requires OAuth]
+├── google/           13 tools  - Gmail + Google Calendar       [requires Google setup]
 ├── image/             6 tools  - Image search, analysis, AI generation
 ├── location/          3 tools  - Weather, time, location
 ├── plex/             18 tools  - Media + ML recommendations    [requires PLEX_URL + PLEX_TOKEN]
@@ -701,12 +701,13 @@ run the weather check every morning at 7am and write a friendly summary
 
 The LLM classifies whether your message is a scheduling request, parses the intent into a job definition, and presents it for confirmation before saving anything. Ambiguous requests are clarified with a question rather than guessed.
 
-**Two trigger types:**
+**Three trigger types:**
 
 | Type | How it works | Example |
 |------|-------------|---------|
-| `cron` | Fires at a fixed time | "every day at 6am" |
+| `cron` | Fires repeatedly on a fixed schedule | "every day at 6am" |
 | `condition` | Polls a check tool on an interval; fires only when condition is true | "when I have unread emails" |
+| `once` | Fires once at a specific date/time, then removes itself | "at 8am today", "remind me tomorrow at noon" |
 
 **LLM involvement:** Every job can have an `llm_prompt` — an instruction passed to the LLM after the tool runs. Instead of broadcasting the raw tool output, the LLM interprets it first:
 
