@@ -75,10 +75,12 @@ class SearchClient:
             }
 
         # ── Try Ollama first ──────────────────────────────────────────── #
+        ollama_error: Optional[Dict[str, Any]] = None
         if self.api_key:
             result = await self._ollama_search(query, max_results, timeout)
             if result.get("success") and self._has_results(result):
                 return result
+            ollama_error = result
             self.logger.warning(
                 f"⚠️ Ollama search unavailable or empty — falling back to LangSearch "
                 f"(reason: {result.get('error', 'empty response')})"
@@ -87,6 +89,9 @@ class SearchClient:
         # ── Fallback: LangSearch ─────────────────────────────────────── #
         if self.langsearch_key:
             return await self._langsearch_search(query, max_results, timeout)
+
+        if ollama_error:
+            return ollama_error
 
         return {"success": False, "error": "All search providers failed or unconfigured"}
 

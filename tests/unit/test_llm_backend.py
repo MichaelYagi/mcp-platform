@@ -116,6 +116,7 @@ class TestCreateLlmGGUF:
         lb._CURRENT_LLM = None
         lb._CURRENT_MODEL_NAME = None
 
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_gguf_model_not_in_registry_raises(self, monkeypatch, temp_dir):
         monkeypatch.setenv("LLM_BACKEND", "gguf")
         with patch("client.llm_backend.GGUF_MODELS_FILE", str(temp_dir / "models.json")):
@@ -123,6 +124,7 @@ class TestCreateLlmGGUF:
             with pytest.raises(ValueError, match="not in registry"):
                 LLMBackendManager.create_llm("nonexistent-model")
 
+    @pytest.mark.filterwarnings("ignore::DeprecationWarning")
     def test_gguf_file_not_found_raises(self, monkeypatch, temp_dir):
         monkeypatch.setenv("LLM_BACKEND", "gguf")
         models_file = temp_dir / "models.json"
