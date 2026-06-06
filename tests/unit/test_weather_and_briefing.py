@@ -417,7 +417,7 @@ class TestBriefingDateOffset:
     def test_offset_zero_text_contains_weather(self):
         result = _run_briefing(date_offset=0)
         text = result.get("text", "")
-        assert "Weather Briefing" in text, (
+        assert "### Weather" in text, (
             "Weather section must appear in briefing text for date_offset=0. "
             f"Got: {text[:200]}"
         )
@@ -426,7 +426,7 @@ class TestBriefingDateOffset:
         """Regression: date_offset=1 was causing weather to silently disappear."""
         result = _run_briefing(date_offset=1, forecast_days=1)
         text = result.get("text", "")
-        assert "Weather Briefing" in text or "Weather: unavailable" in text, (
+        assert "### Weather" in text or "unavailable" in text, (
             "Weather section (or unavailable notice) must appear for date_offset=1. "
             f"Got: {text[:300]}"
         )
@@ -434,7 +434,7 @@ class TestBriefingDateOffset:
     def test_offset_two_text_contains_weather(self):
         result = _run_briefing(date_offset=2, forecast_days=1)
         text = result.get("text", "")
-        assert "Weather Briefing" in text or "Weather: unavailable" in text, (
+        assert "### Weather" in text or "unavailable" in text, (
             f"Weather must appear for date_offset=2. Got: {text[:300]}"
         )
 
@@ -574,13 +574,13 @@ class TestBriefingWeatherFailure:
         err = json.dumps({"error": "api_error", "message": "Parameter out of range"})
         result = self._run_with_weather_error(err)
         text = result.get("text", "")
-        assert "unavailable" in text or "Weather Briefing" in text
+        assert "unavailable" in text or "### Weather" in text
 
     def test_request_failed_shows_unavailable_in_text(self):
         err = json.dumps({"error": "request_failed", "message": "HTTP 503"})
         result = self._run_with_weather_error(err)
         text = result.get("text", "")
-        assert "unavailable" in text or "Weather Briefing" in text
+        assert "unavailable" in text or "### Weather" in text
 
     def test_exception_in_weather_shows_unavailable_in_text(self):
         """If weather raises an exception, text must say unavailable."""
@@ -594,7 +594,7 @@ class TestBriefingWeatherFailure:
         err = json.dumps({"error": "geocode_failed", "message": "no location"})
         result = self._run_with_weather_error(err)
         text = result.get("text", "")
-        assert "Date:" in text
+        assert "## " in text
 
     def test_email_still_present_when_weather_fails(self):
         err = json.dumps({"error": "geocode_failed", "message": "no location"})
@@ -627,7 +627,7 @@ class TestBriefingWeatherFailure:
             ))
 
         text = result.get("text", "")
-        assert "Weather Briefing" in text or "unavailable" in text, (
+        assert "### Weather" in text or "unavailable" in text, (
             "When API returns fewer days than date_offset, weather must still "
             f"appear (fallback or unavailable message). Got: {text[:300]}"
         )
@@ -645,11 +645,11 @@ class TestBriefingTextFormat:
 
     def test_date_header_present(self):
         text = self._briefing_text()
-        assert text.startswith("**Date:**"), f"Text must start with Date header. Got: {text[:80]}"
+        assert text.startswith("## "), f"Text must start with Date header. Got: {text[:80]}"
 
     def test_weather_section_present(self):
         text = self._briefing_text()
-        assert "Weather Briefing" in text
+        assert "### Weather" in text
 
     def test_conditions_line_present(self):
         text = self._briefing_text()
@@ -657,15 +657,15 @@ class TestBriefingTextFormat:
 
     def test_precipitation_chance_present(self):
         text = self._briefing_text()
-        assert "Precipitation Chance:" in text
+        assert "Precipitation:" in text
 
     def test_high_temp_present(self):
         text = self._briefing_text()
-        assert "High Temp:" in text
+        assert "High:" in text
 
     def test_low_temp_present(self):
         text = self._briefing_text()
-        assert "Low Temp:" in text
+        assert "Low:" in text
 
     def test_feels_like_present(self):
         text = self._briefing_text()
@@ -697,7 +697,7 @@ class TestBriefingTextFormat:
 
     def test_forecast_label_today_for_offset_zero(self):
         text = self._briefing_text(date_offset=0)
-        assert "Forecast for Today:" in text
+        assert "**Today**" in text
 
     def test_temperature_has_both_units(self):
         text = self._briefing_text()

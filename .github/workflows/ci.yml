@@ -52,7 +52,10 @@ jobs:
 
       - name: Run Python tests
         id: python_tests
-        run: python -m pytest 2>&1 | tee tests/results/pytest.log
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest 2>&1 | tee tests/results/pytest.log
         env:
           TESTING: "true"
           LLM_BACKEND: "ollama"
@@ -62,7 +65,10 @@ jobs:
 
       - name: Run JS tests
         id: js_tests
-        run: npm test 2>&1 | tee tests/js-results/jest.log
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee tests/js-results/jest.log
         continue-on-error: true
 
       - name: Detect Python failure type
