@@ -296,9 +296,17 @@ def _format_job_list() -> str:
             schedule = f"condition: {j['condition_expr'] or '?'}"
             schedule_detail = f"polls {cron_to_human(j['condition_cron'])}"
         last = j["last_run"][:16].replace("T", " ") if j["last_run"] else "never"
+        _lp = j.get("llm_prompt") or ""
+        if _lp and "|" in _lp:
+            _tool_display = " | ".join(
+                s.strip().split(":")[0].replace("use ", "").strip()
+                for s in _lp.split("|") if s.strip()
+            )
+        else:
+            _tool_display = j["tool"] or _lp or "?"
         lines.append(
             f"[{j['id']}] {j['label']}\n"
-            f"    Tool:     {j['tool']}\n"
+            f"    Tool:     {_tool_display}\n"
             f"    Schedule: {schedule}  ({schedule_detail})\n"
             f"    Status:   {status}  |  Last run: {last}  |  Runs: {j['run_count']}"
         )
