@@ -169,7 +169,8 @@ def _get_routing_llm(base_llm):
     return _with_params(base_llm, temperature=0.0, num_predict=60)
 
 
-async def llm_ainvoke(llm, messages, poll_interval: float = 0.5, num_predict: int | None = None):
+async def llm_ainvoke(llm, messages, poll_interval: float = 0.5, num_predict: int | None = None,
+                       temperature: float | None = None):
     """
     Cancellable wrapper around llm.ainvoke() / llm.astream().
 
@@ -178,9 +179,17 @@ async def llm_ainvoke(llm, messages, poll_interval: float = 0.5, num_predict: in
 
     num_predict: if given, caps the token budget for this specific call via a
     lightweight Pydantic copy of the LLM (avoids touching the shared instance).
+    temperature: if given, overrides sampling temperature for this specific call
+    via the same lightweight copy — e.g. 0.0 for structured-extraction tasks
+    that need compliant, deterministic output rather than creative variance.
     """
+    _override = {}
     if num_predict is not None:
-        llm = _with_params(llm, num_predict=num_predict)
+        _override["num_predict"] = num_predict
+    if temperature is not None:
+        _override["temperature"] = temperature
+    if _override:
+        llm = _with_params(llm, **_override)
 
     cb = _stream_cb.get()
     if cb is not None:

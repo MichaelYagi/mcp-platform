@@ -23,37 +23,58 @@ const SECRET_KEY = '<SECRET_KEY>';
 const MAX_EMAILS = 8;
 
 function doGet(e) {
+  const type = e.parameter.type;
+  console.log("doGet: type=" + type);
+
   if (e.parameter.key !== SECRET_KEY) {
+    console.error("doGet: unauthorized request for type=" + type);
     return ContentService.createTextOutput(JSON.stringify({ error: 'Unauthorized' }))
         .setMimeType(ContentService.MimeType.JSON);
   }
 
-  const type = e.parameter.type;
   let data;
 
-  if (type === 'gmail') {
-    const maxEmails = parseInt(e.parameter.max_emails) || MAX_EMAILS;
-    data = getGmailData(maxEmails);
-  } else if (type === 'gmail_recent') {
-    const maxEmails = parseInt(e.parameter.max_emails) || MAX_EMAILS;
-    data = getGmailRecent(maxEmails);
-  } else if (type === 'gmail_search') {
-    const query = e.parameter.query || '';
-    const maxResults = parseInt(e.parameter.max_results) || 20;
-    data = getGmailSearch(query, maxResults);
-  } else if (type === 'gmail_message') {
-    const id = e.parameter.id || '';
-    data = getGmailMessage(id);
-  } else if (type === 'gmail_check_replied') {
-    const threadId = e.parameter.thread_id || '';
-    const sinceHours = e.parameter.since_hours ? parseFloat(e.parameter.since_hours) : null;
-    data = checkGmailReplied(threadId, sinceHours);
-  } else if (type === 'calendar') {
-    const offset = parseInt(e.parameter.offset) || 0;
-    const days = parseInt(e.parameter.days) || 1;
-    data = getCalendarData(offset, days);
-  } else {
-    data = { error: 'Unknown type' };
+  try {
+    if (type === 'gmail') {
+      const maxEmails = parseInt(e.parameter.max_emails) || MAX_EMAILS;
+      console.log("doGet: gmail unread, maxEmails=" + maxEmails);
+      data = getGmailData(maxEmails);
+      console.log("doGet: gmail unread done, unreadCount=" + data.unreadCount);
+    } else if (type === 'gmail_recent') {
+      const maxEmails = parseInt(e.parameter.max_emails) || MAX_EMAILS;
+      console.log("doGet: gmail_recent, maxEmails=" + maxEmails);
+      data = getGmailRecent(maxEmails);
+      console.log("doGet: gmail_recent done, count=" + data.count);
+    } else if (type === 'gmail_search') {
+      const query = e.parameter.query || '';
+      const maxResults = parseInt(e.parameter.max_results) || 20;
+      console.log("doGet: gmail_search, query=" + query + ", maxResults=" + maxResults);
+      data = getGmailSearch(query, maxResults);
+      console.log("doGet: gmail_search done, count=" + data.count);
+    } else if (type === 'gmail_message') {
+      const id = e.parameter.id || '';
+      console.log("doGet: gmail_message, id=" + id);
+      data = getGmailMessage(id);
+      console.log("doGet: gmail_message done, subject=" + (data.subject || data.error));
+    } else if (type === 'gmail_check_replied') {
+      const threadId = e.parameter.thread_id || '';
+      const sinceHours = e.parameter.since_hours ? parseFloat(e.parameter.since_hours) : null;
+      console.log("doGet: gmail_check_replied, threadId=" + threadId + ", sinceHours=" + sinceHours);
+      data = checkGmailReplied(threadId, sinceHours);
+      console.log("doGet: gmail_check_replied done, replied=" + data.replied);
+    } else if (type === 'calendar') {
+      const offset = parseInt(e.parameter.offset) || 0;
+      const days = parseInt(e.parameter.days) || 1;
+      console.log("doGet: calendar, offset=" + offset + ", days=" + days);
+      data = getCalendarData(offset, days);
+      console.log("doGet: calendar done, events=" + (data.events ? data.events.length : 0));
+    } else {
+      console.error("doGet: unknown type=" + type);
+      data = { error: 'Unknown type' };
+    }
+  } catch (err) {
+    console.error("doGet handler '" + type + "' failed: " + err.message + "\n" + err.stack);
+    data = { error: err.message || String(err) };
   }
 
   return ContentService.createTextOutput(JSON.stringify(data))
@@ -61,31 +82,52 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  console.log("doPost: received request");
+
   let body;
   try {
     body = JSON.parse(e.postData.contents);
-  } catch (_) {
+  } catch (err) {
+    console.error("doPost: failed to parse request body: " + err.message + "\n" + err.stack);
     return ContentService.createTextOutput(JSON.stringify({ error: 'Invalid JSON' }))
         .setMimeType(ContentService.MimeType.JSON);
   }
 
   if (body.key !== SECRET_KEY) {
+    console.error("doPost: unauthorized request, type=" + body.type);
     return ContentService.createTextOutput(JSON.stringify({ error: 'Unauthorized' }))
         .setMimeType(ContentService.MimeType.JSON);
   }
 
   const type = body.type;
+  console.log("doPost: dispatching type=" + type);
   let result;
 
-  if (type === 'send_email') {
-    result = sendEmail(body);
-  } else if (type === 'reply_email') {
-    result = replyToEmail(body);
-  } else if (type === 'create_event') {
-    result = createCalendarEvent(body);
-  } else {
-    result = { error: 'Unknown type' };
+  // Anything thrown by the handlers below (Gmail daily quota exceeded, an
+  // invalid recipient, a transient Google API error, etc.) must be caught
+  // here — otherwise it propagates out of doPost uncaught, Apps Script
+  // aborts the request, and the client receives Google's generic HTML
+  // error page instead of JSON (which then fails to parse on their end,
+  // hiding the real error). Catching it here logs the real exception to
+  // the Executions log AND returns it as JSON so the caller can see it.
+  try {
+    if (type === 'send_email') {
+      result = sendEmail(body);
+    } else if (type === 'reply_email') {
+      result = replyToEmail(body);
+    } else if (type === 'create_event') {
+      result = createCalendarEvent(body);
+    } else {
+      console.error("doPost: unknown type=" + type);
+      result = { error: 'Unknown type' };
+    }
+  } catch (err) {
+    console.error("doPost handler '" + type + "' failed: " + err.message + "\n" + err.stack);
+    result = { error: err.message || String(err) };
   }
+
+  const success = !result.error;
+  console.log("doPost: type=" + type + " " + (success ? "succeeded" : "failed: " + result.error));
 
   return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
@@ -93,21 +135,26 @@ function doPost(e) {
 
 function sendEmail(params) {
   if (!params.to || !params.subject || !params.body) {
+    console.error("sendEmail: missing required fields, to=" + params.to + " subject=" + params.subject);
     return { error: 'Missing required fields: to, subject, body' };
   }
+  console.log("sendEmail: to=" + params.to + ", subject=" + params.subject + ", hasHtml=" + !!params.htmlBody);
   const options = {};
   if (params.cc)       options.cc = params.cc;
   if (params.bcc)      options.bcc = params.bcc;
   if (params.replyTo)  options.replyTo = params.replyTo;
   if (params.htmlBody) options.htmlBody = params.htmlBody;
   GmailApp.sendEmail(params.to, params.subject, params.body, options);
+  console.log("sendEmail: sent successfully to=" + params.to);
   return { success: true };
 }
 
 function createCalendarEvent(params) {
   if (!params.title || !params.start) {
+    console.error("createCalendarEvent: missing required fields, title=" + params.title + " start=" + params.start);
     return { error: 'Missing required fields: title, start' };
   }
+  console.log("createCalendarEvent: title=" + params.title + ", start=" + params.start + ", allDay=" + !!params.allDay);
   const cal = CalendarApp.getDefaultCalendar();
   const startTime = new Date(params.start);
   const options = {};
@@ -127,12 +174,15 @@ function createCalendarEvent(params) {
     const endTime = params.end ? new Date(params.end) : new Date(startTime.getTime() + 60 * 60 * 1000);
     cal.createEvent(params.title, startTime, endTime, options);
   }
+  console.log("createCalendarEvent: created successfully, title=" + params.title);
   return { success: true };
 }
 
 function getGmailData(maxEmails) {
   maxEmails = maxEmails || MAX_EMAILS;
+  console.log("getGmailData: searching inbox unread, maxEmails=" + maxEmails);
   const threads = GmailApp.search('in:inbox is:unread');
+  console.log("getGmailData: found " + threads.length + " unread threads");
   const messages = threads.slice(0, maxEmails).map(thread => {
     const msg = thread.getMessages()[thread.getMessageCount() - 1];
     const rawFrom = msg.getFrom();
@@ -162,24 +212,33 @@ function getGmailData(maxEmails) {
 
 function replyToEmail(params) {
   if (!params.message_id || !params.body) {
+    console.error("replyToEmail: missing required fields, message_id=" + params.message_id);
     return { error: 'Missing required fields: message_id, body' };
   }
+  console.log("replyToEmail: message_id=" + params.message_id);
   const msg = GmailApp.getMessageById(params.message_id);
-  if (!msg) return { error: 'Message not found: ' + params.message_id };
+  if (!msg) {
+    console.error("replyToEmail: message not found, id=" + params.message_id);
+    return { error: 'Message not found: ' + params.message_id };
+  }
   const replyOptions = {};
   if (params.cc) replyOptions.cc = params.cc;
   msg.reply(params.body, replyOptions);
   const subject = msg.getSubject();
+  const replySubject = subject.toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject;
+  console.log("replyToEmail: replied successfully, subject=" + replySubject);
   return {
     status: 'sent',
     to: msg.getFrom(),
-    subject: subject.toLowerCase().startsWith('re:') ? subject : 'Re: ' + subject
+    subject: replySubject
   };
 }
 
 function getGmailRecent(maxEmails) {
   maxEmails = maxEmails || MAX_EMAILS;
+  console.log("getGmailRecent: searching inbox, maxEmails=" + maxEmails);
   const threads = GmailApp.search('in:inbox');
+  console.log("getGmailRecent: found " + threads.length + " threads");
   const messages = threads.slice(0, maxEmails).map(thread => {
     const msg = thread.getMessages()[thread.getMessageCount() - 1];
     const rawFrom = msg.getFrom();
@@ -206,8 +265,13 @@ function getGmailRecent(maxEmails) {
 
 function getGmailSearch(query, maxResults) {
   maxResults = maxResults || 20;
-  if (!query) return { error: 'query is required' };
+  if (!query) {
+    console.error("getGmailSearch: query is required");
+    return { error: 'query is required' };
+  }
+  console.log("getGmailSearch: query=" + query + ", maxResults=" + maxResults);
   const threads = GmailApp.search(query, 0, maxResults);
+  console.log("getGmailSearch: found " + threads.length + " threads");
   const messages = [];
   threads.forEach(function(thread) {
     thread.getMessages().forEach(function(msg) {
@@ -237,13 +301,21 @@ function getGmailSearch(query, maxResults) {
 }
 
 function getGmailMessage(id) {
-  if (!id) return { error: 'id is required' };
+  if (!id) {
+    console.error("getGmailMessage: id is required");
+    return { error: 'id is required' };
+  }
+  console.log("getGmailMessage: id=" + id);
   const msg = GmailApp.getMessageById(id);
-  if (!msg) return { error: 'Message not found: ' + id };
+  if (!msg) {
+    console.error("getGmailMessage: message not found, id=" + id);
+    return { error: 'Message not found: ' + id };
+  }
   const rawFrom = msg.getFrom();
   const from = rawFrom.replace(/<[^>]*>/, '').trim().replace(/"/g, '') || rawFrom;
   const threadId = msg.getThread().getId();
   const body = msg.getPlainBody() || msg.getBody().replace(/<[^>]+>/g, '').trim();
+  console.log("getGmailMessage: fetched, subject=" + msg.getSubject() + ", bodyLength=" + body.length);
   return {
     id: msg.getId(),
     from: from,
@@ -257,9 +329,16 @@ function getGmailMessage(id) {
 }
 
 function checkGmailReplied(threadId, sinceHours) {
-  if (!threadId) return { error: 'thread_id is required' };
+  if (!threadId) {
+    console.error("checkGmailReplied: thread_id is required");
+    return { error: 'thread_id is required' };
+  }
+  console.log("checkGmailReplied: threadId=" + threadId + ", sinceHours=" + sinceHours);
   const thread = GmailApp.getThreadById(threadId);
-  if (!thread) return { error: 'Thread not found: ' + threadId };
+  if (!thread) {
+    console.error("checkGmailReplied: thread not found, id=" + threadId);
+    return { error: 'Thread not found: ' + threadId };
+  }
   const myEmail = Session.getEffectiveUser().getEmail();
   const cutoff = sinceHours ? new Date(Date.now() - sinceHours * 3600 * 1000) : null;
   const sentMessages = thread.getMessages().filter(function(msg) {
@@ -272,6 +351,7 @@ function checkGmailReplied(threadId, sinceHours) {
   const lastReplyAt = lastMsg
       ? Utilities.formatDate(lastMsg.getDate(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ssZ")
       : null;
+  console.log("checkGmailReplied: threadId=" + threadId + ", replied=" + replied + ", replyCount=" + sentMessages.length);
   return {
     thread_id: threadId,
     replied: replied,
@@ -286,11 +366,14 @@ function getCalendarData(offset, numDays) {
   const now = new Date();
   const startOfRange = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 0, 0, 0);
   const endOfRange = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset + numDays - 1, 23, 59, 59);
+  console.log("getCalendarData: offset=" + offset + ", numDays=" + numDays + ", range=" + startOfRange + " to " + endOfRange);
 
   const allItems = [];
   CalendarApp.getAllCalendars().forEach(cal => {
     const calId = cal.getId();
-    cal.getEvents(startOfRange, endOfRange).forEach(ev => allItems.push({ ev, calId }));
+    const events = cal.getEvents(startOfRange, endOfRange);
+    console.log("getCalendarData: calendar=" + calId + ", events=" + events.length);
+    events.forEach(ev => allItems.push({ ev, calId }));
   });
 
   allItems.sort((a, b) => {
@@ -340,6 +423,7 @@ function getCalendarData(offset, numDays) {
     };
   });
 
+  console.log("getCalendarData: returning " + eventList.length + " events for " + dateStr);
   return {
     date: dateStr,
     events: eventList

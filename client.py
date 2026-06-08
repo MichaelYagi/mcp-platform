@@ -860,7 +860,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         _image_id     = tool_json.get("image_id")
         _shashin_base = os.getenv("SHASHIN_BASE_URL", "").rstrip("/")
         _shashin_link = (
-            f"\n\n[🔗 View in Shashin]({_shashin_base}/search?term={_image_id})"
+            f"\n\n[View in Shashin]({_shashin_base}/search?term={_image_id})"
             if _image_id and _shashin_base else ""
         )
 
@@ -1223,7 +1223,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # Auto-convert markdown to HTML for gmail_send_email
         if tool_name == "gmail_send_email" and args.get("body"):
             args = dict(args)
-            args["body"] = args["body"].replace('/thumbnails/225/', '/thumbnails/original/')
+            # Keep the small /thumbnails/225/ image — _md_to_html embeds images as
+            # base64 data URIs, and the /thumbnails/original/ size blows past Gmail's
+            # "Limit Exceeded: Email Body Size" cap.
             args["html"] = True
             args["body"] = _md_to_html(args["body"])
 
@@ -1296,9 +1298,25 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     )
     await agent_scheduler.start()
 
+    async def _schedule_parser_llm_fn(system: str, user: str) -> str:
+        """Background LLM call for schedule-request parsing.
+
+        Uses temperature=0.0 — this is a structured-extraction task (the model
+        must return ONLY a JSON object), so compliant/deterministic output
+        matters far more than creative variance. Mirrors the routing classifier's
+        temperature choice in client/langgraph.py:_get_routing_llm.
+        """
+        from langchain_core.messages import SystemMessage, HumanMessage
+        from client.langgraph import llm_ainvoke as _llm_ainvoke
+        from client.ollama_lock import background_ollama_call
+        msgs = [SystemMessage(content=system), HumanMessage(content=user)]
+        async with background_ollama_call():
+            response = await _llm_ainvoke(llm, msgs, num_predict=800, temperature=0.0)
+        return response.content if hasattr(response, "content") else str(response)
+
     tool_names = [t.name for t in mcp_agent._tools]
     schedule_parser = ScheduleParser(
-        llm_fn=_llm_fn_for_memory,
+        llm_fn=_schedule_parser_llm_fn,
         available_tools=tool_names,
         default_timezone=os.getenv("DEFAULT_TIMEZONE", "America/Vancouver"),
     )
@@ -2026,7 +2044,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
                 _image_id = _tool_json.get("image_id")
                 _shashin_base = os.getenv("SHASHIN_BASE_URL", "").rstrip("/")
                 _shashin_link = (
-                    f"\n\n[🔗 View in Shashin]({_shashin_base}/search?term={_image_id})"
+                    f"\n\n[View in Shashin]({_shashin_base}/search?term={_image_id})"
                     if _image_id and _shashin_base else ""
                 )
 

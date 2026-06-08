@@ -177,7 +177,11 @@ def _script_post(payload: dict) -> dict:
     key = parse_qs(urlparse(url).query).get("key", [""])[0]
     resp = _requests.post(url, json={**payload, "key": key}, timeout=15)
     resp.raise_for_status()
-    data = resp.json()
+    try:
+        data = resp.json()
+    except ValueError:
+        snippet = resp.text.strip()[:200]
+        raise RuntimeError(f"Apps Script returned a non-JSON response: {snippet or '(empty body)'}")
     if "error" in data:
         raise RuntimeError(data["error"])
     return data

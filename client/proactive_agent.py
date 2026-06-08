@@ -518,11 +518,13 @@ Pipeline syntax rules:
 - Optionally add args: `use discord_notify: message="..."` 
 - If no args on a notification step, the previous result is passed automatically as message/body
 - For gmail_send_email you MUST specify to and subject in the step args
-- Examples:
+- Examples (these are TEMPLATE PATTERNS — the placeholder address below is
+  intentionally NOT a real address; always copy the `to=` value from the
+  user's OWN message verbatim, never from these examples):
   "use get_day_briefing | use discord_notify"
   "use gmail_get_unread | use discord_notify"
-  "use shashin_random_tool | use gmail_send_email: to=\"michaeltyagi@gmail.com\" subject=\"Daily Photo\""
-  "use get_day_briefing | use gmail_send_email: to=\"michaeltyagi@gmail.com\" subject=\"Daily Briefing\""
+  "use shashin_random_tool | use gmail_send_email: to=\"recipient@example.com\" subject=\"Daily Photo\""
+  "use get_day_briefing | use gmail_send_email: to=\"recipient@example.com\" subject=\"Daily Briefing\""
 
 WHEN TO USE SHAPE D:
 - User mentions two or more tool actions: "get X and send to Discord", "run X then notify me", "call X and then Y"
@@ -599,6 +601,25 @@ class ScheduleParser:
                 question="I had trouble parsing that scheduling request. "
                          "Could you rephrase it? e.g. 'Run the day briefing every day at 7am'."
             )
+
+        # The model occasionally ignores "Return ONLY JSON" and replies with
+        # prose/explanation instead (especially for pipeline-shaped requests).
+        # Retry once with a sharper reminder before giving up — this recovers
+        # most of these intermittent misses.
+        clean = re.sub(r"```(?:json)?|```", "", raw).strip()
+        try:
+            json.loads(clean)
+        except json.JSONDecodeError:
+            logger.warning(f"⏰ ScheduleParser: non-JSON reply, retrying once. Raw: {raw[:300]!r}")
+            try:
+                raw = await self._llm_fn(
+                    system + "\n\nREMINDER: Reply with ONLY the JSON object — "
+                             "no explanation, no markdown fences, no prose.",
+                    user_message,
+                )
+            except Exception as e:
+                logger.error(f"ScheduleParser retry LLM call failed: {e}")
+
         return await self._parse_response(raw, user_message)
 
     async def _parse_response(self, raw: str, original: str) -> ScheduleConfirmation | ScheduleClarification:
@@ -606,6 +627,7 @@ class ScheduleParser:
         try:
             data = json.loads(clean)
         except json.JSONDecodeError:
+            logger.warning(f"⏰ ScheduleParser: could not parse LLM response as JSON — raw: {raw[:300]!r}")
             return ScheduleClarification(
                 question="I couldn't parse that as a scheduling request. "
                          "Try: 'Schedule [tool] every day at [time]'."
@@ -998,6 +1020,7 @@ class AgentScheduler:
                 # Execute each step in sequence
                 steps = [s.strip() for s in llm_prompt.split("|") if s.strip()]
                 previous_result = condition_result or None
+                _pipeline_failed = False
                 for step_idx, step in enumerate(steps):
                     m = _PIPE_STEP_RE.match(step)
                     if not m:
@@ -1059,12 +1082,32 @@ class AgentScheduler:
                         # Use full executor for notification steps (handles HTML conversion etc.)
                         _exec = self._execute_fn if _is_notif else (getattr(self, '_raw_execute_fn', None) or self._execute_fn)
                         previous_result = await _exec(step_tool, step_args)
-                        if previous_result and str(previous_result).startswith(f"Tool '{step_tool}' not found"):
-                            logger.error(f"⏰ Pipeline: tool '{step_tool}' not found — check tool is registered and server started correctly")
-                        logger.info(f"⏰ Pipeline step {step_idx + 1} completed: {str(previous_result)[:100]}")
+                        # Tool calls that fail server-side don't always raise — MCP can
+                        # return the failure as plain-text content (e.g. "Error executing
+                        # tool X: ..." from FastMCP, or "Tool X error: ..." / "Tool 'X' not
+                        # found." from _tool_executor). Detect those and abort the pipeline
+                        # instead of reporting "Job completed." on a failed run.
+                        _pr_str = str(previous_result or "")
+                        _step_error_msg = None
+                        if _pr_str.startswith("Error executing tool ") or re.match(r"^Tool .+ (error:|not found)", _pr_str, re.IGNORECASE):
+                            _step_error_msg = _pr_str
+                        elif _pr_str.startswith("{"):
+                            try:
+                                _pr_json = json.loads(_pr_str)
+                                if isinstance(_pr_json, dict) and _pr_json.get("error"):
+                                    _step_error_msg = _pr_json["error"]
+                            except Exception:
+                                pass
+                        if _step_error_msg:
+                            logger.error(f"⏰ Pipeline step {step_idx + 1} ({step_tool}) returned an error: {_step_error_msg[:200]}")
+                            previous_result = f"Error in step {step_idx + 1} ({step_tool}): {_step_error_msg}"
+                            _pipeline_failed = True
+                            break
+                        logger.info(f"⏰ Pipeline step {step_idx + 1} completed: {_pr_str[:100]}")
                     except Exception as _step_err:
                         logger.error(f"⏰ Pipeline step {step_idx + 1} ({step_tool}) failed: {_step_err}")
                         previous_result = f"Error in step {step_idx + 1} ({step_tool}): {_step_err}"
+                        _pipeline_failed = True
                         break
 
                     # Extract best text from JSON results before passing to next step
@@ -1081,10 +1124,24 @@ class AgentScheduler:
                 _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
                 _last_step = steps[-1] if steps else ""
                 _last_tool_name = _last_step.split()[1].split(":")[0] if len(_last_step.split()) > 1 else ""
-                if any(_nt in _last_tool_name for _nt in _NOTIF_TOOLS):
-                    result = "Job completed."
+                if _pipeline_failed:
+                    result = f"Job failed (id: {job['id']}): {previous_result}"
+                elif any(_nt in _last_tool_name for _nt in _NOTIF_TOOLS):
+                    # Show the tool's result if it contains useful info beyond a bare success flag
+                    _pr_str = str(previous_result or "")
+                    _show_result = False
+                    if _pr_str.startswith("{"):
+                        try:
+                            _pr_json = json.loads(_pr_str)
+                            _show_result = isinstance(_pr_json, dict) and not _pr_json.get("success")
+                        except Exception:
+                            _show_result = True
+                    elif _pr_str and not _pr_str.lower().startswith("success"):
+                        _show_result = True
+                    result = (f"Job completed (id: {job['id']}): {previous_result}" if _show_result
+                              else f"Job completed (id: {job['id']}).")
                 else:
-                    result = previous_result or "Job completed."
+                    result = previous_result or f"Job completed (id: {job['id']})."
 
             else:
                 # Original single-tool or LLM-based execution

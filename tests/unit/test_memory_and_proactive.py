@@ -9,6 +9,7 @@ Covers:
 import asyncio
 import json
 import os
+import re
 import sqlite3
 import tempfile
 import pytest
@@ -1015,6 +1016,66 @@ class TestScheduleParser:
         from client.proactive_agent import ScheduleClarification
         clar = ScheduleClarification(question="What time?")
         assert clar.render() == "What time?"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# proactive_agent — _PARSER_SYSTEM prompt hygiene
+#
+# Regression coverage for a real production bug: the prompt's own few-shot
+# examples used the user's REAL email (michaeltyagi@gmail.com) as the
+# placeholder `to=` address. Because the user's actual recurring scheduling
+# requests also contain that exact address, the model's attention got
+# hijacked — it would reply with its own example verbatim ("subject=Daily
+# Briefing", "get_day_briefing") instead of extracting from the user's real
+# message ("subject=", "shashin_random_tool"), producing consistent
+# prose-instead-of-JSON failures that survived retries AND temperature=0.0
+# (it wasn't sampling noise — the model was confidently doing the wrong but
+# fully consistent thing because of the string collision).
+#
+# Fix: swapped the example address for recipient@example.com — `example.com`
+# is reserved by RFC 2606 specifically so it can never collide with a real
+# user's address. These tests make sure that holds going forward: any email
+# placeholder baked into the prompt's examples must use a reserved example
+# domain, never something that could double as someone's real address.
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestParserSystemPromptHygiene:
+
+    _EMAIL_RE = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
+    _RESERVED_EXAMPLE_DOMAINS = ("example.com", "example.org", "example.net")
+
+    def test_does_not_contain_users_real_email(self):
+        from client.proactive_agent import _PARSER_SYSTEM
+        assert "michaeltyagi@gmail.com" not in _PARSER_SYSTEM
+        assert "@gmail.com" not in _PARSER_SYSTEM
+
+    def test_example_addresses_use_reserved_example_domain(self):
+        """
+        Any email-shaped string baked into the prompt's few-shot examples must
+        use an RFC 2606 reserved domain (example.com/.org/.net) — never a real
+        provider domain (gmail.com, outlook.com, ...) that a real user could
+        plausibly also be using, which is exactly what caused this bug.
+        """
+        from client.proactive_agent import _PARSER_SYSTEM
+        addresses = self._EMAIL_RE.findall(_PARSER_SYSTEM)
+        assert addresses, "expected at least one example address in the prompt"
+        for addr in addresses:
+            domain = addr.split("@", 1)[1].lower()
+            assert domain in self._RESERVED_EXAMPLE_DOMAINS, (
+                f"prompt example address {addr!r} uses a real-looking domain "
+                f"{domain!r} — it could collide with a real user's address "
+                f"and hijack the model the same way michaeltyagi@gmail.com did. "
+                f"Use one of {self._RESERVED_EXAMPLE_DOMAINS} instead."
+            )
+
+    def test_warns_against_copying_to_address_from_examples(self):
+        """The prompt must explicitly tell the model the to= value comes from
+        the user's message, not from these examples — the collision wouldn't
+        be dangerous on its own without this guidance reinforcing it."""
+        from client.proactive_agent import _PARSER_SYSTEM
+        lowered = _PARSER_SYSTEM.lower()
+        assert "never from these examples" in lowered or "verbatim" in lowered
 
 
 # ═══════════════════════════════════════════════════════════════════
