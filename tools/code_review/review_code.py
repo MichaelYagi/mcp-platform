@@ -16,7 +16,7 @@ def normalize_wsl_path(path_str: str) -> Optional[str]:
 
     Handles:
     - /mnt/c/... paths (WSL format)
-    - C:\... or C:/... (Windows format)
+    - C:\\... or C:/... (Windows format)
     - Case sensitivity issues
     - Relative paths
 
