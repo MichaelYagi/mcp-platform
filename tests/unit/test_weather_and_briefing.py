@@ -19,6 +19,13 @@ import time
 import pytest
 from datetime import date, datetime, timedelta
 from unittest.mock import patch, MagicMock, call
+from zoneinfo import ZoneInfo
+
+_VANCOUVER_TZ = ZoneInfo("America/Vancouver")
+
+def _today_vancouver() -> date:
+    """Return the current date in America/Vancouver — same as what get_weather uses for day labels."""
+    return datetime.now(_VANCOUVER_TZ).date()
 
 
 # ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -35,7 +42,7 @@ def _open_meteo_response(
     cur_temp: float = 19.0,
 ) -> dict:
     """Build a realistic Open-Meteo API response for N forecast days."""
-    today = start_date or date.today()
+    today = start_date or _today_vancouver()
     dates = [(today + timedelta(days=i)).isoformat() for i in range(days)]
     sunrises = [f"{(today + timedelta(days=i)).isoformat()}T05:30" for i in range(days)]
     sunsets  = [f"{(today + timedelta(days=i)).isoformat()}T21:00" for i in range(days)]
@@ -416,7 +423,7 @@ def _owm_current_response(temp=20.0, feels=18.0, humidity=55,
 
 
 def _owm_forecast_response(temp=20.0, pop=0.1) -> dict:
-    today = date.today().isoformat()
+    today = _today_vancouver().isoformat()
     return {
         "list": [
             {
