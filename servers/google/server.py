@@ -1833,24 +1833,24 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         _cur_humidity = _cur.get("humidity")
         for _idx, _day in enumerate(_wd.get("forecast", [])):
             _label = _day.get("day_label") or _day.get("date", "")
-            _text_parts.append(f"\n**{_label}**")
-            _text_parts.append(f"**Conditions:** {_day.get('condition', 'N/A')}")
-            _text_parts.append(f"**Precipitation:** {_day.get('precipitation_chance', 'N/A')}")
+            _text_parts.append(f"\n**{_label}**  ")
+            _text_parts.append(f"**Conditions:** {_day.get('condition', 'N/A')}  ")
+            _text_parts.append(f"**Precipitation:** {_day.get('precipitation_chance', 'N/A')}  ")
             _hi_c = _day.get("max_temp_c"); _hi_f = _day.get("max_temp_f")
             _lo_c = _day.get("min_temp_c"); _lo_f = _day.get("min_temp_f")
             _fl_c = _day.get("feelslike_c"); _fl_f = _day.get("feelslike_f")
             if _hi_c is not None:
-                _text_parts.append(f"**High:** {_hi_c}°C ({_hi_f}°F)")
+                _text_parts.append(f"**High:** {_hi_c}°C ({_hi_f}°F)  ")
             if _lo_c is not None:
-                _text_parts.append(f"**Low:** {_lo_c}°C ({_lo_f}°F)")
+                _text_parts.append(f"**Low:** {_lo_c}°C ({_lo_f}°F)  ")
             if _fl_c is not None:
-                _text_parts.append(f"**Feels Like:** {_fl_c}°C ({_fl_f}°F)")
+                _text_parts.append(f"**Feels Like:** {_fl_c}°C ({_fl_f}°F)  ")
             if _idx == 0 and _cur_humidity and date_offset == 0:
-                _text_parts.append(f"**Humidity:** {_cur_humidity}")
+                _text_parts.append(f"**Humidity:** {_cur_humidity}  ")
             if _day.get("sunrise"):
-                _text_parts.append(f"**Sunrise:** {_day['sunrise']}")
+                _text_parts.append(f"**Sunrise:** {_day['sunrise']}  ")
             if _day.get("sunset"):
-                _text_parts.append(f"**Sunset:** {_day['sunset']}")
+                _text_parts.append(f"**Sunset:** {_day['sunset']}  ")
 
     _ed = result.get("email")
     _email_err = (result.get("errors") or {}).get("email")
@@ -1866,13 +1866,13 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
             _briefing_summaries = _summarise_emails(_briefing_emails)
             for _bi, _em in enumerate(_briefing_emails, 1):
                 _summary = _briefing_summaries.get(_bi) or (_em.get("preview", "")[:120])
-                _text_parts.append(f"\n{_bi}. **{_em.get('subject', '(no subject)')}**")
-                _text_parts.append(f"   **From:** {_em.get('from', '')}")
-                _text_parts.append(f"   **Date:** {_em.get('date', '')}")
+                _text_parts.append(f"\n{_bi}. **{_em.get('subject', '(no subject)')}**  ")
+                _text_parts.append(f"**From:** {_em.get('from', '')}  ")
+                _text_parts.append(f"**Date:** {_em.get('date', '')}  ")
                 if _summary:
-                    _text_parts.append(f"   **Summary:** {_summary}")
+                    _text_parts.append(f"**Summary:** {_summary}  ")
                 if _em.get("link"):
-                    _text_parts.append(f"   **Link:** {_em['link']}")
+                    _text_parts.append(f"**Link:** {_em['link']}  ")
     else:
         _text_parts.append("\n### Emails\nunavailable")
 
@@ -1887,16 +1887,16 @@ def get_day_briefing(max_emails: Optional[int] = 10, forecast_days: Optional[int
         else:
             _text_parts.append(f"\n### Calendar — {_count} event(s)")
             for _ci, _ev in enumerate(_cd.get("events", [])[:5], 1):
-                _text_parts.append(f"\n{_ci}. **{_ev.get('title', '')}**")
-                _text_parts.append(f"   **When:** {_ev.get('when', '')}")
+                _text_parts.append(f"\n{_ci}. **{_ev.get('title', '')}**  ")
+                _text_parts.append(f"**When:** {_ev.get('when', '')}  ")
                 if _ev.get("location"):
-                    _text_parts.append(f"   **Location:** {_ev['location']}")
+                    _text_parts.append(f"**Location:** {_ev['location']}  ")
                 if _ev.get("attendees"):
-                    _text_parts.append(f"   **Attendees:** {_ev['attendees']}")
+                    _text_parts.append(f"**Attendees:** {_ev['attendees']}  ")
                 if _ev.get("meet_link"):
-                    _text_parts.append(f"   **Meet:** {_ev['meet_link']}")
+                    _text_parts.append(f"**Meet:** {_ev['meet_link']}  ")
                 if _ev.get("calendar_link"):
-                    _text_parts.append(f"   **Calendar:** {_ev['calendar_link']}")
+                    _text_parts.append(f"**Calendar:** {_ev['calendar_link']}  ")
 
     result["text"] = "\n".join(_text_parts)
 

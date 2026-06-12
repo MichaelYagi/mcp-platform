@@ -1185,6 +1185,31 @@ class TestAgentScheduler:
         assert "tool failed" in call_data["error"]
 
     @pytest.mark.asyncio
+    async def test_pipeline_pipes_text_field_not_raw_json(self, patched_scheduler_path):
+        """A pipeline step like get_day_briefing | discord_notify should pass the
+        pre-formatted "text" field to discord_notify, not the raw JSON blob."""
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        briefing_json = json.dumps({
+            "date": "2026-06-11",
+            "text": "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**",
+            "email": {"total_unread": 1},
+        })
+        execute_fn = AsyncMock(side_effect=[briefing_json, '{"status": "sent"}'])
+        broadcast_fn = AsyncMock()
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
+        job_id = create_job(
+            label="Daily brief",
+            tool="",
+            llm_prompt="use get_day_briefing | use discord_notify",
+            cron="0 7 * * *",
+        )
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        second_call_args = execute_fn.call_args_list[1][0]
+        assert second_call_args[0] == "discord_notify"
+        assert second_call_args[1]["message"] == "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**"
+
+    @pytest.mark.asyncio
     async def test_condition_check_fires_when_true(self, patched_scheduler_path):
         from client.proactive_agent import AgentScheduler, create_job, get_job
         execute_fn = AsyncMock(side_effect=["15", "action result"])

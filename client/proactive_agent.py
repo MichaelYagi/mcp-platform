@@ -198,6 +198,26 @@ def delete_job(job_id: int):
         conn.execute("DELETE FROM scheduled_jobs WHERE id=?", (job_id,))
 
 
+def _pipe_text(previous_result) -> str:
+    """Extract the human-readable "text" field from a previous pipeline step's
+    JSON result, if present, instead of dumping the raw JSON blob.
+
+    Tools like get_day_briefing return a structured JSON object with a
+    pre-formatted "text" field for display. When piping into a notification
+    tool (e.g. discord_notify), we want that formatted text, not the full
+    JSON dump.
+    """
+    _s = str(previous_result or "")
+    if _s.startswith("{"):
+        try:
+            _data = json.loads(_s)
+            if isinstance(_data, dict) and isinstance(_data.get("text"), str):
+                return _data["text"]
+        except Exception:
+            pass
+    return _s
+
+
 def record_run(job_id: int, is_check: bool = False):
     now = datetime.now(__import__('datetime').timezone.utc).isoformat()
     col = "last_check" if is_check else "last_run"
@@ -1053,9 +1073,9 @@ class AgentScheduler:
                             if "email" in step_tool.lower():
                                 # gmail_send_email needs to/subject/body — can't proceed without to
                                 logger.warning(f"⏰ Pipeline: {step_tool} requires 'to' and 'subject' args — specify them in the pipeline step")
-                                step_args = {"body": str(previous_result)}
+                                step_args = {"body": _pipe_text(previous_result)}
                             else:
-                                step_args = {"message": str(previous_result)}
+                                step_args = {"message": _pipe_text(previous_result)}
 
                     # If step has some args but missing content field, inject previous result
                     elif previous_result and step_args:
@@ -1070,9 +1090,9 @@ class AgentScheduler:
                             _has_content = True
 
                         if not _has_content:
-                            step_args[_content_key] = str(previous_result)
+                            step_args[_content_key] = _pipe_text(previous_result)
                         elif _is_email and not step_args.get("body"):
-                            step_args["body"] = str(previous_result)
+                            step_args["body"] = _pipe_text(previous_result)
 
                     logger.info(f"⏰ Pipeline step {step_idx + 1}/{len(steps)}: {step_tool}({step_args})")
                     try:
