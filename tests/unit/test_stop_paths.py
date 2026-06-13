@@ -847,10 +847,33 @@ class TestContradictoryRoutingDecision:
                 ))
             return AIMessage(content="final answer")
 
-        llm, bound = make_mock_llm(side_effect=llm_side_effect)
+        # _base_llm = llm.bound if hasattr(llm, "bound") else llm (langgraph.py:3295)
+        # then flows through _get_routing_llm -> _with_params, which falls back
+        # to returning its input untouched when model_copy/copy are absent. A
+        # plain MagicMock auto-creates those (and .bound), so restrict the spec
+        # and point .bound at itself: _base_llm resolves to llm, whose .ainvoke
+        # is the same AsyncMock the test asserts against.
+        _spec = ["ainvoke", "bind_tools", "model", "model_name", "bound"]
+        llm = MagicMock(spec=_spec)
+        llm.model = "mock-model"
+        llm.model_name = "mock-model"
+        llm.ainvoke = AsyncMock(side_effect=llm_side_effect)
+        llm.bound = llm
+
+        bound = MagicMock(spec=_spec)
+        bound.model = "mock-model"
+        bound.model_name = "mock-model"
+        bound.ainvoke = llm.ainvoke
+        bound.bound = llm
+        llm.bind_tools = MagicMock(return_value=bound)
+        bound.bind_tools = MagicMock(return_value=bound)
+
         agent = create_langgraph_agent(bound, [ws_tool])
 
-        with patch.dict("sys.modules", {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}):
+        # LLM_ROUTING_MODEL must be cleared so _get_routing_llm uses the mock
+        # llm directly instead of constructing a real ChatOllama.
+        with patch.dict("sys.modules", {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}), \
+             patch.dict(os.environ, {"LLM_ROUTING_MODEL": ""}):
             await invoke(
                 agent,
                 message="what's the traffic like in Vancouver due to FIFA?",
