@@ -63,9 +63,12 @@ def _is_bare_status(tool_json: dict) -> bool:
 def _format_bare_status(tool_json: dict) -> str:
     lines = [
         f"{k.replace('_', ' ').title()}: {v}"
-        for k, v in tool_json.items() if len(str(v)) <= 100
+        for k, v in tool_json.items() if k != "content" and len(str(v)) <= 100
     ]
-    return "\n".join(lines)
+    out = "\n".join(lines)
+    if tool_json.get("content"):
+        out += f"\n\n{tool_json['content']}"
+    return out
 
 
 def _pipeline_aborts(previous: str) -> bool:
@@ -173,8 +176,8 @@ class TestBareStatusResult:
         d = {"title": "page", "content": "text"}
         assert _is_bare_status(d) is False
 
-    def test_format_excludes_long_fields(self):
-        d = {"status": "sent", "channel": "Default", "content": "x" * 200}
+    def test_format_excludes_long_non_content_fields(self):
+        d = {"status": "sent", "channel": "Default", "extra": "x" * 200}
         result = _format_bare_status(d)
         assert result == "Status: sent\nChannel: Default"
 
@@ -182,6 +185,11 @@ class TestBareStatusResult:
         d = {"status": "ok", "run_id": "123"}
         result = _format_bare_status(d)
         assert result == "Status: ok\nRun Id: 123"
+
+    def test_format_includes_content_in_full_below_status(self):
+        d = {"status": "sent", "channel": "Default", "content": "## Daily Brief\n\nHello"}
+        result = _format_bare_status(d)
+        assert result == "Status: sent\nChannel: Default\n\n## Daily Brief\n\nHello"
 
 
 # ═══════════════════════════════════════════════════════════════════

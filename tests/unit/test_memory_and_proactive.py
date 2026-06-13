@@ -1212,16 +1212,20 @@ class TestAgentScheduler:
     @pytest.mark.asyncio
     async def test_pipeline_notify_success_names_tools_and_shows_status_line(self, patched_scheduler_path):
         """A successful notify-ending pipeline should report which tools ran
-        (e.g. "ran get_day_briefing | discord_notify") and show the notify
-        tool's status fields on their own lines, e.g. "Status: sent"."""
+        (e.g. "ran get_day_briefing | discord_notify"), show the notify tool's
+        status fields on their own lines (e.g. "Status: sent"), and still show
+        what was actually sent (the "content" field)."""
         from client.proactive_agent import AgentScheduler, create_job, get_job
         briefing_json = json.dumps({
             "date": "2026-06-11",
             "text": "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**",
         })
         # Simulate _process_tool_result's bare-status formatting of discord_notify's
-        # {"status": "sent", "channel": "Default", ...}.
-        execute_fn = AsyncMock(side_effect=[briefing_json, "Status: sent\nChannel: Default"])
+        # {"status": "sent", "channel": "Default", "content": "..."}.
+        execute_fn = AsyncMock(side_effect=[
+            briefing_json,
+            "Status: sent\nChannel: Default\n\n## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**",
+        ])
         broadcast_fn = AsyncMock()
         scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
         job_id = create_job(
@@ -1235,7 +1239,8 @@ class TestAgentScheduler:
         call_data = broadcast_fn.call_args[0][0]
         assert call_data["result"] == (
             f"Job completed (id: {job_id}): ran get_day_briefing | discord_notify\n"
-            "Status: sent\nChannel: Default"
+            "Status: sent\nChannel: Default\n\n"
+            "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**"
         )
 
     @pytest.mark.asyncio

@@ -899,17 +899,22 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         if isinstance(_tool_json, dict) and (_tool_json.get("image_source") or _tool_json.get("image_base64")):
             return await _process_image_result(_tool_json, tool_name)
 
-        # Bare status result (e.g. discord_notify's {"status": "sent", "channel": ...}) —
-        # one "Key: value" line per short field, no LLM summarization needed.
+        # Bare status result (e.g. discord_notify's {"status": "sent", "channel": ...,
+        # "content": "..."}) — one "Key: value" line per short field, no LLM
+        # summarization needed. The "content" field (what was actually sent) is
+        # shown in full below the status lines, since that's the useful part.
         if isinstance(_tool_json, dict) and "status" in _tool_json and not any(
             isinstance(v, (list, dict)) for v in _tool_json.values()
         ):
             _status_lines = [
                 f"{k.replace('_', ' ').title()}: {v}"
-                for k, v in _tool_json.items() if len(str(v)) <= 100
+                for k, v in _tool_json.items() if k != "content" and len(str(v)) <= 100
             ]
-            if _status_lines:
-                return "\n".join(_status_lines)
+            _out = "\n".join(_status_lines)
+            if _tool_json.get("content"):
+                _out += f"\n\n{_tool_json['content']}"
+            if _out:
+                return _out
 
         # Pre-built summary passthrough
         if isinstance(_tool_json, dict) and "summary" in _tool_json and not any(
