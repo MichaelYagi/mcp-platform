@@ -3342,6 +3342,11 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                 if _json_match:
                     _decision = _json.loads(_json_match.group(0))
                     _context_sufficient = bool(_decision.get("context_sufficient", False))
+                    if _decision.get("needs_web_search"):
+                        # A web search requirement can never be satisfied from context alone —
+                        # treat these flags as contradictory and prefer the tool call.
+                        _context_sufficient = False
+                        _decision["context_sufficient"] = False
                     _needs_rag = bool(_decision.get("needs_rag", True)) and not _context_sufficient
                     _llm_tool_decision = _decision
                     _tags = _decision.get("tool_tags", [])

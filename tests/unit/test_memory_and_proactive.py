@@ -1210,6 +1210,35 @@ class TestAgentScheduler:
         assert second_call_args[1]["message"] == "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**"
 
     @pytest.mark.asyncio
+    async def test_pipeline_notify_success_names_tools_and_shows_status_line(self, patched_scheduler_path):
+        """A successful notify-ending pipeline should report which tools ran
+        (e.g. "ran get_day_briefing | discord_notify") and show the notify
+        tool's status fields on their own lines, e.g. "Status: sent"."""
+        from client.proactive_agent import AgentScheduler, create_job, get_job
+        briefing_json = json.dumps({
+            "date": "2026-06-11",
+            "text": "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**",
+        })
+        # Simulate _process_tool_result's bare-status formatting of discord_notify's
+        # {"status": "sent", "channel": "Default", ...}.
+        execute_fn = AsyncMock(side_effect=[briefing_json, "Status: sent\nChannel: Default"])
+        broadcast_fn = AsyncMock()
+        scheduler = AgentScheduler(execute_fn=execute_fn, broadcast_fn=broadcast_fn)
+        job_id = create_job(
+            label="Daily brief",
+            tool="",
+            llm_prompt="use get_day_briefing | use discord_notify",
+            cron="0 7 * * *",
+        )
+        job = get_job(job_id)
+        await scheduler._fire_job(job)
+        call_data = broadcast_fn.call_args[0][0]
+        assert call_data["result"] == (
+            f"Job completed (id: {job_id}): ran get_day_briefing | discord_notify\n"
+            "Status: sent\nChannel: Default"
+        )
+
+    @pytest.mark.asyncio
     async def test_condition_check_fires_when_true(self, patched_scheduler_path):
         from client.proactive_agent import AgentScheduler, create_job, get_job
         execute_fn = AsyncMock(side_effect=["15", "action result"])

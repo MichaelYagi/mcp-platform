@@ -818,3 +818,48 @@ class TestVisionStopCheck:
                     llm=llm,
                 )
         clear_stop()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 18. Contradictory routing decision (context_sufficient + needs_web_search)
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestContradictoryRoutingDecision:
+
+    async def test_needs_web_search_overrides_context_sufficient(self):
+        """Classifier returning context_sufficient=true AND needs_web_search=true
+        is contradictory. needs_web_search must win so web_search_tool is bound
+        instead of the model hallucinating a search from "context"."""
+        clear_stop()
+
+        ws_tool = make_tool("web_search_tool", "search results")
+
+        call_count = 0
+        async def llm_side_effect(messages):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return AIMessage(content=(
+                    '{"context_sufficient": true, "needs_rag": false, '
+                    '"needs_web_search": true, "tool_tags": ["external"]}'
+                ))
+            return AIMessage(content="final answer")
+
+        llm, bound = make_mock_llm(side_effect=llm_side_effect)
+        agent = create_langgraph_agent(bound, [ws_tool])
+
+        with patch.dict("sys.modules", {"tools.tool_control": MagicMock(is_tool_enabled=lambda *a: True)}):
+            await invoke(
+                agent,
+                message="what's the traffic like in Vancouver due to FIFA?",
+                tools=[ws_tool],
+                llm=llm,
+            )
+
+        # base_llm.bind_tools must have been called with the web_search_tool —
+        # not bind_tools([]), which would skip tool dispatch entirely.
+        last_call_tools = llm.bind_tools.call_args_list[-1][0][0]
+        assert any(getattr(t, "name", "") == "web_search_tool" for t in last_call_tools)
+        clear_stop()

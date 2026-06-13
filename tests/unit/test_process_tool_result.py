@@ -51,6 +51,23 @@ def _format_prebuilt_summary(tool_json: dict) -> str:
     return f"{header}\n\n{presummary}" if header else presummary
 
 
+def _is_bare_status(tool_json: dict) -> bool:
+    """Matches the bare-status guard in _process_tool_result."""
+    return (
+        isinstance(tool_json, dict)
+        and "status" in tool_json
+        and not any(isinstance(v, (list, dict)) for v in tool_json.values())
+    )
+
+
+def _format_bare_status(tool_json: dict) -> str:
+    lines = [
+        f"{k.replace('_', ' ').title()}: {v}"
+        for k, v in tool_json.items() if len(str(v)) <= 100
+    ]
+    return "\n".join(lines)
+
+
 def _pipeline_aborts(previous: str) -> bool:
     """Replicates the abort condition in _run_pipeline (after Phase 1 fix)."""
     return (
@@ -135,6 +152,36 @@ class TestPrebuiltSummary:
         result = _format_prebuilt_summary(d)
         assert "https://x.com" in result
         assert "Body." in result
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 2b. Bare status result (e.g. discord_notify)
+# ═══════════════════════════════════════════════════════════════════
+
+@pytest.mark.unit
+class TestBareStatusResult:
+
+    def test_discord_notify_status_detected(self):
+        d = {"status": "sent", "channel": "Default", "content": "x" * 200}
+        assert _is_bare_status(d) is True
+
+    def test_status_with_nested_list_not_detected(self):
+        d = {"status": "ok", "items": [1, 2, 3]}
+        assert _is_bare_status(d) is False
+
+    def test_no_status_key(self):
+        d = {"title": "page", "content": "text"}
+        assert _is_bare_status(d) is False
+
+    def test_format_excludes_long_fields(self):
+        d = {"status": "sent", "channel": "Default", "content": "x" * 200}
+        result = _format_bare_status(d)
+        assert result == "Status: sent\nChannel: Default"
+
+    def test_format_underscore_keys_title_cased(self):
+        d = {"status": "ok", "run_id": "123"}
+        result = _format_bare_status(d)
+        assert result == "Status: ok\nRun Id: 123"
 
 
 # ═══════════════════════════════════════════════════════════════════

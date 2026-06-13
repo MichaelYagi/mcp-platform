@@ -1144,22 +1144,18 @@ class AgentScheduler:
                 _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
                 _last_step = steps[-1] if steps else ""
                 _last_tool_name = _last_step.split()[1].split(":")[0] if len(_last_step.split()) > 1 else ""
+                _tool_chain = " | ".join(
+                    m.group(1) for m in (_PIPE_STEP_RE.match(s) for s in steps) if m
+                )
                 if _pipeline_failed:
                     result = f"Job failed (id: {job['id']}): {previous_result}"
                 elif any(_nt in _last_tool_name for _nt in _NOTIF_TOOLS):
-                    # Show the tool's result if it contains useful info beyond a bare success flag
-                    _pr_str = str(previous_result or "")
-                    _show_result = False
-                    if _pr_str.startswith("{"):
-                        try:
-                            _pr_json = json.loads(_pr_str)
-                            _show_result = isinstance(_pr_json, dict) and not _pr_json.get("success")
-                        except Exception:
-                            _show_result = True
-                    elif _pr_str and not _pr_str.lower().startswith("success"):
-                        _show_result = True
-                    result = (f"Job completed (id: {job['id']}): {previous_result}" if _show_result
-                              else f"Job completed (id: {job['id']}).")
+                    # Name the tools that ran, plus the notify tool's own status
+                    # lines (e.g. "Status: sent", "Channel: Default") on their own lines.
+                    result = f"Job completed (id: {job['id']}): ran {_tool_chain}"
+                    _status_lines = str(previous_result or "").strip()
+                    if _status_lines:
+                        result += f"\n{_status_lines}"
                 else:
                     result = previous_result or f"Job completed (id: {job['id']})."
 
@@ -1229,6 +1225,16 @@ class AgentScheduler:
                             args = {"message": _msg}
                     tool_result = await self._execute_fn(tool, args)
                     result = tool_result
+                    _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
+                    if any(_nt in tool for _nt in _NOTIF_TOOLS) and not re.match(
+                        r"^(Tool .+ (error:|not found)|Error executing tool)", str(result), re.IGNORECASE
+                    ):
+                        # Name the tool that ran, plus its own status lines
+                        # (e.g. "Status: sent", "Channel: Default") on their own lines.
+                        _status_lines = str(tool_result or "").strip()
+                        result = f"Job completed (id: {job['id']}): ran {tool}"
+                        if _status_lines:
+                            result += f"\n{_status_lines}"
 
                 if llm_prompt and not tool:
                     # Pure LLM job (no tool) — llm_prompt is the entire instruction

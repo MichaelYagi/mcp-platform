@@ -899,6 +899,18 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         if isinstance(_tool_json, dict) and (_tool_json.get("image_source") or _tool_json.get("image_base64")):
             return await _process_image_result(_tool_json, tool_name)
 
+        # Bare status result (e.g. discord_notify's {"status": "sent", "channel": ...}) —
+        # one "Key: value" line per short field, no LLM summarization needed.
+        if isinstance(_tool_json, dict) and "status" in _tool_json and not any(
+            isinstance(v, (list, dict)) for v in _tool_json.values()
+        ):
+            _status_lines = [
+                f"{k.replace('_', ' ').title()}: {v}"
+                for k, v in _tool_json.items() if len(str(v)) <= 100
+            ]
+            if _status_lines:
+                return "\n".join(_status_lines)
+
         # Pre-built summary passthrough
         if isinstance(_tool_json, dict) and "summary" in _tool_json and not any(
             isinstance(_tool_json.get(k), list) for k in
