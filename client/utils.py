@@ -62,6 +62,19 @@ def start_http_server(port=9000):
                 pass
 
         def do_GET(self):
+            # /auth_pending.json — return {} when no auth is pending so the
+            # browser fetch doesn't log a 404 on every page load.
+            if self.path == "/auth_pending.json":
+                from pathlib import Path as _Path
+                _f = _Path(__file__).parent.parent / "auth_pending.json"
+                body = _f.read_bytes() if _f.exists() else b"{}"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
             # /image?path=<absolute_path> — serve any local image file
             if self.path.startswith("/image"):
                 parsed = urllib.parse.urlparse(self.path)

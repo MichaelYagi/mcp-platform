@@ -2191,7 +2191,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                     )
                     if _mem_block:
                         messages = list(messages) + [HumanMessage(content=(
-                            f"[Memory context — use this to answer the question below]\n{_mem_block}"
+                            f"[Background context — internal reference only; do not repeat, quote, or mention this in your response]\n{_mem_block}"
                         ))]
                         logger.info("🧠 Injected memory block as HumanMessage reminder")
             elif state.get("llm_tool_decision"):
@@ -2271,7 +2271,7 @@ def create_langgraph_agent(llm_with_tools, tools):
                         )
                         if _mem_block:
                             messages = list(messages) + [HumanMessage(content=(
-                                f"[Memory context — use this to answer the question below]\n{_mem_block}"
+                                f"[Background context — internal reference only; do not repeat, quote, or mention this in your response]\n{_mem_block}"
                             ))]
                             logger.info("🧠 Injected memory block as HumanMessage reminder (llm_routed:context)")
             else:

@@ -905,6 +905,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         # shown in full below the status lines, since that's the useful part.
         if isinstance(_tool_json, dict) and "status" in _tool_json and not any(
             isinstance(v, (list, dict)) for v in _tool_json.values()
+        ) and all(
+            k == "content" or len(str(v)) <= 200
+            for k, v in _tool_json.items()
         ):
             _status_lines = [
                 f"{k.replace('_', ' ').title()}: {v}"
@@ -1596,7 +1599,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
     #           "use tool_name"            (no-arg tools)
     _USE_TOOL_RE = _re.compile(
         r'^\s*use\s+(\w+)\s*(?:[:\s]\s*(.*))?$',
-        _re.IGNORECASE
+        _re.IGNORECASE | _re.DOTALL
     )
 
     def parse_explicit_tool(message: str, tools_list: list):
@@ -1641,11 +1644,26 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         if not arg_str:
             tool_args = {}
         else:
+            # Pre-pass: if arg_str starts with key="value" where the value spans
+            # multiple lines or contains embedded double quotes, _KV_RE would stop
+            # at the first inner quote. Instead, find the closing " that is
+            # immediately followed by optional whitespace then [ (next bracket arg)
+            # or end of string — that boundary is unambiguous in tool templates.
+            _LEADING_QUOTED_KV = _re.compile(
+                r'^(\w+)="(.*?)"\s*(?=\[|\Z)', _re.DOTALL
+            )
+            _pre_match = _LEADING_QUOTED_KV.match(arg_str.strip())
+            _pre_extracted: dict = {}
+            _kv_input = arg_str
+            if _pre_match:
+                _pre_extracted[_pre_match.group(1)] = _pre_match.group(2)
+                _kv_input = arg_str.strip()[_pre_match.end():].strip()
+
             # Check for key=value syntax: "key1=val1 key2=val2" or "key1=val1, key2=val2"
             # Simple pattern: word=anything-up-to-next-word= or end
-            kv_matches = _KV_RE.findall(arg_str)
-            if kv_matches:
-                tool_args = {}
+            kv_matches = _KV_RE.findall(_kv_input)
+            if kv_matches or _pre_extracted:
+                tool_args = dict(_pre_extracted)
                 for k, v in kv_matches:
                     # Strip surrounding quotes if present
                     if len(v) >= 2 and v[0] in ('"', "'") and v[-1] == v[0]:
