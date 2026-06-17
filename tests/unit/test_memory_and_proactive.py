@@ -1238,7 +1238,7 @@ class TestAgentScheduler:
         await scheduler._fire_job(job)
         call_data = broadcast_fn.call_args[0][0]
         assert call_data["result"] == (
-            f"Job completed (id: {job_id}): ran get_day_briefing | discord_notify\n"
+            f"Job completed (id: {job_id}): ran get_day_briefing >> discord_notify\n"
             "Status: sent\nChannel: Default\n\n"
             "## 2026-06-11\n\n### Emails — 1 unread\n\n1. **Test email**"
         )

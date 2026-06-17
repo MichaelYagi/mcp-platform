@@ -472,31 +472,31 @@ describe('buildPipelinePrompt', () => {
         ui.pipelineToggleTool(SOURCE);
         expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing');
     });
-    test('source | sink — pipe-target param stripped from sink', () => {
+    test('source >> sink — pipe-target param stripped from sink', () => {
         ui.pipelineToggleTool(SOURCE);
         ui.pipelineToggleTool(SINK);
         // message="" stripped because SOURCE output_type="text" matches SINK pipe_targets.message
-        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing | use discord_notify');
+        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing >> use discord_notify');
     });
-    test('source | transform | sink — pipe-target params stripped at each step', () => {
+    test('source >> transform >> sink — pipe-target params stripped at each step', () => {
         ui.pipelineToggleTool(SOURCE);
         ui.pipelineToggleTool(TRANSFORM);
         ui.pipelineToggleTool(SINK);
         // text="" stripped from transform, message="" stripped from sink
-        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing | use summarize_text_tool | use discord_notify');
+        expect(ui.buildPipelinePrompt()).toBe('use get_day_briefing >> use summarize_text_tool >> use discord_notify');
     });
     test('image chain — image_url="" stripped from analyzer', () => {
         ui.pipelineToggleTool(IMG_SRC);
         ui.pipelineToggleTool(IMG_SINK);
         // image_url="" stripped because IMG_SRC output_type="image_url" matches IMG_SINK pipe_targets.image_url
-        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use analyze_image_tool');
+        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool >> use analyze_image_tool');
     });
     test('sink strips content param regardless of type', () => {
         ui.pipelineToggleTool(IMG_SRC);
         ui.pipelineToggleTool(SINK);
         // SINK (output_type="none") strips its content param even when types differ —
         // it will stringify whatever arrives (image URL sent as Discord message)
-        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool | use discord_notify');
+        expect(ui.buildPipelinePrompt()).toBe('use generate_image_tool >> use discord_notify');
     });
     test('empty pipeline returns empty string', () => {
         expect(ui.buildPipelinePrompt()).toBe('');
