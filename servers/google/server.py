@@ -1915,7 +1915,7 @@ _reauth_flow = None
     tags=["auth","google"],
     triggers=["reauth google","google auth","re-authorise google","google token","fix google auth","google login"],
     idempotent=False,
-    template="use google_reauth_start | use google_reauth_complete: code=\"\"",
+    template="use google_reauth_start >> use google_reauth_complete: code=\"\"",
     intent_category="google",
 output_type="none")
 def google_reauth_start() -> str:

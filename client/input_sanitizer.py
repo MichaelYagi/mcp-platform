@@ -82,6 +82,7 @@ def sanitize_user_input(text: str, preserve_markdown: bool = True) -> str:
         text = text.replace('&ast;', '*')  # Italic/lists
         text = text.replace('&#x60;&#x60;&#x60;', '```')  # Code blocks
         text = text.replace('&#x60;', '`')  # Inline code
+        text = text.replace('&gt;', '>')  # Restore > (used in >> pipeline chain operator)
 
     # Log if significant changes were made
     if len(text) < original_length * 0.9:

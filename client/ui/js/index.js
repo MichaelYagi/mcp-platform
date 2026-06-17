@@ -1883,7 +1883,7 @@ function buildPipelinePrompt() {
     const tools = _pipelineSteps.map(s => {
         const t = s.template || `use ${s.name}`;
         return t.startsWith('use ') ? t : `use ${s.name}`;
-    }).join(' | ');
+    }).join(' >> ');
     return _pipelinePrefix ? `${_pipelinePrefix} ${tools}` : tools;
 }
 

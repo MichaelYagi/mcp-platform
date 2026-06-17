@@ -317,10 +317,10 @@ def _format_job_list() -> str:
             schedule_detail = f"polls {cron_to_human(j['condition_cron'])}"
         last = j["last_run"][:16].replace("T", " ") if j["last_run"] else "never"
         _lp = j.get("llm_prompt") or ""
-        if _lp and "|" in _lp:
-            _tool_display = " | ".join(
+        if _lp and ">>" in _lp:
+            _tool_display = " >> ".join(
                 s.strip().split(":")[0].replace("use ", "").strip()
-                for s in _lp.split("|") if s.strip()
+                for s in _lp.split(">>") if s.strip()
             )
         else:
             _tool_display = j["tool"] or _lp or "?"
@@ -387,8 +387,8 @@ def _job_info(label: str) -> str:
         f"Args:      {json.dumps(args) if args else 'none'}\n"
         + sched_lines +
         f"Timezone:  {job['timezone']}\n"
-        + (f"LLM:       {job['llm_prompt']}\n" if job.get('llm_prompt') and "|" not in (job.get('llm_prompt') or '') else "") +
-        (("Pipeline:\n" + "\n".join(f"  {i+1}. {s.strip()}" for i, s in enumerate((job.get('llm_prompt') or '').split('|'))) + "\n") if job.get('llm_prompt') and "|" in (job.get('llm_prompt') or '') else "") +
+        + (f"LLM:       {job['llm_prompt']}\n" if job.get('llm_prompt') and ">>" not in (job.get('llm_prompt') or '') else "") +
+        (("Pipeline:\n" + "\n".join(f"  {i+1}. {s.strip()}" for i, s in enumerate((job.get('llm_prompt') or '').split('>>'))) + "\n") if job.get('llm_prompt') and ">>" in (job.get('llm_prompt') or '') else "") +
         f"Status:    {'active' if job['enabled'] else 'paused'}\n"
         f"Created:   {job['created_at'][:16].replace('T',' ')}\n"
         f"Last run:  {job['last_run'][:16].replace('T',' ') if job['last_run'] else 'never'}\n"
@@ -443,8 +443,8 @@ class ScheduleConfirmation:
 
         llm_line = ""
         if self.llm_prompt:
-            if "|" in self.llm_prompt:
-                steps = [s.strip() for s in self.llm_prompt.split("|")]
+            if ">>" in self.llm_prompt:
+                steps = [s.strip() for s in self.llm_prompt.split(">>")]
                 llm_line = "  Pipeline:\n" + "\n".join(f"    {i+1}. {s}" for i, s in enumerate(steps)) + "\n"
             else:
                 llm_line = f"  LLM:       {self.llm_prompt}\n"
@@ -516,7 +516,7 @@ Shape B — single tool, condition trigger:
 
 Shape D — tool pipeline (multiple tools in sequence), cron or once trigger:
 USE THIS when the user asks to call more than one tool, e.g. "get briefing AND send to Discord", "run X then do Y".
-The llm_prompt must be a pipe-separated list of `use <tool>` steps.
+The llm_prompt must be a >>-separated list of `use <tool>` steps.
 Each step's output is automatically passed as input to the next step.
 {{
   "status": "ready",
@@ -528,23 +528,23 @@ Each step's output is automatically passed as input to the next step.
   "run_date": "<ISO datetime if one-time, else null>",
   "timezone": "America/Vancouver",
   "human_schedule": "<plain English>",
-  "llm_prompt": "use get_day_briefing | use discord_notify",
+  "llm_prompt": "use get_day_briefing >> use discord_notify",
   "deliver_to_session": false
 }}
 
 Pipeline syntax rules:
-- Separate steps with |
+- Separate steps with >>
 - Each step must start with `use <tool_name>`
-- Optionally add args: `use discord_notify: message="..."` 
+- Optionally add args: `use discord_notify: message="..."`
 - If no args on a notification step, the previous result is passed automatically as message/body
 - For gmail_send_email you MUST specify to and subject in the step args
 - Examples (these are TEMPLATE PATTERNS — the placeholder address below is
   intentionally NOT a real address; always copy the `to=` value from the
   user's OWN message verbatim, never from these examples):
-  "use get_day_briefing | use discord_notify"
-  "use gmail_get_unread | use discord_notify"
-  "use shashin_random_tool | use gmail_send_email: to=\"recipient@example.com\" subject=\"Daily Photo\""
-  "use get_day_briefing | use gmail_send_email: to=\"recipient@example.com\" subject=\"Daily Briefing\""
+  "use get_day_briefing >> use discord_notify"
+  "use gmail_get_unread >> use discord_notify"
+  "use shashin_random_tool >> use gmail_send_email: to=\"recipient@example.com\" subject=\"Daily Photo\""
+  "use get_day_briefing >> use gmail_send_email: to=\"recipient@example.com\" subject=\"Daily Briefing\""
 
 WHEN TO USE SHAPE D:
 - User mentions two or more tool actions: "get X and send to Discord", "run X then notify me", "call X and then Y"
@@ -580,7 +580,7 @@ STRICT RULES:
 4. cron must be valid 5-field cron.
 5. Return ONLY JSON. No preamble, no markdown fences.
 6. Set deliver_to_session=true when the user's request implies they want the result in the current conversation (e.g. 'show me', 'tell me', 'give me'). Set false for monitoring/alerting jobs.
-7. When the request involves multiple tools or sending data somewhere after fetching it, ALWAYS use Shape D with pipe-separated `use <tool>` steps in llm_prompt.
+7. When the request involves multiple tools or sending data somewhere after fetching it, ALWAYS use Shape D with >>-separated `use <tool>` steps in llm_prompt.
 8. If the request says "today", "tonight", "at X pm today", or any specific one-time time, set run_date to the ISO datetime and set condition_cron to null for Shape B. This means check ONCE at that time, not repeatedly."""
 
 
@@ -1021,24 +1021,24 @@ class AgentScheduler:
                 return
 
             # ── Pipeline detection ────────────────────────────────────────────
-            # If llm_prompt contains pipe-separated `use <tool>` steps, execute
+            # If llm_prompt contains >>-separated `use <tool>` steps, execute
             # them in sequence without any LLM involvement.
-            # Format: "use tool_a | use tool_b: arg='...' | use tool_c"
+            # Format: "use tool_a >> use tool_b: arg='...' >> use tool_c"
             # Each step's output is available to the next via {previous_result}.
             _PIPE_STEP_RE = re.compile(
                 r'use\s+(\w+)(?:\s*:\s*(.*))?', re.IGNORECASE
             )
             _is_pipeline = (
                 llm_prompt and
-                "|" in llm_prompt and
-                all(_PIPE_STEP_RE.match(s.strip()) for s in llm_prompt.split("|") if s.strip())
+                ">>" in llm_prompt and
+                all(_PIPE_STEP_RE.match(s.strip()) for s in llm_prompt.split(">>") if s.strip())
             )
 
             tool_result = None
 
             if _is_pipeline:
                 # Execute each step in sequence
-                steps = [s.strip() for s in llm_prompt.split("|") if s.strip()]
+                steps = [s.strip() for s in llm_prompt.split(">>") if s.strip()]
                 previous_result = condition_result or None
                 _pipeline_failed = False
                 for step_idx, step in enumerate(steps):
@@ -1144,7 +1144,7 @@ class AgentScheduler:
                 _NOTIF_TOOLS = ("discord_notify", "gmail_send_email", "gmail_reply_tool", "gmail_send")
                 _last_step = steps[-1] if steps else ""
                 _last_tool_name = _last_step.split()[1].split(":")[0] if len(_last_step.split()) > 1 else ""
-                _tool_chain = " | ".join(
+                _tool_chain = " >> ".join(
                     m.group(1) for m in (_PIPE_STEP_RE.match(s) for s in steps) if m
                 )
                 if _pipeline_failed:

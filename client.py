@@ -1084,7 +1084,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
         return s
 
     async def _run_pipeline(pipe_parts: list, tools_list: list, initial_result: str = None) -> str:
-        """Execute a pipe-separated tool chain using _tool_executor for each step.
+        """Execute a >>-separated tool chain using _tool_executor for each step.
         Identical execution path to the scheduler pipeline — no extra transformation."""
         _STEP_RE = _USE_STEP_RE
         _NOTIF = ("discord_notify", "gmail_reply_tool")
@@ -1778,7 +1778,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             if _cond_fired:
                 logger.info(f"🔍 Condition TRUE — running action: {_action_str}")
                 # Parse action as pipeline or single use step
-                _action_parts = [p.strip() for p in _action_str.split("|") if p.strip()]
+                _action_parts = [p.strip() for p in _action_str.split(">>") if p.strip()]
                 # Inject check result as first previous_result
                 _action_result = await _run_pipeline(_action_parts, tools, initial_result=_check_result)
                 _cond_output = _action_result
@@ -1796,9 +1796,9 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             }
 
         # ── Pipeline dispatch ──────────────────────────────────────────
-        # "use tool1 | use tool2: arg=val" runs tools in sequence without LLM.
+        # "use tool1 >> use tool2: arg=val" runs tools in sequence without LLM.
         _PIPE_STEP_RE = _USE_STEP_RE
-        _pipe_parts = [p.strip() for p in user_message.split("|") if p.strip()]
+        _pipe_parts = [p.strip() for p in user_message.split(">>") if p.strip()]
         _is_pipeline = (
             len(_pipe_parts) > 1 and
             all(_PIPE_STEP_RE.match(p) for p in _pipe_parts)

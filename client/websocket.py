@@ -380,10 +380,10 @@ async def process_query(websocket, prompt, original_prompt, agent_ref, conversat
                         if _agent_scheduler:
                             _agent_scheduler.add_job(job_id)
                         _confirmation_tracker.clear(_session_key)
-                        if pending.llm_prompt and "|" in (pending.llm_prompt or ""):
-                            _steps = " → ".join(
+                        if pending.llm_prompt and ">>" in (pending.llm_prompt or ""):
+                            _steps = " >> ".join(
                                 s.strip().split(":")[0].replace("use ", "").strip()
-                                for s in pending.llm_prompt.split("|") if s.strip()
+                                for s in pending.llm_prompt.split(">>") if s.strip()
                             )
                             _tool_line = f"  Pipeline: {_steps}\n"
                         else:

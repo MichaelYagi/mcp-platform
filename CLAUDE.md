@@ -173,7 +173,7 @@ Every LLM call assembles context in this order:
 
 ### Proactive Agents / Scheduler
 
-**`client/proactive_agent.py`** — cron, interval, and `once` trigger types. Users describe jobs in natural language; the LLM parses them into job definitions. Tool pipelines use `|` in `llm_prompt`. Requires `apscheduler`.
+**`client/proactive_agent.py`** — cron, interval, and `once` trigger types. Users describe jobs in natural language; the LLM parses them into job definitions. Tool pipelines use `>>` in `llm_prompt`. Requires `apscheduler`.
 
 - `once` trigger type uses `_one_time_signals` deterministic regex (not LLM-based) to detect one-time job intent
 - `run_date`/`end_date` columns in `scheduler.db` track once-job lifecycle

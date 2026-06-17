@@ -1200,7 +1200,7 @@ class TestAgentScheduler:
         job_id = create_job(
             label="Daily brief",
             tool="",
-            llm_prompt="use get_day_briefing | use discord_notify",
+            llm_prompt="use get_day_briefing >> use discord_notify",
             cron="0 7 * * *",
         )
         job = get_job(job_id)
@@ -1231,7 +1231,7 @@ class TestAgentScheduler:
         job_id = create_job(
             label="Daily brief",
             tool="",
-            llm_prompt="use get_day_briefing | use discord_notify",
+            llm_prompt="use get_day_briefing >> use discord_notify",
             cron="0 7 * * *",
         )
         job = get_job(job_id)
