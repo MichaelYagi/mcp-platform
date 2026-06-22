@@ -115,11 +115,9 @@
             <div id="logHeader">
                 <h2>📋 Live Logs</h2>
                 <div class="log-controls">
-                    <button class="log-btn danger" onclick="clearLogs()">Clear</button>
                     <button class="log-btn" onclick="toggleAutoscroll()" title="Automatically scroll to newest logs">
                         <span id="autoscrollText">Auto-scroll: On</span>
                     </button>
-                    <button class="log-btn mobile-close" onclick="toggleLogPanel()" style="display:none;">✖ Close</button>
                 </div>
             </div>
             <div id="logFilters">
@@ -135,6 +133,10 @@
                 </div>
             </div>
             <div id="logContainer"></div>
+            <div id="logFooter">
+                <button class="log-btn danger" onclick="clearLogs()">Clear</button>
+                <button class="log-btn" onclick="toggleLogPanel()">Close</button>
+            </div>
         </div>
 
         <div id="systemMonitor">

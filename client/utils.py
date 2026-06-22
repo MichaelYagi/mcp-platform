@@ -51,7 +51,13 @@ def get_venv_python(project_root: Path) -> str:
 def start_http_server(port=9000):
     """Serve index.html over HTTP on the network"""
 
+    _project_root = str(Path(__file__).parent.parent)
+
     class QuietHTTPRequestHandler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault('directory', _project_root)
+            super().__init__(*args, **kwargs)
+
         def log_message(self, format_log, *args):
             pass
 

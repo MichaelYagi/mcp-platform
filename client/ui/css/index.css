@@ -798,6 +798,17 @@ pre code { white-space: pre-wrap; word-break: break-word; overflow-wrap: break-w
 .mobile-close { background: #424242 !important; display: none; }
 .mobile-close:hover { background: #555 !important; }
 
+#logFooter {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1rem;
+    border-top: 1px solid var(--log-border);
+    background: var(--log-header);
+    flex-shrink: 0;
+}
+
 #logFilters {
     padding: 0.75rem 1rem;
     background: var(--log-filter-bg);
