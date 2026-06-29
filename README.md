@@ -28,7 +28,6 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, ML-p
 * Python 3.12+
 * 16GB+ RAM recommended
 * Ollama installed
-* `apscheduler` (`pip install apscheduler`) — required for proactive agent scheduler
 
 ---
 
