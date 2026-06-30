@@ -41,7 +41,7 @@ npx jest --no-coverage
 # Reports generated to tests/results/ and tests/js-results/
 ```
 
-Pytest config is in `pytest.ini`. Coverage threshold is 22%. Tests require an active virtualenv.
+Pytest config is in `pytest.ini`. Coverage threshold is 40%. Tests require an active virtualenv.
 
 ## Linting
 

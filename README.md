@@ -37,11 +37,18 @@ Local MCP runtime with multi-agent orchestration, distributed tool servers, ML-p
 
 ```bash
 cd mcp-platform
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate       # Linux/macOS
 .venv\Scripts\activate          # Windows PowerShell
 pip install -r requirements.txt
 ```
+
+> **WSL2 note:** creating `.venv` inside `/mnt/c/` fails because NTFS does not support the Unix symlinks that venvs require. Create the venv in the Linux filesystem instead:
+> ```bash
+> python3 -m venv /home/$USER/.virtualenvs/mcp_platform
+> source /home/$USER/.virtualenvs/mcp_platform/bin/activate
+> pip install -r requirements.txt
+> ```
 
 ### LLM Backend
 
@@ -385,6 +392,7 @@ Activate your virtualenv first, then run from the project root:
 ```bash
 source .venv/bin/activate        # Linux/macOS
 .venv\Scripts\activate           # Windows PowerShell
+# WSL2: source /home/$USER/.virtualenvs/mcp_platform/bin/activate
 
 python -m pytest                 # all tests
 python -m pytest -m unit         # fast unit tests only
@@ -790,8 +798,9 @@ Using web_image_search_tool, show me a red panda
 - For WSL2 + LAN access, start Ollama with `OLLAMA_HOST=0.0.0.0 ollama serve`
 - Add Windows port proxies (elevated PowerShell):
   ```powershell
-  wsl hostname -I   # get WSL2 IP
-  netsh interface portproxy add v4tov4 listenport=11434 listenaddress=0.0.0.0 connectport=11434 connectaddress=<WSL_IP>
+  # Get WSL2 IP (use ip addr — hostname -I is not available on all WSL2 distros)
+  $wslIp = (wsl -- ip -4 addr show eth0 | Select-String "inet ") -replace '.*inet (\d+\.\d+\.\d+\.\d+).*','$1'
+  netsh interface portproxy add v4tov4 listenport=11434 listenaddress=0.0.0.0 connectport=11434 connectaddress=$wslIp
   New-NetFirewallRule -DisplayName "WSL2 Ollama" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 11434
   ```
 - WSL2 IP changes on reboot — re-run the portproxy commands above after each reboot
@@ -815,13 +824,14 @@ The platform binds ports 9000 (HTTP), 8765, and 8766 (WebSockets) to `0.0.0.0` i
 WSL2 runs on a private virtual network (`172.x.x.x`) that is not directly routable from your LAN. Windows must forward LAN traffic to WSL2 using `netsh portproxy`. Run this in an elevated PowerShell each time the WSL2 IP changes (it changes on every reboot):
 
 ```powershell
-# 1. Find your current WSL2 IP
-wsl hostname -I
+# 1. Find your current WSL2 IP (hostname -I is not available on all WSL2 distros)
+$wslIp = (wsl -- ip -4 addr show eth0 | Select-String "inet ") -replace '.*inet (\d+\.\d+\.\d+\.\d+).*','$1'
+Write-Host "WSL2 IP: $wslIp"
 
-# 2. Add port forwarding for each port (replace <WSL_IP> with the IP above)
-netsh interface portproxy add v4tov4 listenport=9000  listenaddress=0.0.0.0 connectport=9000  connectaddress=<WSL_IP>
-netsh interface portproxy add v4tov4 listenport=8765  listenaddress=0.0.0.0 connectport=8765  connectaddress=<WSL_IP>
-netsh interface portproxy add v4tov4 listenport=8766  listenaddress=0.0.0.0 connectport=8766  connectaddress=<WSL_IP>
+# 2. Add port forwarding for each port
+netsh interface portproxy add v4tov4 listenport=9000  listenaddress=0.0.0.0 connectport=9000  connectaddress=$wslIp
+netsh interface portproxy add v4tov4 listenport=8765  listenaddress=0.0.0.0 connectport=8765  connectaddress=$wslIp
+netsh interface portproxy add v4tov4 listenport=8766  listenaddress=0.0.0.0 connectport=8766  connectaddress=$wslIp
 
 # 3. Allow inbound through Windows Firewall (first time only)
 New-NetFirewallRule -DisplayName "MCP Platform 9000" -Direction Inbound -Protocol TCP -LocalPort 9000 -Action Allow
