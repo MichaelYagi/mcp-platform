@@ -54,7 +54,7 @@ pip install -r requirements.txt
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama serve
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
 ollama pull qwen2.5:14b-instruct-q4_K_M   # primary inference (recommended — any tool-calling model works)
 ollama pull qwen2.5:0.5b                  # routing classifier (fast pre-flight intent detection)
 ollama pull bge-large                     # RAG document embeddings
@@ -795,7 +795,7 @@ Using web_image_search_tool, show me a red panda
 
 **Ollama not reachable / connection refused:**
 - Use `OLLAMA_BASE_URL=http://127.0.0.1:11434` in `.env` for local access
-- For WSL2 + LAN access, start Ollama with `OLLAMA_HOST=0.0.0.0 ollama serve`
+- For WSL2 + LAN access, start Ollama with `OLLAMA_HOST=0.0.0.0:11434 ollama serve`
 - Add Windows port proxies (elevated PowerShell):
   ```powershell
   # Get WSL2 IP (use ip addr — hostname -I is not available on all WSL2 distros)
@@ -807,7 +807,7 @@ Using web_image_search_tool, show me a red panda
 
 **Ollama models not appearing:**
 - If `OLLAMA_BASE_URL` points to a LAN IP but Ollama is bound to `127.0.0.1` only, the model list will be empty
-- Fix: start Ollama with `OLLAMA_HOST=0.0.0.0 ollama serve`
+- Fix: start Ollama with `OLLAMA_HOST=0.0.0.0:11434 ollama serve`
 - Verify: `ollama list`
 
 **Web UI not accessible from LAN:**
@@ -867,7 +867,7 @@ netstat -an | grep LISTEN   # check ports 8765, 8766, 9000
 - `invalid_grant` at runtime: the re-auth banner will appear in the UI automatically — follow the link, approve, paste the code into chat
 
 **RAG not working:**
-- Ensure Ollama is running: `ollama serve`
+- Ensure Ollama is running: `OLLAMA_HOST=0.0.0.0:11434 ollama serve`
 - Pull bge-large if missing: `ollama pull bge-large`
 
 **Auto-RAG returning irrelevant context:**
