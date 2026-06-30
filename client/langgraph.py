@@ -2140,6 +2140,7 @@ def create_langgraph_agent(llm_with_tools, tools):
         if user_message:
             all_tools = list(state.get("tools", {}).values())
             _cap_reg = state.get("capability_registry")
+            _is_explicit_tool_call = bool(re.match(r'^\s*use\s+\w', user_message, re.IGNORECASE))
             if state.get("rag_fallback"):
                 # RAG already failed — run trigger matching normally but default to
                 # external (web search) tools if nothing specific matches.
@@ -2172,8 +2173,9 @@ def create_langgraph_agent(llm_with_tools, tools):
                     llm_to_use = base_llm.bind_tools(_external_tools)
                     pattern_name = "rag_fallback_external"
                     logger.info(f"🌐 rag_fallback no trigger match — bound {len(_external_tools)} external tools")
-            elif state.get("context_sufficient"):
+            elif state.get("context_sufficient") and not _is_explicit_tool_call:
                 # Classifier determined context/memory is sufficient — no tools needed.
+                # Guard: explicit "use <tool>:" calls always bypass this path.
                 # Re-inject memory block as HumanMessage so the model attends to it.
                 logger.info("🧠 context_sufficient=True — skipping trigger matching, answering from context")
                 llm_to_use = base_llm.bind_tools([])
@@ -2253,6 +2255,12 @@ def create_langgraph_agent(llm_with_tools, tools):
                                 f"Follow-up question: {user_message}"
                             ))]
                             logger.info("🧠 Injected recent conversation context for web search follow-up")
+                elif _is_explicit_tool_call:
+                    # Explicit direct tool call with empty tags — fall through to trigger matching.
+                    llm_to_use, pattern_name = match_intent(
+                        user_message, all_tools, base_llm, logger, state, capability_registry=_cap_reg
+                    )
+                    logger.info(f"🎯 explicit tool call — overrode llm_routed:context → {pattern_name}")
                 else:
                     # No tools needed per classifier — answer from context
                     logger.info("🎯 LLM routing → no tools needed, answering from context")
@@ -3345,6 +3353,10 @@ async def run_agent(agent, conversation_state, user_message, logger, tools, syst
                     if _decision.get("needs_web_search"):
                         # A web search requirement can never be satisfied from context alone —
                         # treat these flags as contradictory and prefer the tool call.
+                        _context_sufficient = False
+                        _decision["context_sufficient"] = False
+                    if _context_sufficient and _re.match(r'^\s*use\s+\w', user_message, _re.IGNORECASE):
+                        # Explicit direct tool call — always dispatch the tool regardless of context.
                         _context_sufficient = False
                         _decision["context_sufficient"] = False
                     _needs_rag = bool(_decision.get("needs_rag", True)) and not _context_sufficient
