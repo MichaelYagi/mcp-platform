@@ -2525,8 +2525,8 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
             A2A_STATE,
             mcp_agent
         )
-    except KeyboardInterrupt:
-        print("\n👋 Shutting down...")
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        print("\nShutting down...")
     finally:
         websocket_server.close()
         await websocket_server.wait_closed()
@@ -2535,4 +2535,7 @@ You: "Your last prompt was: what's the weather?"  ← DO THIS"""
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
