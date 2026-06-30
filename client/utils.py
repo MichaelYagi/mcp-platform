@@ -8,11 +8,12 @@ import platform
 import requests
 import socket
 import subprocess
+import sys
 import threading
 import urllib.parse
 import webbrowser
 from http.server import SimpleHTTPRequestHandler
-from socketserver import TCPServer
+from socketserver import TCPServer, ThreadingTCPServer
 from pathlib import Path
 
 
@@ -25,7 +26,19 @@ def get_public_ip():
 
 
 def get_venv_python(project_root: Path) -> str:
-    """Return the correct Python executable path for the project's virtual environment."""
+    """Return the correct Python executable path for the project's virtual environment.
+
+    Preference order:
+    1. sys.executable — whatever Python is running client.py right now (correct venv already active)
+    2. .venv-wsl/bin/python — Linux-filesystem venv symlinked into the project root
+    3. .venv/bin/python — in-project venv (broken on NTFS/WSL2 Windows paths)
+    """
+    # If the running interpreter is already inside a venv, use it for servers too.
+    if hasattr(sys, "real_prefix") or (
+        hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+    ):
+        return sys.executable
+
     venv = project_root / ".venv"
 
     if platform.system() == "Windows":
@@ -35,8 +48,8 @@ def get_venv_python(project_root: Path) -> str:
         ]
     else:
         candidates = [
-            venv / "bin" / "python",
             project_root / ".venv-wsl" / "bin" / "python",
+            venv / "bin" / "python",
         ]
 
     for path in candidates:
@@ -129,7 +142,8 @@ def start_http_server(port=9000):
         private_ip = "127.0.0.1"
 
     def serve():
-        with TCPServer(("0.0.0.0", port), QuietHTTPRequestHandler) as httpd:
+        ThreadingTCPServer.allow_reuse_address = True
+        with ThreadingTCPServer(("0.0.0.0", port), QuietHTTPRequestHandler) as httpd:
             print(f"📄 HTTP server listening on 0.0.0.0:{port}")
             print(f"   Local: http://127.0.0.1:{port}/client/ui/index.html")
             print(f"   Network: http://{private_ip}:{port}/client/ui/index.html")

@@ -828,15 +828,22 @@ WSL2 runs on a private virtual network (`172.x.x.x`) that is not directly routab
 $wslIp = (wsl -- ip -4 addr show eth0 | Select-String "inet ") -replace '.*inet (\d+\.\d+\.\d+\.\d+).*','$1'
 Write-Host "WSL2 IP: $wslIp"
 
-# 2. Add port forwarding for each port
+# 2. Add port forwarding for each port (both 0.0.0.0 and specific LAN IP — both are needed)
 netsh interface portproxy add v4tov4 listenport=9000  listenaddress=0.0.0.0 connectport=9000  connectaddress=$wslIp
 netsh interface portproxy add v4tov4 listenport=8765  listenaddress=0.0.0.0 connectport=8765  connectaddress=$wslIp
 netsh interface portproxy add v4tov4 listenport=8766  listenaddress=0.0.0.0 connectport=8766  connectaddress=$wslIp
+$lanIp = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like "192.168.*" } | Select-Object -First 1).IPAddress
+netsh interface portproxy add v4tov4 listenport=9000  listenaddress=$lanIp connectport=9000  connectaddress=$wslIp
+netsh interface portproxy add v4tov4 listenport=8765  listenaddress=$lanIp connectport=8765  connectaddress=$wslIp
+netsh interface portproxy add v4tov4 listenport=8766  listenaddress=$lanIp connectport=8766  connectaddress=$wslIp
 
 # 3. Allow inbound through Windows Firewall (first time only)
 New-NetFirewallRule -DisplayName "MCP Platform 9000" -Direction Inbound -Protocol TCP -LocalPort 9000 -Action Allow
 New-NetFirewallRule -DisplayName "MCP Platform 8765" -Direction Inbound -Protocol TCP -LocalPort 8765 -Action Allow
 New-NetFirewallRule -DisplayName "MCP Platform 8766" -Direction Inbound -Protocol TCP -LocalPort 8766 -Action Allow
+
+# 4. Allow inbound through WSL2 firewall (first time only — run inside WSL2)
+# sudo ufw allow 9000 && sudo ufw allow 8765 && sudo ufw allow 8766
 ```
 
 Access from LAN devices using your **Windows** LAN IP (e.g. `192.168.0.x`), not the WSL2 IP:
